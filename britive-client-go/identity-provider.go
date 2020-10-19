@@ -1,0 +1,60 @@
+package britive
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+// GetIdentityProviders - Returns all identity providers
+func (c *Client) GetIdentityProviders() (*[]IdentityProvider, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/identity-providers", c.HostURL), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	identityProviders := make([]IdentityProvider, 0)
+	err = json.Unmarshal(body, &identityProviders)
+	if err != nil {
+		return nil, err
+	}
+
+	return &identityProviders, nil
+}
+
+// GetIdentityProvider - Returns all identity providers
+func (c *Client) GetIdentityProvider(identityProviderID string) (*IdentityProvider, error) {
+	resourceURL := fmt.Sprintf("%s/identity-providers/%s", c.HostURL, identityProviderID)
+	return c.getIdentityProvider(resourceURL)
+}
+
+// GetIdentityProviderByName - Returns all identity providers
+func (c *Client) GetIdentityProviderByName(name string) (*IdentityProvider, error) {
+	resourceURL := fmt.Sprintf("%s/identity-providers?metadata=false&name=%s", c.HostURL, name)
+	return c.getIdentityProvider(resourceURL)
+}
+
+func (c *Client) getIdentityProvider(resourceURL string) (*IdentityProvider, error) {
+	req, err := http.NewRequest("GET", resourceURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	identityProvider := IdentityProvider{}
+	err = json.Unmarshal(body, &identityProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	return &identityProvider, nil
+}
