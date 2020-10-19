@@ -207,9 +207,6 @@ func flattenTagIdentityProviders(tagIdentityProviders *[]britive.UserTagIdentity
 			utip := make(map[string]interface{})
 			ip := make(map[string]interface{})
 			ip["id"] = tagIdentityProvider.IdentityProvider.ID
-			ip["name"] = tagIdentityProvider.IdentityProvider.Name
-			ip["description"] = tagIdentityProvider.IdentityProvider.Description
-			ip["type"] = tagIdentityProvider.IdentityProvider.Type
 			utip["identity_provider"] = []interface{}{ip}
 
 			utips[i] = utip
