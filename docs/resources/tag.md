@@ -1,14 +1,12 @@
----
-subcategory: "Tag"
-layout: "Britive"
-page_title: "Britive: britive_tag"
-description: |-
-  Creates a Britive Tag.
----
+| subcategory | layout    | page_title             | description                             |
+| ----------- | --------- | ---------------------- | --------------------------------------- |
+| Tag         |  Britive  | Britive: britive_tag   | The Britive Tag creates a new user tag. |
 
 # britive\_tag
 
-Manages Britive Tag.
+Creates a new user tag.
+
+**Note:** A user tag represents a group of users in the Britive system.
 
 ## Example Usage
 
@@ -32,14 +30,27 @@ resource "britive_tag" "new" {
 
 The following arguments are supported:
 
-* `name` - (Required) The name of tag.
-* `description` - (Optional) A description of the tag.
-* `status` - (Required) The status of the tag.
-* `user_tag_identity_providers` - (Required) The list of identity providers associated with the tag. Structure is documented below.
+* `name` - (Required): The name of tag.
+
+  For example: `My Tag`
+
+* `description` - (Optional): A description of the tag.
+
+  For example: `My Tag Description`
+
+* `status` - (Required): The status of the tag.
+
+  For example: `Active`
+
+* `user_tag_identity_providers` - (Required): The list of identity providers associated with the tag. 
+
+  The format is documented below.
 
 ### `user_tag_identity_providers` block supports
 
-* `identity_provider` - An identity provider. Structure is documented below.
+* `identity_provider` - An identity provider. 
+
+  The format is documented below.
 
 ### `identity_provider` block supports
 
@@ -50,8 +61,13 @@ The following arguments are supported:
 In addition to the above arguments, the following attributes are exported.
 
 * `id` - An identifier for the resource.
-* `external` - Boolean - If the tag is external or not.
+* `external` - This is a boolean attribute that indicates whether the tag is external or not.
 * `user_count` - The number of users associated with the tag.
 
+## Import
 
+Tag can be imported using TagID with the following command
 
+```
+terraform import britive_tag.new user-tags/{{TagID}}
+```

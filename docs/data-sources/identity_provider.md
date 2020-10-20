@@ -1,20 +1,16 @@
----
-subcategory: "Identity Provider"
-layout: "Britive"
-page_title: "Britive: britive_identity_provider"
-description: |-
-  Get information about identity provider.
----
+| Subcategory         | layout    | page_title                           | description                                                  |
+| ------------------- | --------- | ------------------------------------ | ------------------------------------------------------------ |
+| Identity Provider   |  Britive  | Britive: britive_identity_provider   | The Britive Identity Provider retrieves information about the identity provider. |
 
 # britive\_identity\_provider
 
-Get information about identity provider.
+Gets information about the identity provider.
 
 ## Example Usage
 
 ```hcl
-data "britive_identity_provider" "britive" {
-    name = "Britive"
+data "britive_identity_provider" "idp" {
+    name = "My Identity Provider"
 }
 resource "britive_tag" "new" {
     # ...
@@ -29,13 +25,15 @@ resource "britive_tag" "new" {
 
 ## Argument Reference
 
-The following arguments are supported:
+The following argument is supported:
 
-* `name` - (Required) The name of the identity provider.
+* `name` - (Required): The name of the identity provider.
+
+  For example, `Britive`
 
 ## Attributes Reference
 
-In addition to all arguments above, the following attributes are exported:
+In addition to the above arguments , the following attributes are exported:
 
-* `id` - an identifier for the data source
+* `id` - an identifier for the data source. 
 

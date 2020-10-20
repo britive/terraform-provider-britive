@@ -1,14 +1,12 @@
----
-subcategory: "Tag Member"
-layout: "Britive"
-page_title: "Britive: britive_tag_member"
-description: |-
-  Add member to the Britive Tag.
----
+| subcategory  | layout    | page_title                    | description                                            |
+| ------------ | --------- | ----------------------------- | ------------------------------------------------------ |
+| Tag Member   | Britive   | Britive: britive_tag_member   | The Britive Tag Member adds a user to the Britive tag. |
 
 # britive\_tag\_member
 
-Manage Britive Tag Member.
+Adds a user to the Britive tag.
+
+**Note:** A user tag represents a group of users in the Britive system.
 
 ## Example Usage
 
@@ -27,12 +25,16 @@ resource "britive_tag_member" "new" {
 
 The following argument is supported:
 
-* `tag_id` - (Required) The identifier of the tag.
+* `tag_id` - (Required): The identifier of the tag.
 
-* `username` - The username of the member to add to tag.
+  For example: `britive_tag.new.id`
+
+* `username` - The username of the user who is added to the tag.
+
+  For example: `NewUserOne`
 
 ## Attribute Reference
 
 In addition to the above argument, the following attribute is exported.
 
-* `id` - an identifier for the resource with format `user-tag/{{tagID}}/users/{{userID}}`
+* `id` - An identifier of the resource with format `user-tag/{{tagID}}/users/{{userID}}`
