@@ -44,10 +44,6 @@ func resourceApplicationReadByName(ctx context.Context, d *schema.ResourceData, 
 	var application *britive.Application
 	for _, app := range *applications {
 		if strings.ToLower(app.CatalogAppDisplayName) == strings.ToLower(applicationName) {
-			diags = append(diags, diag.Diagnostic{
-				Severity: diag.Warning,
-				Summary:  fmt.Sprintf("App %v", app),
-			})
 			application = &app
 			break
 		}
