@@ -31,6 +31,7 @@ func Provider() *schema.Provider {
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider": dataIdentityProvider(),
+			"britive_application":       dataApplication(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

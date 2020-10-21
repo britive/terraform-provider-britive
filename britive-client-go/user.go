@@ -9,7 +9,7 @@ import (
 
 // GetUsers - Returns all identity providers
 func (c *Client) GetUsers() (*[]User, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/identity-providers", c.HostURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users", c.HostURL), nil)
 	if err != nil {
 		return nil, err
 	}

@@ -24,12 +24,14 @@ func resourceProfile() *schema.Resource {
 			"app_container_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Required:    true,
+				ForceNew:    true,
 				Description: "The application id to associate the profile",
 			},
 			"profile_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Computed:    true,
 				Optional:    true,
+				ForceNew:    true,
 				Description: "The id of the profile",
 			},
 			"name": &schema.Schema{
@@ -189,7 +191,7 @@ func generateUniqueID(appContainerID string, profileID string) string {
 func parseUniqueID(ID string) (appContainerID string, profileID string, err error) {
 	idParts := strings.Split(ID, "/")
 	if len(idParts) < 4 {
-		return "", "", fmt.Errorf("Invalid user tag member reference, please check the state for %s", ID)
+		return "", "", fmt.Errorf("Invalid application profile ID reference, please check the state for %s", ID)
 	}
 	appContainerID = idParts[1]
 	profileID = idParts[3]

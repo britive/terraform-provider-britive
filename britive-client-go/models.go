@@ -69,3 +69,9 @@ type Scope struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
 }
+
+//Application - godoc
+type Application struct {
+	AppContainerID        string `json:"appContainerId"`
+	CatalogAppDisplayName string `json:"catalogAppDisplayName,omitempty"`
+}
