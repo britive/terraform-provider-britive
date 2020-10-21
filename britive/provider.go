@@ -25,9 +25,10 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"britive_tag":        resourceTag(),
-			"britive_tag_member": resourceTagMember(),
-			"britive_profile":    resourceProfile(),
+			"britive_tag":                resourceTag(),
+			"britive_tag_member":         resourceTagMember(),
+			"britive_profile":            resourceProfile(),
+			"britive_profile_permission": resourceProfilePermission(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider": dataIdentityProvider(),

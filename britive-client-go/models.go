@@ -75,3 +75,19 @@ type Application struct {
 	AppContainerID        string `json:"appContainerId"`
 	CatalogAppDisplayName string `json:"catalogAppDisplayName,omitempty"`
 }
+
+//ProfilePermission - godoc
+type ProfilePermission struct {
+	ProfileID   string      `json:"papId,omitempty"`
+	Name        string      `json:"name"`
+	Type        string      `json:"type"`
+	Description interface{} `json:"description,omitempty"`
+	CheckStatus string      `json:"checkStatus,omitempty"`
+	Message     string      `json:"message,omitempty"`
+}
+
+//ProfilePermissionRequest - godoc
+type ProfilePermissionRequest struct {
+	Operation  string            `json:"op"`
+	Permission ProfilePermission `json:"permission"`
+}
