@@ -2,7 +2,6 @@ package britive
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 
@@ -14,7 +13,6 @@ func parseImportID(idRegexes []string, d *schema.ResourceData) error {
 		re, err := regexp.Compile(idFormat)
 
 		if err != nil {
-			log.Printf("[DEBUG] Could not compile %s.", idFormat)
 			return fmt.Errorf("Import is not supported. Invalid regex formats. %s", err)
 		}
 

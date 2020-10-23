@@ -188,7 +188,7 @@ func resourceTagDelete(ctx context.Context, d *schema.ResourceData, m interface{
 }
 
 func resourceTagStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	if err := parseImportID([]string{"user-tags/(?P<id>[^/]+)"}, d); err != nil {
+	if err := parseImportID([]string{"user-tags/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 	err := getAndSetTagToState(d, m)
