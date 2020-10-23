@@ -53,7 +53,6 @@ type AdminRole struct {
 type Profile struct {
 	ProfileID                     string      `json:"papId,omitempty"`
 	AppContainerID                string      `json:"appContainerId"`
-	Scopes                        []Scope     `json:"scope"`
 	Name                          string      `json:"name"`
 	Description                   string      `json:"description"`
 	Status                        string      `json:"status,omitempty"`

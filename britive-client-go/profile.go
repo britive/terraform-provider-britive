@@ -59,7 +59,6 @@ func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile
 	if err != nil {
 		return nil, err
 	}
-
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps", c.HostURL, appContainerID), strings.NewReader(string(utb)))
 	if err != nil {
 		return nil, err

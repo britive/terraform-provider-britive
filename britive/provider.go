@@ -29,6 +29,7 @@ func Provider() *schema.Provider {
 			"britive_tag_member":         resourceTagMember(),
 			"britive_profile":            resourceProfile(),
 			"britive_profile_permission": resourceProfilePermission(),
+			"britive_profile_tag":        resourceProfileTag(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider": dataIdentityProvider(),
