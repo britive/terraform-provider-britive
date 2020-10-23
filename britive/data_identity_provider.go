@@ -11,7 +11,7 @@ import (
 
 func dataIdentityProvider() *schema.Resource {
 	return &schema.Resource{
-		ReadContext: resourceIdentityProviderReadByName,
+		ReadContext: resourceIdentityProviderRead,
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
 				Type:     schema.TypeString,
@@ -20,16 +20,18 @@ func dataIdentityProvider() *schema.Resource {
 			"description": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
+				Computed: true,
 			},
 			"type": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
+				Computed: true,
 			},
 		},
 	}
 }
 
-func resourceIdentityProviderReadByName(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func resourceIdentityProviderRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics

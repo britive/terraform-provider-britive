@@ -55,11 +55,8 @@ func (c *Client) CreateTagMember(tagID string, userID string) error {
 	}
 
 	_, err = c.doRequest(req)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 // DeleteTagMember - Delete member from the tag
@@ -70,9 +67,6 @@ func (c *Client) DeleteTagMember(tagID string, userID string) error {
 	}
 
 	_, err = c.doRequest(req)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }

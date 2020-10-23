@@ -50,33 +50,40 @@ func resourceTagMemberCreate(ctx context.Context, d *schema.ResourceData, m inte
 		return diag.FromErr(err)
 	}
 
-	d.SetId(fmt.Sprintf("user-tags/%s/users/%s", tagID, user.UserID))
+	d.SetId(generateTagMemberUniqueID(tagID, user.UserID))
 
 	return diags
+}
+
+func generateTagMemberUniqueID(tagID string, userID string) string {
+	return fmt.Sprintf("user-tags/%s/users/%s", tagID, userID)
+}
+
+func parseTagMemberUniqueID(ID string) (tagID string, userID string, err error) {
+	tagMemberParts := strings.Split(ID, "/")
+	if len(tagMemberParts) < 4 {
+		err = fmt.Errorf("Invalid user tag member reference, please check the state for %s", ID)
+		return
+	}
+	tagID = tagMemberParts[1]
+	userID = tagMemberParts[3]
+	return
 }
 
 func resourceTagMemberRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
-
-	tagMemberID := d.Id()
-	tagMemberParts := strings.Split(tagMemberID, "/")
-	if len(tagMemberParts) < 4 {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("Invalid user tag member reference, please check the state for %s", tagMemberID),
-		})
-		return diags
-	}
-	tagID := tagMemberParts[1]
-	userID := tagMemberParts[3]
-
-	_, err := c.GetTagMember(tagID, userID)
+	tagID, userID, err := parseTagMemberUniqueID(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	d.SetId(tagMemberID)
+
+	_, err = c.GetTagMember(tagID, userID)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.SetId(generateTagMemberUniqueID(tagID, userID))
 
 	return diags
 }
@@ -86,19 +93,12 @@ func resourceTagMemberDelete(ctx context.Context, d *schema.ResourceData, m inte
 
 	var diags diag.Diagnostics
 
-	tagMemberID := d.Id()
-	tagMemberParts := strings.Split(tagMemberID, "/")
-	if len(tagMemberParts) < 4 {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("Invalid user tag member reference, please clear the state for %s", tagMemberID),
-		})
-		return diags
+	tagID, userID, err := parseTagMemberUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
 	}
-	tagID := tagMemberParts[1]
-	userID := tagMemberParts[3]
 
-	err := c.DeleteTagMember(tagID, userID)
+	err = c.DeleteTagMember(tagID, userID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
