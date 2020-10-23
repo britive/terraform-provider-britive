@@ -58,47 +58,57 @@ func resourceProfilePermissionCreate(ctx context.Context, d *schema.ResourceData
 
 	permission := pd.(map[string]interface{})
 
-	profilePermission := britive.ProfilePermission{
-		Name: permission["name"].(string),
-		Type: permission["type"].(string),
-	}
 	profilePermissionRequest := britive.ProfilePermissionRequest{
-		Operation:  "add",
-		Permission: profilePermission,
+		Operation: "add",
+		Permission: britive.ProfilePermission{
+			ProfileID: profileID,
+			Name:      permission["name"].(string),
+			Type:      permission["type"].(string),
+		},
 	}
 
-	pp, err := c.PerformProfilePermissionRequest(profileID, profilePermissionRequest)
+	err := c.PerformProfilePermissionRequest(profileID, profilePermissionRequest)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	d.SetId(fmt.Sprintf("paps/%s/permissions/%s/type/%s", pp.ProfileID, pp.Name, pp.Type))
+	d.SetId(generateProfilePermissionUniqueID(profilePermissionRequest.Permission))
 
 	return diags
+}
+
+func generateProfilePermissionUniqueID(profilePermission britive.ProfilePermission) string {
+	return fmt.Sprintf("paps/%s/permissions/%s/type/%s", profilePermission.ProfileID, profilePermission.Name, profilePermission.Type)
+}
+
+func parsePerfilePermissionUniqueID(ID string) (*britive.ProfilePermission, error) {
+	profileMemberParts := strings.Split(ID, "/")
+
+	if len(profileMemberParts) < 6 {
+		return nil, fmt.Errorf("Invalid user profile member reference, please check the state for %s", ID)
+
+	}
+	profilePermission := &britive.ProfilePermission{
+		ProfileID: profileMemberParts[1],
+		Name:      profileMemberParts[3],
+		Type:      profileMemberParts[5],
+	}
+	return profilePermission, nil
 }
 
 func resourceProfilePermissionRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
-
-	profileMemberID := d.Id()
-	profileMemberParts := strings.Split(profileMemberID, "/")
-	if len(profileMemberParts) < 6 {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("Invalid user profile member reference, please check the state for %s", profileMemberID),
-		})
-		return diags
-	}
-	pp, err := c.GetProfilePermission(profileMemberParts[1], britive.ProfilePermission{
-		Name: profileMemberParts[3],
-		Type: profileMemberParts[5],
-	})
+	profilePermission, err := parsePerfilePermissionUniqueID(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	d.SetId(fmt.Sprintf("paps/%s/permissions/%s/type/%s", pp.ProfileID, pp.Name, pp.Type))
+	pp, err := c.GetProfilePermission(profilePermission.ProfileID, *profilePermission)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.SetId(generateProfilePermissionUniqueID(*pp))
 
 	return diags
 }
@@ -107,26 +117,16 @@ func resourceProfilePermissionDelete(ctx context.Context, d *schema.ResourceData
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
-
-	profileMemberID := d.Id()
-	profileMemberParts := strings.Split(profileMemberID, "/")
-	if len(profileMemberParts) < 6 {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("Invalid user profile member reference, please check the state for %s", profileMemberID),
-		})
-		return diags
-	}
-	profilePermission := britive.ProfilePermission{
-		Name: profileMemberParts[3],
-		Type: profileMemberParts[5],
+	profilePermission, err := parsePerfilePermissionUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
 	}
 	profilePermissionRequest := britive.ProfilePermissionRequest{
 		Operation:  "remove",
-		Permission: profilePermission,
+		Permission: *profilePermission,
 	}
 
-	_, err := c.PerformProfilePermissionRequest(profileMemberParts[1], profilePermissionRequest)
+	err = c.PerformProfilePermissionRequest(profilePermission.ProfileID, profilePermissionRequest)
 	if err != nil {
 		return diag.FromErr(err)
 	}

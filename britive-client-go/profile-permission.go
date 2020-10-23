@@ -30,6 +30,7 @@ func (c *Client) GetProfilePermissions(profileID string) (*[]ProfilePermission, 
 
 // GetProfilePermission - Returns a specifc user from user profile
 func (c *Client) GetProfilePermission(profileID string, profilePermission ProfilePermission) (*ProfilePermission, error) {
+	//TODO: Warning Recursion - Get by Name
 	profilePermissions, err := c.GetProfilePermissions(profileID)
 	if err != nil {
 		return nil, err
@@ -46,26 +47,21 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 }
 
 // PerformProfilePermissionRequest - Add/delete permission from profile
-func (c *Client) PerformProfilePermissionRequest(profileID string, ppr ProfilePermissionRequest) (*ProfilePermission, error) {
+func (c *Client) PerformProfilePermissionRequest(profileID string, ppr ProfilePermissionRequest) error {
 	pprb, err := json.Marshal(ppr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/permissions", c.HostURL, profileID), strings.NewReader(string(pprb)))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	body, err := c.doRequest(req)
+	_, err = c.doRequest(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var profilePermission ProfilePermission
-	err = json.Unmarshal(body, &profilePermission)
-	if err != nil {
-		return nil, err
-	}
-	return &profilePermission, nil
+	return nil
 }

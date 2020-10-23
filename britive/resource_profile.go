@@ -49,25 +49,6 @@ func resourceProfile() *schema.Resource {
 				Required:    true,
 				Description: "The status of the profile",
 			},
-			"scopes": &schema.Schema{
-				Type:        schema.TypeList,
-				Required:    true,
-				Description: "Scopes for the profile",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"type": &schema.Schema{
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "The type of scope",
-						},
-						"value": &schema.Schema{
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "The value of scope",
-						},
-					},
-				},
-			},
 			"expiration_duration": &schema.Schema{
 				Type:         schema.TypeString,
 				Required:     true,
@@ -117,17 +98,6 @@ func mapResourceDataToProfile(d *schema.ResourceData, profile *britive.Profile, 
 	if !isUpdate {
 		profile.Status = d.Get("status").(string)
 	}
-	scopes := d.Get("scopes").([]interface{})
-
-	for _, scope := range scopes {
-		s := scope.(map[string]interface{})
-
-		profile.Scopes = append(profile.Scopes, britive.Scope{
-			Type:  s["type"].(string),
-			Value: s["value"].(string),
-		})
-	}
-
 	expirationDuration, err := time.ParseDuration(d.Get("expiration_duration").(string))
 	if err != nil {
 		return err
@@ -263,17 +233,12 @@ func getAndSetProfileToState(d *schema.ResourceData, m interface{}) error {
 			return err
 		}
 	}
-	scopes := flattenProfileScopes(&profile.Scopes)
-	if err := d.Set("scopes", scopes); err != nil {
-		return err
-	}
 	return nil
 }
 
 func resourceProfileUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	if d.HasChange("name") ||
 		d.HasChange("description") ||
-		d.HasChange("scopes") ||
 		d.HasChange("expiration_duration") ||
 		d.HasChange("extendable") ||
 		d.HasChange("notification_prior_to_expiration") ||
@@ -326,20 +291,4 @@ func resourceProfileStateImporter(d *schema.ResourceData, m interface{}) ([]*sch
 	}
 
 	return []*schema.ResourceData{d}, nil
-}
-
-func flattenProfileScopes(scopes *[]britive.Scope) []interface{} {
-	if scopes != nil {
-		profileScopes := make([]interface{}, len(*scopes), len(*scopes))
-
-		for i, scope := range *scopes {
-			profileScope := make(map[string]interface{})
-			profileScope["type"] = scope.Type
-			profileScope["value"] = scope.Value
-
-			profileScopes[i] = profileScope
-		}
-		return profileScopes
-	}
-	return make([]interface{}, 0)
 }

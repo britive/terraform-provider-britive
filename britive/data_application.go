@@ -36,7 +36,7 @@ func resourceApplicationReadByName(ctx context.Context, d *schema.ResourceData, 
 		})
 		return diags
 	}
-
+	//TODO: Warning Recursion - Get by Name
 	applications, err := c.GetApplications()
 	if err != nil {
 		return diag.FromErr(err)

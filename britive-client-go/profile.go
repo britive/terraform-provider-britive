@@ -40,7 +40,7 @@ func (c *Client) GetProfile(appContainerID string, profileID string) (*Profile, 
 	if err != nil {
 		return nil, err
 	}
-	//TODO: Once the profile to fix by return single profile then update requires
+	//TODO: Warning Recursion - Get single instead of array
 	profiles := []Profile{}
 	err = json.Unmarshal(body, &profiles)
 	if err != nil {
