@@ -51,20 +51,21 @@ type AdminRole struct {
 
 //Profile - godoc
 type Profile struct {
-	ProfileID                     string      `json:"papId,omitempty"`
-	AppContainerID                string      `json:"appContainerId"`
-	Name                          string      `json:"name"`
-	Description                   string      `json:"description"`
-	Status                        string      `json:"status,omitempty"`
-	ExpirationDuration            int64       `json:"expirationDuration,omitempty"`
-	Extendable                    bool        `json:"extendable"`
-	NotificationPriorToExpiration *int64      `json:"notificationPriorToExpiration,omitempty"`
-	ExtensionDuration             *int64      `json:"extensionDuration,omitempty"`
-	ExtensionLimit                interface{} `json:"extensionLimit,omitempty"`
+	ProfileID                     string        `json:"papId,omitempty"`
+	AppContainerID                string        `json:"appContainerId"`
+	Name                          string        `json:"name"`
+	Description                   string        `json:"description"`
+	Status                        string        `json:"status,omitempty"`
+	Associations                  []Association `json:"scope,omitempty"`
+	ExpirationDuration            int64         `json:"expirationDuration,omitempty"`
+	Extendable                    bool          `json:"extendable"`
+	NotificationPriorToExpiration *int64        `json:"notificationPriorToExpiration,omitempty"`
+	ExtensionDuration             *int64        `json:"extensionDuration,omitempty"`
+	ExtensionLimit                interface{}   `json:"extensionLimit,omitempty"`
 }
 
-//Scope - godoc
-type Scope struct {
+//Association - godoc
+type Association struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
 }

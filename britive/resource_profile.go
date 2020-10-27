@@ -97,6 +97,7 @@ func mapResourceDataToProfile(d *schema.ResourceData, profile *britive.Profile, 
 	profile.Description = d.Get("description").(string)
 	if !isUpdate {
 		profile.Status = d.Get("status").(string)
+		//britive_tag_memberprofile.Associations = []britive.Association{britive.Association{Type: "", Value: ""}}
 	}
 	expirationDuration, err := time.ParseDuration(d.Get("expiration_duration").(string))
 	if err != nil {
