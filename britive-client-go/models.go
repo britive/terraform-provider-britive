@@ -112,3 +112,9 @@ type ProfileAssociation struct {
 	Value                string      `json:"value"`
 	ProfileID            string      `json:"papId,omitempty"`
 }
+
+//TimePeriod - godoc
+type TimePeriod struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}

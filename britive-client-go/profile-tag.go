@@ -48,8 +48,17 @@ func (c *Client) GetProfileTag(profileID string, tagID string) (*Tag, error) {
 }
 
 // CreateProfileTag - Add tag to profile
-func (c *Client) CreateProfileTag(profileID string, tagID string) error {
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/user-tags/%s", c.HostURL, profileID, tagID), nil)
+func (c *Client) CreateProfileTag(profileID string, tagID string, timePeriod *TimePeriod) (err error) {
+	var utsb []byte
+	if timePeriod == nil {
+		utsb = []byte("{}")
+	} else {
+		utsb, err = json.Marshal(timePeriod)
+		if err != nil {
+			return err
+		}
+	}
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/user-tags/%s", c.HostURL, profileID, tagID), strings.NewReader(string(utsb)))
 	if err != nil {
 		return err
 	}

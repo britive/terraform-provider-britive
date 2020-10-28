@@ -8,6 +8,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func resourceProfileTag() *schema.Resource {
@@ -28,6 +29,29 @@ func resourceProfileTag() *schema.Resource {
 				ForceNew:    true,
 				Description: "The tag associate wit the profile",
 			},
+			"time_period": &schema.Schema{
+				Type:        schema.TypeList,
+				MaxItems:    1,
+				Optional:    true,
+				ForceNew:    true,
+				Description: "The time period for the associated tag",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"start": &schema.Schema{
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.IsRFC3339Time,
+							Description:  "The start of the time period for the associated tag",
+						},
+						"end": &schema.Schema{
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.IsRFC3339Time,
+							Description:  "The end of the time period for the associated tag",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -40,12 +64,22 @@ func resourceProfileTagCreate(ctx context.Context, d *schema.ResourceData, m int
 	profileID := d.Get("profile_id").(string)
 	tagName := d.Get("tag").(string)
 
+	tps := d.Get("time_period").([]interface{})
+	var timePeriod *britive.TimePeriod
+	if len(tps) > 0 {
+		tp := tps[0].(map[string]interface{})
+		timePeriod = &britive.TimePeriod{
+			Start: tp["start"].(string),
+			End:   tp["end"].(string),
+		}
+	}
+
 	tag, err := c.GetTagByName(tagName)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	err = c.CreateProfileTag(profileID, tag.ID)
+	err = c.CreateProfileTag(profileID, tag.ID, timePeriod)
 	if err != nil {
 		return diag.FromErr(err)
 	}
