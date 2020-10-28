@@ -49,6 +49,25 @@ func resourceProfile() *schema.Resource {
 				Required:    true,
 				Description: "The status of the profile",
 			},
+			"associations": &schema.Schema{
+				Type:        schema.TypeList,
+				Optional:    true,
+				Description: "Associations for the profile",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"type": &schema.Schema{
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "The type of association",
+						},
+						"value": &schema.Schema{
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "The value of association",
+						},
+					},
+				},
+			},
 			"expiration_duration": &schema.Schema{
 				Type:         schema.TypeString,
 				Required:     true,
@@ -91,13 +110,66 @@ func durationSchemaValidateFunc(val interface{}, key string) (warns []string, er
 	return
 }
 
-func mapResourceDataToProfile(d *schema.ResourceData, profile *britive.Profile, isUpdate bool) error {
+func appendAssociations(associations []britive.ProfileAssociation, associationType string, associationID string) []britive.ProfileAssociation {
+	associations = append(associations, britive.ProfileAssociation{
+		Type:  associationType,
+		Value: associationID,
+	})
+	return associations
+}
+
+func saveProfileAssociations(appContainerID string, profileID string, d *schema.ResourceData, m interface{}) error {
+	c := m.(*britive.Client)
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
+	if err != nil {
+		return err
+	}
+	if appRootEnvironmentGroup == nil {
+		return nil
+	}
+	associations := make([]britive.ProfileAssociation, 0)
+	as := d.Get("associations").([]interface{})
+	if len(as) == 0 {
+		for _, daeg := range appRootEnvironmentGroup.EnvironmentGroups {
+			if daeg.ParentID == "" {
+				associations = appendAssociations(associations, "EnvironmentGroup", daeg.ID)
+				break
+			}
+		}
+	} else {
+		for _, a := range as {
+			s := a.(map[string]interface{})
+			associationType := s["type"].(string)
+			associationName := s["value"].(string)
+			var rootAssociations []britive.Association
+			if associationType == "EnvironmentGroup" {
+				rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
+			} else {
+				rootAssociations = appRootEnvironmentGroup.Environments
+			}
+			for _, aeg := range rootAssociations {
+				if aeg.Name == associationName {
+					associations = appendAssociations(associations, associationType, aeg.ID)
+					break
+				}
+			}
+		}
+	}
+	if len(associations) > 0 {
+		err = c.SaveProfileAssociations(profileID, associations)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mapResourceDataToProfile(d *schema.ResourceData, m interface{}, profile *britive.Profile, isUpdate bool) error {
 	profile.AppContainerID = d.Get("app_container_id").(string)
 	profile.Name = d.Get("name").(string)
 	profile.Description = d.Get("description").(string)
 	if !isUpdate {
 		profile.Status = d.Get("status").(string)
-		//britive_tag_memberprofile.Associations = []britive.Association{britive.Association{Type: "", Value: ""}}
 	}
 	expirationDuration, err := time.ParseDuration(d.Get("expiration_duration").(string))
 	if err != nil {
@@ -141,7 +213,7 @@ func resourceProfileCreate(ctx context.Context, d *schema.ResourceData, m interf
 
 	profile := britive.Profile{}
 
-	mapResourceDataToProfile(d, &profile, false)
+	mapResourceDataToProfile(d, m, &profile, false)
 
 	p, err := c.CreateProfile(profile.AppContainerID, profile)
 	if err != nil {
@@ -149,6 +221,8 @@ func resourceProfileCreate(ctx context.Context, d *schema.ResourceData, m interf
 	}
 
 	d.SetId(generateUniqueID(p.AppContainerID, p.ProfileID))
+
+	saveProfileAssociations(p.AppContainerID, p.ProfileID, d, m)
 
 	resourceProfileRead(ctx, d, m)
 
@@ -234,12 +308,20 @@ func getAndSetProfileToState(d *schema.ResourceData, m interface{}) error {
 			return err
 		}
 	}
+	associations, err := flattenProfileAssociations(appContainerID, profile.Associations, m)
+	if err != nil {
+		return err
+	}
+	if err := d.Set("associations", associations); err != nil {
+		return err
+	}
 	return nil
 }
 
 func resourceProfileUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	if d.HasChange("name") ||
 		d.HasChange("description") ||
+		d.HasChange("associations") ||
 		d.HasChange("expiration_duration") ||
 		d.HasChange("extendable") ||
 		d.HasChange("notification_prior_to_expiration") ||
@@ -252,11 +334,12 @@ func resourceProfileUpdate(ctx context.Context, d *schema.ResourceData, m interf
 		}
 
 		profile := britive.Profile{}
-		mapResourceDataToProfile(d, &profile, true)
+		mapResourceDataToProfile(d, m, &profile, true)
 		_, err = c.UpdateProfile(appContainerID, profileID, profile)
 		if err != nil {
 			return diag.FromErr(err)
 		}
+		saveProfileAssociations(appContainerID, profileID, d, m)
 		return resourceProfileRead(ctx, d, m)
 	}
 	return nil
@@ -292,4 +375,41 @@ func resourceProfileStateImporter(d *schema.ResourceData, m interface{}) ([]*sch
 	}
 
 	return []*schema.ResourceData{d}, nil
+}
+
+func flattenProfileAssociations(appContainerID string, associations []britive.ProfileAssociation, m interface{}) ([]interface{}, error) {
+	c := m.(*britive.Client)
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(associations) == 0 || appRootEnvironmentGroup == nil {
+		return make([]interface{}, 0), nil
+	}
+	profileAssociations := make([]interface{}, len(associations), len(associations))
+	for i, association := range associations {
+		var rootAssociations []britive.Association
+		if association.Type == "EnvironmentGroup" {
+			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
+		} else {
+			rootAssociations = appRootEnvironmentGroup.Environments
+		}
+		var a *britive.Association
+		for _, aeg := range rootAssociations {
+			if aeg.ID == association.Value {
+				a = &aeg
+				break
+			}
+		}
+		if a == nil {
+			return nil, fmt.Errorf("Unable to get association related to ID %s in root environment", association.Value)
+		}
+		profileAssociation := make(map[string]interface{})
+		profileAssociation["type"] = association.Type
+		profileAssociation["value"] = a.Name
+		profileAssociations[i] = profileAssociation
+	}
+	return profileAssociations, nil
+
 }

@@ -51,23 +51,17 @@ type AdminRole struct {
 
 //Profile - godoc
 type Profile struct {
-	ProfileID                     string        `json:"papId,omitempty"`
-	AppContainerID                string        `json:"appContainerId"`
-	Name                          string        `json:"name"`
-	Description                   string        `json:"description"`
-	Status                        string        `json:"status,omitempty"`
-	Associations                  []Association `json:"scope,omitempty"`
-	ExpirationDuration            int64         `json:"expirationDuration,omitempty"`
-	Extendable                    bool          `json:"extendable"`
-	NotificationPriorToExpiration *int64        `json:"notificationPriorToExpiration,omitempty"`
-	ExtensionDuration             *int64        `json:"extensionDuration,omitempty"`
-	ExtensionLimit                interface{}   `json:"extensionLimit,omitempty"`
-}
-
-//Association - godoc
-type Association struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
+	ProfileID                     string               `json:"papId,omitempty"`
+	AppContainerID                string               `json:"appContainerId"`
+	Name                          string               `json:"name"`
+	Description                   string               `json:"description"`
+	Status                        string               `json:"status,omitempty"`
+	Associations                  []ProfileAssociation `json:"scope,omitempty"`
+	ExpirationDuration            int64                `json:"expirationDuration,omitempty"`
+	Extendable                    bool                 `json:"extendable"`
+	NotificationPriorToExpiration *int64               `json:"notificationPriorToExpiration,omitempty"`
+	ExtensionDuration             *int64               `json:"extensionDuration,omitempty"`
+	ExtensionLimit                interface{}          `json:"extensionLimit,omitempty"`
 }
 
 //Application - godoc
@@ -90,4 +84,31 @@ type ProfilePermission struct {
 type ProfilePermissionRequest struct {
 	Operation  string            `json:"op"`
 	Permission ProfilePermission `json:"permission"`
+}
+
+//ApplicationRootEnvironmentGroup - godoc
+type ApplicationRootEnvironmentGroup struct {
+	EnvironmentGroups []Association `json:"environmentGroups,omitempty"`
+	Environments      []Association `json:"environments,omitempty"`
+}
+
+//Association - godoc
+type Association struct {
+	ID               string      `json:"id,omitempty"`
+	Name             string      `json:"name"`
+	Description      interface{} `json:"description,omitempty"`
+	ParentID         string      `json:"parentId,omitempty"`
+	ParentGroupID    string      `json:"parentGroupId,omitempty"`
+	InternalParentID string      `json:"internalParentId,omitempty"`
+	Type             string      `json:"type,omitempty"`
+	Status           string      `json:"status,omitempty"`
+}
+
+//ProfileAssociation - godoc
+type ProfileAssociation struct {
+	ProfileAssociationID interface{} `json:"papScopeId,omitempty"`
+	Type                 string      `json:"type"`
+	AppContainerID       interface{} `json:"appContainerId,omitempty"`
+	Value                string      `json:"value"`
+	ProfileID            string      `json:"papId,omitempty"`
 }
