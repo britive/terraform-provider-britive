@@ -10,6 +10,10 @@ import (
 
 //Provider - godoc
 func Provider() *schema.Provider {
+	validation := NewValidation()
+	importHelper := NewImportHelper()
+	profile := NewResourceProfile(validation, importHelper)
+	profileTag := NewResourceProfileTag()
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
 			"host": &schema.Schema{
@@ -27,9 +31,9 @@ func Provider() *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource{
 			"britive_tag":                resourceTag(),
 			"britive_tag_member":         resourceTagMember(),
-			"britive_profile":            resourceProfile(),
+			"britive_profile":            profile.Resource,
 			"britive_profile_permission": resourceProfilePermission(),
-			"britive_profile_tag":        resourceProfileTag(),
+			"britive_profile_tag":        profileTag.Resource,
 			"britive_profile_identity":   resourceProfileIdentity(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{

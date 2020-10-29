@@ -1,5 +1,7 @@
 package britive
 
+import "time"
+
 //Tag - godoc
 type Tag struct {
 	ID                       string                    `json:"userTagId,omitempty"`
@@ -115,6 +117,19 @@ type ProfileAssociation struct {
 
 //TimePeriod - godoc
 type TimePeriod struct {
-	Start string `json:"start"`
-	End   string `json:"end"`
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+}
+
+//ProfileTag - godoc
+type ProfileTag struct {
+	ProfileID    string      `json:"papId,omitempty"`
+	TagID        string      `json:"userTagId,omitempty"`
+	Name         string      `json:"name,omitempty"`
+	Description  string      `json:"description,omitempty"`
+	Status       string      `json:"status,omitempty"`
+	UserCount    interface{} `json:"userCount,omitempty"`
+	AccessPeriod *TimePeriod `json:"accessPeriod,omitempty"`
+	CheckStatus  string      `json:"checkStatus,omitempty"`
+	Message      string      `json:"message,omitempty"`
 }

@@ -8,7 +8,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func parseImportID(idRegexes []string, d *schema.ResourceData) error {
+//ImportHelper - Helper functions for terraform imports
+type ImportHelper struct {
+}
+
+//NewImportHelper - Initialises new NewImportHelper
+func NewImportHelper() *ImportHelper {
+	return &ImportHelper{}
+}
+
+//ParseImportID - Helper function to parse Import ID
+func (ih *ImportHelper) ParseImportID(idRegexes []string, d *schema.ResourceData) error {
 	for _, idFormat := range idRegexes {
 		re, err := regexp.Compile(idFormat)
 
@@ -44,4 +54,9 @@ func parseImportID(idRegexes []string, d *schema.ResourceData) error {
 		}
 	}
 	return fmt.Errorf("Import id %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
+}
+
+// TODO - Remove the backward compatability code
+func parseImportID(idRegexes []string, d *schema.ResourceData) error {
+	return NewImportHelper().ParseImportID(idRegexes, d)
 }

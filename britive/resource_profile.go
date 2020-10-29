@@ -11,14 +11,28 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func resourceProfile() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: resourceProfileCreate,
-		ReadContext:   resourceProfileRead,
-		UpdateContext: resourceProfileUpdate,
-		DeleteContext: resourceProfileDelete,
+//ResourceProfile - Terraform Resource for Profile
+type ResourceProfile struct {
+	Resource     *schema.Resource
+	helper       *ResourceProfileHelper
+	validation   *Validation
+	importHelper *ImportHelper
+}
+
+//NewResourceProfile - Initialisation of new profile resource
+func NewResourceProfile(validation *Validation, importHelper *ImportHelper) *ResourceProfile {
+	rp := &ResourceProfile{
+		helper:       NewResourceProfileHelper(),
+		validation:   validation,
+		importHelper: importHelper,
+	}
+	rp.Resource = &schema.Resource{
+		CreateContext: rp.resourceCreate,
+		ReadContext:   rp.resourceRead,
+		UpdateContext: rp.resourceUpdate,
+		DeleteContext: rp.resourceDelete,
 		Importer: &schema.ResourceImporter{
-			State: resourceProfileStateImporter,
+			State: rp.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
 			"app_container_id": &schema.Schema{
@@ -71,7 +85,7 @@ func resourceProfile() *schema.Resource {
 			"expiration_duration": &schema.Schema{
 				Type:         schema.TypeString,
 				Required:     true,
-				ValidateFunc: durationSchemaValidateFunc,
+				ValidateFunc: rp.validation.DurationValidateFunc,
 				Description:  "The profile expiration time out as duration",
 			},
 			"extendable": &schema.Schema{
@@ -83,13 +97,13 @@ func resourceProfile() *schema.Resource {
 			"notification_prior_to_expiration": &schema.Schema{
 				Type:         schema.TypeString,
 				Optional:     true,
-				ValidateFunc: durationSchemaValidateFunc,
+				ValidateFunc: rp.validation.DurationValidateFunc,
 				Description:  "The profile expiration notification as duration",
 			},
 			"extension_duration": &schema.Schema{
 				Type:         schema.TypeString,
 				Optional:     true,
-				ValidateFunc: durationSchemaValidateFunc,
+				ValidateFunc: rp.validation.DurationValidateFunc,
 				Description:  "The profile expiration extenstion as duration",
 			},
 			"extension_limit": &schema.Schema{
@@ -99,18 +113,137 @@ func resourceProfile() *schema.Resource {
 			},
 		},
 	}
+	return rp
 }
 
-func durationSchemaValidateFunc(val interface{}, key string) (warns []string, errs []error) {
-	v := val.(string)
-	_, err := time.ParseDuration(v)
+//region Profile Resource Context Operations
+
+func (rp *ResourceProfile) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
+
+	var diags diag.Diagnostics
+
+	profile := britive.Profile{}
+
+	rp.helper.mapResourceToModel(d, m, &profile, false)
+
+	p, err := c.CreateProfile(profile.AppContainerID, profile)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("%s must be duration. [e.g 1s, 10m, 2h, 5d], got: %s", key, v))
+		return diag.FromErr(err)
 	}
+
+	d.SetId(rp.helper.generateUniqueID(p.AppContainerID, p.ProfileID))
+
+	rp.helper.saveProfileAssociations(p.AppContainerID, p.ProfileID, d, m)
+
+	rp.resourceRead(ctx, d, m)
+
+	return diags
+}
+
+func (rp *ResourceProfile) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+
+	var diags diag.Diagnostics
+
+	err := rp.helper.getAndMapModelToResource(d, m)
+
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
+}
+
+func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if d.HasChange("name") ||
+		d.HasChange("description") ||
+		d.HasChange("associations") ||
+		d.HasChange("expiration_duration") ||
+		d.HasChange("extendable") ||
+		d.HasChange("notification_prior_to_expiration") ||
+		d.HasChange("extension_duration") ||
+		d.HasChange("extension_limit") {
+		c := m.(*britive.Client)
+		appContainerID, profileID, err := rp.helper.parseUniqueID(d.Id())
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		profile := britive.Profile{}
+		rp.helper.mapResourceToModel(d, m, &profile, true)
+		_, err = c.UpdateProfile(appContainerID, profileID, profile)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		rp.helper.saveProfileAssociations(appContainerID, profileID, d, m)
+		return rp.resourceRead(ctx, d, m)
+	}
+	return nil
+}
+
+func (rp *ResourceProfile) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
+
+	var diags diag.Diagnostics
+
+	appContainerID, profileID, err := rp.helper.parseUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = c.DeleteProfile(appContainerID, profileID)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.SetId("")
+
+	return diags
+}
+
+func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
+	if err := rp.importHelper.ParseImportID([]string{"apps/(?P<app_container_id>[^/]+)/paps/(?P<profile_id>[^/]+)", "(?P<app_container_id>[^/]+)/(?P<profile_id>[^/]+)"}, d); err != nil {
+		return nil, err
+	}
+	appContainerID := d.Get("app_container_id").(string)
+	profileID := d.Get("profile_id").(string)
+	d.SetId(rp.helper.generateUniqueID(appContainerID, profileID))
+	err := rp.helper.getAndMapModelToResource(d, m)
+	if err != nil {
+		return nil, err
+	}
+
+	return []*schema.ResourceData{d}, nil
+}
+
+//endregion
+
+//ResourceProfileHelper - Resource Profile helper functions
+type ResourceProfileHelper struct {
+	Resource *schema.Resource
+}
+
+//NewResourceProfileHelper - Initialisation of new profile resource helper
+func NewResourceProfileHelper() *ResourceProfileHelper {
+	return &ResourceProfileHelper{}
+}
+
+//region Profile Helper functions
+
+func (rph *ResourceProfileHelper) generateUniqueID(appContainerID string, profileID string) string {
+	return fmt.Sprintf("apps/%s/paps/%s", appContainerID, profileID)
+}
+
+func (rph *ResourceProfileHelper) parseUniqueID(ID string) (appContainerID string, profileID string, err error) {
+	idParts := strings.Split(ID, "/")
+	if len(idParts) < 4 {
+		return "", "", fmt.Errorf("Invalid application profile ID reference, please check the state for %s", ID)
+	}
+	appContainerID = idParts[1]
+	profileID = idParts[3]
 	return
 }
 
-func appendAssociations(associations []britive.ProfileAssociation, associationType string, associationID string) []britive.ProfileAssociation {
+func (rph *ResourceProfileHelper) appendProfileAssociations(associations []britive.ProfileAssociation, associationType string, associationID string) []britive.ProfileAssociation {
 	associations = append(associations, britive.ProfileAssociation{
 		Type:  associationType,
 		Value: associationID,
@@ -118,7 +251,7 @@ func appendAssociations(associations []britive.ProfileAssociation, associationTy
 	return associations
 }
 
-func saveProfileAssociations(appContainerID string, profileID string, d *schema.ResourceData, m interface{}) error {
+func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string, profileID string, d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
 	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
 	if err != nil {
@@ -132,7 +265,7 @@ func saveProfileAssociations(appContainerID string, profileID string, d *schema.
 	if len(as) == 0 {
 		for _, daeg := range appRootEnvironmentGroup.EnvironmentGroups {
 			if daeg.ParentID == "" {
-				associations = appendAssociations(associations, "EnvironmentGroup", daeg.ID)
+				associations = rph.appendProfileAssociations(associations, "EnvironmentGroup", daeg.ID)
 				break
 			}
 		}
@@ -149,7 +282,7 @@ func saveProfileAssociations(appContainerID string, profileID string, d *schema.
 			}
 			for _, aeg := range rootAssociations {
 				if aeg.Name == associationName {
-					associations = appendAssociations(associations, associationType, aeg.ID)
+					associations = rph.appendProfileAssociations(associations, associationType, aeg.ID)
 					break
 				}
 			}
@@ -164,7 +297,7 @@ func saveProfileAssociations(appContainerID string, profileID string, d *schema.
 	return nil
 }
 
-func mapResourceDataToProfile(d *schema.ResourceData, m interface{}, profile *britive.Profile, isUpdate bool) error {
+func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, profile *britive.Profile, isUpdate bool) error {
 	profile.AppContainerID = d.Get("app_container_id").(string)
 	profile.Name = d.Get("name").(string)
 	profile.Description = d.Get("description").(string)
@@ -206,62 +339,12 @@ func mapResourceDataToProfile(d *schema.ResourceData, m interface{}, profile *br
 	return nil
 }
 
-func resourceProfileCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-
-	profile := britive.Profile{}
-
-	mapResourceDataToProfile(d, m, &profile, false)
-
-	p, err := c.CreateProfile(profile.AppContainerID, profile)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	d.SetId(generateUniqueID(p.AppContainerID, p.ProfileID))
-
-	saveProfileAssociations(p.AppContainerID, p.ProfileID, d, m)
-
-	resourceProfileRead(ctx, d, m)
-
-	return diags
-}
-
-func generateUniqueID(appContainerID string, profileID string) string {
-	return fmt.Sprintf("apps/%s/paps/%s", appContainerID, profileID)
-}
-
-func parseUniqueID(ID string) (appContainerID string, profileID string, err error) {
-	idParts := strings.Split(ID, "/")
-	if len(idParts) < 4 {
-		return "", "", fmt.Errorf("Invalid application profile ID reference, please check the state for %s", ID)
-	}
-	appContainerID = idParts[1]
-	profileID = idParts[3]
-	return
-}
-
-func resourceProfileRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	var diags diag.Diagnostics
-
-	err := getAndSetProfileToState(d, m)
-
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	return diags
-}
-
-func getAndSetProfileToState(d *schema.ResourceData, m interface{}) error {
+func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
 
 	ID := d.Id()
 
-	appContainerID, profileID, err := parseUniqueID(ID)
+	appContainerID, profileID, err := rph.parseUniqueID(ID)
 	if err != nil {
 		return err
 	}
@@ -308,7 +391,7 @@ func getAndSetProfileToState(d *schema.ResourceData, m interface{}) error {
 			return err
 		}
 	}
-	associations, err := flattenProfileAssociations(appContainerID, profile.Associations, m)
+	associations, err := rph.mapProfileAssociationsModelToResource(appContainerID, profile.Associations, m)
 	if err != nil {
 		return err
 	}
@@ -318,66 +401,7 @@ func getAndSetProfileToState(d *schema.ResourceData, m interface{}) error {
 	return nil
 }
 
-func resourceProfileUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	if d.HasChange("name") ||
-		d.HasChange("description") ||
-		d.HasChange("associations") ||
-		d.HasChange("expiration_duration") ||
-		d.HasChange("extendable") ||
-		d.HasChange("notification_prior_to_expiration") ||
-		d.HasChange("extension_duration") ||
-		d.HasChange("extension_limit") {
-		c := m.(*britive.Client)
-		appContainerID, profileID, err := parseUniqueID(d.Id())
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		profile := britive.Profile{}
-		mapResourceDataToProfile(d, m, &profile, true)
-		_, err = c.UpdateProfile(appContainerID, profileID, profile)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-		saveProfileAssociations(appContainerID, profileID, d, m)
-		return resourceProfileRead(ctx, d, m)
-	}
-	return nil
-}
-
-func resourceProfileDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-
-	appContainerID, profileID, err := parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	err = c.DeleteProfile(appContainerID, profileID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId("")
-
-	return diags
-}
-
-func resourceProfileStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	if err := parseImportID([]string{"apps/(?P<app_container_id>[^/]+)/paps/(?P<profile_id>[^/]+)", "(?P<app_container_id>[^/]+)/(?P<profile_id>[^/]+)"}, d); err != nil {
-		return nil, err
-	}
-	d.SetId(generateUniqueID(d.Get("app_container_id").(string), d.Get("profile_id").(string)))
-	err := getAndSetProfileToState(d, m)
-	if err != nil {
-		return nil, err
-	}
-
-	return []*schema.ResourceData{d}, nil
-}
-
-func flattenProfileAssociations(appContainerID string, associations []britive.ProfileAssociation, m interface{}) ([]interface{}, error) {
+func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appContainerID string, associations []britive.ProfileAssociation, m interface{}) ([]interface{}, error) {
 	c := m.(*britive.Client)
 	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
 	if err != nil {
@@ -413,3 +437,5 @@ func flattenProfileAssociations(appContainerID string, associations []britive.Pr
 	return profileAssociations, nil
 
 }
+
+//endregion

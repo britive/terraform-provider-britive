@@ -35,6 +35,10 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 	if err != nil {
 		return nil, err
 	}
+	if profilePermissions == nil || len(*profilePermissions) == 0 {
+		return nil, fmt.Errorf("No profiles permissions matching for the resource /paps/%s/permissions/%s", profileID, profilePermission.Name)
+	}
+
 	var pp *ProfilePermission
 	for _, p := range *profilePermissions {
 		if strings.ToLower(p.Name) == strings.ToLower(profilePermission.Name) && strings.ToLower(p.Type) == strings.ToLower(profilePermission.Type) {
