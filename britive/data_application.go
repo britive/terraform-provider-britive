@@ -3,16 +3,22 @@ package britive
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func dataApplication() *schema.Resource {
-	return &schema.Resource{
-		ReadContext: resourceApplicationReadByName,
+//DataSourceApplication - Terraform Application DataSource
+type DataSourceApplication struct {
+	Resource *schema.Resource
+}
+
+//NewDataSourceApplication - Initialises new DataSourceApplication
+func NewDataSourceApplication() *DataSourceApplication {
+	dsa := &DataSourceApplication{}
+	dsa.Resource = &schema.Resource{
+		ReadContext: dsa.resourceRead,
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
 				Type:     schema.TypeString,
@@ -20,9 +26,10 @@ func dataApplication() *schema.Resource {
 			},
 		},
 	}
+	return dsa
 }
 
-func resourceApplicationReadByName(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (dsa *DataSourceApplication) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
@@ -36,26 +43,11 @@ func resourceApplicationReadByName(ctx context.Context, d *schema.ResourceData, 
 		})
 		return diags
 	}
-	//TODO: Warning Recursion - Get by Name
-	applications, err := c.GetApplications()
+	application, err := c.GetApplicationByName(applicationName)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	var application *britive.Application
-	for _, app := range *applications {
-		if strings.ToLower(app.CatalogAppDisplayName) == strings.ToLower(applicationName) {
-			application = &app
-			break
-		}
-	}
 
-	if application == nil {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("No application found matching %s", applicationName),
-		})
-		return diags
-	}
 	d.SetId(application.AppContainerID)
 	if err := d.Set("name", application.CatalogAppDisplayName); err != nil {
 		return diag.FromErr(err)

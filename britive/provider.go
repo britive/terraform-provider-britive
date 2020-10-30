@@ -8,12 +8,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-//Provider - godoc
+//Provider - Britive Provider
 func Provider() *schema.Provider {
 	validation := NewValidation()
 	importHelper := NewImportHelper()
-	profile := NewResourceProfile(validation, importHelper)
-	profileTag := NewResourceProfileTag()
+
+	resourceProfile := NewResourceProfile(validation, importHelper)
+	resourceProfilePermission := NewResourceProfilePermission()
+	resourceProfileIdentity := NewResourceProfileIdentity()
+	resourceProfileTag := NewResourceProfileTag()
+
+	dataSourceApplication := NewDataSourceApplication()
+	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
+
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
 			"host": &schema.Schema{
@@ -31,14 +38,14 @@ func Provider() *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource{
 			"britive_tag":                resourceTag(),
 			"britive_tag_member":         resourceTagMember(),
-			"britive_profile":            profile.Resource,
-			"britive_profile_permission": resourceProfilePermission(),
-			"britive_profile_tag":        profileTag.Resource,
-			"britive_profile_identity":   resourceProfileIdentity(),
+			"britive_profile":            resourceProfile.Resource,
+			"britive_profile_permission": resourceProfilePermission.Resource,
+			"britive_profile_identity":   resourceProfileIdentity.Resource,
+			"britive_profile_tag":        resourceProfileTag.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
-			"britive_identity_provider": dataIdentityProvider(),
-			"britive_application":       dataApplication(),
+			"britive_identity_provider": dataSourceIdentityProvider.Resource,
+			"britive_application":       dataSourceApplication.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

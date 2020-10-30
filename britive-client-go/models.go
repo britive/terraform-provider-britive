@@ -133,3 +133,16 @@ type ProfileTag struct {
 	CheckStatus  string      `json:"checkStatus,omitempty"`
 	Message      string      `json:"message,omitempty"`
 }
+
+//ProfileIdentity - godoc
+type ProfileIdentity struct {
+	ProfileID    string      `json:"papId,omitempty"`
+	UserID       string      `json:"userId,omitempty"`
+	Name         string      `json:"name,omitempty"`
+	Username     string      `json:"username,omitempty"`
+	UserType     string      `json:"userType,omitempty"`
+	Status       string      `json:"status,omitempty"`
+	AccessPeriod *TimePeriod `json:"accessPeriod,omitempty"`
+	CheckStatus  string      `json:"checkStatus,omitempty"`
+	Message      string      `json:"message,omitempty"`
+}

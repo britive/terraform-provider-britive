@@ -48,6 +48,10 @@ func (c *Client) GetProfileTag(profileID string, tagID string) (*ProfileTag, err
 		}
 	}
 
+	if profileTag == nil {
+		return nil, fmt.Errorf("No profiles tags matching for the resource /paps/%s/user-tags/%s", profileID, tagID)
+	}
+
 	return profileTag, nil
 }
 
@@ -90,7 +94,7 @@ func (c *Client) UpdateProfileTag(profileTag ProfileTag) (*ProfileTag, error) {
 	return c.createOrUpdateProfileTag("PATCH", profileTag)
 }
 
-// DeleteProfileTag - Delete member from the profile
+// DeleteProfileTag - Delete tag from the profile
 func (c *Client) DeleteProfileTag(profileID string, tagID string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/paps/%s/user-tags/%s", c.HostURL, profileID, tagID), nil)
 	if err != nil {

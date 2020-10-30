@@ -50,8 +50,8 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 	return pp, nil
 }
 
-// PerformProfilePermissionRequest - Add/delete permission from profile
-func (c *Client) PerformProfilePermissionRequest(profileID string, ppr ProfilePermissionRequest) error {
+// ExecuteProfilePermissionRequest - Add/delete permission from profile
+func (c *Client) ExecuteProfilePermissionRequest(profileID string, ppr ProfilePermissionRequest) error {
 	pprb, err := json.Marshal(ppr)
 	if err != nil {
 		return err

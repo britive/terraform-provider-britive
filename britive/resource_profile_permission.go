@@ -10,11 +10,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func resourceProfilePermission() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: resourceProfilePermissionCreate,
-		ReadContext:   resourceProfilePermissionRead,
-		DeleteContext: resourceProfilePermissionDelete,
+//ResourceProfilePermission - Terraform Resource for Profile Permission
+type ResourceProfilePermission struct {
+	Resource *schema.Resource
+	helper   *ResourceProfilePermissionHelper
+}
+
+//NewResourceProfilePermission - Initialisation of new profile permission resource
+func NewResourceProfilePermission() *ResourceProfilePermission {
+	rpp := &ResourceProfilePermission{
+		helper: NewResourceProfilePermissionHelper(),
+	}
+	rpp.Resource = &schema.Resource{
+		CreateContext: rpp.resourceCreate,
+		ReadContext:   rpp.resourceRead,
+		DeleteContext: rpp.resourceDelete,
 		Schema: map[string]*schema.Schema{
 			"profile_id": &schema.Schema{
 				Type:        schema.TypeString,
@@ -45,9 +55,10 @@ func resourceProfilePermission() *schema.Resource {
 			},
 		},
 	}
+	return rpp
 }
 
-func resourceProfilePermissionCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rpp *ResourceProfilePermission) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
@@ -67,21 +78,70 @@ func resourceProfilePermissionCreate(ctx context.Context, d *schema.ResourceData
 		},
 	}
 
-	err := c.PerformProfilePermissionRequest(profileID, profilePermissionRequest)
+	err := c.ExecuteProfilePermissionRequest(profileID, profilePermissionRequest)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	d.SetId(generateProfilePermissionUniqueID(profilePermissionRequest.Permission))
+	d.SetId(rpp.helper.generateUniqueID(profilePermissionRequest.Permission))
 
 	return diags
 }
 
-func generateProfilePermissionUniqueID(profilePermission britive.ProfilePermission) string {
+func (rpp *ResourceProfilePermission) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
+
+	var diags diag.Diagnostics
+	profilePermission, err := rpp.helper.parseUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	pp, err := c.GetProfilePermission(profilePermission.ProfileID, *profilePermission)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.SetId(rpp.helper.generateUniqueID(*pp))
+
+	return diags
+}
+
+func (rpp *ResourceProfilePermission) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
+
+	var diags diag.Diagnostics
+	profilePermission, err := rpp.helper.parseUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	profilePermissionRequest := britive.ProfilePermissionRequest{
+		Operation:  "remove",
+		Permission: *profilePermission,
+	}
+
+	err = c.ExecuteProfilePermissionRequest(profilePermission.ProfileID, profilePermissionRequest)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.SetId("")
+
+	return diags
+
+}
+
+//ResourceProfilePermissionHelper - Terraform Resource for Profile Permission Helper
+type ResourceProfilePermissionHelper struct {
+}
+
+//NewResourceProfilePermissionHelper - Initialisation of new profile tag resource helper
+func NewResourceProfilePermissionHelper() *ResourceProfilePermissionHelper {
+	return &ResourceProfilePermissionHelper{}
+}
+
+func (rpph *ResourceProfilePermissionHelper) generateUniqueID(profilePermission britive.ProfilePermission) string {
 	return fmt.Sprintf("paps/%s/permissions/%s/type/%s", profilePermission.ProfileID, profilePermission.Name, profilePermission.Type)
 }
 
-func parsePerfilePermissionUniqueID(ID string) (*britive.ProfilePermission, error) {
+func (rpph *ResourceProfilePermissionHelper) parseUniqueID(ID string) (*britive.ProfilePermission, error) {
 	profileMemberParts := strings.Split(ID, "/")
 
 	if len(profileMemberParts) < 6 {
@@ -94,44 +154,4 @@ func parsePerfilePermissionUniqueID(ID string) (*britive.ProfilePermission, erro
 		Type:      profileMemberParts[5],
 	}
 	return profilePermission, nil
-}
-
-func resourceProfilePermissionRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-	profilePermission, err := parsePerfilePermissionUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	pp, err := c.GetProfilePermission(profilePermission.ProfileID, *profilePermission)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId(generateProfilePermissionUniqueID(*pp))
-
-	return diags
-}
-
-func resourceProfilePermissionDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-	profilePermission, err := parsePerfilePermissionUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	profilePermissionRequest := britive.ProfilePermissionRequest{
-		Operation:  "remove",
-		Permission: *profilePermission,
-	}
-
-	err = c.PerformProfilePermissionRequest(profilePermission.ProfileID, profilePermissionRequest)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId("")
-
-	return diags
-
 }
