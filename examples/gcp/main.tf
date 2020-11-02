@@ -47,7 +47,7 @@ output "britive_tag_member_new" {
 }
 
 data "britive_application" "app" {
-  name = "Azure-ValueLabs"
+  name = var.name
 }
 
 output "britive_application_app" {
@@ -65,8 +65,8 @@ resource "britive_profile" "new" {
   extension_duration               = "12m30s"
   extension_limit                  = 2
   associations {
-    type  = "Environment"
-    value = "QA Subscription"
+    type  = "EnvironmentGroup"
+    value = "Test Folder"
   }
 }
 
@@ -79,7 +79,7 @@ output "britive_profile_new" {
 resource "britive_profile_permission" "new" {
   profile_id = britive_profile.new.profile_id
   permission {
-    name = "Application Developer"
+    name = "Access Approval Viewer"
     type = "role"
   }
 }

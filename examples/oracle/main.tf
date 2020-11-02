@@ -47,7 +47,7 @@ output "britive_tag_member_new" {
 }
 
 data "britive_application" "app" {
-  name = "Azure-ValueLabs"
+  name = var.name
 }
 
 output "britive_application_app" {
