@@ -12,7 +12,7 @@ func TestBritiveTagMember(t *testing.T) {
 	identityProviderName := "Britive"
 	tagName := "BPAT - New Britive Tag Member Test"
 	tagDescription := "BPAT - New Britive Tag Member Test Description"
-	username := "britiveprovideracceptancetest@britive.com"
+	username := "britiveprovideracceptancetest"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,

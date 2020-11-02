@@ -6,7 +6,6 @@ type Tag struct {
 	Name                     string                    `json:"name"`
 	Description              string                    `json:"description"`
 	Status                   string                    `json:"status,omitempty"`
-	UserCount                interface{}               `json:"userCount,omitempty"`
 	UserTagIdentityProviders []UserTagIdentityProvider `json:"userTagIdentityProviders,omitempty"`
 	External                 interface{}               `json:"external,omitempty"`
 }

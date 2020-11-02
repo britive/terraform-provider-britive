@@ -8,14 +8,26 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func resourceTag() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: resourceTagCreate,
-		ReadContext:   resourceTagRead,
-		UpdateContext: resourceTagUpdate,
-		DeleteContext: resourceTagDelete,
+//ResourceTag - Terraform Resource for Tag
+type ResourceTag struct {
+	Resource     *schema.Resource
+	helper       *ResourceTagHelper
+	importHelper *ImportHelper
+}
+
+//NewResourceTag - Initialises new tag resource
+func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
+	rt := &ResourceTag{
+		helper:       NewResourceTagHelper(),
+		importHelper: importHelper,
+	}
+	rt.Resource = &schema.Resource{
+		CreateContext: rt.resourceCreate,
+		ReadContext:   rt.resourceRead,
+		UpdateContext: rt.resourceUpdate,
+		DeleteContext: rt.resourceDelete,
 		Importer: &schema.ResourceImporter{
-			State: resourceTagStateImporter,
+			State: rt.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
@@ -63,17 +75,14 @@ func resourceTag() *schema.Resource {
 				Computed:    true,
 				Description: "The flag whether tag is external or not",
 			},
-			"user_count": &schema.Schema{
-				Type:        schema.TypeInt,
-				Optional:    true,
-				Computed:    true,
-				Description: "Number of users associated with the tag",
-			},
 		},
 	}
+	return rt
 }
 
-func resourceTagCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+//region Tag Resource Context Operations
+
+func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
@@ -106,16 +115,16 @@ func resourceTagCreate(ctx context.Context, d *schema.ResourceData, m interface{
 
 	d.SetId(ut.ID)
 
-	resourceTagRead(ctx, d, m)
+	rt.resourceRead(ctx, d, m)
 
 	return diags
 }
 
-func resourceTagRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	var diags diag.Diagnostics
 
-	err := getAndSetTagToState(d, m)
+	err := rt.helper.getAndMapModelToResource(d, m)
 
 	if err != nil {
 		return diag.FromErr(err)
@@ -124,7 +133,64 @@ func resourceTagRead(ctx context.Context, d *schema.ResourceData, m interface{})
 	return diags
 }
 
-func getAndSetTagToState(d *schema.ResourceData, m interface{}) error {
+func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if d.HasChange("name") || d.HasChange("description") {
+		c := m.(*britive.Client)
+		tagID := d.Id()
+		tag := britive.Tag{}
+		tag.Name = d.Get("name").(string)
+		tag.Description = d.Get("description").(string)
+		_, err := c.UpdateTag(tagID, tag)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		return rt.resourceRead(ctx, d, m)
+	}
+	return nil
+}
+
+func (rt *ResourceTag) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
+
+	var diags diag.Diagnostics
+
+	tagID := d.Id()
+
+	err := c.DeleteTag(tagID)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.SetId("")
+
+	return diags
+}
+
+func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
+	if err := rt.importHelper.ParseImportID([]string{"user-tags/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
+		return nil, err
+	}
+	err := rt.helper.getAndMapModelToResource(d, m)
+	if err != nil {
+		return nil, err
+	}
+
+	return []*schema.ResourceData{d}, nil
+}
+
+//endregion
+
+//ResourceTagHelper - Resource Tag helper functions
+type ResourceTagHelper struct {
+}
+
+//NewResourceTagHelper - Initialises new tag resource helper
+func NewResourceTagHelper() *ResourceTagHelper {
+	return &ResourceTagHelper{}
+}
+
+//region Tag Resource helper functions
+
+func (rth *ResourceTagHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
 
 	tagID := d.Id()
@@ -145,61 +211,14 @@ func getAndSetTagToState(d *schema.ResourceData, m interface{}) error {
 	if err := d.Set("external", tag.External); err != nil {
 		return err
 	}
-	if err := d.Set("user_count", tag.UserCount); err != nil {
-		return err
-	}
-	utips := flattenTagIdentityProviders(&tag.UserTagIdentityProviders)
+	utips := rth.mapIdentityProvidersModelToResource(&tag.UserTagIdentityProviders)
 	if err := d.Set("user_tag_identity_providers", utips); err != nil {
 		return err
 	}
 	return nil
 }
 
-func resourceTagUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	if d.HasChange("name") || d.HasChange("description") {
-		c := m.(*britive.Client)
-		tagID := d.Id()
-		tag := britive.Tag{}
-		tag.Name = d.Get("name").(string)
-		tag.Description = d.Get("description").(string)
-		_, err := c.UpdateTag(tagID, tag)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-		return resourceTagRead(ctx, d, m)
-	}
-	return nil
-}
-
-func resourceTagDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-
-	tagID := d.Id()
-
-	err := c.DeleteTag(tagID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId("")
-
-	return diags
-}
-
-func resourceTagStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	if err := parseImportID([]string{"user-tags/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
-		return nil, err
-	}
-	err := getAndSetTagToState(d, m)
-	if err != nil {
-		return nil, err
-	}
-
-	return []*schema.ResourceData{d}, nil
-}
-
-func flattenTagIdentityProviders(tagIdentityProviders *[]britive.UserTagIdentityProvider) []interface{} {
+func (rth *ResourceTagHelper) mapIdentityProvidersModelToResource(tagIdentityProviders *[]britive.UserTagIdentityProvider) []interface{} {
 	if tagIdentityProviders != nil {
 		utips := make([]interface{}, len(*tagIdentityProviders), len(*tagIdentityProviders))
 
@@ -215,3 +234,5 @@ func flattenTagIdentityProviders(tagIdentityProviders *[]britive.UserTagIdentity
 	}
 	return make([]interface{}, 0)
 }
+
+//endregion

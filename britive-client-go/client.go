@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-// Client - godoc
+// Client - Britive API client
 type Client struct {
 	HostURL    string
 	HTTPClient *http.Client
 	Token      string
 }
 
-// NewClient - godoc
+// NewClient - Initialises new Britive API client
 func NewClient(host, token *string) (*Client, error) {
 	if token == nil {
 		return nil, fmt.Errorf("Token must not be empty")
@@ -27,7 +27,7 @@ func NewClient(host, token *string) (*Client, error) {
 	return &c, nil
 }
 
-//DoRequest - godoc
+//DoRequest - Perform Britive API call
 func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
 	req.Header.Set("Content-Type", "application/json")
@@ -43,8 +43,8 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("\nrequest: %+v\nstatus: %d\nbody: %s", *req, res.StatusCode, body)
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
+		return nil, fmt.Errorf("An error occured while processing the request\nrequestUrl: %s\nrequestMethod: %s\nresponseStatus: %d\nresponseBody: %s", req.URL, req.Method, res.StatusCode, body)
 	}
 
 	return body, err

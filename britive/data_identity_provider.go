@@ -9,9 +9,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func dataIdentityProvider() *schema.Resource {
-	return &schema.Resource{
-		ReadContext: resourceIdentityProviderRead,
+//DataSourceIdentityProvider - Terraform IdentityProvider DataSource
+type DataSourceIdentityProvider struct {
+	Resource *schema.Resource
+}
+
+//NewDataSourceIdentityProvider - Initialises new DataSourceIdentityProvider
+func NewDataSourceIdentityProvider() *DataSourceIdentityProvider {
+	dsip := &DataSourceIdentityProvider{}
+	dsip.Resource = &schema.Resource{
+		ReadContext: dsip.resourceRead,
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
 				Type:     schema.TypeString,
@@ -29,9 +36,10 @@ func dataIdentityProvider() *schema.Resource {
 			},
 		},
 	}
+	return dsip
 }
 
-func resourceIdentityProviderRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (dsip *DataSourceIdentityProvider) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics

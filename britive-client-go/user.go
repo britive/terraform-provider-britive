@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-// GetUsers - Returns all identity providers
+// GetUsers - Returns all users
 func (c *Client) GetUsers() (*[]User, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users", c.HostURL), nil)
 	if err != nil {
@@ -28,7 +28,7 @@ func (c *Client) GetUsers() (*[]User, error) {
 	return &users, nil
 }
 
-// GetUser - Returns user by userid
+// GetUser - Returns user by user id
 func (c *Client) GetUser(userID string) (*User, error) {
 	resourceURL := fmt.Sprintf("%s/users/%s", c.HostURL, userID)
 	return c.getUser(resourceURL)

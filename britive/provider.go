@@ -10,6 +10,13 @@ import (
 
 //Provider - godoc
 func Provider() *schema.Provider {
+	importHelper := NewImportHelper()
+
+	resourceTag := NewResourceTag(importHelper)
+	resourceTagMember := NewResourceTagMember(importHelper)
+
+	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
+
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
 			"host": &schema.Schema{
@@ -25,11 +32,11 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"britive_tag":        resourceTag(),
-			"britive_tag_member": resourceTagMember(),
+			"britive_tag":        resourceTag.Resource,
+			"britive_tag_member": resourceTagMember.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
-			"britive_identity_provider": dataIdentityProvider(),
+			"britive_identity_provider": dataSourceIdentityProvider.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
