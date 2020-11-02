@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-// Client - Britive API Client
+// Client - Britive API client
 type Client struct {
 	HostURL    string
 	HTTPClient *http.Client
 	Token      string
 }
 
-// NewClient - Initialises new Britive API Client
+// NewClient - Initialises new Britive API client
 func NewClient(host, token *string) (*Client, error) {
 	if token == nil {
 		return nil, fmt.Errorf("Token must not be empty")
@@ -27,7 +27,7 @@ func NewClient(host, token *string) (*Client, error) {
 	return &c, nil
 }
 
-//DoRequest - Perform API Call
+//DoRequest - Perform Britive API call
 func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
 	req.Header.Set("Content-Type", "application/json")

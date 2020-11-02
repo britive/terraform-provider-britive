@@ -12,7 +12,7 @@ import (
 type ImportHelper struct {
 }
 
-//NewImportHelper - Initialises new NewImportHelper
+//NewImportHelper - Initialises new ImportHelper
 func NewImportHelper() *ImportHelper {
 	return &ImportHelper{}
 }

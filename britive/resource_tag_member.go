@@ -10,11 +10,26 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func resourceTagMember() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: resourceTagMemberCreate,
-		ReadContext:   resourceTagMemberRead,
-		DeleteContext: resourceTagMemberDelete,
+//ResourceTagMember - Terraform Resource for Tag member
+type ResourceTagMember struct {
+	Resource     *schema.Resource
+	helper       *ResourceTagMemberHelper
+	importHelper *ImportHelper
+}
+
+//NewResourceTagMember - Initialises new tag member resource
+func NewResourceTagMember(importHelper *ImportHelper) *ResourceTagMember {
+	rtm := &ResourceTagMember{
+		helper:       NewResourceTagMemberHelper(),
+		importHelper: importHelper,
+	}
+	rtm.Resource = &schema.Resource{
+		CreateContext: rtm.resourceCreate,
+		ReadContext:   rtm.resourceRead,
+		DeleteContext: rtm.resourceDelete,
+		Importer: &schema.ResourceImporter{
+			State: rtm.resourceStateImporter,
+		},
 		Schema: map[string]*schema.Schema{
 			"tag_id": &schema.Schema{
 				Type:        schema.TypeString,
@@ -26,16 +41,17 @@ func resourceTagMember() *schema.Resource {
 				Type:        schema.TypeString,
 				Required:    true,
 				ForceNew:    true,
-				Description: "The username associate wit the tag",
+				Description: "The username associate with the tag",
 			},
 		},
 	}
+	return rtm
 }
 
-func resourceTagMemberCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+//region Tag member Resource Context Operations
 
-	var diags diag.Diagnostics
+func (rtm *ResourceTagMember) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
 
 	tagID := d.Get("tag_id").(string)
 	username := d.Get("username").(string)
@@ -49,51 +65,27 @@ func resourceTagMemberCreate(ctx context.Context, d *schema.ResourceData, m inte
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	d.SetId(rtm.helper.generateUniqueID(tagID, user.UserID))
 
-	d.SetId(generateTagMemberUniqueID(tagID, user.UserID))
-
-	return diags
+	return rtm.resourceRead(ctx, d, m)
 }
 
-func generateTagMemberUniqueID(tagID string, userID string) string {
-	return fmt.Sprintf("user-tags/%s/users/%s", tagID, userID)
-}
-
-func parseTagMemberUniqueID(ID string) (tagID string, userID string, err error) {
-	tagMemberParts := strings.Split(ID, "/")
-	if len(tagMemberParts) < 4 {
-		err = fmt.Errorf("Invalid user tag member reference, please check the state for %s", ID)
-		return
-	}
-	tagID = tagMemberParts[1]
-	userID = tagMemberParts[3]
-	return
-}
-
-func resourceTagMemberRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
+func (rtm *ResourceTagMember) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	tagID, userID, err := parseTagMemberUniqueID(d.Id())
+
+	err := rtm.helper.getAndMapModelToResource(d, m)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	_, err = c.GetTagMember(tagID, userID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId(generateTagMemberUniqueID(tagID, userID))
-
 	return diags
 }
 
-func resourceTagMemberDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rtm *ResourceTagMember) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
 
-	tagID, userID, err := parseTagMemberUniqueID(d.Id())
+	tagID, userID, err := rtm.helper.parseUniqueID(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -106,3 +98,71 @@ func resourceTagMemberDelete(ctx context.Context, d *schema.ResourceData, m inte
 
 	return diags
 }
+
+func (rtm *ResourceTagMember) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
+	if err := rtm.importHelper.ParseImportID([]string{"user-tags/(?P<tag_id>[^/]+)/users/(?P<username>[^/]+)", "(?P<tag_id>[^/]+)/(?P<username>[^/]+)"}, d); err != nil {
+		return nil, err
+	}
+	tagID := d.Get("tag_id").(string)
+	userID := d.Get("username").(string)
+
+	d.SetId(rtm.helper.generateUniqueID(tagID, userID))
+
+	err := rtm.helper.getAndMapModelToResource(d, m)
+	if err != nil {
+		return nil, err
+	}
+
+	return []*schema.ResourceData{d}, nil
+}
+
+//endregion
+
+//ResourceTagMemberHelper - Resource Tag member helper functions
+type ResourceTagMemberHelper struct {
+}
+
+//NewResourceTagMemberHelper - Initialises new tag member resource helper
+func NewResourceTagMemberHelper() *ResourceTagMemberHelper {
+	return &ResourceTagMemberHelper{}
+}
+
+//region Tag member Resource helper functions
+
+func (rtmh *ResourceTagMemberHelper) generateUniqueID(tagID string, userID string) string {
+	return fmt.Sprintf("user-tags/%s/users/%s", tagID, userID)
+}
+
+func (rtmh *ResourceTagMemberHelper) parseUniqueID(ID string) (tagID string, userID string, err error) {
+	tagMemberParts := strings.Split(ID, "/")
+	if len(tagMemberParts) < 4 {
+		err = fmt.Errorf("Invalid user tag member reference, please check the state for %s", ID)
+		return
+	}
+	tagID = tagMemberParts[1]
+	userID = tagMemberParts[3]
+	return
+}
+
+func (rtmh *ResourceTagMemberHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
+	c := m.(*britive.Client)
+
+	tagID, userID, err := rtmh.parseUniqueID(d.Id())
+	if err != nil {
+		return err
+	}
+
+	u, err := c.GetTagMember(tagID, userID)
+	if err != nil {
+		return err
+	}
+	if err := d.Set("tag_id", tagID); err != nil {
+		return err
+	}
+	if err := d.Set("username", u.Username); err != nil {
+		return err
+	}
+	return nil
+}
+
+//endregion

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// GetTags - Returns all user tags
+// GetTags - Returns all tags
 func (c *Client) GetTags() (*[]Tag, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags", c.HostURL), nil)
 	if err != nil {
@@ -28,7 +28,7 @@ func (c *Client) GetTags() (*[]Tag, error) {
 	return &tags, nil
 }
 
-// GetTagByName - Returns a specifc user tag by name
+// GetTagByName - Returns a specifc tag by name
 func (c *Client) GetTagByName(tagName string) (*Tag, error) {
 	//TODO: Warning Recursion - Get single instead of array
 	tags, err := c.GetTags()
@@ -47,7 +47,7 @@ func (c *Client) GetTagByName(tagName string) (*Tag, error) {
 	return tag, nil
 }
 
-// GetTag - Returns a specifc user tag
+// GetTag - Returns a specifc tag by id
 func (c *Client) GetTag(tagID string) (*Tag, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s", c.HostURL, tagID), nil)
 	if err != nil {
@@ -92,7 +92,7 @@ func (c *Client) CreateTag(tag Tag) (*Tag, error) {
 	return &tag, nil
 }
 
-// UpdateTag - Updates an tag
+// UpdateTag - Update tag
 func (c *Client) UpdateTag(tagID string, tag Tag) (*Tag, error) {
 	utsb, err := json.Marshal(tag)
 	if err != nil {
@@ -117,7 +117,7 @@ func (c *Client) UpdateTag(tagID string, tag Tag) (*Tag, error) {
 	return &tag, nil
 }
 
-// DeleteTag - Deletes an tag
+// DeleteTag - Delete tag
 func (c *Client) DeleteTag(tagID string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/user-tags/%s", c.HostURL, tagID), nil)
 	if err != nil {

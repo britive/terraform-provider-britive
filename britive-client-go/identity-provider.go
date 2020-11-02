@@ -27,13 +27,13 @@ func (c *Client) GetIdentityProviders() (*[]IdentityProvider, error) {
 	return &identityProviders, nil
 }
 
-// GetIdentityProvider - Returns all identity providers
+// GetIdentityProvider - Returns identity provider
 func (c *Client) GetIdentityProvider(identityProviderID string) (*IdentityProvider, error) {
 	resourceURL := fmt.Sprintf("%s/identity-providers/%s", c.HostURL, identityProviderID)
 	return c.getIdentityProvider(resourceURL)
 }
 
-// GetIdentityProviderByName - Returns all identity providers
+// GetIdentityProviderByName - Returns identity provider by passing name
 func (c *Client) GetIdentityProviderByName(name string) (*IdentityProvider, error) {
 	resourceURL := fmt.Sprintf("%s/identity-providers?metadata=false&name=%s", c.HostURL, name)
 	return c.getIdentityProvider(resourceURL)

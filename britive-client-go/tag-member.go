@@ -6,8 +6,8 @@ import (
 	"net/http"
 )
 
-// GetTagMembers - Returns all users assigned to user tag
-func (c *Client) GetTagMembers(tagID string) (*[]User, error) {
+// GetAssignedTagMembers - Returns all members assigned to tag
+func (c *Client) GetAssignedTagMembers(tagID string) (*[]User, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s/users?filter=assigned", c.HostURL, tagID), nil)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func (c *Client) GetTagMembers(tagID string) (*[]User, error) {
 	return &users, nil
 }
 
-// GetTagMember - Returns a specifc user from user tag
+// GetTagMember - Returns a specifc member assigned to tag
 func (c *Client) GetTagMember(tagID string, userID string) (*User, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s/users/%s?filter=assigned", c.HostURL, tagID, userID), nil)
 	if err != nil {
@@ -47,7 +47,7 @@ func (c *Client) GetTagMember(tagID string, userID string) (*User, error) {
 	return user, nil
 }
 
-// CreateTagMember - Add member to user tag
+// CreateTagMember - Add member to tag
 func (c *Client) CreateTagMember(tagID string, userID string) error {
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/user-tags/%s/users/%s", c.HostURL, tagID, userID), nil)
 	if err != nil {

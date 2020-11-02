@@ -62,7 +62,6 @@ In addition to the above arguments, the following attributes are exported.
 
 * `id` - An identifier for the resource.
 * `external` - This is a boolean attribute that indicates whether the tag is external or not.
-* `user_count` - The number of users associated with the tag.
 
 ## Import
 

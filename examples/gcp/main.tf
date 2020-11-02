@@ -15,7 +15,7 @@ variable "name" {
 }
 
 locals {
-  resource_name_prefix = "${var.name}-2020-10-31"
+  resource_name_prefix = "${var.name}-2020-11-02"
 }
 
 data "britive_identity_provider" "idp" {
