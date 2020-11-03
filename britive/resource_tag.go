@@ -2,6 +2,7 @@ package britive
 
 import (
 	"context"
+	"log"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -85,8 +86,6 @@ func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	var diags diag.Diagnostics
-
 	tag := britive.Tag{}
 	tag.Name = d.Get("name").(string)
 	tag.Description = d.Get("description").(string)
@@ -108,23 +107,33 @@ func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceDat
 		tag.UserTagIdentityProviders = append(tag.UserTagIdentityProviders, utip)
 	}
 
+	log.Printf("[INFO] Creating new tag: %#v", tag)
 	ut, err := c.CreateTag(tag)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Submitted new tag: %#v", ut)
 	d.SetId(ut.ID)
 
-	rt.resourceRead(ctx, d, m)
-
-	return diags
+	return rt.resourceRead(ctx, d, m)
 }
 
 func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
 
-	err := rt.helper.getAndMapModelToResource(d, m)
+	tagID := d.Id()
+
+	log.Printf("[INFO] Reading tag %s", tagID)
+	tag, err := c.GetTag(tagID)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	log.Printf("[INFO] Received tag: %#v", tag)
+	err = rt.helper.mapModelToResource(tag, d, m)
 
 	if err != nil {
 		return diag.FromErr(err)
@@ -140,10 +149,16 @@ func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceDat
 		tag := britive.Tag{}
 		tag.Name = d.Get("name").(string)
 		tag.Description = d.Get("description").(string)
-		_, err := c.UpdateTag(tagID, tag)
+
+		log.Printf("[INFO] Updating tag: %#v", tag)
+		ut, err := c.UpdateTag(tagID, tag)
 		if err != nil {
 			return diag.FromErr(err)
 		}
+
+		log.Printf("[INFO] Submitted updated tag: %#v", ut)
+		d.SetId(ut.ID)
+
 		return rt.resourceRead(ctx, d, m)
 	}
 	return nil
@@ -156,20 +171,37 @@ func (rt *ResourceTag) resourceDelete(ctx context.Context, d *schema.ResourceDat
 
 	tagID := d.Id()
 
+	log.Printf("[INFO] Deleting tag: %s", tagID)
 	err := c.DeleteTag(tagID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	log.Printf("[INFO] Tag %s deleted", tagID)
 	d.SetId("")
 
 	return diags
 }
 
 func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	if err := rt.importHelper.ParseImportID([]string{"user-tags/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
+	c := m.(*britive.Client)
+
+	if err := rt.importHelper.ParseImportID([]string{"user-tags/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
-	err := rt.helper.getAndMapModelToResource(d, m)
+
+	tagName := d.Get("name").(string)
+
+	log.Printf("[INFO] Importing tag: %s", tagName)
+
+	tag, err := c.GetTagByName(tagName)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[INFO] Imported tag: %#v", tag)
+	d.SetId(tag.ID)
+
+	err = rt.helper.mapModelToResource(tag, d, m)
 	if err != nil {
 		return nil, err
 	}
@@ -190,15 +222,7 @@ func NewResourceTagHelper() *ResourceTagHelper {
 
 //region Tag Resource helper functions
 
-func (rth *ResourceTagHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
-
-	tagID := d.Id()
-
-	tag, err := c.GetTag(tagID)
-	if err != nil {
-		return err
-	}
+func (rth *ResourceTagHelper) mapModelToResource(tag *britive.Tag, d *schema.ResourceData, m interface{}) error {
 	if err := d.Set("name", tag.Name); err != nil {
 		return err
 	}

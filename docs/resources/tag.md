@@ -65,8 +65,9 @@ In addition to the above arguments, the following attributes are exported.
 
 ## Import
 
-Tag can be imported using TagID with the following command
+Tag can be imported using any of these accepted formats:
 
 ```
-terraform import britive_tag.new user-tags/{{TagID}}
+$ terraform import britive_tag.new user-tags/{{tag_name}}
+$ terraform import britive_tag.new {{tag_name}}
 ```

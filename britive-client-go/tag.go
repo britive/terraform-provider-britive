@@ -59,6 +59,10 @@ func (c *Client) GetTag(tagID string) (*Tag, error) {
 		return nil, err
 	}
 
+	if string(body) == "" {
+		return nil, fmt.Errorf("No tag found with id %s", tagID)
+	}
+
 	tag := Tag{}
 	err = json.Unmarshal(body, &tag)
 	if err != nil {

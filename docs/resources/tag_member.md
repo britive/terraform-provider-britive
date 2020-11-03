@@ -38,3 +38,12 @@ The following argument is supported:
 In addition to the above argument, the following attribute is exported.
 
 * `id` - An identifier of the resource with format `user-tag/{{tagID}}/users/{{userID}}`
+
+## Import
+
+Tag member can be imported using any of these accepted formats:
+
+```
+$ terraform import britive_tag_member.new user-tags/{{tag_name}}/users/{{username}}
+$ terraform import britive_tag_member.new {{tag_name}}/{{username}}
+```

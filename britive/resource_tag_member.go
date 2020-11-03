@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -37,6 +38,12 @@ func NewResourceTagMember(importHelper *ImportHelper) *ResourceTagMember {
 				ForceNew:    true,
 				Description: "The identifier of the tag",
 			},
+			"tag_name": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The name of the tag",
+			},
 			"username": &schema.Schema{
 				Type:        schema.TypeString,
 				Required:    true,
@@ -61,10 +68,13 @@ func (rtm *ResourceTagMember) resourceCreate(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Creating new tag member: %s/%s", tagID, user.UserID)
 	err = c.CreateTagMember(tagID, user.UserID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Submitted new tag member: %s/%s", tagID, user.UserID)
 	d.SetId(rtm.helper.generateUniqueID(tagID, user.UserID))
 
 	return rtm.resourceRead(ctx, d, m)
@@ -73,7 +83,12 @@ func (rtm *ResourceTagMember) resourceCreate(ctx context.Context, d *schema.Reso
 func (rtm *ResourceTagMember) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	err := rtm.helper.getAndMapModelToResource(d, m)
+	tagID, userID, err := rtm.helper.parseUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = rtm.helper.getAndMapModelToResource(tagID, userID, d, m)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -90,28 +105,49 @@ func (rtm *ResourceTagMember) resourceDelete(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Deleting tag member %s/%s", tagID, userID)
+
 	err = c.DeleteTagMember(tagID, userID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Deleted tag member %s/%s", tagID, userID)
 	d.SetId("")
 
 	return diags
 }
 
 func (rtm *ResourceTagMember) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	if err := rtm.importHelper.ParseImportID([]string{"user-tags/(?P<tag_id>[^/]+)/users/(?P<username>[^/]+)", "(?P<tag_id>[^/]+)/(?P<username>[^/]+)"}, d); err != nil {
+	c := m.(*britive.Client)
+
+	if err := rtm.importHelper.ParseImportID([]string{"user-tags/(?P<tag_name>[^/]+)/users/(?P<username>[^/]+)", "(?P<tag_name>[^/]+)/(?P<username>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
-	tagID := d.Get("tag_id").(string)
-	userID := d.Get("username").(string)
 
-	d.SetId(rtm.helper.generateUniqueID(tagID, userID))
+	tagName := d.Get("tag_name").(string)
+	username := d.Get("username").(string)
 
-	err := rtm.helper.getAndMapModelToResource(d, m)
+	log.Printf("[INFO] Importing tag member %s/%s", tagName, username)
+
+	tag, err := c.GetTagByName(tagName)
 	if err != nil {
 		return nil, err
 	}
+	user, err := c.GetUserByName(username)
+	if err != nil {
+		return nil, err
+	}
+
+	d.SetId(rtm.helper.generateUniqueID(tag.ID, user.UserID))
+	d.Set("tag_name", "")
+
+	err = rtm.helper.getAndMapModelToResource(tag.ID, user.UserID, d, m)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[INFO] Imported tag member %s/%s", tagName, username)
 
 	return []*schema.ResourceData{d}, nil
 }
@@ -144,24 +180,24 @@ func (rtmh *ResourceTagMemberHelper) parseUniqueID(ID string) (tagID string, use
 	return
 }
 
-func (rtmh *ResourceTagMemberHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
+func (rtmh *ResourceTagMemberHelper) getAndMapModelToResource(tagID string, userID string, d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
 
-	tagID, userID, err := rtmh.parseUniqueID(d.Id())
-	if err != nil {
-		return err
-	}
-
+	log.Printf("[INFO] Reading tag member %s/%s", tagID, userID)
 	u, err := c.GetTagMember(tagID, userID)
 	if err != nil {
 		return err
 	}
+
+	log.Printf("[INFO] Received tag member %#v", u)
+
 	if err := d.Set("tag_id", tagID); err != nil {
 		return err
 	}
 	if err := d.Set("username", u.Username); err != nil {
 		return err
 	}
+
 	return nil
 }
 
