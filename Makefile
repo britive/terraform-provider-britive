@@ -36,6 +36,4 @@ test:
 	echo $(TEST) | xargs -t -n4 go test $(TESTARGS) -timeout=30s -parallel=4                    
 
 testacc:
-	mkdir -p /tmp/terraform-acc-logs
-	mkdir -p /tmp/terraform-acc-tmp
-	TF_ACC=1 TF_ACC_STATE_LINEAGE=1 TF_ACC_TEMP_DIR=/tmp/terraform-acc-tmp TF_ACC_LOG_PATH=/tmp/terraform-acc-logs/debug.log go test $(TEST) -v $(TESTARGS) -timeout 120m
+	TF_ACC=1 TF_ACC_STATE_LINEAGE=1 go test $(TEST) -v $(TESTARGS) -timeout 120m

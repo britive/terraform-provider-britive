@@ -28,7 +28,25 @@ func (c *Client) GetTags() (*[]Tag, error) {
 	return &tags, nil
 }
 
-// GetTag - Returns a specifc tag
+// GetTagByName - Returns a specifc tag by name
+func (c *Client) GetTagByName(tagName string) (*Tag, error) {
+	tags, err := c.GetTags()
+	if err != nil {
+		return nil, err
+	}
+
+	var tag *Tag
+	for _, t := range *tags {
+		if strings.ToLower(t.Name) == strings.ToLower(tagName) {
+			tag = &t
+			break
+		}
+	}
+
+	return tag, nil
+}
+
+// GetTag - Returns a specifc tag by id
 func (c *Client) GetTag(tagID string) (*Tag, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s", c.HostURL, tagID), nil)
 	if err != nil {
@@ -38,6 +56,10 @@ func (c *Client) GetTag(tagID string) (*Tag, error) {
 	body, err := c.doRequest(req)
 	if err != nil {
 		return nil, err
+	}
+
+	if string(body) == "" {
+		return nil, fmt.Errorf("No tag found with id %s", tagID)
 	}
 
 	tag := Tag{}

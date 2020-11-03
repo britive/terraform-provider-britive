@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/mitchellh/go-homedir"
 )
 
 var testAccProviders map[string]*schema.Provider
@@ -28,6 +29,10 @@ func TestProvider_impl(t *testing.T) {
 }
 
 func testAccPreCheck(t *testing.T) {
+	configPath, _ := homedir.Expand("~/.britive/config")
+	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+		return
+	}
 	if err := os.Getenv("BRITIVE_HOST"); err == "" {
 		t.Fatal("BRITIVE_HOST must be set for acceptance tests")
 	}

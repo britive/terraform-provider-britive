@@ -1,5 +1,11 @@
 package britive
 
+//Config - godoc
+type Config struct {
+	Host  string `json:"host"`
+	Token string `json:"token"`
+}
+
 //Tag - godoc
 type Tag struct {
 	ID                       string                    `json:"userTagId,omitempty"`

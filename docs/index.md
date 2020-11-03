@@ -24,7 +24,7 @@ provider "britive" {
 There are two ways to configure the Britive Provider:
 
 1. Using environment variables
-2. Using statically-defined credentials
+2. Using statically-defined variables
 
 ### Configuring using environment variables
 
@@ -35,9 +35,9 @@ provider "britive" {
 }
 ```
 
-### Statically-defined credentials
+### Statically-defined variables
 
-In this configuration, it is required to **statically** define host name and token as credentials.
+In this configuration, it is required to **statically** define host name and token as variables.
 
 ```hcl
 provider "britive" {
@@ -57,3 +57,14 @@ The following arguments are supported:
 * `token` - (Required): The API token required to authenticate the Britive API. 
 
   For example, `iw8ECAdxhF/T/fyX/O3bCBV60TkOopdu5JEE0UY1mSw=`
+
+* `config_path` - (Optional): The Britive configuration (holding host and token as json attributes) file path. Default configuration path is `~/.britive/config`. 
+
+  Sample config file content 
+  ```
+  {
+    "host": "https://britive.local/api",
+    "token": "iw8ECAdxhF/T/fyX/O3bCBV60TkOopdu5JEE0UY1mSw="
+  }
+  ```
+~> If host and token passed either statically or through environment varibales those will be overwriten on the config file data.
