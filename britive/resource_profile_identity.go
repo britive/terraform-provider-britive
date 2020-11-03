@@ -39,7 +39,7 @@ func NewResourceProfileIdentity() *ResourceProfileIdentity {
 				Type:        schema.TypeString,
 				Required:    true,
 				ForceNew:    true,
-				Description: "The identity associate wit the profile",
+				Description: "The identity associate with the profile",
 			},
 			"access_period": &schema.Schema{
 				Type:        schema.TypeList,

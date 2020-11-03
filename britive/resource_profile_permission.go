@@ -37,7 +37,7 @@ func NewResourceProfilePermission() *ResourceProfilePermission {
 				MaxItems:    1,
 				Required:    true,
 				ForceNew:    true,
-				Description: "The permission associate wit the profile",
+				Description: "The permission associate with the profile",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"name": &schema.Schema{

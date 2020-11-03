@@ -39,7 +39,7 @@ func NewResourceProfileTag() *ResourceProfileTag {
 				Type:        schema.TypeString,
 				Required:    true,
 				ForceNew:    true,
-				Description: "The tag associate wit the profile",
+				Description: "The tag associate with the profile",
 			},
 			"access_period": &schema.Schema{
 				Type:        schema.TypeList,
