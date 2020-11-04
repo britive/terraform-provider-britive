@@ -30,9 +30,14 @@ func (c *Client) GetTags() (*[]Tag, error) {
 
 // GetTagByName - Returns a specifc tag by name
 func (c *Client) GetTagByName(tagName string) (*Tag, error) {
+	//TODO: Warning Recursion - Get single instead of array
 	tags, err := c.GetTags()
 	if err != nil {
 		return nil, err
+	}
+
+	if tags == nil || len(*tags) == 0 {
+		return nil, fmt.Errorf("No tag found with name %s", tagName)
 	}
 
 	var tag *Tag
@@ -41,6 +46,10 @@ func (c *Client) GetTagByName(tagName string) (*Tag, error) {
 			tag = &t
 			break
 		}
+	}
+
+	if tag == nil {
+		return nil, fmt.Errorf("No tag found with name %s", tagName)
 	}
 
 	return tag, nil

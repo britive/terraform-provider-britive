@@ -55,3 +55,8 @@ func (ih *ImportHelper) ParseImportID(idRegexes []string, d *schema.ResourceData
 	}
 	return fmt.Errorf("Import id %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
 }
+
+// TODO - Remove the backward compatability code after changing tags
+func parseImportID(idRegexes []string, d *schema.ResourceData) error {
+	return NewImportHelper().ParseImportID(idRegexes, d)
+}

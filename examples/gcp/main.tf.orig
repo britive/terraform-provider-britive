@@ -11,11 +11,15 @@ provider "britive" {
 }
 
 variable "name" {
-  default = "AWS-ValueLabs"
+  default = "GCP-ValueLabs"
 }
 
 locals {
+<<<<<<< HEAD
+  resource_name_prefix = "${var.name}-2020-10-31"
+=======
   resource_name_prefix = "${var.name}-2020-11-02"
+>>>>>>> origin/main
 }
 
 data "britive_identity_provider" "idp" {
@@ -45,6 +49,7 @@ resource "britive_tag_member" "new" {
 output "britive_tag_member_new" {
   value = britive_tag_member.new
 }
+<<<<<<< HEAD
 
 data "britive_application" "app" {
   name = var.name
@@ -65,8 +70,8 @@ resource "britive_profile" "new" {
   extension_duration               = "12m30s"
   extension_limit                  = 2
   associations {
-    type  = "Environment"
-    value = "QA Subscription"
+    type  = "EnvironmentGroup"
+    value = "Test Folder"
   }
 }
 
@@ -79,7 +84,7 @@ output "britive_profile_new" {
 resource "britive_profile_permission" "new" {
   profile_id = britive_profile.new.profile_id
   permission {
-    name = "Application Developer"
+    name = "Access Approval Viewer"
     type = "role"
   }
 }
@@ -114,3 +119,5 @@ resource "britive_profile_identity" "new" {
 output "britive_profile_identity_new" {
   value = britive_profile_identity.new
 }
+=======
+>>>>>>> origin/main

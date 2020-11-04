@@ -61,11 +61,11 @@ The following arguments are supported:
 In addition to the above arguments, the following attributes are exported.
 
 * `id` - An identifier for the resource.
-* `external` - This is a boolean attribute that indicates whether the tag is external or not.
+* `external` - The boolean attribute that indicates whether the tag is external or not.
 
 ## Import
 
-Tag can be imported using any of these accepted formats:
+You can import the tag using any of these accepted formats:
 
 ```
 $ terraform import britive_tag.new user-tags/{{tag_name}}

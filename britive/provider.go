@@ -13,14 +13,20 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-//Provider - godoc
+//Provider - Britive Provider
 func Provider() *schema.Provider {
+	validation := NewValidation()
 	importHelper := NewImportHelper()
 
 	resourceTag := NewResourceTag(importHelper)
 	resourceTagMember := NewResourceTagMember(importHelper)
+	resourceProfile := NewResourceProfile(validation, importHelper)
+	resourceProfilePermission := NewResourceProfilePermission()
+	resourceProfileIdentity := NewResourceProfileIdentity()
+	resourceProfileTag := NewResourceProfileTag()
 
 	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
+	dataSourceApplication := NewDataSourceApplication()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -43,11 +49,16 @@ func Provider() *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"britive_tag":        resourceTag.Resource,
-			"britive_tag_member": resourceTagMember.Resource,
+			"britive_tag":                resourceTag.Resource,
+			"britive_tag_member":         resourceTagMember.Resource,
+			"britive_profile":            resourceProfile.Resource,
+			"britive_profile_permission": resourceProfilePermission.Resource,
+			"britive_profile_identity":   resourceProfileIdentity.Resource,
+			"britive_profile_tag":        resourceProfileTag.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider": dataSourceIdentityProvider.Resource,
+			"britive_application":       dataSourceApplication.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

@@ -33,7 +33,7 @@ func (c *Client) GetIdentityProvider(identityProviderID string) (*IdentityProvid
 	return c.getIdentityProvider(resourceURL)
 }
 
-// GetIdentityProviderByName - Returns identity provider by passing name
+// GetIdentityProviderByName - Returns identity provider by name
 func (c *Client) GetIdentityProviderByName(name string) (*IdentityProvider, error) {
 	resourceURL := fmt.Sprintf("%s/identity-providers?metadata=false&name=%s", c.HostURL, name)
 	return c.getIdentityProvider(resourceURL)

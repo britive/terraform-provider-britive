@@ -23,7 +23,7 @@ resource "britive_tag_member" "new" {
 
 ## Argument Reference
 
-The following argument is supported:
+The following arguments are supported:
 
 * `tag_id` - (Required): The identifier of the tag.
 
@@ -41,7 +41,7 @@ In addition to the above argument, the following attribute is exported.
 
 ## Import
 
-Tag member can be imported using any of these accepted formats:
+You can import the tag member using any of these accepted formats:
 
 ```
 $ terraform import britive_tag_member.new user-tags/{{tag_name}}/users/{{username}}

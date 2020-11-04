@@ -1,14 +1,14 @@
-| layout    | page_title          | description                                                  |
-| --------- | ------------------- | ------------------------------------------------------------ |
-| Britive   | Provider: Britive   | The Britive Provider is used to interact with the resources supported by Britive APIs. The Provider needs to be configured with the proper credentials before it can be used. |
+| layout  | page_title        | description                                                  |
+| ------- | ----------------- | ------------------------------------------------------------ |
+| Britive | Provider: Britive | The Britive Provider is used to interact with the resources supported by the Britive APIs. The Provider needs to be configured with proper credentials before it can be used. |
 
 # Britive Provider
 
-Britive is a cloud-native security solution that provides centralized Privileged Access Security for cloud-forward enterprises. This is an overview document for the Britive Terraform Provider hosted by the Terraform registry.  
+Britive is a cloud-native security solution that provides centralized Privileged Access Security for cloud-forward enterprises. 
 
-The Britive provider is used to configure your Britive infrastructure using Terraform. 
+This is an overview document for the Britive Terraform Provider hosted by the Terraform registry.  
 
-The Britive provider is jointly maintained by:
+The Britive provider is used to configure your Britive infrastructure using Terraform. The Britive provider is jointly maintained by:
 
 * The Britive Team and 
 * The Terraform Team at HashiCorp
@@ -50,21 +50,21 @@ provider "britive" {
 
 The following arguments are supported:
 
-* `host` - (Required): The API URL for the Britive API.  
+* `host`  (Required): The API URL for the Britive API.  
 
-  For example, https://britive.local/api.
+  For example, https://britive.local/api
 
-* `token` - (Required): The API token required to authenticate the Britive API. 
+* `token`  (Required): The API token required to authenticate the Britive API. 
 
   For example, `iw8ECAdxhF/T/fyX/O3bCBV60TkOopdu5JEE0UY1mSw=`
 
-* `config_path` - (Optional): The Britive configuration (holding host and token as json attributes) file path. Default configuration path is `~/.britive/config`. 
+* `config_path` (Optional): The Britive configuration (holding host and token as JSON attributes) file path. The default configuration path is `~/.britive/config`. 
 
-  Sample config file content 
+  A sample config file content is shown here. 
   ```
   {
     "host": "https://britive.local/api",
     "token": "iw8ECAdxhF/T/fyX/O3bCBV60TkOopdu5JEE0UY1mSw="
   }
   ```
-~> If host and token passed either statically or through environment varibales those will be overwriten on the config file data.
+**Note:** If host and token are passed either statically or through environment variables, they will be overwritten on the config file.
