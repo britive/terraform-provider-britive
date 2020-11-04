@@ -36,12 +36,20 @@ func (c *Client) GetTagByName(tagName string) (*Tag, error) {
 		return nil, err
 	}
 
+	if tags == nil || len(*tags) == 0 {
+		return nil, fmt.Errorf("No tag found with name %s", tagName)
+	}
+
 	var tag *Tag
 	for _, t := range *tags {
 		if strings.ToLower(t.Name) == strings.ToLower(tagName) {
 			tag = &t
 			break
 		}
+	}
+
+	if tag == nil {
+		return nil, fmt.Errorf("No tag found with name %s", tagName)
 	}
 
 	return tag, nil
