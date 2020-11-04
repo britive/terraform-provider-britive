@@ -43,11 +43,13 @@ func NewResourceProfilePermission() *ResourceProfilePermission {
 						"name": &schema.Schema{
 							Type:        schema.TypeString,
 							Required:    true,
+							ForceNew:    true,
 							Description: "The name of permission",
 						},
 						"type": &schema.Schema{
 							Type:        schema.TypeString,
 							Required:    true,
+							ForceNew:    true,
 							Description: "The type of permission",
 						},
 					},

@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -127,11 +128,14 @@ func (rp *ResourceProfile) resourceCreate(ctx context.Context, d *schema.Resourc
 
 	rp.helper.mapResourceToModel(d, m, &profile, false)
 
+	log.Printf("[INFO] Creating new profile: %#v", profile)
+
 	p, err := c.CreateProfile(profile.AppContainerID, profile)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Submitted new profile: %#v", p)
 	d.SetId(rp.helper.generateUniqueID(p.AppContainerID, p.ProfileID))
 
 	rp.helper.saveProfileAssociations(p.AppContainerID, p.ProfileID, d, m)
@@ -262,32 +266,32 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	}
 	associations := make([]britive.ProfileAssociation, 0)
 	as := d.Get("associations").([]interface{})
-	if len(as) == 0 {
-		for _, daeg := range appRootEnvironmentGroup.EnvironmentGroups {
-			if daeg.ParentID == "" {
-				associations = rph.appendProfileAssociations(associations, "EnvironmentGroup", daeg.ID)
+	// if len(as) == 0 {
+	// 	for _, daeg := range appRootEnvironmentGroup.EnvironmentGroups {
+	// 		if daeg.ParentID == "" {
+	// 			associations = rph.appendProfileAssociations(associations, "EnvironmentGroup", daeg.ID)
+	// 			break
+	// 		}
+	// 	}
+	// } else {
+	for _, a := range as {
+		s := a.(map[string]interface{})
+		associationType := s["type"].(string)
+		associationName := s["value"].(string)
+		var rootAssociations []britive.Association
+		if associationType == "EnvironmentGroup" {
+			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
+		} else {
+			rootAssociations = appRootEnvironmentGroup.Environments
+		}
+		for _, aeg := range rootAssociations {
+			if aeg.Name == associationName {
+				associations = rph.appendProfileAssociations(associations, associationType, aeg.ID)
 				break
 			}
 		}
-	} else {
-		for _, a := range as {
-			s := a.(map[string]interface{})
-			associationType := s["type"].(string)
-			associationName := s["value"].(string)
-			var rootAssociations []britive.Association
-			if associationType == "EnvironmentGroup" {
-				rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
-			} else {
-				rootAssociations = appRootEnvironmentGroup.Environments
-			}
-			for _, aeg := range rootAssociations {
-				if aeg.Name == associationName {
-					associations = rph.appendProfileAssociations(associations, associationType, aeg.ID)
-					break
-				}
-			}
-		}
 	}
+	// }
 	if len(associations) > 0 {
 		err = c.SaveProfileAssociations(profileID, associations)
 		if err != nil {
@@ -349,7 +353,7 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 		return err
 	}
 
-	profile, err := c.GetProfile(appContainerID, profileID)
+	profile, err := c.GetProfile(profileID)
 	if err != nil {
 		return err
 	}
@@ -411,8 +415,8 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 	if len(associations) == 0 || appRootEnvironmentGroup == nil {
 		return make([]interface{}, 0), nil
 	}
-	profileAssociations := make([]interface{}, len(associations), len(associations))
-	for i, association := range associations {
+	profileAssociations := make([]interface{}, 0)
+	for _, association := range associations {
 		var rootAssociations []britive.Association
 		if association.Type == "EnvironmentGroup" {
 			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
@@ -432,7 +436,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 		profileAssociation := make(map[string]interface{})
 		profileAssociation["type"] = association.Type
 		profileAssociation["value"] = a.Name
-		profileAssociations[i] = profileAssociation
+		profileAssociations = append(profileAssociations, profileAssociation)
 	}
 	return profileAssociations, nil
 

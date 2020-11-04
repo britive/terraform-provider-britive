@@ -29,8 +29,8 @@ func (c *Client) GetProfiles(appContainerID string) (*[]Profile, error) {
 }
 
 // GetProfile - Returns a specifc user profile
-func (c *Client) GetProfile(appContainerID string, profileID string) (*Profile, error) {
-	requestURL := fmt.Sprintf("%s/apps/%s/paps/%s", c.HostURL, appContainerID, profileID)
+func (c *Client) GetProfile(profileID string) (*Profile, error) {
+	requestURL := fmt.Sprintf("%s/paps/%s", c.HostURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, err
@@ -40,17 +40,12 @@ func (c *Client) GetProfile(appContainerID string, profileID string) (*Profile, 
 	if err != nil {
 		return nil, err
 	}
-	//TODO: Warning Recursion - Get single instead of array
-	profiles := []Profile{}
-	err = json.Unmarshal(body, &profiles)
+	profile := &Profile{}
+	err = json.Unmarshal(body, profile)
 	if err != nil {
 		return nil, err
 	}
-	if len(profiles) == 0 {
-		return nil, fmt.Errorf("No profiles matching for the resource %s", requestURL)
-	}
-
-	return &profiles[0], nil
+	return profile, nil
 }
 
 // CreateProfile - Create new profile
