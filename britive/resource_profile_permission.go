@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -80,10 +81,14 @@ func (rpp *ResourceProfilePermission) resourceCreate(ctx context.Context, d *sch
 		},
 	}
 
+	log.Printf("[INFO] Creating new profile permission:  %s, %#v", profileID, profilePermissionRequest)
+
 	err := c.ExecuteProfilePermissionRequest(profileID, profilePermissionRequest)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Submitted new profile permission:  %s, %#v", profileID, profilePermissionRequest)
 
 	d.SetId(rpp.helper.generateUniqueID(profilePermissionRequest.Permission))
 
@@ -98,10 +103,16 @@ func (rpp *ResourceProfilePermission) resourceRead(ctx context.Context, d *schem
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Reading profile permission:  %s, %#v", profilePermission.ProfileID, *profilePermission)
+
 	pp, err := c.GetProfilePermission(profilePermission.ProfileID, *profilePermission)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Reading profile permission:  %s, %#v", profilePermission.ProfileID, pp)
+
 	d.SetId(rpp.helper.generateUniqueID(*pp))
 
 	return diags
@@ -120,10 +131,15 @@ func (rpp *ResourceProfilePermission) resourceDelete(ctx context.Context, d *sch
 		Permission: *profilePermission,
 	}
 
+	log.Printf("[INFO] Deleting profile permission: %s, %#v", profilePermission.ProfileID, profilePermissionRequest)
+
 	err = c.ExecuteProfilePermissionRequest(profilePermission.ProfileID, profilePermissionRequest)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Deleted profile permission: %s, %#v", profilePermission.ProfileID, profilePermissionRequest)
+
 	d.SetId("")
 
 	return diags

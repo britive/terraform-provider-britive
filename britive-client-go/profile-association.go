@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// GetProfileAssociations - Returns a specifc user from profile
+// GetProfileAssociations - Returns a all associations linked with profile
 func (c *Client) GetProfileAssociations(profileID string) (*[]ProfileAssociation, error) {
 	requestURL := fmt.Sprintf("%s/paps/%s/scopes", c.HostURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)

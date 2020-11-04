@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -77,10 +78,14 @@ func (rpt *ResourceProfileTag) resourceCreate(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 
-	_, err = c.CreateProfileTag(*profileTag)
+	log.Printf("[INFO] Creating new profile tag: %#v", *profileTag)
+
+	pt, err := c.CreateProfileTag(*profileTag)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Submitted new profile tag: %#v", *pt)
 
 	d.SetId(rpt.helper.generateUniqueID(profileTag.ProfileID, profileTag.TagID))
 
@@ -96,10 +101,15 @@ func (rpt *ResourceProfileTag) resourceRead(ctx context.Context, d *schema.Resou
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Reading profile tag: %s/%s", profileID, tagID)
+
 	pt, err := c.GetProfileTag(profileID, tagID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Recieved profile tag: %#v", pt)
+
 	d.SetId(rpt.helper.generateUniqueID(profileID, tagID))
 
 	if pt.AccessPeriod != nil {
@@ -126,10 +136,14 @@ func (rpt *ResourceProfileTag) resourceUpdate(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 
-	_, err = c.UpdateProfileTag(*profileTag)
+	log.Printf("[INFO] Updating profile tag: %#v", *profileTag)
+
+	upt, err := c.UpdateProfileTag(*profileTag)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Submitted Updated profile tag: %#v", upt)
 
 	d.SetId(rpt.helper.generateUniqueID(profileTag.ProfileID, profileTag.TagID))
 
@@ -146,10 +160,15 @@ func (rpt *ResourceProfileTag) resourceDelete(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Deleting profile tag: %s/%s", profileID, tagID)
+
 	err = c.DeleteProfileTag(profileID, tagID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Deleted profile tag: %s/%s", profileID, tagID)
+
 	d.SetId("")
 
 	return diags

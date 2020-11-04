@@ -51,12 +51,3 @@ The following arguments are supported:
 In addition to the above argument, the following attribute is exported.
 
 * `id` - An identifier of the resource with format `paps/{{profileID}}/user-tags/{{tagID}}`
-
-## Import
-
-You can import a profile tag using any of these accepted formats:
-
-```
-$ terraform import britive_profile_tag.new paps/{{profile_name}}/user-tags/{{tag_name}}
-$ terraform import britive_profile_tag.new {{profile_name}}/{{tag_name}}
-```

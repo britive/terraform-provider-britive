@@ -87,7 +87,7 @@ func (c *Client) CreateProfileIdentity(profileIdentity ProfileIdentity) (*Profil
 	return c.createOrUpdateProfileIdentity("POST", profileIdentity)
 }
 
-// UpdateProfileIdentity - Add identity to profile
+// UpdateProfileIdentity - Update profile identity properties
 func (c *Client) UpdateProfileIdentity(profileIdentity ProfileIdentity) (*ProfileIdentity, error) {
 	return c.createOrUpdateProfileIdentity("PATCH", profileIdentity)
 }

@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// GetProfileTags - Returns all tags assigned to profile
-func (c *Client) GetProfileTags(profileID string) (*[]ProfileTag, error) {
+// GetAssignedProfileTags - Returns all tags assigned to profile
+func (c *Client) GetAssignedProfileTags(profileID string) (*[]ProfileTag, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/user-tags?filter=assigned", c.HostURL, profileID), nil)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (c *Client) GetProfileTags(profileID string) (*[]ProfileTag, error) {
 // GetProfileTag - Returns a specifc tag from profile
 func (c *Client) GetProfileTag(profileID string, tagID string) (*ProfileTag, error) {
 	//TODO: Warning Recursion - Get single instead of array
-	profileTags, err := c.GetProfileTags(profileID)
+	profileTags, err := c.GetAssignedProfileTags(profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (c *Client) CreateProfileTag(profileTag ProfileTag) (*ProfileTag, error) {
 	return c.createOrUpdateProfileTag("POST", profileTag)
 }
 
-// UpdateProfileTag - Add tag to profile
+// UpdateProfileTag - Update profile tag attributes
 func (c *Client) UpdateProfileTag(profileTag ProfileTag) (*ProfileTag, error) {
 	return c.createOrUpdateProfileTag("PATCH", profileTag)
 }

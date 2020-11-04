@@ -46,12 +46,3 @@ The following argument is supported:
 In addition to the above argument, the following attribute is exported.
 
 * `id` - An identifier of the resource with the format `paps/{{profileID}}/permissions/{{permission_name}}/type/{{permission_type}}`
-
-## Import
-
-You can import the profile tag using any of these accepted formats:
-
-```
-$ terraform import britive_profile_permission.new paps/{{profile_name}}/permissions/{{permission_name}}/type/{{permission_type}}
-$ terraform import britive_profile_permission.new {{profile_name}}/{{permission_name}}/{{permission_type}}
-```

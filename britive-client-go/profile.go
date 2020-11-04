@@ -71,7 +71,7 @@ func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile
 	return &profile, nil
 }
 
-// UpdateProfile - Updates an profile
+// UpdateProfile - Updates profile
 func (c *Client) UpdateProfile(appContainerID string, profileID string, profile Profile) (*Profile, error) {
 	utsb, err := json.Marshal(profile)
 	if err != nil {
@@ -95,7 +95,7 @@ func (c *Client) UpdateProfile(appContainerID string, profileID string, profile 
 	return &profile, nil
 }
 
-// DeleteProfile - Deletes an profile
+// DeleteProfile - Deletes profile
 func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/paps/%s", c.HostURL, appContainerID, profileID), nil)
 	if err != nil {

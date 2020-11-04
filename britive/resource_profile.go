@@ -175,11 +175,18 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 
 		profile := britive.Profile{}
 		rp.helper.mapResourceToModel(d, m, &profile, true)
-		_, err = c.UpdateProfile(appContainerID, profileID, profile)
+
+		log.Printf("[INFO] Updating profile: %#v", profile)
+
+		up, err := c.UpdateProfile(appContainerID, profileID, profile)
 		if err != nil {
 			return diag.FromErr(err)
 		}
+
+		log.Printf("[INFO] Submitted updated profile: %#v", up)
+
 		rp.helper.saveProfileAssociations(appContainerID, profileID, d, m)
+
 		return rp.resourceRead(ctx, d, m)
 	}
 	return nil
@@ -195,10 +202,14 @@ func (rp *ResourceProfile) resourceDelete(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Deleting profile: %s/%s", appContainerID, profileID)
+
 	err = c.DeleteProfile(appContainerID, profileID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Deleted profile: %s/%s", appContainerID, profileID)
 	d.SetId("")
 
 	return diags
@@ -210,12 +221,14 @@ func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m inter
 	}
 	appContainerID := d.Get("app_container_id").(string)
 	profileID := d.Get("profile_id").(string)
+
+	log.Printf("[INFO] Importing profile: %s/%s", appContainerID, profileID)
 	d.SetId(rp.helper.generateUniqueID(appContainerID, profileID))
 	err := rp.helper.getAndMapModelToResource(d, m)
 	if err != nil {
 		return nil, err
 	}
-
+	log.Printf("[INFO] Imported profile: %s/%s", appContainerID, profileID)
 	return []*schema.ResourceData{d}, nil
 }
 
@@ -293,10 +306,12 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	}
 	// }
 	if len(associations) > 0 {
+		log.Printf("[INFO] Updating profile %s associations: %#v", profileID, associations)
 		err = c.SaveProfileAssociations(profileID, associations)
 		if err != nil {
 			return err
 		}
+		log.Printf("[INFO] Submitted Update profile %s associations: %#v", profileID, associations)
 	}
 	return nil
 }
@@ -353,10 +368,15 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 		return err
 	}
 
+	log.Printf("[INFO] Reading profile %s", profileID)
+
 	profile, err := c.GetProfile(profileID)
 	if err != nil {
 		return err
 	}
+
+	log.Printf("[INFO] Received profile %#v", profile)
+
 	if err := d.Set("app_container_id", profile.AppContainerID); err != nil {
 		return err
 	}
@@ -378,22 +398,20 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	if err := d.Set("extendable", profile.Extendable); err != nil {
 		return err
 	}
-	if profile.Extendable {
-		if profile.NotificationPriorToExpiration != nil {
-			notificationPriorToExpiration := *profile.NotificationPriorToExpiration
-			if err := d.Set("notification_prior_to_expiration", time.Duration(notificationPriorToExpiration*int64(time.Millisecond)).String()); err != nil {
-				return err
-			}
-		}
-		if profile.ExtensionDuration != nil {
-			extensionDuration := *profile.ExtensionDuration
-			if err := d.Set("extension_duration", time.Duration(extensionDuration*int64(time.Millisecond)).String()); err != nil {
-				return err
-			}
-		}
-		if err := d.Set("extension_limit", profile.ExtensionLimit); err != nil {
+	if profile.NotificationPriorToExpiration != nil {
+		notificationPriorToExpiration := *profile.NotificationPriorToExpiration
+		if err := d.Set("notification_prior_to_expiration", time.Duration(notificationPriorToExpiration*int64(time.Millisecond)).String()); err != nil {
 			return err
 		}
+	}
+	if profile.ExtensionDuration != nil {
+		extensionDuration := *profile.ExtensionDuration
+		if err := d.Set("extension_duration", time.Duration(extensionDuration*int64(time.Millisecond)).String()); err != nil {
+			return err
+		}
+	}
+	if err := d.Set("extension_limit", profile.ExtensionLimit); err != nil {
+		return err
 	}
 	associations, err := rph.mapProfileAssociationsModelToResource(appContainerID, profile.Associations, m)
 	if err != nil {

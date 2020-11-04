@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -77,11 +78,14 @@ func (rpt *ResourceProfileIdentity) resourceCreate(ctx context.Context, d *schem
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Creating new profile identity: %#v", *profileIdentity)
+
 	_, err = c.CreateProfileIdentity(*profileIdentity)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Submitted new profile identity: %#v", *profileIdentity)
 	d.SetId(rpt.helper.generateUniqueID(profileIdentity.ProfileID, profileIdentity.UserID))
 
 	return rpt.resourceRead(ctx, d, m)
@@ -96,10 +100,14 @@ func (rpt *ResourceProfileIdentity) resourceRead(ctx context.Context, d *schema.
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Reading profile identity: %s/%s", profileID, userID)
+
 	pt, err := c.GetProfileIdentity(profileID, userID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Recieved profile identity: %#v", pt)
 	d.SetId(rpt.helper.generateUniqueID(profileID, userID))
 
 	if pt.AccessPeriod != nil {
@@ -126,10 +134,14 @@ func (rpt *ResourceProfileIdentity) resourceUpdate(ctx context.Context, d *schem
 		return diag.FromErr(err)
 	}
 
-	_, err = c.UpdateProfileIdentity(*profileIdentity)
+	log.Printf("[INFO] Updating profile identity: %#v", *profileIdentity)
+
+	pi, err := c.UpdateProfileIdentity(*profileIdentity)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Submitted updated profile identity: %#v", pi)
 
 	d.SetId(rpt.helper.generateUniqueID(profileIdentity.ProfileID, profileIdentity.UserID))
 
@@ -146,10 +158,14 @@ func (rpt *ResourceProfileIdentity) resourceDelete(ctx context.Context, d *schem
 		return diag.FromErr(err)
 	}
 
+	log.Printf("[INFO] Deleting profile identity: %s/%s", profileID, userID)
+
 	err = c.DeleteProfileIdentity(profileID, userID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	log.Printf("[INFO] Deleted profile identity: %s/%s", profileID, userID)
 	d.SetId("")
 
 	return diags
