@@ -6,6 +6,8 @@
 
 Gets information about the application.
 
+**Note:** An application is any IAAS/SAAS application integrated with Britive. For example, AWS.
+
 ## Example Usage
 
 ```hcl

@@ -1,10 +1,10 @@
 | subcategory  | layout    | page_title                    | description                                            |
 | ------------ | --------- | ----------------------------- | ------------------------------------------------------ |
-| Profile Permission   | Britive   | Britive: britive_profile_permission   | The Britive Profile Permission adds a permission to the Britive profile. |
+| Profile Permission   | Britive   | Britive: britive_profile_permission   | The Britive Profile Permission adds a permission to a Britive profile. |
 
 # britive\_profile\_permission
 
-Adds a permission to the Britive profile.
+Adds a permission to a Britive profile.
 
 ## Example Usage
 
@@ -26,13 +26,13 @@ resource "britive_profile_permission" "new" {
 
 The following argument is supported:
 
-* `profile_id` - (Required): The identifier of the profile.
+* `profile_id` (Required): The identifier of the profile.
 
   For example: `britive_profile.new.id`
 
-* `permission` - (Required): The permission to add to the profile. 
+* `permission` (Required): The permission that should be added to the profile. 
 
-  The format is documented below.
+  The format of the permission is given below.
 
 
 ### `permission` block supports
@@ -45,11 +45,11 @@ The following argument is supported:
 
 In addition to the above argument, the following attribute is exported.
 
-* `id` - An identifier of the resource with format `paps/{{profileID}}/permissions/{{permission_name}}/type/{{permission_type}}`
+* `id` - An identifier of the resource with the format `paps/{{profileID}}/permissions/{{permission_name}}/type/{{permission_type}}`
 
 ## Import
 
-Profile tag can be imported using any of these accepted formats:
+You can import the profile tag using any of these accepted formats:
 
 ```
 $ terraform import britive_profile_permission.new paps/{{profile_name}}/permissions/{{permission_name}}/type/{{permission_type}}

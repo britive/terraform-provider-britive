@@ -1,10 +1,10 @@
 | subcategory  | layout    | page_title                    | description                                            |
 | ------------ | --------- | ----------------------------- | ------------------------------------------------------ |
-| Profile Identity   | Britive   | Britive: britive_profile_identity   | The Britive Profile Identity adds a identity to the Britive profile. |
+| Profile Identity   | Britive   | Britive: britive_profile_identity   | The Britive Profile Identity adds an identity to a Britive profile. |
 
 # britive\_profile\_identity
 
-Adds a identity to the Britive profile.
+Adds an identity to a Britive profile.
 
 ## Example Usage
 
@@ -27,17 +27,17 @@ resource "britive_profile_identity" "new" {
 
 The following argument is supported:
 
-* `profile_id` - (Required): The identifier of the profile.
+* `profile_id` (Required): The identifier of the profile.
 
   For example: `britive_profile.new.id`
 
-* `username` - (Required): The name of the identity.
+* `username` (Required): The name of the identity.
 
   For example: `My Tag`
 
-* `access_period` - (Optional): The access period of identity in the profile. 
+* `access_period` (Optional): The access period of the identity in a profile. 
 
-  The format is documented below.
+  The format of an access_period is documented below.
 
 
 ### `access_period` block supports
@@ -50,11 +50,11 @@ The following argument is supported:
 
 In addition to the above argument, the following attribute is exported.
 
-* `id` - An identifier of the resource with format `paps/{{profileID}}/users/{{userID}}`
+* `id` - An identifier of the resource with the format `paps/{{profileID}}/users/{{userID}}`
 
 ## Import
 
-Profile identity can be imported using any of these accepted formats:
+You can import the profile identity using any of these accepted formats:
 
 ```
 $ terraform import britive_profile_identity.new paps/{{profile_name}}/users/{{username}}

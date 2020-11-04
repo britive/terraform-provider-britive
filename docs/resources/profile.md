@@ -1,10 +1,10 @@
 | subcategory | layout    | page_title             | description                             |
 | ----------- | --------- | ---------------------- | --------------------------------------- |
-| Profile         |  Britive  | Britive: britive_profile   | The Britive Profile creates a new profile. |
+| Profile         |  Britive  | Britive: britive_profile   | The Britive Profile creates a new user profile. |
 
 # britive\_profile
 
-Creates a new profile.
+Creates a new user profile.
 
 ## Example Usage
 
@@ -34,65 +34,65 @@ resource "britive_profile" "new" {
 
 The following arguments are supported:
 
-* `app_container_id` - (Required): The id of the Britive application.
+* `app_container_id` (Required): The id of the Britive application.
 
   For example: `bCBV60TkOopdu5JEE` or `data.britive_application.app.id`
 
-* `name` - (Required): The name of profile.
+* `name` (Required): The name of the profile.
 
   For example: `My Profile`
 
-* `description` - (Optional): A description of the profile.
+* `description` (Optional): A description of the profile.
 
   For example: `My Profile Description`
 
-* `status` - (Required): The status of the profile.
+* `status` (Required): The status of the profile.
 
   For example: `Active`
 
-* `expiration_duration` - (Required): The expiration duration of the profile.
+* `expiration_duration` (Required): The expiration time for the profile.
 
   For example: `25m0s`
 
 
-* `extendable` - (Optional): Boolean flag whether profile expiration is extendable or not. Default to `false`.
+* `extendable` (Optional): The Boolean flag that indicates whether profile expiry is extendable or not. The default value is `false`.
 
   For example: `false`
 
-* `notification_prior_to_expiration` - (Optional): The profile expiration notification as duration.
+* `notification_prior_to_expiration`  (Optional): The profile expiry notification as a time value.
 
   For example: `10m0s`
 
 
-* `extension_duration` - (Optional): The profile expiration extenstion as duration.
+* `extension_duration` - (Optional): The profile expiry extension as a time value.
 
   For example: `12m30s`
 
 
-* `extension_limit` - (Optional): The profile expiration extension repeat limit
+* `extension_limit` - (Optional): The repetition limit for extending the profile expiry.
 
   For example: `2`
 
 * `associations` - (Required): The list of associations for the profile. 
 
-  The format is documented below.
+  The format of an association is documented below.
 
 
 ### `associations` block supports
 
-* `type` - Type of association, either Environment or EnvironmentGroup.
+* `type` - The type of association, either Environment or Environment Group.
 
-* `value` - Association value.
+* `value` - The association value.
 
 ## Attribute Reference
 
-In addition to the above arguments, the following attributes are exported.
+In addition to the above arguments, the following attribute is exported.
 
 * `id` - An identifier for the resource.
 
 ## Import
 
-Profile can be imported using any of these accepted formats:
+You can import a profile using any of these accepted formats:
 
 ```
 $ terraform import britive_profile.new user-profiles/{{profile_name}}

@@ -33,7 +33,7 @@ The following argument is supported:
 
 ## Attributes Reference
 
-In addition to the above arguments , the following attributes are exported:
+In addition to the above arguments, the following attribute is exported:
 
 * `id` - an identifier for the data source. 
 

@@ -25,19 +25,19 @@ resource "britive_profile_tag" "new" {
 
 ## Argument Reference
 
-The following argument is supported:
+The following arguments are supported:
 
-* `profile_id` - (Required): The identifier of the profile.
+* `profile_id` (Required): The identifier of the profile.
 
   For example: `britive_profile.new.id`
 
-* `tag` - (Required): The name of the tag.
+* `tag` (Required): The name of the tag.
 
   For example: `My Tag`
 
-* `access_period` - (Optional): The access period of tag in the profile. 
+* `access_period` (Optional): The access period of tag in the profile. 
 
-  The format is documented below.
+  The format of access_period is given below.
 
 
 ### `access_period` block supports
@@ -54,7 +54,7 @@ In addition to the above argument, the following attribute is exported.
 
 ## Import
 
-Profile tag can be imported using any of these accepted formats:
+You can import a profile tag using any of these accepted formats:
 
 ```
 $ terraform import britive_profile_tag.new paps/{{profile_name}}/user-tags/{{tag_name}}
