@@ -7,6 +7,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceTag - Terraform Resource for Tag
@@ -42,9 +43,10 @@ func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 				Description: "The description of the tag",
 			},
 			"status": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The status of the tag",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The status of the tag",
+				ValidateFunc: validation.StringInSlice([]string{"Active", "Inactive"}, false),
 			},
 			"user_tag_identity_providers": &schema.Schema{
 				Type:        schema.TypeList,
@@ -143,9 +145,9 @@ func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData,
 }
 
 func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
+	tagID := d.Id()
 	if d.HasChange("name") || d.HasChange("description") {
-		c := m.(*britive.Client)
-		tagID := d.Id()
 		tag := britive.Tag{}
 		tag.Name = d.Get("name").(string)
 		tag.Description = d.Get("description").(string)
@@ -157,6 +159,19 @@ func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceDat
 		}
 
 		log.Printf("[INFO] Submitted updated tag: %#v", ut)
+		d.SetId(ut.ID)
+
+		return rt.resourceRead(ctx, d, m)
+	} else if d.HasChange("status") {
+		status := d.Get("status").(string)
+
+		log.Printf("[INFO] Updating status: %s of tag: %s", status, tagID)
+		ut, err := c.EnableOrDisableTag(tagID, status)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		log.Printf("[INFO] Submitted updated status of tag: %#v", ut)
 		d.SetId(ut.ID)
 
 		return rt.resourceRead(ctx, d, m)

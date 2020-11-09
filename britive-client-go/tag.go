@@ -129,6 +129,33 @@ func (c *Client) UpdateTag(tagID string, tag Tag) (*Tag, error) {
 	return &tag, nil
 }
 
+// EnableOrDisableTag - Enable or Disable tag
+func (c *Client) EnableOrDisableTag(tagID string, status string) (*Tag, error) {
+	var endpoint string
+	if status == "Active" {
+		endpoint = "enabled-statuses"
+	} else {
+		endpoint = "disabled-statuses"
+	}
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/user-tags/%s/%s", c.HostURL, tagID, endpoint), strings.NewReader(string([]byte("{}"))))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var tag Tag
+	err = json.Unmarshal(body, &tag)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tag, nil
+}
+
 // DeleteTag - Delete tag
 func (c *Client) DeleteTag(tagID string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/user-tags/%s", c.HostURL, tagID), nil)
