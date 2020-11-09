@@ -147,7 +147,9 @@ func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData,
 func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 	tagID := d.Id()
+	var hasChanges bool
 	if d.HasChange("name") || d.HasChange("description") {
+		hasChanges = true
 		tag := britive.Tag{}
 		tag.Name = d.Get("name").(string)
 		tag.Description = d.Get("description").(string)
@@ -160,9 +162,9 @@ func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceDat
 
 		log.Printf("[INFO] Submitted updated tag: %#v", ut)
 		d.SetId(ut.ID)
-
-		return rt.resourceRead(ctx, d, m)
-	} else if d.HasChange("status") {
+	}
+	if d.HasChange("status") {
+		hasChanges = true
 		status := d.Get("status").(string)
 
 		log.Printf("[INFO] Updating status: %s of tag: %s", status, tagID)
@@ -173,7 +175,8 @@ func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceDat
 
 		log.Printf("[INFO] Submitted updated status of tag: %#v", ut)
 		d.SetId(ut.ID)
-
+	}
+	if hasChanges {
 		return rt.resourceRead(ctx, d, m)
 	}
 	return nil

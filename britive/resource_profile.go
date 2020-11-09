@@ -10,6 +10,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceProfile - Terraform Resource for Profile
@@ -21,10 +22,10 @@ type ResourceProfile struct {
 }
 
 //NewResourceProfile - Initialisation of new profile resource
-func NewResourceProfile(validation *Validation, importHelper *ImportHelper) *ResourceProfile {
+func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProfile {
 	rp := &ResourceProfile{
 		helper:       NewResourceProfileHelper(),
-		validation:   validation,
+		validation:   v,
 		importHelper: importHelper,
 	}
 	rp.Resource = &schema.Resource{
@@ -60,13 +61,14 @@ func NewResourceProfile(validation *Validation, importHelper *ImportHelper) *Res
 				Description: "The description of the profile",
 			},
 			"status": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The status of the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The status of the profile",
+				ValidateFunc: validation.StringInSlice([]string{"active", "inactive"}, false),
 			},
 			"associations": &schema.Schema{
 				Type:        schema.TypeList,
-				Optional:    true,
+				Required:    true,
 				Description: "Associations for the profile",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
@@ -159,6 +161,12 @@ func (rp *ResourceProfile) resourceRead(ctx context.Context, d *schema.ResourceD
 }
 
 func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	c := m.(*britive.Client)
+	appContainerID, profileID, err := rp.helper.parseUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	var hasChanges bool
 	if d.HasChange("name") ||
 		d.HasChange("description") ||
 		d.HasChange("associations") ||
@@ -167,11 +175,8 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 		d.HasChange("notification_prior_to_expiration") ||
 		d.HasChange("extension_duration") ||
 		d.HasChange("extension_limit") {
-		c := m.(*britive.Client)
-		appContainerID, profileID, err := rp.helper.parseUniqueID(d.Id())
-		if err != nil {
-			return diag.FromErr(err)
-		}
+
+		hasChanges = true
 
 		profile := britive.Profile{}
 		rp.helper.mapResourceToModel(d, m, &profile, true)
@@ -186,7 +191,21 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 		log.Printf("[INFO] Submitted updated profile: %#v", up)
 
 		rp.helper.saveProfileAssociations(appContainerID, profileID, d, m)
+	}
+	if d.HasChange("status") {
 
+		hasChanges = true
+		status := d.Get("status").(string)
+
+		log.Printf("[INFO] Updating status: %s of profile: %s", status, profileID)
+		up, err := c.EnableOrDisableProfile(appContainerID, profileID, status)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		log.Printf("[INFO] Submitted updated status of profile: %#v", up)
+	}
+	if hasChanges {
 		return rp.resourceRead(ctx, d, m)
 	}
 	return nil
@@ -279,14 +298,6 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	}
 	associations := make([]britive.ProfileAssociation, 0)
 	as := d.Get("associations").([]interface{})
-	// if len(as) == 0 {
-	// 	for _, daeg := range appRootEnvironmentGroup.EnvironmentGroups {
-	// 		if daeg.ParentID == "" {
-	// 			associations = rph.appendProfileAssociations(associations, "EnvironmentGroup", daeg.ID)
-	// 			break
-	// 		}
-	// 	}
-	// } else {
 	for _, a := range as {
 		s := a.(map[string]interface{})
 		associationType := s["type"].(string)
@@ -304,7 +315,6 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 			}
 		}
 	}
-	// }
 	if len(associations) > 0 {
 		log.Printf("[INFO] Updating profile %s associations: %#v", profileID, associations)
 		err = c.SaveProfileAssociations(profileID, associations)

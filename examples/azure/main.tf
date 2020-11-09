@@ -15,7 +15,7 @@ variable "name" {
 }
 
 locals {
-  resource_name_prefix = "${var.name}-2020-11-09"
+  resource_name_prefix = "${var.name}-2020-11-09 New"
 }
 
 data "britive_identity_provider" "idp" {
@@ -60,7 +60,7 @@ resource "britive_profile" "new" {
   description                      = "${local.resource_name_prefix}-Profile"
   status                           = "active"
   expiration_duration              = "25m0s"
-  extendable                       = false
+  extendable                       = true
   notification_prior_to_expiration = "10m0s"
   extension_duration               = "12m30s"
   extension_limit                  = 2

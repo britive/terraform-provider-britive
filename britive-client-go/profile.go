@@ -95,6 +95,33 @@ func (c *Client) UpdateProfile(appContainerID string, profileID string, profile 
 	return &profile, nil
 }
 
+// EnableOrDisableProfile - Enable or Disable tag
+func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string, status string) (*Profile, error) {
+	var endpoint string
+	if status == "active" {
+		endpoint = "enabled-statuses"
+	} else {
+		endpoint = "disabled-statuses"
+	}
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps/%s/%s", c.HostURL, appContainerID, profileID, endpoint), strings.NewReader(string([]byte("{}"))))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var profile Profile
+	err = json.Unmarshal(body, &profile)
+	if err != nil {
+		return nil, err
+	}
+
+	return &profile, nil
+}
+
 // DeleteProfile - Deletes profile
 func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/paps/%s", c.HostURL, appContainerID, profileID), nil)
