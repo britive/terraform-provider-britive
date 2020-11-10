@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+	"net/url"
 )
 
 // GetApplications - Returns all applications
@@ -31,39 +31,6 @@ func (c *Client) GetApplications() (*[]Application, error) {
 // GetApplication - Returns application
 func (c *Client) GetApplication(appContainerID string) (*Application, error) {
 	resourceURL := fmt.Sprintf("%s/apps/%s", c.HostURL, appContainerID)
-	return c.getApplication(resourceURL)
-}
-
-// GetApplicationByName - Returns application
-func (c *Client) GetApplicationByName(name string) (*Application, error) {
-	// resourceURL := fmt.Sprintf("%s/apps?metadata=false&name=%s", c.HostURL, name)
-	// return c.getApplication(resourceURL)
-	//TODO: Warning Recursion - Get by Name
-	applications, err := c.GetApplications()
-	if err != nil {
-		return nil, err
-	}
-
-	if applications == nil || len(*applications) == 0 {
-		return nil, fmt.Errorf("No application matching for the resource by name %s", name)
-	}
-
-	var application *Application
-	for _, a := range *applications {
-		if strings.ToLower(a.CatalogAppDisplayName) == strings.ToLower(name) {
-			application = &a
-			break
-		}
-	}
-
-	if application == nil {
-		return nil, fmt.Errorf("No application matching for the resource by name %s", name)
-	}
-
-	return application, nil
-}
-
-func (c *Client) getApplication(resourceURL string) (*Application, error) {
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err
@@ -81,4 +48,35 @@ func (c *Client) getApplication(resourceURL string) (*Application, error) {
 	}
 
 	return &application, nil
+}
+
+// GetApplicationByName - Returns application
+func (c *Client) GetApplicationByName(name string) (*Application, error) {
+	filter := fmt.Sprintf(`name eq "%s"`, name)
+	resourceURL := fmt.Sprintf(`%s/apps?filter=%s`, c.HostURL, url.QueryEscape(filter))
+	req, err := http.NewRequest("GET", resourceURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if string(body) == "" {
+		return nil, fmt.Errorf("No application matching with the name %s", name)
+	}
+
+	applications := make([]Application, 0)
+	err = json.Unmarshal(body, &applications)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(applications) == 0 {
+		return nil, fmt.Errorf("No application matching with the name %s", name)
+	}
+
+	return &applications[0], nil
 }

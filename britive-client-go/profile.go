@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -26,6 +27,37 @@ func (c *Client) GetProfiles(appContainerID string) (*[]Profile, error) {
 	}
 
 	return &profiles, nil
+}
+
+// GetProfileByName - Returns a specifc profile by name
+func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile, error) {
+	filter := fmt.Sprintf(`name eq "%s"`, name)
+	resourceURL := fmt.Sprintf(`%s/apps/%s/paps?filter=%s`, c.HostURL, appContainerID, url.QueryEscape(filter))
+	req, err := http.NewRequest("GET", resourceURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if string(body) == "" {
+		return nil, fmt.Errorf("No profile matching with the name %s", name)
+	}
+
+	profiles := make([]Profile, 0)
+	err = json.Unmarshal(body, &profiles)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("No profile matching with the name %s", name)
+	}
+
+	return &profiles[0], nil
 }
 
 // GetProfile - Returns a specifc user profile

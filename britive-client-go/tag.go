@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -29,30 +30,34 @@ func (c *Client) GetTags() (*[]Tag, error) {
 }
 
 // GetTagByName - Returns a specifc tag by name
-func (c *Client) GetTagByName(tagName string) (*Tag, error) {
-	//TODO: Warning Recursion - Get single instead of array
-	tags, err := c.GetTags()
+func (c *Client) GetTagByName(name string) (*Tag, error) {
+	filter := fmt.Sprintf(`name eq "%s"`, name)
+	resourceURL := fmt.Sprintf(`%s/user-tags?filter=%s`, c.HostURL, url.QueryEscape(filter))
+	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if tags == nil || len(*tags) == 0 {
-		return nil, fmt.Errorf("No tag found with name %s", tagName)
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
 	}
 
-	var tag *Tag
-	for _, t := range *tags {
-		if strings.ToLower(t.Name) == strings.ToLower(tagName) {
-			tag = &t
-			break
-		}
+	if string(body) == "" {
+		return nil, fmt.Errorf("No tag matching with the name %s", name)
 	}
 
-	if tag == nil {
-		return nil, fmt.Errorf("No tag found with name %s", tagName)
+	tags := make([]Tag, 0)
+	err = json.Unmarshal(body, &tags)
+	if err != nil {
+		return nil, err
 	}
 
-	return tag, nil
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("No tag matching with the name %s", name)
+	}
+
+	return &tags[0], nil
 }
 
 // GetTag - Returns a specifc tag by id
