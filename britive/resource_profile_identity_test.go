@@ -37,7 +37,6 @@ func testAccCheckBritiveProfileIdentityConfig(applicationName string, profileNam
 		app_container_id = data.britive_application.app.id
 		name = "%s"
 		description = "%s"
-		status = "active"
 		expiration_duration = "25m0s"
 	}
 

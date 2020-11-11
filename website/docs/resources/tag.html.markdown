@@ -18,7 +18,6 @@ data "britive_identity_provider" "idp" {
 resource "britive_tag" "new" {
     name = "My Tag"
     description = "My Tag Description"
-    status = "Active"
     user_tag_identity_providers {
         identity_provider {
             id = data.britive_identity_provider.idp.id
@@ -38,9 +37,7 @@ The following arguments are supported:
 
   For example: `My Tag Description`
 
-* `status` - (Required): The status of the tag.
-
-  For example: `Active`
+* `disabled` - (Optional): Default tag is enabled. To disable tag set `disabled = true`.
 
 * `user_tag_identity_providers` - (Required): The list of identity providers associated with the tag. 
 

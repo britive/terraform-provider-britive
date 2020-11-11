@@ -17,7 +17,6 @@ resource "britive_profile" "new" {
     app_container_id                 = data.britive_application.app.id
     name                             = "My Profile"
     description                      = "My Profile Description"
-    status                           = "active"
     expiration_duration              = "25m0s"
     extendable                       = true
     notification_prior_to_expiration = "10m0s"
@@ -46,9 +45,7 @@ The following arguments are supported:
 
   For example: `My Profile Description`
 
-* `status` (Required): The status of the profile.
-
-  For example: `Active`
+* `disabled` - (Optional): Default profile is enabled. To disable profile set `disabled = true`.
 
 * `expiration_duration` (Required): The expiration time for the profile.
 
@@ -57,7 +54,7 @@ The following arguments are supported:
 
 * `extendable` (Optional): The Boolean flag that indicates whether profile expiry is extendable or not. The default value is `false`.
 
-  For example: `false`
+  For example: `true`
 
 * `notification_prior_to_expiration`  (Optional): The profile expiry notification as a time value.
 

@@ -25,7 +25,6 @@ data "britive_identity_provider" "idp" {
 resource "britive_tag" "new" {
   name        = "${local.resource_name_prefix}-Tag"
   description = "${local.resource_name_prefix}-Tag"
-  status      = "Active"
   user_tag_identity_providers {
     identity_provider {
       id = data.britive_identity_provider.idp.id
@@ -58,7 +57,6 @@ resource "britive_profile" "new" {
   app_container_id                 = data.britive_application.app.id
   name                             = "${local.resource_name_prefix}-Profile"
   description                      = "${local.resource_name_prefix}-Profile"
-  status                           = "active"
   expiration_duration              = "25m0s"
   extendable                       = false
   notification_prior_to_expiration = "10m0s"

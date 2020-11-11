@@ -135,12 +135,12 @@ func (c *Client) UpdateTag(tagID string, tag Tag) (*Tag, error) {
 }
 
 // EnableOrDisableTag - Enable or Disable tag
-func (c *Client) EnableOrDisableTag(tagID string, status string) (*Tag, error) {
+func (c *Client) EnableOrDisableTag(tagID string, disabled bool) (*Tag, error) {
 	var endpoint string
-	if status == "Active" {
-		endpoint = "enabled-statuses"
-	} else {
+	if disabled {
 		endpoint = "disabled-statuses"
+	} else {
+		endpoint = "enabled-statuses"
 	}
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/user-tags/%s/%s", c.HostURL, tagID, endpoint), strings.NewReader(string([]byte("{}"))))
 	if err != nil {

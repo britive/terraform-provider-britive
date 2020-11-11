@@ -128,12 +128,12 @@ func (c *Client) UpdateProfile(appContainerID string, profileID string, profile 
 }
 
 // EnableOrDisableProfile - Enable or Disable tag
-func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string, status string) (*Profile, error) {
+func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string, disabled bool) (*Profile, error) {
 	var endpoint string
-	if status == "active" {
-		endpoint = "enabled-statuses"
-	} else {
+	if disabled {
 		endpoint = "disabled-statuses"
+	} else {
+		endpoint = "enabled-statuses"
 	}
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps/%s/%s", c.HostURL, appContainerID, profileID, endpoint), strings.NewReader(string([]byte("{}"))))
 	if err != nil {

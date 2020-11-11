@@ -3,11 +3,11 @@ package britive
 import (
 	"context"
 	"log"
+	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceTag - Terraform Resource for Tag
@@ -42,11 +42,11 @@ func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 				Optional:    true,
 				Description: "The description of the tag",
 			},
-			"status": &schema.Schema{
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The status of the tag",
-				ValidateFunc: validation.StringInSlice([]string{"Active", "Inactive"}, false),
+			"disabled": &schema.Schema{
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "To disable the tag",
 			},
 			"user_tag_identity_providers": &schema.Schema{
 				Type:        schema.TypeList,
@@ -91,7 +91,11 @@ func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceDat
 	tag := britive.Tag{}
 	tag.Name = d.Get("name").(string)
 	tag.Description = d.Get("description").(string)
-	tag.Status = d.Get("status").(string)
+	if d.Get("disabled").(bool) {
+		tag.Status = "Inactive"
+	} else {
+		tag.Status = "Active"
+	}
 	userTagIdentityProviders := d.Get("user_tag_identity_providers").([]interface{})
 
 	for _, userTagIdentityProvider := range userTagIdentityProviders {
@@ -163,12 +167,12 @@ func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceDat
 		log.Printf("[INFO] Submitted updated tag: %#v", ut)
 		d.SetId(ut.ID)
 	}
-	if d.HasChange("status") {
+	if d.HasChange("disabled") {
 		hasChanges = true
-		status := d.Get("status").(string)
+		disabled := d.Get("disabled").(bool)
 
-		log.Printf("[INFO] Updating status: %s of tag: %s", status, tagID)
-		ut, err := c.EnableOrDisableTag(tagID, status)
+		log.Printf("[INFO] Updating status disabled: %t of tag: %s", disabled, tagID)
+		ut, err := c.EnableOrDisableTag(tagID, disabled)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -247,7 +251,7 @@ func (rth *ResourceTagHelper) mapModelToResource(tag *britive.Tag, d *schema.Res
 	if err := d.Set("description", tag.Description); err != nil {
 		return err
 	}
-	if err := d.Set("status", tag.Status); err != nil {
+	if err := d.Set("disabled", strings.EqualFold(tag.Status, "Inactive")); err != nil {
 		return err
 	}
 	if err := d.Set("external", tag.External); err != nil {

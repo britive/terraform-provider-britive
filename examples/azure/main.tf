@@ -15,7 +15,7 @@ variable "name" {
 }
 
 locals {
-  resource_name_prefix = "${var.name}-2020-11-09 New"
+  resource_name_prefix = "${var.name}-2020-11-11 New"
 }
 
 data "britive_identity_provider" "idp" {
@@ -25,7 +25,6 @@ data "britive_identity_provider" "idp" {
 resource "britive_tag" "new" {
   name        = "${local.resource_name_prefix}-Tag"
   description = "${local.resource_name_prefix}-Tag"
-  status      = "Active"
   user_tag_identity_providers {
     identity_provider {
       id = data.britive_identity_provider.idp.id
@@ -58,7 +57,6 @@ resource "britive_profile" "new" {
   app_container_id                 = data.britive_application.app.id
   name                             = "${local.resource_name_prefix}-Profile"
   description                      = "${local.resource_name_prefix}-Profile"
-  status                           = "active"
   expiration_duration              = "25m0s"
   extendable                       = true
   notification_prior_to_expiration = "10m0s"
@@ -79,7 +77,7 @@ output "britive_profile_new" {
 resource "britive_profile_permission" "new" {
   profile_id = britive_profile.new.profile_id
   permission {
-    name = "Application Developer"
+    name = "AcrPull"
     type = "role"
   }
 }
@@ -92,7 +90,7 @@ resource "britive_profile_tag" "new" {
   profile_id = britive_profile.new.profile_id
   tag        = "${local.resource_name_prefix}-Tag"
   access_period {
-    start = "2020-12-01T06:00:00Z"
+    start = "2020-11-11T08:30:00Z"
     end   = "2020-12-05T06:00:00Z"
   }
   depends_on = [britive_tag.new, britive_tag_member.new]
@@ -106,7 +104,7 @@ resource "britive_profile_identity" "new" {
   profile_id = britive_profile.new.profile_id
   username   = "terraformexample2@britive.com"
   access_period {
-    start = "2020-12-02T06:00:00Z"
+    start = "2020-11-11T08:30:00Z"
     end   = "2020-12-06T06:00:00Z"
   }
 }

@@ -54,7 +54,6 @@ func testAccCheckBritiveProfileConfig(name string, description string, applicati
 		app_container_id = data.britive_application.app.id
 		name = "%s"
 		description = "%s"
-		status = "active"
 		expiration_duration = "25m0s"
 	}`, applicationName, name, description)
 }
@@ -69,7 +68,6 @@ func testAccCheckBritiveProfileConfigAddAssociations(name, description, applicat
 		app_container_id = data.britive_application.app.id
 		name = "%s"
 		description = "%s"
-		status = "active"
 		expiration_duration = "25m0s"
 		associations {
 			type  = "%s"

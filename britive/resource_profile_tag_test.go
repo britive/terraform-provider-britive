@@ -37,7 +37,6 @@ func testAccCheckBritiveProfileTagConfig(identityProviderName, tagName, applicat
 	resource "britive_tag" "new" {
 		name = "%s"
 		description = "BPAT - Profile Tag Test"
-		status = "Active"
 		user_tag_identity_providers {
 			identity_provider {
 				id = data.britive_identity_provider.existing.id
@@ -52,7 +51,6 @@ func testAccCheckBritiveProfileTagConfig(identityProviderName, tagName, applicat
 	resource "britive_profile" "new" {
 		app_container_id = data.britive_application.app.id
 		name = "%s"
-		status = "active"
 		expiration_duration = "25m0s"
 	}
 

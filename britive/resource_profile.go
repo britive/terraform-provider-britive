@@ -10,7 +10,6 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceProfile - Terraform Resource for Profile
@@ -60,11 +59,11 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 				Optional:    true,
 				Description: "The description of the profile",
 			},
-			"status": &schema.Schema{
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The status of the profile",
-				ValidateFunc: validation.StringInSlice([]string{"active", "inactive"}, false),
+			"disabled": &schema.Schema{
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "To disable the profile",
 			},
 			"associations": &schema.Schema{
 				Type:        schema.TypeList,
@@ -192,13 +191,13 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 
 		rp.helper.saveProfileAssociations(appContainerID, profileID, d, m)
 	}
-	if d.HasChange("status") {
+	if d.HasChange("disabled") {
 
 		hasChanges = true
-		status := d.Get("status").(string)
+		disabled := d.Get("disabled").(bool)
 
-		log.Printf("[INFO] Updating status: %s of profile: %s", status, profileID)
-		up, err := c.EnableOrDisableProfile(appContainerID, profileID, status)
+		log.Printf("[INFO] Updating status disabled: %t of profile: %s", disabled, profileID)
+		up, err := c.EnableOrDisableProfile(appContainerID, profileID, disabled)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -331,7 +330,11 @@ func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m i
 	profile.Name = d.Get("name").(string)
 	profile.Description = d.Get("description").(string)
 	if !isUpdate {
-		profile.Status = d.Get("status").(string)
+		if d.Get("disabled").(bool) {
+			profile.Status = "inactive"
+		} else {
+			profile.Status = "active"
+		}
 	}
 	expirationDuration, err := time.ParseDuration(d.Get("expiration_duration").(string))
 	if err != nil {
@@ -399,7 +402,7 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	if err := d.Set("description", profile.Description); err != nil {
 		return err
 	}
-	if err := d.Set("status", profile.Status); err != nil {
+	if err := d.Set("disabled", strings.EqualFold(profile.Status, "inactive")); err != nil {
 		return err
 	}
 	if err := d.Set("expiration_duration", time.Duration(profile.ExpirationDuration*int64(time.Millisecond)).String()); err != nil {
