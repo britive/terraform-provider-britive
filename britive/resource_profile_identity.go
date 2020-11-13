@@ -15,26 +15,43 @@ import (
 
 //ResourceProfileIdentity - Terraform Resource for Profile Identity
 type ResourceProfileIdentity struct {
-	Resource *schema.Resource
-	helper   *ResourceProfileIdentityHelper
+	Resource     *schema.Resource
+	helper       *ResourceProfileIdentityHelper
+	importHelper *ImportHelper
 }
 
 //NewResourceProfileIdentity - Initialisation of new profile identity resource
-func NewResourceProfileIdentity() *ResourceProfileIdentity {
+func NewResourceProfileIdentity(importHelper *ImportHelper) *ResourceProfileIdentity {
 	rpt := &ResourceProfileIdentity{
-		helper: NewResourceProfileIdentityHelper(),
+		helper:       NewResourceProfileIdentityHelper(),
+		importHelper: importHelper,
 	}
 	rpt.Resource = &schema.Resource{
 		CreateContext: rpt.resourceCreate,
 		ReadContext:   rpt.resourceRead,
 		UpdateContext: rpt.resourceUpdate,
 		DeleteContext: rpt.resourceDelete,
+		Importer: &schema.ResourceImporter{
+			State: rpt.resourceStateImporter,
+		},
 		Schema: map[string]*schema.Schema{
+			"app_name": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The application name of the application, profile is assciated with",
+			},
 			"profile_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Required:    true,
 				ForceNew:    true,
 				Description: "The identifier of the profile",
+			},
+			"profile_name": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The name of the profile",
 			},
 			"username": &schema.Schema{
 				Type:        schema.TypeString,
@@ -169,6 +186,41 @@ func (rpt *ResourceProfileIdentity) resourceDelete(ctx context.Context, d *schem
 	d.SetId("")
 
 	return diags
+}
+
+func (rpt *ResourceProfileIdentity) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
+	c := m.(*britive.Client)
+	if err := rpt.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/users/(?P<username>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<username>[^/]+)"}, d); err != nil {
+		return nil, err
+	}
+	appName := d.Get("app_name").(string)
+	profileName := d.Get("profile_name").(string)
+	username := d.Get("username").(string)
+
+	log.Printf("[INFO] Importing profile identity: %s/%s/%s", appName, profileName, username)
+
+	app, err := c.GetApplicationByName(appName)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := c.GetUserByName(username)
+	if err != nil {
+		return nil, err
+	}
+
+	d.SetId(rpt.helper.generateUniqueID(profile.ProfileID, user.UserID))
+	d.Set("profile_id", profile.ProfileID)
+
+	d.Set("app_name", "")
+	d.Set("profile_name", "")
+
+	log.Printf("[INFO] Imported profile tag: %s/%s/%s", appName, profileName, username)
+	return []*schema.ResourceData{d}, nil
 }
 
 //endregion

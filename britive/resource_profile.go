@@ -42,6 +42,12 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 				ForceNew:    true,
 				Description: "The application id to associate the profile",
 			},
+			"app_name": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The application name to associate the profile",
+			},
 			"profile_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Computed:    true,
@@ -234,19 +240,32 @@ func (rp *ResourceProfile) resourceDelete(ctx context.Context, d *schema.Resourc
 }
 
 func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	if err := rp.importHelper.ParseImportID([]string{"apps/(?P<app_container_id>[^/]+)/paps/(?P<profile_id>[^/]+)", "(?P<app_container_id>[^/]+)/(?P<profile_id>[^/]+)"}, d); err != nil {
+	c := m.(*britive.Client)
+	if err := rp.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<name>[^/]+)", "(?P<app_name>[^/]+)/(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
-	appContainerID := d.Get("app_container_id").(string)
-	profileID := d.Get("profile_id").(string)
+	appName := d.Get("app_name").(string)
+	profileName := d.Get("name").(string)
 
-	log.Printf("[INFO] Importing profile: %s/%s", appContainerID, profileID)
-	d.SetId(rp.helper.generateUniqueID(appContainerID, profileID))
-	err := rp.helper.getAndMapModelToResource(d, m)
+	log.Printf("[INFO] Importing profile: %s/%s", appName, profileName)
+
+	app, err := c.GetApplicationByName(appName)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[INFO] Imported profile: %s/%s", appContainerID, profileID)
+	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+	if err != nil {
+		return nil, err
+	}
+
+	d.SetId(rp.helper.generateUniqueID(app.AppContainerID, profile.ProfileID))
+	d.Set("app_name", "")
+
+	err = rp.helper.getAndMapModelToResource(d, m)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("[INFO] Imported profile: %s/%s", appName, profileName)
 	return []*schema.ResourceData{d}, nil
 }
 

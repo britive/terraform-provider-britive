@@ -154,7 +154,7 @@ func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string,
 	return &profile, nil
 }
 
-// DeleteProfile - Deletes profile
+// DeleteProfile - Delete profile
 func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/paps/%s", c.HostURL, appContainerID, profileID), nil)
 	if err != nil {

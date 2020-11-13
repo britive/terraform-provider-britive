@@ -28,7 +28,7 @@ func (c *Client) GetApplications() (*[]Application, error) {
 	return &applications, nil
 }
 
-// GetApplication - Returns application
+// GetApplication - Returns application by id
 func (c *Client) GetApplication(appContainerID string) (*Application, error) {
 	resourceURL := fmt.Sprintf("%s/apps/%s", c.HostURL, appContainerID)
 	req, err := http.NewRequest("GET", resourceURL, nil)
@@ -50,7 +50,7 @@ func (c *Client) GetApplication(appContainerID string) (*Application, error) {
 	return &application, nil
 }
 
-// GetApplicationByName - Returns application
+// GetApplicationByName - Returns application by name
 func (c *Client) GetApplicationByName(name string) (*Application, error) {
 	filter := fmt.Sprintf(`name eq "%s"`, name)
 	resourceURL := fmt.Sprintf(`%s/apps?filter=%s`, c.HostURL, url.QueryEscape(filter))

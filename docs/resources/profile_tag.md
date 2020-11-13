@@ -15,7 +15,7 @@ resource "britive_profile" "new" {
 
 resource "britive_profile_tag" "new" {
     profile_id = britive_profile.new.id
-    tag = "My Tag"
+    tag_name = "My Tag"
     access_period {
         start = "2020-11-01T06:00:00Z"
         end   = "2020-11-05T06:00:00Z"
@@ -50,4 +50,13 @@ The following arguments are supported:
 
 In addition to the above argument, the following attribute is exported.
 
-* `id` - An identifier of the resource with format `paps/{{profileID}}/user-tags/{{tagID}}`
+* `id` - An identifier of the resource with format `paps/{{profileID}}/tags/{{tagID}}`
+
+## Import
+
+You can import a profile using any of these accepted formats:
+
+```
+$ terraform import britive_profile.new apps/{{app_name}}/paps/{{profile_name}}/tags/{{tag_name}}
+$ terraform import britive_profile.new {{app_name}}/{{profile_name}}/{{tag_name}}
+```

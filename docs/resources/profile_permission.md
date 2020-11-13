@@ -15,10 +15,8 @@ resource "britive_profile" "new" {
 
 resource "britive_profile_permission" "new" {
     profile_id = britive_profile.new.id
-    permission {
-      name = "Application Developer"
-      type = "role"
-    }
+    permission_name = "Application Developer"
+    permission_type = "role"
 }
 ```
 
@@ -30,19 +28,23 @@ The following argument is supported:
 
   For example: `britive_profile.new.id`
 
-* `permission` (Required): The permission that should be added to the profile. 
 
-  The format of the permission is given below.
+* `permission_name` (Required): The name of permission.
 
+* `permission_type` (Required): The type of permission.
 
-### `permission` block supports
-
-* `name` - The name of permission.
-
-* `type` - The type of permission.
 
 ## Attribute Reference
 
 In addition to the above argument, the following attribute is exported.
 
 * `id` - An identifier of the resource with the format `paps/{{profileID}}/permissions/{{permission_name}}/type/{{permission_type}}`
+
+## Import
+
+You can import a profile using any of these accepted formats:
+
+```
+$ terraform import britive_profile.new apps/{{app_name}}/paps/{{profile_name}}/permissions/{{permission_name}}/{{permission_type}}
+$ terraform import britive_profile.new {{app_name}}/{{profile_name}}/{{permission_name}}/{{permission_type}}
+```

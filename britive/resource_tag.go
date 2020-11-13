@@ -207,7 +207,7 @@ func (rt *ResourceTag) resourceDelete(ctx context.Context, d *schema.ResourceDat
 func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
 
-	if err := rt.importHelper.ParseImportID([]string{"user-tags/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
+	if err := rt.importHelper.ParseImportID([]string{"tags/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 

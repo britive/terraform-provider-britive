@@ -75,11 +75,10 @@ output "britive_profile_new" {
 
 
 resource "britive_profile_permission" "new" {
-  profile_id = britive_profile.new.profile_id
-  permission {
-    name = "Application Developer"
-    type = "role"
-  }
+  profile_id      = britive_profile.new.profile_id
+  permission_name = "Application Developer"
+  permission_type = "role"
+
 }
 
 output "britive_profile_permission_new" {
@@ -88,7 +87,7 @@ output "britive_profile_permission_new" {
 
 resource "britive_profile_tag" "new" {
   profile_id = britive_profile.new.profile_id
-  tag        = "${local.resource_name_prefix}-Tag"
+  tag_name   = "${local.resource_name_prefix}-Tag"
   access_period {
     start = "2020-11-01T06:00:00Z"
     end   = "2020-11-05T06:00:00Z"

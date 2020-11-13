@@ -60,7 +60,7 @@ func testAccCheckBritiveProfileTagConfig(identityProviderName, tagName, applicat
 
 	resource "britive_profile_tag" "new" {
 		profile_id = britive_profile.new.profile_id
-		tag        = britive_tag.new.name
+		tag_name   = britive_tag.new.name
 	}
 	
 	`, identityProviderName, tagName, applicationName, profileName)

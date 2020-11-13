@@ -13,48 +13,54 @@ import (
 
 //ResourceProfilePermission - Terraform Resource for Profile Permission
 type ResourceProfilePermission struct {
-	Resource *schema.Resource
-	helper   *ResourceProfilePermissionHelper
+	Resource     *schema.Resource
+	helper       *ResourceProfilePermissionHelper
+	importHelper *ImportHelper
 }
 
 //NewResourceProfilePermission - Initialisation of new profile permission resource
-func NewResourceProfilePermission() *ResourceProfilePermission {
+func NewResourceProfilePermission(importHelper *ImportHelper) *ResourceProfilePermission {
 	rpp := &ResourceProfilePermission{
-		helper: NewResourceProfilePermissionHelper(),
+		helper:       NewResourceProfilePermissionHelper(),
+		importHelper: importHelper,
 	}
 	rpp.Resource = &schema.Resource{
 		CreateContext: rpp.resourceCreate,
 		ReadContext:   rpp.resourceRead,
 		DeleteContext: rpp.resourceDelete,
+		Importer: &schema.ResourceImporter{
+			State: rpp.resourceStateImporter,
+		},
 		Schema: map[string]*schema.Schema{
+			"app_name": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The application name of the application, profile is assciated with",
+			},
 			"profile_id": &schema.Schema{
 				Type:        schema.TypeString,
 				Required:    true,
 				ForceNew:    true,
 				Description: "The identifier of the profile",
 			},
-			"permission": &schema.Schema{
-				Type:        schema.TypeList,
-				MaxItems:    1,
+			"profile_name": &schema.Schema{
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The name of the profile",
+			},
+			"permission_name": &schema.Schema{
+				Type:        schema.TypeString,
 				Required:    true,
 				ForceNew:    true,
-				Description: "The permission associate with the profile",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"name": &schema.Schema{
-							Type:        schema.TypeString,
-							Required:    true,
-							ForceNew:    true,
-							Description: "The name of permission",
-						},
-						"type": &schema.Schema{
-							Type:        schema.TypeString,
-							Required:    true,
-							ForceNew:    true,
-							Description: "The type of permission",
-						},
-					},
-				},
+				Description: "The name of permission",
+			},
+			"permission_type": &schema.Schema{
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The type of permission",
 			},
 		},
 	}
@@ -68,16 +74,12 @@ func (rpp *ResourceProfilePermission) resourceCreate(ctx context.Context, d *sch
 
 	profileID := d.Get("profile_id").(string)
 
-	pd := d.Get("permission").([]interface{})[0]
-
-	permission := pd.(map[string]interface{})
-
 	profilePermissionRequest := britive.ProfilePermissionRequest{
 		Operation: "add",
 		Permission: britive.ProfilePermission{
 			ProfileID: profileID,
-			Name:      permission["name"].(string),
-			Type:      permission["type"].(string),
+			Name:      d.Get("permission_name").(string),
+			Type:      d.Get("permission_type").(string),
 		},
 	}
 
@@ -143,7 +145,42 @@ func (rpp *ResourceProfilePermission) resourceDelete(ctx context.Context, d *sch
 	d.SetId("")
 
 	return diags
+}
 
+func (rpp *ResourceProfilePermission) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
+	c := m.(*britive.Client)
+	if err := rpp.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/permissions/(?P<permission_name>[^/]+)/type/(?P<permission_type>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<permission_name>[^/]+)/(?P<permission_type>[^/]+)"}, d); err != nil {
+		return nil, err
+	}
+	appName := d.Get("app_name").(string)
+	profileName := d.Get("profile_name").(string)
+	permissionName := d.Get("permission_name").(string)
+	permissionType := d.Get("permission_type").(string)
+
+	log.Printf("[INFO] Importing profile permission: %s/%s/%s/%s", appName, profileName, permissionName, permissionType)
+
+	app, err := c.GetApplicationByName(appName)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+	if err != nil {
+		return nil, err
+	}
+
+	profilePermission, err := c.GetProfilePermission(profile.ProfileID, britive.ProfilePermission{Name: permissionName, Type: permissionType})
+	if err != nil {
+		return nil, err
+	}
+	profilePermission.ProfileID = profile.ProfileID
+	d.SetId(rpp.helper.generateUniqueID(*profilePermission))
+	d.Set("profile_id", profile.ProfileID)
+
+	d.Set("app_name", "")
+	d.Set("profile_name", "")
+
+	log.Printf("[INFO] Imported profile permission: %s/%s/%s/%s", appName, profileName, permissionName, permissionType)
+	return []*schema.ResourceData{d}, nil
 }
 
 //ResourceProfilePermissionHelper - Terraform Resource for Profile Permission Helper

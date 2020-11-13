@@ -27,11 +27,6 @@ func TestBritiveProfile(t *testing.T) {
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
 				Config: testAccCheckBritiveProfileConfigAddAssociations(name, description, applicationName, associationType, associationValue),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckBritiveProfileExists(resourceName),

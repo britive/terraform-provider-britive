@@ -65,6 +65,6 @@ In addition to the above arguments, the following attributes are exported.
 You can import the tag using any of these accepted formats:
 
 ```
-$ terraform import britive_tag.new user-tags/{{tag_name}}
+$ terraform import britive_tag.new tags/{{tag_name}}
 $ terraform import britive_tag.new {{tag_name}}
 ```

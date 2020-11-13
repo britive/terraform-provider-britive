@@ -21,9 +21,9 @@ func Provider() *schema.Provider {
 	resourceTag := NewResourceTag(importHelper)
 	resourceTagMember := NewResourceTagMember(importHelper)
 	resourceProfile := NewResourceProfile(validation, importHelper)
-	resourceProfilePermission := NewResourceProfilePermission()
-	resourceProfileIdentity := NewResourceProfileIdentity()
-	resourceProfileTag := NewResourceProfileTag()
+	resourceProfilePermission := NewResourceProfilePermission(importHelper)
+	resourceProfileIdentity := NewResourceProfileIdentity(importHelper)
+	resourceProfileTag := NewResourceProfileTag(importHelper)
 
 	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
 	dataSourceApplication := NewDataSourceApplication()
