@@ -39,6 +39,10 @@ func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, pr
 		name = "%s"
 		description = "%s"
 		expiration_duration = "25m0s"
+		associations {
+			type  = "Environment"
+			value = "QA Subscription"
+		}
 	}
 
 	resource "britive_profile_permission" "new" {

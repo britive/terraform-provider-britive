@@ -52,6 +52,10 @@ func testAccCheckBritiveProfileTagConfig(identityProviderName, tagName, applicat
 		app_container_id = data.britive_application.app.id
 		name = "%s"
 		expiration_duration = "25m0s"
+		associations {
+			type  = "Environment"
+			value = "QA Subscription"
+		}
 	}
 
 	resource "britive_profile_tag" "new" {

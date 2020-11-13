@@ -10,13 +10,14 @@ Maintainers
 
 This provider plugin is maintained by:
 
-* The Britive Team at Britive
+* The Britive Team at [Britive](https://www.britive.com/)
 * The Terraform team at [HashiCorp](https://www.hashicorp.com/)
 
 Requirements
 ------------
 
-- [Terraform](https://www.terraform.io/downloads.html) 0.12+
+- [Terraform](https://www.terraform.io/downloads.html) >= 0.12+
+- [Go](https://golang.org/doc/install) >= 1.15
 
 
 Using the provider

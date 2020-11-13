@@ -411,20 +411,22 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	if err := d.Set("extendable", profile.Extendable); err != nil {
 		return err
 	}
-	if profile.NotificationPriorToExpiration != nil {
-		notificationPriorToExpiration := *profile.NotificationPriorToExpiration
-		if err := d.Set("notification_prior_to_expiration", time.Duration(notificationPriorToExpiration*int64(time.Millisecond)).String()); err != nil {
+	if profile.Extendable {
+		if profile.NotificationPriorToExpiration != nil {
+			notificationPriorToExpiration := *profile.NotificationPriorToExpiration
+			if err := d.Set("notification_prior_to_expiration", time.Duration(notificationPriorToExpiration*int64(time.Millisecond)).String()); err != nil {
+				return err
+			}
+		}
+		if profile.ExtensionDuration != nil {
+			extensionDuration := *profile.ExtensionDuration
+			if err := d.Set("extension_duration", time.Duration(extensionDuration*int64(time.Millisecond)).String()); err != nil {
+				return err
+			}
+		}
+		if err := d.Set("extension_limit", profile.ExtensionLimit); err != nil {
 			return err
 		}
-	}
-	if profile.ExtensionDuration != nil {
-		extensionDuration := *profile.ExtensionDuration
-		if err := d.Set("extension_duration", time.Duration(extensionDuration*int64(time.Millisecond)).String()); err != nil {
-			return err
-		}
-	}
-	if err := d.Set("extension_limit", profile.ExtensionLimit); err != nil {
-		return err
 	}
 	associations, err := rph.mapProfileAssociationsModelToResource(appContainerID, profile.Associations, m)
 	if err != nil {

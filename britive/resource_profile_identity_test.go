@@ -38,6 +38,10 @@ func testAccCheckBritiveProfileIdentityConfig(applicationName string, profileNam
 		name = "%s"
 		description = "%s"
 		expiration_duration = "25m0s"
+		associations {
+			type  = "Environment"
+			value = "QA Subscription"
+		}
 	}
 
 	resource "britive_profile_identity" "new" {
