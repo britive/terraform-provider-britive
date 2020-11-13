@@ -283,7 +283,7 @@ func (rpth *ResourceProfileTagHelper) getAndMapResourceToModel(d *schema.Resourc
 }
 
 func (rpth *ResourceProfileTagHelper) generateUniqueID(profileID string, tagID string) string {
-	return fmt.Sprintf("paps/%s/user-tags/%s", profileID, tagID)
+	return fmt.Sprintf("paps/%s/tags/%s", profileID, tagID)
 }
 
 func (rpth *ResourceProfileTagHelper) parseUniqueID(ID string) (profileID string, tagID string, err error) {

@@ -166,7 +166,7 @@ func NewResourceTagMemberHelper() *ResourceTagMemberHelper {
 //region Tag member Resource helper functions
 
 func (rtmh *ResourceTagMemberHelper) generateUniqueID(tagID string, userID string) string {
-	return fmt.Sprintf("user-tags/%s/users/%s", tagID, userID)
+	return fmt.Sprintf("tags/%s/users/%s", tagID, userID)
 }
 
 func (rtmh *ResourceTagMemberHelper) parseUniqueID(ID string) (tagID string, userID string, err error) {
