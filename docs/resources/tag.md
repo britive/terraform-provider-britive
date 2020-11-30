@@ -1,8 +1,4 @@
-| subcategory | layout    | page_title             | description                             |
-| ----------- | --------- | ---------------------- | --------------------------------------- |
-| Tag         |  Britive  | Britive: britive_tag   | The Britive Tag creates a new user tag. |
-
-# britive\_tag
+# britive_tag Resource
 
 Creates a new user tag.
 

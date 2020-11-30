@@ -1,8 +1,4 @@
-| subcategory  | layout    | page_title                    | description                                            |
-| ------------ | --------- | ----------------------------- | ------------------------------------------------------ |
-| Profile Identity   | Britive   | Britive: britive_profile_identity   | The Britive Profile Identity adds an identity to a Britive profile. |
-
-# britive\_profile\_identity
+# britive_profile_identity Resource
 
 Adds an identity to a Britive profile.
 

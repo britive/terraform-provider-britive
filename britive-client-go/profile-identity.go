@@ -40,7 +40,6 @@ func (c *Client) GetProfileIdentity(profileID string, userID string) (*ProfileId
 	if err != nil {
 		return nil, err
 	}
-	//TODO: Warning Recursion - Get single instead of array
 	profileIdentities := []ProfileIdentity{}
 	err = json.Unmarshal(body, &profileIdentities)
 	if err != nil {

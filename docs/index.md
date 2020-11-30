@@ -1,7 +1,3 @@
-| layout  | page_title        | description                                                  |
-| ------- | ----------------- | ------------------------------------------------------------ |
-| Britive | Provider: Britive | The Britive Provider is used to interact with the resources supported by the Britive APIs. The Provider needs to be configured with proper credentials before it can be used. |
-
 # Britive Provider
 
 Britive is a cloud-native security solution that provides centralized Privileged Access Security for cloud-forward enterprises. 
@@ -10,8 +6,7 @@ This is an overview document for the Britive Terraform Provider hosted by the Te
 
 The Britive provider is used to configure your Britive infrastructure using Terraform. The Britive provider is jointly maintained by:
 
-* The Britive Team and 
-* The Terraform Team at HashiCorp
+* The Britive Team
 
 ## Example usage
 
@@ -41,7 +36,7 @@ In this configuration, it is required to **statically** define host name and tok
 
 ```hcl
 provider "britive" {
-  host = "https://britive.api.local"
+  host = "https://britive.api.local/api"
   token = "${file("~/britive-token.config")}"
 }
 ```

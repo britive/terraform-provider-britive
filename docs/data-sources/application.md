@@ -1,8 +1,4 @@
-| Subcategory         | layout    | page_title                           | description                                                  |
-| ------------------- | --------- | ------------------------------------ | ------------------------------------------------------------ |
-| Application   |  Britive  | Britive: britive_application   | The Britive Application retrieves information about the application. |
-
-# britive\_application
+# britive_application Data Source
 
 Gets information about the application.
 

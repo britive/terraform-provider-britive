@@ -11,7 +11,6 @@ Maintainers
 This provider plugin is maintained by:
 
 * The Britive Team at [Britive](https://www.britive.com/)
-* The Terraform team at [HashiCorp](https://www.hashicorp.com/)
 
 Requirements
 ------------
