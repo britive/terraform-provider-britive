@@ -145,7 +145,10 @@ func (rp *ResourceProfile) resourceCreate(ctx context.Context, d *schema.Resourc
 	log.Printf("[INFO] Submitted new profile: %#v", p)
 	d.SetId(rp.helper.generateUniqueID(p.AppContainerID, p.ProfileID))
 
-	rp.helper.saveProfileAssociations(p.AppContainerID, p.ProfileID, d, m)
+	err = rp.helper.saveProfileAssociations(p.AppContainerID, p.ProfileID, d, m)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
 	rp.resourceRead(ctx, d, m)
 
@@ -195,7 +198,10 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 
 		log.Printf("[INFO] Submitted updated profile: %#v", up)
 
-		rp.helper.saveProfileAssociations(appContainerID, profileID, d, m)
+		err = rp.helper.saveProfileAssociations(appContainerID, profileID, d, m)
+		if err != nil {
+			return diag.FromErr(err)
+		}
 	}
 	if d.HasChange("disabled") {
 
@@ -340,6 +346,8 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 			return err
 		}
 		log.Printf("[INFO] Submitted Update profile %s associations: %#v", profileID, associations)
+	} else {
+		return fmt.Errorf("Invalid associations passed %v", as)
 	}
 	return nil
 }

@@ -1,8 +1,4 @@
-| subcategory  | layout    | page_title                    | description                                            |
-| ------------ | --------- | ----------------------------- | ------------------------------------------------------ |
-| Profile Tag   | Britive   | Britive: britive_profile_tag   | The Britive Profile Tag adds a tag to the Britive profile. |
-
-# britive\_profile\_tag
+# britive_profile_tag Resource
 
 Adds a tag to the Britive profile.
 

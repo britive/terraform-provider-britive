@@ -1,8 +1,4 @@
-| subcategory  | layout    | page_title                    | description                                            |
-| ------------ | --------- | ----------------------------- | ------------------------------------------------------ |
-| Tag Member   | Britive   | Britive: britive_tag_member   | The Britive Tag Member adds a user to the Britive tag. |
-
-# britive\_tag\_member
+# britive_tag_member Resource
 
 Adds a user to the Britive tag.
 

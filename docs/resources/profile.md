@@ -1,8 +1,4 @@
-| subcategory | layout    | page_title             | description                             |
-| ----------- | --------- | ---------------------- | --------------------------------------- |
-| Profile         |  Britive  | Britive: britive_profile   | The Britive Profile creates a new user profile. |
-
-# britive\_profile
+# britive_profile Resource
 
 Creates a new user profile.
 

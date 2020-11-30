@@ -1,8 +1,4 @@
-| subcategory  | layout    | page_title                    | description                                            |
-| ------------ | --------- | ----------------------------- | ------------------------------------------------------ |
-| Profile Permission   | Britive   | Britive: britive_profile_permission   | The Britive Profile Permission adds a permission to a Britive profile. |
-
-# britive\_profile\_permission
+# britive_profile_permission Resource
 
 Adds a permission to a Britive profile.
 

@@ -1,8 +1,4 @@
-| Subcategory         | layout    | page_title                           | description                                                  |
-| ------------------- | --------- | ------------------------------------ | ------------------------------------------------------------ |
-| Identity Provider   |  Britive  | Britive: britive_identity_provider   | The Britive Identity Provider retrieves information about the identity provider. |
-
-# britive\_identity\_provider
+# britive_identity_provider Data Source
 
 Gets information about the identity provider.
 
@@ -36,4 +32,3 @@ The following argument is supported:
 In addition to the above arguments, the following attribute is exported:
 
 * `id` - an identifier for the data source. 
-
