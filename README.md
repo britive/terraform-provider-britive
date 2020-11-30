@@ -2,7 +2,7 @@ Terraform Provider for Britive
 ==================
 
 - Website: https://www.terraform.io
-- Documentation: https://www.terraform.io/docs/providers/britive/index.html
+- Documentation: https://registry.terraform.io/providers/britive/britive/latest/docs
 <img src="https://cdn.rawgit.com/hashicorp/terraform-website/master/content/source/assets/images/logo-hashicorp.svg" width="600px">
 
 Maintainers
@@ -22,7 +22,7 @@ Requirements
 Using the provider
 ----------------------
 
-See the [Britive Provider documentation](https://www.terraform.io/docs/providers/britive/index.html) to get started using the
+See the [Britive Provider documentation](https://registry.terraform.io/providers/britive/britive/latest/docs) to get started using the
 Britive provider.
 
 
