@@ -10,7 +10,7 @@ import (
 
 // GetTags - Returns all tags
 func (c *Client) GetTags() (*[]Tag, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags", c.HostURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags", c.APIBaseURL), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (c *Client) GetTags() (*[]Tag, error) {
 // GetTagByName - Returns a specifc tag by name
 func (c *Client) GetTagByName(name string) (*Tag, error) {
 	filter := fmt.Sprintf(`name eq "%s"`, name)
-	resourceURL := fmt.Sprintf(`%s/user-tags?filter=%s`, c.HostURL, url.QueryEscape(filter))
+	resourceURL := fmt.Sprintf(`%s/user-tags?filter=%s`, c.APIBaseURL, url.QueryEscape(filter))
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (c *Client) GetTagByName(name string) (*Tag, error) {
 
 // GetTag - Returns a specifc tag by id
 func (c *Client) GetTag(tagID string) (*Tag, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s", c.HostURL, tagID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s", c.APIBaseURL, tagID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (c *Client) CreateTag(tag Tag) (*Tag, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/user-tags", c.HostURL), strings.NewReader(string(utb)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/user-tags", c.APIBaseURL), strings.NewReader(string(utb)))
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (c *Client) UpdateTag(tagID string, tag Tag) (*Tag, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/user-tags/%s", c.HostURL, tagID), strings.NewReader(string(utsb)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/user-tags/%s", c.APIBaseURL, tagID), strings.NewReader(string(utsb)))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (c *Client) EnableOrDisableTag(tagID string, disabled bool) (*Tag, error) {
 	} else {
 		endpoint = "enabled-statuses"
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/user-tags/%s/%s", c.HostURL, tagID, endpoint), strings.NewReader(string([]byte("{}"))))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/user-tags/%s/%s", c.APIBaseURL, tagID, endpoint), strings.NewReader(string([]byte("{}"))))
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (c *Client) EnableOrDisableTag(tagID string, disabled bool) (*Tag, error) {
 
 // DeleteTag - Delete tag
 func (c *Client) DeleteTag(tagID string) error {
-	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/user-tags/%s", c.HostURL, tagID), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/user-tags/%s", c.APIBaseURL, tagID), nil)
 	if err != nil {
 		return err
 	}

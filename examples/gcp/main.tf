@@ -1,12 +1,12 @@
 terraform {
   required_providers {
     britive = {
-      versions = ["0.1"]
-      source   = "github.com/britive/britive"
+      source  = "britive/britive"
+      version = ">= 1.0"
     }
   }
 }
-
+source  = "britive/britive"
 provider "britive" {
 }
 

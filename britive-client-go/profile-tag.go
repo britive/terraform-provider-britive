@@ -9,7 +9,7 @@ import (
 
 // GetAssignedProfileTags - Returns all tags assigned to profile
 func (c *Client) GetAssignedProfileTags(profileID string) (*[]ProfileTag, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/user-tags?filter=assigned", c.HostURL, profileID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/user-tags?filter=assigned", c.APIBaseURL, profileID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (c *Client) createOrUpdateProfileTag(method string, profileTag ProfileTag) 
 			return nil, err
 		}
 	}
-	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/user-tags/%s", c.HostURL, profileTag.ProfileID, profileTag.TagID), strings.NewReader(string(ptapb)))
+	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/user-tags/%s", c.APIBaseURL, profileTag.ProfileID, profileTag.TagID), strings.NewReader(string(ptapb)))
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (c *Client) UpdateProfileTag(profileTag ProfileTag) (*ProfileTag, error) {
 
 // DeleteProfileTag - Delete tag from the profile
 func (c *Client) DeleteProfileTag(profileID string, tagID string) error {
-	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/paps/%s/user-tags/%s", c.HostURL, profileID, tagID), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/paps/%s/user-tags/%s", c.APIBaseURL, profileID, tagID), nil)
 	if err != nil {
 		return err
 	}

@@ -33,8 +33,8 @@ func testAccPreCheck(t *testing.T) {
 	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
 		return
 	}
-	if err := os.Getenv("BRITIVE_HOST"); err == "" {
-		t.Fatal("BRITIVE_HOST must be set for acceptance tests")
+	if err := os.Getenv("BRITIVE_TENANT"); err == "" {
+		t.Fatal("BRITIVE_TENANT must be set for acceptance tests")
 	}
 	if err := os.Getenv("BRITIVE_TOKEN"); err == "" {
 		t.Fatal("BRITIVE_TOKEN must be set for acceptance tests")

@@ -9,7 +9,7 @@ import (
 
 // GetAssignedProfilePermissions - Returns all permissions assigned to user profile
 func (c *Client) GetAssignedProfilePermissions(profileID string) (*[]ProfilePermission, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/permissions?filter=assigned", c.HostURL, profileID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/permissions?filter=assigned", c.APIBaseURL, profileID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *Client) ExecuteProfilePermissionRequest(profileID string, ppr ProfilePe
 		return err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/permissions", c.HostURL, profileID), strings.NewReader(string(pprb)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/permissions", c.APIBaseURL, profileID), strings.NewReader(string(pprb)))
 	if err != nil {
 		return err
 	}

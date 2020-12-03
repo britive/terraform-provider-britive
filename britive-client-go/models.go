@@ -4,8 +4,8 @@ import "time"
 
 //Config - godoc
 type Config struct {
-	Host  string `json:"host"`
-	Token string `json:"token"`
+	Tenant string `json:"tenant"`
+	Token  string `json:"token"`
 }
 
 //Tag - godoc

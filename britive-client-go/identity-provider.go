@@ -8,7 +8,7 @@ import (
 
 // GetIdentityProviders - Returns all identity providers
 func (c *Client) GetIdentityProviders() (*[]IdentityProvider, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/identity-providers", c.HostURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/identity-providers", c.APIBaseURL), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -29,13 +29,13 @@ func (c *Client) GetIdentityProviders() (*[]IdentityProvider, error) {
 
 // GetIdentityProvider - Returns identity provider
 func (c *Client) GetIdentityProvider(identityProviderID string) (*IdentityProvider, error) {
-	resourceURL := fmt.Sprintf("%s/identity-providers/%s", c.HostURL, identityProviderID)
+	resourceURL := fmt.Sprintf("%s/identity-providers/%s", c.APIBaseURL, identityProviderID)
 	return c.getIdentityProvider(resourceURL)
 }
 
 // GetIdentityProviderByName - Returns identity provider by name
 func (c *Client) GetIdentityProviderByName(name string) (*IdentityProvider, error) {
-	resourceURL := fmt.Sprintf("%s/identity-providers?metadata=false&name=%s", c.HostURL, name)
+	resourceURL := fmt.Sprintf("%s/identity-providers?metadata=false&name=%s", c.APIBaseURL, name)
 	return c.getIdentityProvider(resourceURL)
 }
 

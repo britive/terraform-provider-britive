@@ -9,7 +9,7 @@ import (
 
 // GetUsers - Returns all users
 func (c *Client) GetUsers() (*[]User, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users", c.HostURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users", c.APIBaseURL), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -30,14 +30,14 @@ func (c *Client) GetUsers() (*[]User, error) {
 
 // GetUser - Returns user by user id
 func (c *Client) GetUser(userID string) (*User, error) {
-	resourceURL := fmt.Sprintf("%s/users/%s", c.HostURL, userID)
+	resourceURL := fmt.Sprintf("%s/users/%s", c.APIBaseURL, userID)
 	return c.getUser(resourceURL)
 }
 
 // GetUserByName - Returns user by username
 func (c *Client) GetUserByName(username string) (*User, error) {
 	filter := fmt.Sprintf(`username eq "%s"`, username)
-	resourceURL := fmt.Sprintf(`%s/users?filter=%s`, c.HostURL, url.QueryEscape(filter))
+	resourceURL := fmt.Sprintf(`%s/users?filter=%s`, c.APIBaseURL, url.QueryEscape(filter))
 	return c.getUser(resourceURL)
 }
 

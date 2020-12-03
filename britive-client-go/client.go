@@ -9,20 +9,17 @@ import (
 
 // Client - Britive API client
 type Client struct {
-	HostURL    string
+	APIBaseURL string
 	HTTPClient *http.Client
 	Token      string
 }
 
 // NewClient - Initialises new Britive API client
-func NewClient(host, token *string) (*Client, error) {
-	if token == nil {
-		return nil, fmt.Errorf("Token must not be empty")
-	}
+func NewClient(apiBaseURL, token string) (*Client, error) {
 	c := Client{
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-		HostURL:    *host,
-		Token:      *token,
+		APIBaseURL: apiBaseURL,
+		Token:      token,
 	}
 	return &c, nil
 }

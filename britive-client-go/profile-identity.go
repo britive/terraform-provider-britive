@@ -9,7 +9,7 @@ import (
 
 // GetProfileIdentities - Returns all identities assigned to profile
 func (c *Client) GetProfileIdentities(profileID string) (*[]ProfileIdentity, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/users?filter=assigned", c.HostURL, profileID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/users?filter=assigned", c.APIBaseURL, profileID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (c *Client) GetProfileIdentities(profileID string) (*[]ProfileIdentity, err
 
 // GetProfileIdentity - Returns a specifc identity from profile
 func (c *Client) GetProfileIdentity(profileID string, userID string) (*ProfileIdentity, error) {
-	requestURL := fmt.Sprintf("%s/paps/%s/users/%s", c.HostURL, profileID, userID)
+	requestURL := fmt.Sprintf("%s/paps/%s/users/%s", c.APIBaseURL, profileID, userID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (c *Client) createOrUpdateProfileIdentity(method string, profileIdentity Pr
 			return nil, err
 		}
 	}
-	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/users/%s", c.HostURL, profileIdentity.ProfileID, profileIdentity.UserID), strings.NewReader(string(ptapb)))
+	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/users/%s", c.APIBaseURL, profileIdentity.ProfileID, profileIdentity.UserID), strings.NewReader(string(ptapb)))
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (c *Client) UpdateProfileIdentity(profileIdentity ProfileIdentity) (*Profil
 
 // DeleteProfileIdentity - Delete identity from the profile
 func (c *Client) DeleteProfileIdentity(profileID string, userID string) error {
-	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/paps/%s/users/%s", c.HostURL, profileID, userID), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/paps/%s/users/%s", c.APIBaseURL, profileID, userID), nil)
 	if err != nil {
 		return err
 	}

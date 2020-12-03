@@ -9,7 +9,7 @@ import (
 
 // GetApplications - Returns all applications
 func (c *Client) GetApplications() (*[]Application, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/apps", c.HostURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/apps", c.APIBaseURL), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (c *Client) GetApplications() (*[]Application, error) {
 
 // GetApplication - Returns application by id
 func (c *Client) GetApplication(appContainerID string) (*Application, error) {
-	resourceURL := fmt.Sprintf("%s/apps/%s", c.HostURL, appContainerID)
+	resourceURL := fmt.Sprintf("%s/apps/%s", c.APIBaseURL, appContainerID)
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (c *Client) GetApplication(appContainerID string) (*Application, error) {
 // GetApplicationByName - Returns application by name
 func (c *Client) GetApplicationByName(name string) (*Application, error) {
 	filter := fmt.Sprintf(`name eq "%s"`, name)
-	resourceURL := fmt.Sprintf(`%s/apps?filter=%s`, c.HostURL, url.QueryEscape(filter))
+	resourceURL := fmt.Sprintf(`%s/apps?filter=%s`, c.APIBaseURL, url.QueryEscape(filter))
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err

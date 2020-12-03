@@ -10,7 +10,7 @@ import (
 
 // GetProfiles - Returns all user profiles
 func (c *Client) GetProfiles(appContainerID string) (*[]Profile, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/apps/%s/paps", c.HostURL, appContainerID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/apps/%s/paps", c.APIBaseURL, appContainerID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (c *Client) GetProfiles(appContainerID string) (*[]Profile, error) {
 // GetProfileByName - Returns a specifc profile by name
 func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile, error) {
 	filter := fmt.Sprintf(`name eq "%s"`, name)
-	resourceURL := fmt.Sprintf(`%s/apps/%s/paps?filter=%s`, c.HostURL, appContainerID, url.QueryEscape(filter))
+	resourceURL := fmt.Sprintf(`%s/apps/%s/paps?filter=%s`, c.APIBaseURL, appContainerID, url.QueryEscape(filter))
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile,
 
 // GetProfile - Returns a specifc user profile
 func (c *Client) GetProfile(profileID string) (*Profile, error) {
-	requestURL := fmt.Sprintf("%s/paps/%s", c.HostURL, profileID)
+	requestURL := fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps", c.HostURL, appContainerID), strings.NewReader(string(utb)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps", c.APIBaseURL, appContainerID), strings.NewReader(string(utb)))
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (c *Client) UpdateProfile(appContainerID string, profileID string, profile 
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/apps/%s/paps/%s", c.HostURL, appContainerID, profileID), strings.NewReader(string(utsb)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/apps/%s/paps/%s", c.APIBaseURL, appContainerID, profileID), strings.NewReader(string(utsb)))
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string,
 	} else {
 		endpoint = "enabled-statuses"
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps/%s/%s", c.HostURL, appContainerID, profileID, endpoint), strings.NewReader(string([]byte("{}"))))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps/%s/%s", c.APIBaseURL, appContainerID, profileID, endpoint), strings.NewReader(string([]byte("{}"))))
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string,
 
 // DeleteProfile - Delete profile
 func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
-	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/paps/%s", c.HostURL, appContainerID, profileID), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/paps/%s", c.APIBaseURL, appContainerID, profileID), nil)
 	if err != nil {
 		return err
 	}

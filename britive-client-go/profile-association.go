@@ -9,7 +9,7 @@ import (
 
 // GetProfileAssociations - Returns a all associations linked with profile
 func (c *Client) GetProfileAssociations(profileID string) (*[]ProfileAssociation, error) {
-	requestURL := fmt.Sprintf("%s/paps/%s/scopes", c.HostURL, profileID)
+	requestURL := fmt.Sprintf("%s/paps/%s/scopes", c.APIBaseURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func (c *Client) SaveProfileAssociations(profileID string, associations []Profil
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/scopes", c.HostURL, profileID), strings.NewReader(string(utb)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/scopes", c.APIBaseURL, profileID), strings.NewReader(string(utb)))
 	if err != nil {
 		return err
 	}

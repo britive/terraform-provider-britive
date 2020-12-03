@@ -3,9 +3,11 @@ package britive
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -30,10 +32,10 @@ func Provider() *schema.Provider {
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
-			"host": &schema.Schema{
+			"tenant": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_HOST", nil),
+				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_TENANT", nil),
 			},
 			"token": &schema.Schema{
 				Type:        schema.TypeString,
@@ -66,11 +68,11 @@ func Provider() *schema.Provider {
 
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	token := d.Get("token").(string)
-	host := d.Get("host").(string)
+	tenant := d.Get("tenant").(string)
 
 	var diags diag.Diagnostics
 
-	if host == "" && token == "" {
+	if tenant == "" && token == "" {
 		log.Print("[DEBUG] Trying to load configuration from file")
 		if configPath, ok := d.GetOk("config_path"); ok && configPath.(string) != "" {
 			path, err := homedir.Expand(configPath.(string))
@@ -97,14 +99,14 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 				log.Printf("[DEBUG] Failed to parse config file %s", path)
 				return nil, diag.FromErr(err)
 			}
-			host = config.Host
+			tenant = config.Tenant
 			token = config.Token
 		}
 	}
-	if host == "" {
+	if tenant == "" {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
-			Summary:  "Initialising provider, host parameter is missing",
+			Summary:  "Initialising provider, tenant parameter is missing",
 		})
 	}
 	if token == "" {
@@ -117,7 +119,8 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		return nil, diags
 	}
 
-	c, err := britive.NewClient(&host, &token)
+	apiBaseURL := fmt.Sprintf("%s/api", strings.TrimSuffix(tenant, "/"))
+	c, err := britive.NewClient(apiBaseURL, token)
 	if err != nil {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
