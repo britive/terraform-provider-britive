@@ -14,7 +14,7 @@ default: testacc
 build:
 	go get
 	go mod vendor
-	go build -o ${BINARY}
+	go build -ldflags "-X main.version=v${VERSION}" -o ${BINARY}
 
 install: build
 	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}

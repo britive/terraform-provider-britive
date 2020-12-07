@@ -6,10 +6,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
 )
 
+var version string
+
 func main() {
 	plugin.Serve(&plugin.ServeOpts{
 		ProviderFunc: func() *schema.Provider {
-			return britive.Provider()
+			return britive.Provider(version)
 		},
 	})
 }

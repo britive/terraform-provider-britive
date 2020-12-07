@@ -15,8 +15,11 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
+var version string
+
 //Provider - Britive Provider
-func Provider() *schema.Provider {
+func Provider(v string) *schema.Provider {
+	version = v
 	validation := NewValidation()
 	importHelper := NewImportHelper()
 
@@ -120,7 +123,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	}
 
 	apiBaseURL := fmt.Sprintf("%s/api", strings.TrimSuffix(tenant, "/"))
-	c, err := britive.NewClient(apiBaseURL, token)
+	c, err := britive.NewClient(apiBaseURL, token, version)
 	if err != nil {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
