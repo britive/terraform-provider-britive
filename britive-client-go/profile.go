@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// GetProfiles - Returns all user profiles
+// GetProfiles - Returns all profiles
 func (c *Client) GetProfiles(appContainerID string) (*[]Profile, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/apps/%s/paps", c.APIBaseURL, appContainerID), nil)
 	if err != nil {
@@ -60,7 +60,7 @@ func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile,
 	return &profiles[0], nil
 }
 
-// GetProfile - Returns a specifc user profile
+// GetProfile - Returns a specifc profile
 func (c *Client) GetProfile(profileID string) (*Profile, error) {
 	requestURL := fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)

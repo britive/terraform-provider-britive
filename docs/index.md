@@ -1,6 +1,6 @@
 # Britive Provider
 
-Britive is a cloud-native security solution that provides centralized Privileged Access Security for cloud-forward enterprises. 
+Britive is a cloud-native security solution that provides centralized Privileged Access Security for cloud-forward enterprises.
 
 This is an overview document for the Britive Terraform Provider hosted by the Terraform registry.  
 
@@ -10,56 +10,78 @@ The Britive provider is used to configure your Britive infrastructure using Terr
 
 ## Example usage
 
+Terraform 0.13 and later:
+
 ```hcl
+terraform {
+  required_providers {
+    britive = {
+      source = "britive/britive"
+      version = "~> 1.0"
+    }
+  }
+}
+
+# Configure the Britive Provider
 provider "britive" {
+  tenant = "https://company.britive.com"
+  token  = "xxxx"
 }
 ```
+
+Terraform 0.12:
+
+```hcl
+
+# Configure the Britive Provider
+provider "britive" {
+  tenant = "https://company.britive.com"
+  token  = "xxxx"
+}
+```
+
 ## Authentication
 
-There are two ways to configure the Britive Provider:
+The Britive provider offers a flexible means of providing credentials for authentication. The following methods are supported, in this order, and explained below:
 
-1. Using environment variables
-2. Using statically-defined variables
+1. Environment variables
+2. Provider Config
 
-### Configuring using environment variables
+### Environment variables
 
-In this configuration, the environment variables `BRITIVE_TENANT` and `BRITIVE_TOKEN` are used to detect the tenant and token on the host machine.
+You can provide your credentials via the `BRITIVE_TENANT` and `BRITIVE_TOKEN`, environment variables, representing your Britive Tenant URL (ie. `"https://company.britive.com"`) and Britive API Token, respectively.
 
 ```hcl
-provider "britive" {
-}
+provider "britive" {}
 ```
 
-### Statically-defined variables
+Usage:
 
-In this configuration, it is required to **statically** define tenant name and token as variables.
-
-```hcl
-provider "britive" {
-  tenant = "https://britive.api.local"
-  token = "iw8ECAdxhF/T/fyX/O3bCBV60TkOopdu5JEE0UY1mSw="
-}
+```sh
+$ export BRITIVE_TENANT="https://company.britive.com"
+$ export BRITIVE_TOKEN="xxxx"
+$ terraform plan
 ```
 
 ## Argument Reference
 
-The following arguments are supported:
+In addition to [generic `provider` arguments](https://www.terraform.io/docs/configuration/providers.html)
+(e.g. `alias` and `version`), the following arguments are supported in the Britive
+ `provider` block:
 
-* `tenant`  (Required): The API URL for the Britive API.  
+* `tenant` - (Optional): This is the Britive Tenant URL, for example `https://company.britive.com`. It must be provided, but it can also be sourced from the `BRITIVE_TENANT` environment variable.  
 
-  For example, https://britive.local
+* `token` - (Optional): This is the API Token to interact with your Britive. It must be provided, but it can also be sourced from the `BRITIVE_TOKEN` environment variable.
 
-* `token`  (Required): The API token required to authenticate the Britive API. 
+* `config_path` (Optional): This is the file path for Britive provider configuration. The default configuration path is `~/.britive/tf.config`. It can also be sourced from the `BRITIVE_CONFIG` environment variable.
 
-  For example, `iw8ECAdxhF/T/fyX/O3bCBV60TkOopdu5JEE0UY1mSw=`
-
-* `config_path` (Optional): The Britive configuration (holding tenant and token as JSON attributes) file path. The default configuration path is `~/.britive/config`. 
-
-  A sample config file content is shown here. 
-  ```
+  A sample Britive configuration file content as below.
+  
+  ```json
   {
-    "tenant": "https://britive.local",
-    "token": "iw8ECAdxhF/T/fyX/O3bCBV60TkOopdu5JEE0UY1mSw="
+    "tenant": "https://company.britive.com",
+    "token": "xxxx"
   }
   ```
-**Note:** If tenant and token are passed either statically or through environment variables, they will be overwritten on the config file.
+
+**Note:** If you have **both** valid configurations in a config file and provider config, the provider config is used as an override. ie. any provider config will override its counterpart loaded from config file.

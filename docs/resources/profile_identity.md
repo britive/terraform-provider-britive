@@ -2,6 +2,8 @@
 
 Adds an identity to a Britive profile.
 
+This resource allows you to add or delete Identity from a Profile.
+
 ## Example Usage
 
 ```hcl
@@ -25,16 +27,11 @@ The following argument is supported:
 
 * `profile_id` (Required): The identifier of the profile.
 
-  For example: `britive_profile.new.id`
-
 * `username` (Required): The name of the identity.
-
-  For example: `My Tag`
 
 * `access_period` (Optional): The access period of the identity in a profile. 
 
-  The format of an access_period is documented below.
-
+  The format of an `access_period` is documented below.
 
 ### `access_period` block supports
 
@@ -52,7 +49,7 @@ In addition to the above argument, the following attribute is exported.
 
 You can import a profile using any of these accepted formats:
 
-```
+```sh
 $ terraform import britive_profile.new apps/{{app_name}}/paps/{{profile_name}}/users/{{username}}
 $ terraform import britive_profile.new {{app_name}}/{{profile_name}}/{{username}}
 ```

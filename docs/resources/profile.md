@@ -1,6 +1,8 @@
 # britive_profile Resource
 
-Creates a new user profile.
+Creates a Profile.
+
+This resource allows you to create and configure a Profile.
 
 ## Example Usage
 
@@ -31,45 +33,25 @@ The following arguments are supported:
 
 * `app_container_id` (Required): The id of the Britive application.
 
-  For example: `bCBV60TkOopdu5JEE` or `data.britive_application.app.id`
-
 * `name` (Required): The name of the profile.
-
-  For example: `My Profile`
 
 * `description` (Optional): A description of the profile.
 
-  For example: `My Profile Description`
-
 * `disabled` - (Optional): Default profile is enabled. To disable profile set `disabled = true`.
 
-* `expiration_duration` (Required): The expiration time for the profile.
-
-  For example: `25m0s`
-
+* `expiration_duration` (Required): The expiration time for the profile. For example: `25m0s`
 
 * `extendable` (Optional): The Boolean flag that indicates whether profile expiry is extendable or not. The default value is `false`.
 
-  For example: `true`
+* `notification_prior_to_expiration`  (Optional): The profile expiry notification as a time value. For example: `10m0s`
 
-* `notification_prior_to_expiration`  (Optional): The profile expiry notification as a time value.
+* `extension_duration` - (Optional): The profile expiry extension as a time value. For example: `12m30s`
 
-  For example: `10m0s`
+* `extension_limit` - (Optional): The repetition limit for extending the profile expiry. For example: `2`
 
+* `associations` - (Required): The list of associations for the profile.
 
-* `extension_duration` - (Optional): The profile expiry extension as a time value.
-
-  For example: `12m30s`
-
-
-* `extension_limit` - (Optional): The repetition limit for extending the profile expiry.
-
-  For example: `2`
-
-* `associations` - (Required): The list of associations for the profile. 
-
-  The format of an association is documented below.
-
+  The format of an `associations` is documented below.
 
 ### `associations` block supports
 
@@ -81,13 +63,13 @@ The following arguments are supported:
 
 In addition to the above arguments, the following attribute is exported.
 
-* `id` - An identifier for the resource.
+* `id` - The ID of the Profile.
 
 ## Import
 
 You can import a profile using any of these accepted formats:
 
-```
+```sh
 $ terraform import britive_profile.new apps/{{app_name}}/paps/{{name}}
 $ terraform import britive_profile.new {{app_name}}/{{name}}
 ```

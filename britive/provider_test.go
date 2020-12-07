@@ -29,7 +29,7 @@ func TestProvider_impl(t *testing.T) {
 }
 
 func testAccPreCheck(t *testing.T) {
-	configPath, _ := homedir.Expand("~/.britive/config")
+	configPath, _ := homedir.Expand("~/.britive/tf.config")
 	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
 		return
 	}

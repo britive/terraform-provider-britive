@@ -1,8 +1,10 @@
 # britive_tag Resource
 
-Creates a new user tag.
+Creates a Tag.
 
-**Note:** A user tag represents a group of users in the Britive system.
+This resource allows you to create and configure a Tag.
+
+__A tag represents a group of users in the Britive system.__
 
 ## Example Usage
 
@@ -21,46 +23,43 @@ resource "britive_tag" "new" {
     }
 }
 ```
+
 ## Argument Reference
 
 The following arguments are supported:
 
 * `name` - (Required): The name of tag.
 
-  For example: `My Tag`
-
 * `description` - (Optional): A description of the tag.
-
-  For example: `My Tag Description`
 
 * `disabled` - (Optional): Default tag is enabled. To disable tag set `disabled = true`.
 
-* `user_tag_identity_providers` - (Required): The list of identity providers associated with the tag. 
+* `user_tag_identity_providers` - (Required): The list of identity providers associated with the tag.
 
-  The format is documented below.
+  The format of `user_tag_identity_providers` is documented below.
 
 ### `user_tag_identity_providers` block supports
 
-* `identity_provider` - An identity provider. 
+* `identity_provider` - An identity provider.
 
-  The format is documented below.
+   The format of `identity_provider` is documented below.
 
 ### `identity_provider` block supports
 
-* `id` - The unique ID of the identity-provider.
+* `id` - The unique ID of the identity provider.
 
 ## Attribute Reference
 
 In addition to the above arguments, the following attributes are exported.
 
-* `id` - An identifier for the resource.
+* `id` - The ID of the Tag.
 * `external` - The boolean attribute that indicates whether the tag is external or not.
 
 ## Import
 
 You can import the tag using any of these accepted formats:
 
-```
+```sh
 $ terraform import britive_tag.new tags/{{tag_name}}
 $ terraform import britive_tag.new {{tag_name}}
 ```

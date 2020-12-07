@@ -172,7 +172,7 @@ func (rtmh *ResourceTagMemberHelper) generateUniqueID(tagID string, userID strin
 func (rtmh *ResourceTagMemberHelper) parseUniqueID(ID string) (tagID string, userID string, err error) {
 	tagMemberParts := strings.Split(ID, "/")
 	if len(tagMemberParts) < 4 {
-		err = fmt.Errorf("Invalid user tag member reference, please check the state for %s", ID)
+		err = fmt.Errorf("Invalid tag member reference, please check the state for %s", ID)
 		return
 	}
 	tagID = tagMemberParts[1]

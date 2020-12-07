@@ -200,7 +200,7 @@ func (rpph *ResourceProfilePermissionHelper) parseUniqueID(ID string) (*britive.
 	profileMemberParts := strings.Split(ID, "/")
 
 	if len(profileMemberParts) < 6 {
-		return nil, fmt.Errorf("Invalid user profile member reference, please check the state for %s", ID)
+		return nil, fmt.Errorf("Invalid profile member reference, please check the state for %s", ID)
 
 	}
 	profilePermission := &britive.ProfilePermission{

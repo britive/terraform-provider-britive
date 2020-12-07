@@ -2,6 +2,8 @@
 
 Adds a tag to the Britive profile.
 
+This resource allows you to add or delete Tag from a Profile.
+
 ## Example Usage
 
 ```hcl
@@ -25,16 +27,11 @@ The following arguments are supported:
 
 * `profile_id` (Required): The identifier of the profile.
 
-  For example: `britive_profile.new.id`
+* `tag_name` (Required): The name of the tag.
 
-* `tag` (Required): The name of the tag.
+* `access_period` (Optional): The access period of tag in the profile.
 
-  For example: `My Tag`
-
-* `access_period` (Optional): The access period of tag in the profile. 
-
-  The format of access_period is given below.
-
+  The format of `access_period` is documented below.
 
 ### `access_period` block supports
 
@@ -52,7 +49,7 @@ In addition to the above argument, the following attribute is exported.
 
 You can import a profile using any of these accepted formats:
 
-```
+```SH
 $ terraform import britive_profile.new apps/{{app_name}}/paps/{{profile_name}}/tags/{{tag_name}}
 $ terraform import britive_profile.new {{app_name}}/{{profile_name}}/{{tag_name}}
 ```

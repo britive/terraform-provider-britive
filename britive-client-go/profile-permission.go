@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// GetAssignedProfilePermissions - Returns all permissions assigned to user profile
+// GetAssignedProfilePermissions - Returns all permissions assigned to profile
 func (c *Client) GetAssignedProfilePermissions(profileID string) (*[]ProfilePermission, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/permissions?filter=assigned", c.APIBaseURL, profileID), nil)
 	if err != nil {
@@ -28,7 +28,7 @@ func (c *Client) GetAssignedProfilePermissions(profileID string) (*[]ProfilePerm
 	return &profilePermissions, nil
 }
 
-// GetProfilePermission - Returns a specifc permission associated with user profile
+// GetProfilePermission - Returns a specifc permission associated with profile
 func (c *Client) GetProfilePermission(profileID string, profilePermission ProfilePermission) (*ProfilePermission, error) {
 	//TODO: Warning Recursion - Get by Name
 	profilePermissions, err := c.GetAssignedProfilePermissions(profileID)

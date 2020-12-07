@@ -46,8 +46,8 @@ func Provider() *schema.Provider {
 			"config_path": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_CONFIG", "~/.britive/config"),
-				Description: "Path to the britive config file, defaults to ~/.britive/config",
+				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_CONFIG", "~/.britive/tf.config"),
+				Description: "Path to the britive config file, defaults to ~/.britive/tf.config",
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
