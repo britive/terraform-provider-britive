@@ -10,22 +10,23 @@ import (
 
 var testAccProviders map[string]*schema.Provider
 var testAccProvider *schema.Provider
+var testVersion = "1.0.0"
 
 func init() {
-	testAccProvider = Provider()
+	testAccProvider = Provider(testVersion)
 	testAccProviders = map[string]*schema.Provider{
 		"britive": testAccProvider,
 	}
 }
 
 func TestProvider(t *testing.T) {
-	if err := Provider().InternalValidate(); err != nil {
+	if err := Provider(testVersion).InternalValidate(); err != nil {
 		t.Fatalf("err: %s", err)
 	}
 }
 
 func TestProvider_impl(t *testing.T) {
-	var _ *schema.Provider = Provider()
+	var _ *schema.Provider = Provider(testVersion)
 }
 
 func testAccPreCheck(t *testing.T) {

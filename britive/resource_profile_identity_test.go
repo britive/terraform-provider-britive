@@ -45,7 +45,7 @@ func testAccCheckBritiveProfileIdentityConfig(applicationName string, profileNam
 	}
 
 	resource "britive_profile_identity" "new" {
-		profile_id = britive_profile.new.profile_id
+		profile_id = britive_profile.new.id
     	username = "%s"
 	}`, applicationName, profileName, profileDescription, username)
 

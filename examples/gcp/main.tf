@@ -75,7 +75,7 @@ output "britive_profile_new" {
 
 
 resource "britive_profile_permission" "new" {
-  profile_id      = britive_profile.new.profile_id
+  profile_id      = britive_profile.new.id
   permission_name = "Access Approval Viewer"
   permission_type = "role"
 }
@@ -85,7 +85,7 @@ output "britive_profile_permission_new" {
 }
 
 resource "britive_profile_tag" "new" {
-  profile_id = britive_profile.new.profile_id
+  profile_id = britive_profile.new.id
   tag_name   = "${local.resource_name_prefix}-Tag"
   access_period {
     start = "2020-11-01T06:00:00Z"
@@ -99,7 +99,7 @@ output "britive_profile_tag_new" {
 }
 
 resource "britive_profile_identity" "new" {
-  profile_id = britive_profile.new.profile_id
+  profile_id = britive_profile.new.id
   username   = "terraformexample2@britive.com"
   access_period {
     start = "2020-11-02T06:00:00Z"

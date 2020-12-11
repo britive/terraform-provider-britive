@@ -1,6 +1,6 @@
 # britive_identity_provider Data Source
 
-Gets information about the identity provider.
+Use this data source to retrieve the identity provider information.
 
 ## Example Usage
 
@@ -25,10 +25,8 @@ The following argument is supported:
 
 * `name` - (Required): The name of the identity provider.
 
-  For example, `Britive`
-
 ## Attributes Reference
 
-In addition to the above arguments, the following attribute is exported:
+In addition to the above argument, the following attribute is exported:
 
-* `id` - an identifier for the data source. 
+* `id` - An identifier for the identity provider.

@@ -46,7 +46,7 @@ func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, pr
 	}
 
 	resource "britive_profile_permission" "new" {
-		profile_id = britive_profile.new.profile_id
+		profile_id = britive_profile.new.id
 		permission_name = "%s"
 		permission_type = "%s"
 	}`, applicationName, profileName, profileDescription, permissionName, permissionType)

@@ -1,8 +1,6 @@
 # britive_profile Resource
 
-Creates a Profile.
-
-This resource allows you to create and configure a Profile.
+This resource allows you to create and configure a Britive Profile.
 
 ## Example Usage
 
@@ -31,25 +29,25 @@ resource "britive_profile" "new" {
 
 The following arguments are supported:
 
-* `app_container_id` (Required): The id of the Britive application.
+* `app_container_id` (Required): The identity of the Britive application.
 
-* `name` (Required): The name of the profile.
+* `name` (Required): The name of the Britive profile.
 
-* `description` (Optional): A description of the profile.
+* `description` (Optional): A description of the Britive profile.
 
-* `disabled` - (Optional): Default profile is enabled. To disable profile set `disabled = true`.
+* `disabled` - (Optional): Default profile is enabled. To disable a Britive profile, set `disabled = true`.
 
-* `expiration_duration` (Required): The expiration time for the profile. For example: `25m0s`
+* `expiration_duration` (Required): The expiration time for the Britive profile. For example, `25m0s`
 
 * `extendable` (Optional): The Boolean flag that indicates whether profile expiry is extendable or not. The default value is `false`.
 
-* `notification_prior_to_expiration`  (Optional): The profile expiry notification as a time value. For example: `10m0s`
+* `notification_prior_to_expiration`  (Optional): The profile expiry notification as a time value. For example, `10m0s`
 
 * `extension_duration` - (Optional): The profile expiry extension as a time value. For example: `12m30s`
 
 * `extension_limit` - (Optional): The repetition limit for extending the profile expiry. For example: `2`
 
-* `associations` - (Required): The list of associations for the profile.
+* `associations` - (Required): The list of associations for the Britive profile.
 
   The format of an `associations` is documented below.
 
@@ -63,7 +61,7 @@ The following arguments are supported:
 
 In addition to the above arguments, the following attribute is exported.
 
-* `id` - The ID of the Profile.
+* `id` - The identity of the Britive profile.
 
 ## Import
 

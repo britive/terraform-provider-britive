@@ -69,41 +69,49 @@ func Provider(v string) *schema.Provider {
 	}
 }
 
+func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, error) {
+	log.Print("[DEBUG] Trying to load configuration from file")
+	if configPath, ok := d.GetOk("config_path"); ok && configPath.(string) != "" {
+		path, err := homedir.Expand(configPath.(string))
+		if err != nil {
+			log.Printf("[DEBUG] Failed to expand config file path %s, error %s", configPath, err)
+			return "", "", nil
+		}
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			log.Printf("[DEBUG] Terraform config file %s not exists, error %s", path, err)
+			return "", "", nil
+		}
+		log.Printf("[DEBUG] Terraform configuration file is: %s", path)
+		configFile, err := os.Open(path)
+		if err != nil {
+			log.Printf("[DEBUG] Unable to open Terraform configuration file %s", path)
+			return "", "", fmt.Errorf("Unable to open terraform configuration file. Error %v", err)
+		}
+		defer configFile.Close()
+
+		configBytes, _ := ioutil.ReadAll(configFile)
+		var config britive.Config
+		err = json.Unmarshal(configBytes, &config)
+		if err != nil {
+			log.Printf("[DEBUG] Failed to parse config file %s", path)
+			return "", "", fmt.Errorf("Invalid terraform configuration file. Error %v", err)
+		}
+		return config.Tenant, config.Token, nil
+	}
+	return "", "", nil
+}
+
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var err error
+
 	token := d.Get("token").(string)
 	tenant := d.Get("tenant").(string)
 
-	var diags diag.Diagnostics
-
 	if tenant == "" && token == "" {
-		log.Print("[DEBUG] Trying to load configuration from file")
-		if configPath, ok := d.GetOk("config_path"); ok && configPath.(string) != "" {
-			path, err := homedir.Expand(configPath.(string))
-			if err != nil {
-				log.Printf("[DEBUG] Failed to expand config file path %s", configPath)
-				return nil, diag.FromErr(err)
-			}
-			if _, err := os.Stat(path); os.IsNotExist(err) {
-				log.Printf("[DEBUG] Config file %s not exists", path)
-				return nil, diag.FromErr(err)
-			}
-			log.Printf("[DEBUG] Configuration file is: %s", path)
-			configFile, err := os.Open(path)
-			if err != nil {
-				log.Printf("[DEBUG] Unable to open config file %s", path)
-				return nil, diag.FromErr(err)
-			}
-			defer configFile.Close()
-
-			configBytes, _ := ioutil.ReadAll(configFile)
-			var config britive.Config
-			err = json.Unmarshal(configBytes, &config)
-			if err != nil {
-				log.Printf("[DEBUG] Failed to parse config file %s", path)
-				return nil, diag.FromErr(err)
-			}
-			tenant = config.Tenant
-			token = config.Token
+		tenant, token, err = getProviderConfigurationFromFile(d)
+		if err != nil {
+			return nil, diag.FromErr(err)
 		}
 	}
 	if tenant == "" {

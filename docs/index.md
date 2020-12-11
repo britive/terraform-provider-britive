@@ -2,13 +2,11 @@
 
 Britive is a cloud-native security solution that provides centralized Privileged Access Security for cloud-forward enterprises.
 
-This is an overview document for the Britive Terraform Provider hosted by the Terraform registry.  
+The Britive provider is used to interact with the resources supported by Britive.  The provider needs to be configured with the proper credentials before it can be used.
 
-The Britive provider is used to configure your Britive infrastructure using Terraform. The Britive provider is jointly maintained by:
+Use the navigation to the left to read about the available resources.
 
-* The Britive Team
-
-## Example usage
+## Example Usage
 
 Terraform 0.13 and later:
 
@@ -47,9 +45,9 @@ The Britive provider offers a flexible means of providing credentials for authen
 1. Environment variables
 2. Provider Config
 
-### Environment variables
+### Environment Variables
 
-You can provide your credentials via the `BRITIVE_TENANT` and `BRITIVE_TOKEN`, environment variables, representing your Britive Tenant URL (ie. `"https://company.britive.com"`) and Britive API Token, respectively.
+You can provide your credentials via the `BRITIVE_TENANT` and `BRITIVE_TOKEN`, environment variables, representing your Britive Tenant URL (that is, `"https://company.britive.com"`) and Britive API Token, respectively.
 
 ```hcl
 provider "britive" {}
@@ -65,9 +63,7 @@ $ terraform plan
 
 ## Argument Reference
 
-In addition to [generic `provider` arguments](https://www.terraform.io/docs/configuration/providers.html)
-(e.g. `alias` and `version`), the following arguments are supported in the Britive
- `provider` block:
+In addition to [generic `provider` arguments](https://www.terraform.io/docs/configuration/providers.html) (e.g. `alias` and `version`), the following arguments are supported in the Britive  `provider` block:
 
 * `tenant` - (Optional): This is the Britive Tenant URL, for example `https://company.britive.com`. It must be provided, but it can also be sourced from the `BRITIVE_TENANT` environment variable.  
 
@@ -84,4 +80,4 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
   }
   ```
 
-**Note:** If you have **both** valid configurations in a config file and provider config, the provider config is used as an override. ie. any provider config will override its counterpart loaded from config file.
+**Note:** If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from config file.

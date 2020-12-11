@@ -1,8 +1,6 @@
 # britive_profile_identity Resource
 
-Adds an identity to a Britive profile.
-
-This resource allows you to add or delete Identity from a Profile.
+This resource allows you to add or remove an identity from a Britive Profile.
 
 ## Example Usage
 
@@ -23,13 +21,13 @@ resource "britive_profile_identity" "new" {
 
 ## Argument Reference
 
-The following argument is supported:
+The following arguments are supported:
 
 * `profile_id` (Required): The identifier of the profile.
 
 * `username` (Required): The name of the identity.
 
-* `access_period` (Optional): The access period of the identity in a profile. 
+* `access_period` (Optional): The access period of the identity in a profile.
 
   The format of an `access_period` is documented below.
 
@@ -47,7 +45,7 @@ In addition to the above argument, the following attribute is exported.
 
 ## Import
 
-You can import a profile using any of these accepted formats:
+You can import a Britive profile using any of these accepted formats:
 
 ```sh
 $ terraform import britive_profile.new apps/{{app_name}}/paps/{{profile_name}}/users/{{username}}

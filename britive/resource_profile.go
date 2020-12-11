@@ -48,13 +48,6 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 				Computed:    true,
 				Description: "The application name to associate the profile",
 			},
-			"profile_id": &schema.Schema{
-				Type:        schema.TypeString,
-				Computed:    true,
-				Optional:    true,
-				ForceNew:    true,
-				Description: "The id of the profile",
-			},
 			"name": &schema.Schema{
 				Type:        schema.TypeString,
 				Required:    true,
@@ -143,7 +136,7 @@ func (rp *ResourceProfile) resourceCreate(ctx context.Context, d *schema.Resourc
 	}
 
 	log.Printf("[INFO] Submitted new profile: %#v", p)
-	d.SetId(rp.helper.generateUniqueID(p.AppContainerID, p.ProfileID))
+	d.SetId(p.ProfileID)
 
 	err = rp.helper.saveProfileAssociations(p.AppContainerID, p.ProfileID, d, m)
 	if err != nil {
@@ -170,10 +163,10 @@ func (rp *ResourceProfile) resourceRead(ctx context.Context, d *schema.ResourceD
 
 func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
-	appContainerID, profileID, err := rp.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
+
+	profileID := d.Id()
+	appContainerID := d.Get("app_container_id").(string)
+
 	var hasChanges bool
 	if d.HasChange("name") ||
 		d.HasChange("description") ||
@@ -227,14 +220,12 @@ func (rp *ResourceProfile) resourceDelete(ctx context.Context, d *schema.Resourc
 
 	var diags diag.Diagnostics
 
-	appContainerID, profileID, err := rp.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
+	profileID := d.Id()
+	appContainerID := d.Get("app_container_id").(string)
 
 	log.Printf("[INFO] Deleting profile: %s/%s", appContainerID, profileID)
 
-	err = c.DeleteProfile(appContainerID, profileID)
+	err := c.DeleteProfile(appContainerID, profileID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -264,7 +255,7 @@ func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m inter
 		return nil, err
 	}
 
-	d.SetId(rp.helper.generateUniqueID(app.AppContainerID, profile.ProfileID))
+	d.SetId(profile.ProfileID)
 	d.Set("app_name", "")
 
 	err = rp.helper.getAndMapModelToResource(d, m)
@@ -288,20 +279,6 @@ func NewResourceProfileHelper() *ResourceProfileHelper {
 }
 
 //region Profile Helper functions
-
-func (rph *ResourceProfileHelper) generateUniqueID(appContainerID string, profileID string) string {
-	return fmt.Sprintf("apps/%s/paps/%s", appContainerID, profileID)
-}
-
-func (rph *ResourceProfileHelper) parseUniqueID(ID string) (appContainerID string, profileID string, err error) {
-	idParts := strings.Split(ID, "/")
-	if len(idParts) < 4 {
-		return "", "", fmt.Errorf("Invalid application profile ID reference, please check the state for %s", ID)
-	}
-	appContainerID = idParts[1]
-	profileID = idParts[3]
-	return
-}
 
 func (rph *ResourceProfileHelper) appendProfileAssociations(associations []britive.ProfileAssociation, associationType string, associationID string) []britive.ProfileAssociation {
 	associations = append(associations, britive.ProfileAssociation{
@@ -401,12 +378,7 @@ func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m i
 func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
 
-	ID := d.Id()
-
-	appContainerID, profileID, err := rph.parseUniqueID(ID)
-	if err != nil {
-		return err
-	}
+	profileID := d.Id()
 
 	log.Printf("[INFO] Reading profile %s", profileID)
 
@@ -418,9 +390,6 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	log.Printf("[INFO] Received profile %#v", profile)
 
 	if err := d.Set("app_container_id", profile.AppContainerID); err != nil {
-		return err
-	}
-	if err := d.Set("profile_id", profile.ProfileID); err != nil {
 		return err
 	}
 	if err := d.Set("name", profile.Name); err != nil {
@@ -455,7 +424,7 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 			return err
 		}
 	}
-	associations, err := rph.mapProfileAssociationsModelToResource(appContainerID, profile.Associations, m)
+	associations, err := rph.mapProfileAssociationsModelToResource(profile.AppContainerID, profile.Associations, m)
 	if err != nil {
 		return err
 	}

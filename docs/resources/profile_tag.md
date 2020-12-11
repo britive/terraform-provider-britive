@@ -1,8 +1,6 @@
 # britive_profile_tag Resource
 
-Adds a tag to the Britive profile.
-
-This resource allows you to add or delete Tag from a Profile.
+This resource allows you to add or remove a tag from a Britive profile.
 
 ## Example Usage
 
@@ -29,7 +27,7 @@ The following arguments are supported:
 
 * `tag_name` (Required): The name of the tag.
 
-* `access_period` (Optional): The access period of tag in the profile.
+* `access_period` (Optional): The access period of the tag in the Britive profile.
 
   The format of `access_period` is documented below.
 
@@ -41,13 +39,13 @@ The following arguments are supported:
 
 ## Attribute Reference
 
-In addition to the above argument, the following attribute is exported.
+In addition to the above arguments, the following attribute is exported.
 
 * `id` - An identifier of the resource with format `paps/{{profileID}}/tags/{{tagID}}`
 
 ## Import
 
-You can import a profile using any of these accepted formats:
+You can import a Britive profile using any of these accepted formats:
 
 ```SH
 $ terraform import britive_profile.new apps/{{app_name}}/paps/{{profile_name}}/tags/{{tag_name}}

@@ -1,8 +1,6 @@
 # britive_profile_permission Resource
 
-Adds a permission to a Britive profile.
-
-This resource allows you to add or delete Permission from a Profile.
+This resource allows you to add or remove permissions from a Britive profile.
 
 ## Example Usage
 
@@ -20,7 +18,7 @@ resource "britive_profile_permission" "new" {
 
 ## Argument Reference
 
-The following argument is supported:
+The following arguments are supported:
 
 * `profile_id` (Required): The identifier of the profile.
 
@@ -30,13 +28,13 @@ The following argument is supported:
 
 ## Attribute Reference
 
-In addition to the above argument, the following attribute is exported.
+In addition to the above arguments, the following attribute is exported.
 
 * `id` - An identifier of the resource with the format `paps/{{profileID}}/permissions/{{permission_name}}/type/{{permission_type}}`
 
 ## Import
 
-You can import a profile using any of these accepted formats:
+You can import a Britive profile using any of these accepted formats:
 
 ```sh
 $ terraform import britive_profile.new apps/{{app_name}}/paps/{{profile_name}}/permissions/{{permission_name}}/type/{{permission_type}}
