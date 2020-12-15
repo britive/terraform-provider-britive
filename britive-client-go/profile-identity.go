@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // GetProfileIdentities - Returns all identities assigned to profile
@@ -55,7 +56,8 @@ func (c *Client) GetProfileIdentity(profileID string, userID string) (*ProfileId
 func (c *Client) createOrUpdateProfileIdentity(method string, profileIdentity ProfileIdentity) (*ProfileIdentity, error) {
 	var ptapb []byte
 	var err error
-	if profileIdentity.AccessPeriod == nil {
+	var emptyTime = time.Time{}
+	if profileIdentity.AccessPeriod == nil || (profileIdentity.AccessPeriod.Start == emptyTime && profileIdentity.AccessPeriod.End == emptyTime) {
 		ptapb = []byte("{}")
 	} else {
 		ptapb, err = json.Marshal(*profileIdentity.AccessPeriod)

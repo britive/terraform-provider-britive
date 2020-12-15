@@ -249,17 +249,24 @@ func (rpth *ResourceProfileIdentityHelper) getAndMapResourceToModel(d *schema.Re
 	var accessPeriod *britive.TimePeriod
 	if len(aps) > 0 {
 		ap := aps[0].(map[string]interface{})
-		startTime, err := time.Parse(time.RFC3339, ap["start"].(string))
-		if err != nil {
-			return nil, err
-		}
-		endTime, err := time.Parse(time.RFC3339, ap["end"].(string))
-		if err != nil {
-			return nil, err
-		}
-		accessPeriod = &britive.TimePeriod{
-			Start: startTime,
-			End:   endTime,
+		start := ap["start"].(string)
+		end := ap["end"].(string)
+
+		if start == "" && end == "" {
+			accessPeriod = nil
+		} else {
+			startTime, err := time.Parse(time.RFC3339, start)
+			if err != nil {
+				return nil, err
+			}
+			endTime, err := time.Parse(time.RFC3339, end)
+			if err != nil {
+				return nil, err
+			}
+			accessPeriod = &britive.TimePeriod{
+				Start: startTime,
+				End:   endTime,
+			}
 		}
 	}
 	profileIdentity := britive.ProfileIdentity{
