@@ -16,13 +16,13 @@ out "britive_application_my_app" {
 }
 ```
 
-## Arguments Reference
+## Argument Reference
 
 The following argument is supported:
 
 * `name` - (Required): The name of the application.
 
-## Attributes Reference
+## Attribute Reference
 
 In addition to the above argument, the following attribute is exported:
 

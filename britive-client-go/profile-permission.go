@@ -36,7 +36,7 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 		return nil, err
 	}
 	if profilePermissions == nil || len(*profilePermissions) == 0 {
-		return nil, fmt.Errorf("No profiles permissions matching for the resource /paps/%s/permissions/%s", profileID, profilePermission.Name)
+		return nil, fmt.Errorf("No profiles permissions matching for the resource /paps/%s/permissions/%s/type/%s", profileID, profilePermission.Name, profilePermission.Type)
 	}
 
 	var pp *ProfilePermission
@@ -45,6 +45,10 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 			pp = &p
 			break
 		}
+	}
+
+	if pp == nil {
+		return nil, fmt.Errorf("No profiles permissions matching for the resource /paps/%s/permissions/%s/type/%s", profileID, profilePermission.Name, profilePermission.Type)
 	}
 
 	return pp, nil

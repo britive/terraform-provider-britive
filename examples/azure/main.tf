@@ -32,25 +32,13 @@ resource "britive_tag" "new" {
   }
 }
 
-output "britive_tag_new" {
-  value = britive_tag.new
-}
-
 resource "britive_tag_member" "new" {
   tag_id   = britive_tag.new.id
   username = "terraformexample1@britive.com"
 }
 
-output "britive_tag_member_new" {
-  value = britive_tag_member.new
-}
-
 data "britive_application" "app" {
   name = var.name
-}
-
-output "britive_application_app" {
-  value = data.britive_application.app
 }
 
 resource "britive_profile" "new" {
@@ -68,20 +56,10 @@ resource "britive_profile" "new" {
   }
 }
 
-
-output "britive_profile_new" {
-  value = britive_profile.new
-}
-
-
 resource "britive_profile_permission" "new" {
   profile_id      = britive_profile.new.id
   permission_name = "AcrPull"
   permission_type = "role"
-}
-
-output "britive_profile_permission_new" {
-  value = britive_profile_permission.new
 }
 
 resource "britive_profile_tag" "new" {
@@ -94,10 +72,6 @@ resource "britive_profile_tag" "new" {
   depends_on = [britive_tag.new, britive_tag_member.new]
 }
 
-output "britive_profile_tag_new" {
-  value = britive_profile_tag.new
-}
-
 resource "britive_profile_identity" "new" {
   profile_id = britive_profile.new.id
   username   = "terraformexample2@britive.com"
@@ -105,8 +79,4 @@ resource "britive_profile_identity" "new" {
     start = "2020-12-04T08:30:00Z"
     end   = "2020-12-06T06:00:00Z"
   }
-}
-
-output "britive_profile_identity_new" {
-  value = britive_profile_identity.new
 }

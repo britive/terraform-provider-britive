@@ -67,11 +67,11 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
 
 * `tenant` - (Optional): This is the Britive Tenant URL, for example `https://company.britive.com`. It must be provided, but it can also be sourced from the `BRITIVE_TENANT` environment variable.  
 
-* `token` - (Optional): This is the API Token to interact with your Britive. It must be provided, but it can also be sourced from the `BRITIVE_TOKEN` environment variable.
+* `token` - (Optional): This is the API Token to interact with your Britive API. It must be provided, but it can also be sourced from the `BRITIVE_TOKEN` environment variable.
 
 * `config_path` (Optional): This is the file path for Britive provider configuration. The default configuration path is `~/.britive/tf.config`. It can also be sourced from the `BRITIVE_CONFIG` environment variable.
 
-  A sample Britive configuration file content as below.
+  A sample Britive configuration file is given below.
   
   ```json
   {
@@ -80,4 +80,4 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
   }
   ```
 
-**Note:** If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from config file.
+**Note:** If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from the config file.

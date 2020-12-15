@@ -25,7 +25,7 @@ The following argument is supported:
 
 * `name` - (Required): The name of the identity provider.
 
-## Attributes Reference
+## Attribute Reference
 
 In addition to the above argument, the following attribute is exported:
 
