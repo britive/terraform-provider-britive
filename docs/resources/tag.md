@@ -12,11 +12,7 @@ data "britive_identity_provider" "idp" {
 resource "britive_tag" "new" {
     name = "My Tag"
     description = "My Tag Description"
-    user_tag_identity_providers {
-        identity_provider {
-            id = data.britive_identity_provider.idp.id
-        }
-    }
+    identity_provider_id = data.britive_identity_provider.idp.id
 }
 ```
 
@@ -28,21 +24,9 @@ The following arguments are supported:
 
 * `description` - (Optional): A description of the Britive tag.
 
+* `identity_provider_id` - (Required): The unique identity of the identity provider associated with the Britive tag.
+
 * `disabled` - (Optional): By default, the Britive tag is enabled. To disable a tag set `disabled = true`.
-
-* `user_tag_identity_providers` - (Required): The list of identity providers associated with the Britive tag.
-
-  The format of `user_tag_identity_providers` is documented below.
-
-### `user_tag_identity_providers` block supports
-
-* `identity_provider` - The identity provider.
-
-   The format of `identity_provider` is documented below.
-
-### `identity_provider` block supports
-
-* `id` - The unique identity of the identity provider.
 
 ## Attribute Reference
 

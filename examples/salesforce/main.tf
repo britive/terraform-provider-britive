@@ -25,11 +25,7 @@ data "britive_identity_provider" "idp" {
 resource "britive_tag" "new" {
   name        = "${local.resource_name_prefix}-Tag"
   description = "${local.resource_name_prefix}-Tag"
-  user_tag_identity_providers {
-    identity_provider {
-      id = data.britive_identity_provider.idp.id
-    }
-  }
+  identity_provider_id = data.britive_identity_provider.idp.id
 }
 
 resource "britive_tag_member" "new" {

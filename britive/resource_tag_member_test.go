@@ -36,11 +36,7 @@ func testAccCheckBritiveTagMemberConfig(identityProviderName string, tagName str
 	resource "britive_tag" "new" {
 		name = "%s"
 		description = "%s"
-		user_tag_identity_providers {
-			identity_provider {
-				id = data.britive_identity_provider.existing.id
-			}
-		}
+		identity_provider_id = data.britive_identity_provider.existing.id
 	}
 
 	resource "britive_tag_member" "new" {

@@ -48,29 +48,10 @@ func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 				Default:     false,
 				Description: "To disable the tag",
 			},
-			"user_tag_identity_providers": &schema.Schema{
-				Type:        schema.TypeList,
+			"identity_provider_id": &schema.Schema{
+				Type:        schema.TypeString,
 				Required:    true,
-				Description: "The identity provider list associated with tag",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"identity_provider": &schema.Schema{
-							Type:        schema.TypeList,
-							MaxItems:    1,
-							Required:    true,
-							Description: "The identity provider associated with tag",
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"id": &schema.Schema{
-										Type:        schema.TypeString,
-										Required:    true,
-										Description: "The id of the identity provider associated with tag",
-									},
-								},
-							},
-						},
-					},
-				},
+				Description: "The id of the identity provider associated with tag",
 			},
 			"external": &schema.Schema{
 				Type:        schema.TypeBool,
@@ -96,23 +77,13 @@ func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceDat
 	} else {
 		tag.Status = "Active"
 	}
-	userTagIdentityProviders := d.Get("user_tag_identity_providers").([]interface{})
-
-	for _, userTagIdentityProvider := range userTagIdentityProviders {
-		utipm := userTagIdentityProvider.(map[string]interface{})
-
-		ipm := utipm["identity_provider"].([]interface{})[0]
-		ip := ipm.(map[string]interface{})
-
-		utip := britive.UserTagIdentityProvider{
+	tag.UserTagIdentityProviders = []britive.UserTagIdentityProvider{
+		britive.UserTagIdentityProvider{
 			IdentityProvider: britive.IdentityProvider{
-				ID: ip["id"].(string),
+				ID: d.Get("identity_provider_id").(string),
 			},
-		}
-
-		tag.UserTagIdentityProviders = append(tag.UserTagIdentityProviders, utip)
+		},
 	}
-
 	log.Printf("[INFO] Creating new tag: %#v", tag)
 	ut, err := c.CreateTag(tag)
 	if err != nil {
@@ -251,34 +222,18 @@ func (rth *ResourceTagHelper) mapModelToResource(tag *britive.Tag, d *schema.Res
 	if err := d.Set("description", tag.Description); err != nil {
 		return err
 	}
+	if len(tag.UserTagIdentityProviders) > 0 {
+		if err := d.Set("identity_provider_id", tag.UserTagIdentityProviders[0].IdentityProvider.ID); err != nil {
+			return err
+		}
+	}
 	if err := d.Set("disabled", strings.EqualFold(tag.Status, "Inactive")); err != nil {
 		return err
 	}
 	if err := d.Set("external", tag.External); err != nil {
 		return err
 	}
-	utips := rth.mapIdentityProvidersModelToResource(&tag.UserTagIdentityProviders)
-	if err := d.Set("user_tag_identity_providers", utips); err != nil {
-		return err
-	}
 	return nil
-}
-
-func (rth *ResourceTagHelper) mapIdentityProvidersModelToResource(tagIdentityProviders *[]britive.UserTagIdentityProvider) []interface{} {
-	if tagIdentityProviders != nil {
-		utips := make([]interface{}, len(*tagIdentityProviders), len(*tagIdentityProviders))
-
-		for i, tagIdentityProvider := range *tagIdentityProviders {
-			utip := make(map[string]interface{})
-			ip := make(map[string]interface{})
-			ip["id"] = tagIdentityProvider.IdentityProvider.ID
-			utip["identity_provider"] = []interface{}{ip}
-
-			utips[i] = utip
-		}
-		return utips
-	}
-	return make([]interface{}, 0)
 }
 
 //endregion
