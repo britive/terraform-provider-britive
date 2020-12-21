@@ -14,7 +14,7 @@ func (c *Client) GetAssignedProfilePermissions(profileID string) (*[]ProfilePerm
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.doRequestWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (c *Client) ExecuteProfilePermissionRequest(profileID string, ppr ProfilePe
 		return err
 	}
 
-	_, err = c.doRequest(req)
+	_, err = c.doRequestWithLock(req, profileID)
 	if err != nil {
 		return err
 	}

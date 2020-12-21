@@ -5,7 +5,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
+)
+
+var (
+	syncOnce sync.Once
+	client   *Client
 )
 
 // Client - Britive API client
@@ -14,17 +20,53 @@ type Client struct {
 	HTTPClient *http.Client
 	Token      string
 	Version    string
+	SyncMap    *sync.Map
 }
 
 // NewClient - Initialises new Britive API client
 func NewClient(apiBaseURL, token, version string) (*Client, error) {
-	c := Client{
-		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-		APIBaseURL: apiBaseURL,
-		Token:      token,
-		Version:    version,
+	syncOnce.Do(func() {
+		client = &Client{
+			HTTPClient: &http.Client{Timeout: 10 * time.Second},
+			APIBaseURL: apiBaseURL,
+			Token:      token,
+			Version:    version,
+			SyncMap:    &sync.Map{},
+		}
+	})
+	return client, nil
+}
+
+//Lock to lock based on key
+func (c *Client) lock(key interface{}) {
+	mutex := &sync.Mutex{}
+	actual, _ := c.SyncMap.LoadOrStore(key, mutex)
+	actualMutex := actual.(*sync.Mutex)
+	actualMutex.Lock()
+	if actualMutex != mutex {
+		actualMutex.Unlock()
+		c.lock(key)
+		return
 	}
-	return &c, nil
+	return
+}
+
+//Unlock to unlock based on key
+func (c *Client) unlock(key interface{}) {
+	actual, exist := c.SyncMap.Load(key)
+	if !exist {
+		return
+	}
+	actualMutex := actual.(*sync.Mutex)
+	c.SyncMap.Delete(key)
+	actualMutex.Unlock()
+}
+
+//DoRequest - Perform Britive API call
+func (c *Client) doRequestWithLock(req *http.Request, key string) ([]byte, error) {
+	c.lock(key)
+	defer c.unlock(key)
+	return c.doRequest(req)
 }
 
 //DoRequest - Perform Britive API call

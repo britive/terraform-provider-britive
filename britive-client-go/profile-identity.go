@@ -15,7 +15,7 @@ func (c *Client) GetProfileIdentities(profileID string) (*[]ProfileIdentity, err
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.doRequestWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (c *Client) GetProfileIdentity(profileID string, userID string) (*ProfileId
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.doRequestWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (c *Client) createOrUpdateProfileIdentity(method string, profileIdentity Pr
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.doRequestWithLock(req, profileIdentity.ProfileID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (c *Client) DeleteProfileIdentity(profileID string, userID string) error {
 		return err
 	}
 
-	_, err = c.doRequest(req)
+	_, err = c.doRequestWithLock(req, profileID)
 
 	return err
 }

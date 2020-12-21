@@ -15,7 +15,7 @@ func (c *Client) GetProfileAssociations(profileID string) (*[]ProfileAssociation
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.doRequestWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (c *Client) SaveProfileAssociations(profileID string, associations []Profil
 		return err
 	}
 
-	_, err = c.doRequest(req)
+	_, err = c.doRequestWithLock(req, profileID)
 
 	return err
 }
