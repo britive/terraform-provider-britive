@@ -122,6 +122,17 @@ type ProfileAssociation struct {
 	ProfileID            string      `json:"papId,omitempty"`
 }
 
+//ProfileAssociationResource - godoc
+type ProfileAssociationResource struct {
+	ID          int64       `json:"id,omitempty"`
+	Name        string      `json:"name"`
+	Description interface{} `json:"description,omitempty"`
+	NativeID    string      `json:"nativeId,omitempty"`
+	ParentID    string      `json:"parentId,omitempty"`
+	ParentName  string      `json:"parentName,omitempty"`
+	Type        string      `json:"type,omitempty"`
+}
+
 //TimePeriod - godoc
 type TimePeriod struct {
 	Start time.Time `json:"start"`

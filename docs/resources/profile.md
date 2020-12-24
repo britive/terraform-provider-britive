@@ -53,9 +53,11 @@ The following arguments are supported:
 
 ### `associations` block supports
 
-* `type` - The type of association, either Environment or Environment Group.
+* `type` - (Required): The type of association, should be one of [Environment, EnvironmentGroup, ApplicationResource].
 
-* `value` - The association value.
+* `value` - (Required): The association value.
+
+* `parent_name` - (Optional): The parent name of the resource. Required only if the association type is ApplicationResource.
 
 ## Attribute Reference
 

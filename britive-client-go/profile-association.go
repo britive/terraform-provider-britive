@@ -7,9 +7,9 @@ import (
 	"strings"
 )
 
-// GetProfileAssociations - Returns a all associations linked with profile
-func (c *Client) GetProfileAssociations(profileID string) (*[]ProfileAssociation, error) {
-	requestURL := fmt.Sprintf("%s/paps/%s/scopes", c.APIBaseURL, profileID)
+// GetProfileAssociationResources - Returns a all associations linked with profile
+func (c *Client) GetProfileAssociationResources(profileID string) (*[]ProfileAssociationResource, error) {
+	requestURL := fmt.Sprintf("%s/paps/%s/resources", c.APIBaseURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, err
@@ -19,21 +19,37 @@ func (c *Client) GetProfileAssociations(profileID string) (*[]ProfileAssociation
 	if err != nil {
 		return nil, err
 	}
-	profileAssociations := make([]ProfileAssociation, 0)
-	err = json.Unmarshal(body, &profileAssociations)
+	profileAssociationResources := make([]ProfileAssociationResource, 0)
+	err = json.Unmarshal(body, &profileAssociationResources)
 	if err != nil {
 		return nil, err
 	}
-	return &profileAssociations, nil
+	return &profileAssociationResources, nil
 }
 
-// SaveProfileAssociations - Save profile associations
-func (c *Client) SaveProfileAssociations(profileID string, associations []ProfileAssociation) error {
+// SaveProfileAssociationScopes - Save profile associations
+func (c *Client) SaveProfileAssociationScopes(profileID string, associations []ProfileAssociation) error {
 	utb, err := json.Marshal(associations)
 	if err != nil {
 		return err
 	}
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/scopes", c.APIBaseURL, profileID), strings.NewReader(string(utb)))
+	if err != nil {
+		return err
+	}
+
+	_, err = c.doRequestWithLock(req, profileID)
+
+	return err
+}
+
+// SaveProfileAssociationResourceScopes - Save profile associations
+func (c *Client) SaveProfileAssociationResourceScopes(profileID string, associations []ProfileAssociation) error {
+	utb, err := json.Marshal(associations)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/resources/scopes", c.APIBaseURL, profileID), strings.NewReader(string(utb)))
 	if err != nil {
 		return err
 	}
