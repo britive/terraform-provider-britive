@@ -23,7 +23,7 @@ type Client struct {
 	SyncMap    *sync.Map
 }
 
-// NewClient - Initialises new Britive API client
+// NewClient - Initializes new Britive API client
 func NewClient(apiBaseURL, token, version string) (*Client, error) {
 	syncOnce.Do(func() {
 		client = &Client{
@@ -87,8 +87,12 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
+	if res.StatusCode == http.StatusNotFound {
+		return body, ErrNotFound
+	}
+
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf("An error occured while processing the request\nrequestUrl: %s\nrequestMethod: %s\nresponseStatus: %d\nresponseBody: %s", req.URL, req.Method, res.StatusCode, body)
+		return nil, fmt.Errorf("An error occurred while processing the request\nRequest Url: %s\nRequest Method: %s\nResponse Status: %d\nResponse Body: %s", req.URL, req.Method, res.StatusCode, body)
 	}
 
 	return body, err

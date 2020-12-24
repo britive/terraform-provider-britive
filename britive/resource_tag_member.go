@@ -2,6 +2,7 @@ package britive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceTagMember - Terraform Resource for Tag member
@@ -18,7 +20,7 @@ type ResourceTagMember struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceTagMember - Initialises new tag member resource
+//NewResourceTagMember - Initializes new tag member resource
 func NewResourceTagMember(importHelper *ImportHelper) *ResourceTagMember {
 	rtm := &ResourceTagMember{
 		helper:       NewResourceTagMemberHelper(),
@@ -33,22 +35,24 @@ func NewResourceTagMember(importHelper *ImportHelper) *ResourceTagMember {
 		},
 		Schema: map[string]*schema.Schema{
 			"tag_id": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The identifier of the tag",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The identifier of the Britive tag",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"tag_name": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
-				Description: "The name of the tag",
+				Description: "The name of the Britive tag",
 			},
 			"username": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The username associate with the tag",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The username of the user added to the Britive tag",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 		},
 	}
@@ -128,13 +132,27 @@ func (rtm *ResourceTagMember) resourceStateImporter(d *schema.ResourceData, m in
 	tagName := d.Get("tag_name").(string)
 	username := d.Get("username").(string)
 
+	if strings.TrimSpace(tagName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("tag_name")
+	}
+
+	if strings.TrimSpace(username) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("username")
+	}
+
 	log.Printf("[INFO] Importing tag member %s/%s", tagName, username)
 
 	tag, err := c.GetTagByName(tagName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("tag %s", tagName)
+	}
 	if err != nil {
 		return nil, err
 	}
 	user, err := c.GetUserByName(username)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("member %s", username)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -158,21 +176,21 @@ func (rtm *ResourceTagMember) resourceStateImporter(d *schema.ResourceData, m in
 type ResourceTagMemberHelper struct {
 }
 
-//NewResourceTagMemberHelper - Initialises new tag member resource helper
+//NewResourceTagMemberHelper - Initializes new tag member resource helper
 func NewResourceTagMemberHelper() *ResourceTagMemberHelper {
 	return &ResourceTagMemberHelper{}
 }
 
 //region Tag member Resource helper functions
 
-func (rtmh *ResourceTagMemberHelper) generateUniqueID(tagID string, userID string) string {
+func (resourceTagMemberHelper *ResourceTagMemberHelper) generateUniqueID(tagID string, userID string) string {
 	return fmt.Sprintf("tags/%s/users/%s", tagID, userID)
 }
 
-func (rtmh *ResourceTagMemberHelper) parseUniqueID(ID string) (tagID string, userID string, err error) {
+func (resourceTagMemberHelper *ResourceTagMemberHelper) parseUniqueID(ID string) (tagID string, userID string, err error) {
 	tagMemberParts := strings.Split(ID, "/")
 	if len(tagMemberParts) < 4 {
-		err = fmt.Errorf("Invalid tag member reference, please check the state for %s", ID)
+		err = NewInvalidResourceIDError("tag member", ID)
 		return
 	}
 	tagID = tagMemberParts[1]
@@ -180,11 +198,14 @@ func (rtmh *ResourceTagMemberHelper) parseUniqueID(ID string) (tagID string, use
 	return
 }
 
-func (rtmh *ResourceTagMemberHelper) getAndMapModelToResource(tagID string, userID string, d *schema.ResourceData, m interface{}) error {
+func (resourceTagMemberHelper *ResourceTagMemberHelper) getAndMapModelToResource(tagID string, userID string, d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
 
 	log.Printf("[INFO] Reading tag member %s/%s", tagID, userID)
 	u, err := c.GetTagMember(tagID, userID)
+	if errors.Is(err, britive.ErrNotFound) {
+		return NewNotFoundErrorf("member %s in tag %s", userID, tagID)
+	}
 	if err != nil {
 		return err
 	}

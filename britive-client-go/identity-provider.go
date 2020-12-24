@@ -50,11 +50,19 @@ func (c *Client) getIdentityProvider(resourceURL string) (*IdentityProvider, err
 		return nil, err
 	}
 
-	identityProvider := IdentityProvider{}
-	err = json.Unmarshal(body, &identityProvider)
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
+	identityProvider := &IdentityProvider{}
+	err = json.Unmarshal(body, identityProvider)
 	if err != nil {
 		return nil, err
 	}
 
-	return &identityProvider, nil
+	if identityProvider == nil {
+		return nil, ErrNotFound
+	}
+
+	return identityProvider, nil
 }

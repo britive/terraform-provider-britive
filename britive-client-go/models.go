@@ -1,6 +1,8 @@
 package britive
 
-import "time"
+import (
+	"time"
+)
 
 //Config - godoc
 type Config struct {

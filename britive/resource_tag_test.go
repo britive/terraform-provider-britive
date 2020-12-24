@@ -9,8 +9,8 @@ import (
 )
 
 func TestBritiveTag(t *testing.T) {
-	name := "BPAT - New Britive Tag Test"
-	description := "BPAT - New Britive Tag Test Description"
+	name := "AT - New Britive Tag Test"
+	description := "AT - New Britive Tag Test Description"
 	identityProviderName := "Britive"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
@@ -44,11 +44,11 @@ func testAccCheckBritiveTagExists(n string) resource.TestCheckFunc {
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return NewNotFoundErrorf("%s in state", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No TagID set")
+			return NewNotFoundErrorf("ID for %s in state", n)
 		}
 
 		return nil

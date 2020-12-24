@@ -12,7 +12,7 @@ import (
 type ImportHelper struct {
 }
 
-//NewImportHelper - Initialises new ImportHelper
+//NewImportHelper - Initializes new ImportHelper
 func NewImportHelper() *ImportHelper {
 	return &ImportHelper{}
 }
@@ -21,9 +21,8 @@ func NewImportHelper() *ImportHelper {
 func (ih *ImportHelper) ParseImportID(idRegexes []string, d *schema.ResourceData) error {
 	for _, idFormat := range idRegexes {
 		re, err := regexp.Compile(idFormat)
-
 		if err != nil {
-			return fmt.Errorf("Import is not supported. Invalid regex formats. %s", err)
+			return fmt.Errorf("Invalid import format. %s", err)
 		}
 
 		if fieldValues := re.FindStringSubmatch(d.Id()); fieldValues != nil {
@@ -53,5 +52,5 @@ func (ih *ImportHelper) ParseImportID(idRegexes []string, d *schema.ResourceData
 			return nil
 		}
 	}
-	return fmt.Errorf("Import id %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
+	return fmt.Errorf("Import value %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
 }

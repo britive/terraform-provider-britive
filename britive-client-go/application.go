@@ -41,13 +41,21 @@ func (c *Client) GetApplication(appContainerID string) (*Application, error) {
 		return nil, err
 	}
 
-	application := Application{}
-	err = json.Unmarshal(body, &application)
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
+	application := &Application{}
+	err = json.Unmarshal(body, application)
 	if err != nil {
 		return nil, err
 	}
 
-	return &application, nil
+	if application == nil {
+		return nil, ErrNotFound
+	}
+
+	return application, nil
 }
 
 // GetApplicationByName - Returns application by name
@@ -64,8 +72,8 @@ func (c *Client) GetApplicationByName(name string) (*Application, error) {
 		return nil, err
 	}
 
-	if string(body) == "" {
-		return nil, fmt.Errorf("No application matching with the name %s", name)
+	if string(body) == emptyString {
+		return nil, ErrNotFound
 	}
 
 	applications := make([]Application, 0)
@@ -75,7 +83,7 @@ func (c *Client) GetApplicationByName(name string) (*Application, error) {
 	}
 
 	if len(applications) == 0 {
-		return nil, fmt.Errorf("No application matching with the name %s", name)
+		return nil, ErrNotFound
 	}
 
 	return &applications[0], nil

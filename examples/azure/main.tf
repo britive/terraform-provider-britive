@@ -15,7 +15,7 @@ variable "name" {
 }
 
 locals {
-  resource_name_prefix = "${var.name}-2020-12-03 New"
+  resource_name_prefix = "${var.name}-2020-12-24"
 }
 
 data "britive_identity_provider" "idp" {
@@ -61,18 +61,10 @@ resource "britive_profile_permission" "new" {
 resource "britive_profile_tag" "new" {
   profile_id = britive_profile.new.id
   tag_name   = "${local.resource_name_prefix}-Tag"
-  access_period {
-    start = "2020-12-04T08:30:00Z"
-    end   = "2020-12-05T06:00:00Z"
-  }
   depends_on = [britive_tag.new, britive_tag_member.new]
 }
 
 resource "britive_profile_identity" "new" {
   profile_id = britive_profile.new.id
   username   = "terraformexample2@britive.com"
-  access_period {
-    start = "2020-12-04T08:30:00Z"
-    end   = "2020-12-06T06:00:00Z"
-  }
 }

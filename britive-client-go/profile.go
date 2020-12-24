@@ -43,8 +43,8 @@ func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile,
 		return nil, err
 	}
 
-	if string(body) == "" {
-		return nil, fmt.Errorf("No profile matching with the name %s", name)
+	if string(body) == emptyString {
+		return nil, ErrNotFound
 	}
 
 	profiles := make([]Profile, 0)
@@ -54,7 +54,7 @@ func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile,
 	}
 
 	if len(profiles) == 0 {
-		return nil, fmt.Errorf("No profile matching with the name %s", name)
+		return nil, ErrNotFound
 	}
 
 	return &profiles[0], nil
@@ -72,11 +72,20 @@ func (c *Client) GetProfile(profileID string) (*Profile, error) {
 	if err != nil {
 		return nil, err
 	}
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
 	profile := &Profile{}
 	err = json.Unmarshal(body, profile)
 	if err != nil {
 		return nil, err
 	}
+
+	if profile == nil {
+		return nil, ErrNotFound
+	}
+
 	return profile, nil
 }
 
@@ -105,12 +114,12 @@ func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile
 
 // UpdateProfile - Updates profile
 func (c *Client) UpdateProfile(appContainerID string, profileID string, profile Profile) (*Profile, error) {
-	utsb, err := json.Marshal(profile)
+	profileBody, err := json.Marshal(profile)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/apps/%s/paps/%s", c.APIBaseURL, appContainerID, profileID), strings.NewReader(string(utsb)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/apps/%s/paps/%s", c.APIBaseURL, appContainerID, profileID), strings.NewReader(string(profileBody)))
 	if err != nil {
 		return nil, err
 	}

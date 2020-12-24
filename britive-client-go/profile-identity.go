@@ -41,31 +41,37 @@ func (c *Client) GetProfileIdentity(profileID string, userID string) (*ProfileId
 	if err != nil {
 		return nil, err
 	}
+
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
 	profileIdentities := []ProfileIdentity{}
 	err = json.Unmarshal(body, &profileIdentities)
 	if err != nil {
 		return nil, err
 	}
+
 	if len(profileIdentities) == 0 {
-		return nil, fmt.Errorf("No identities associated with profile for the resource %s", requestURL)
+		return nil, ErrNotFound
 	}
 
 	return &profileIdentities[0], nil
 }
 
 func (c *Client) createOrUpdateProfileIdentity(method string, profileIdentity ProfileIdentity) (*ProfileIdentity, error) {
-	var ptapb []byte
+	var profileIdentityBody []byte
 	var err error
 	var emptyTime = time.Time{}
 	if profileIdentity.AccessPeriod == nil || (profileIdentity.AccessPeriod.Start == emptyTime && profileIdentity.AccessPeriod.End == emptyTime) {
-		ptapb = []byte("{}")
+		profileIdentityBody = []byte("{}")
 	} else {
-		ptapb, err = json.Marshal(*profileIdentity.AccessPeriod)
+		profileIdentityBody, err = json.Marshal(*profileIdentity.AccessPeriod)
 		if err != nil {
 			return nil, err
 		}
 	}
-	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/users/%s", c.APIBaseURL, profileIdentity.ProfileID, profileIdentity.UserID), strings.NewReader(string(ptapb)))
+	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/users/%s", c.APIBaseURL, profileIdentity.ProfileID, profileIdentity.UserID), strings.NewReader(string(profileIdentityBody)))
 	if err != nil {
 		return nil, err
 	}

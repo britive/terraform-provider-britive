@@ -43,8 +43,8 @@ func (c *Client) GetTagByName(name string) (*Tag, error) {
 		return nil, err
 	}
 
-	if string(body) == "" {
-		return nil, fmt.Errorf("No tag matching with the name %s", name)
+	if string(body) == emptyString {
+		return nil, ErrNotFound
 	}
 
 	tags := make([]Tag, 0)
@@ -54,7 +54,7 @@ func (c *Client) GetTagByName(name string) (*Tag, error) {
 	}
 
 	if len(tags) == 0 {
-		return nil, fmt.Errorf("No tag matching with the name %s", name)
+		return nil, ErrNotFound
 	}
 
 	return &tags[0], nil
@@ -72,17 +72,21 @@ func (c *Client) GetTag(tagID string) (*Tag, error) {
 		return nil, err
 	}
 
-	if string(body) == "" {
-		return nil, fmt.Errorf("No tag found with id %s", tagID)
+	if string(body) == emptyString {
+		return nil, ErrNotFound
 	}
 
-	tag := Tag{}
-	err = json.Unmarshal(body, &tag)
+	tag := &Tag{}
+	err = json.Unmarshal(body, tag)
 	if err != nil {
 		return nil, err
 	}
 
-	return &tag, nil
+	if tag == nil {
+		return nil, ErrNotFound
+	}
+
+	return tag, nil
 }
 
 // CreateTag - Create new tag
@@ -111,12 +115,12 @@ func (c *Client) CreateTag(tag Tag) (*Tag, error) {
 
 // UpdateTag - Update tag
 func (c *Client) UpdateTag(tagID string, tag Tag) (*Tag, error) {
-	utsb, err := json.Marshal(tag)
+	tagBody, err := json.Marshal(tag)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/user-tags/%s", c.APIBaseURL, tagID), strings.NewReader(string(utsb)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/user-tags/%s", c.APIBaseURL, tagID), strings.NewReader(string(tagBody)))
 	if err != nil {
 		return nil, err
 	}

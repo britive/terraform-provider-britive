@@ -9,7 +9,7 @@ import (
 type Validation struct {
 }
 
-//NewValidation - Initialises new Validation
+//NewValidation - Initializes new Validation
 func NewValidation() *Validation {
 	return &Validation{}
 }
@@ -19,7 +19,7 @@ func (v *Validation) DurationValidateFunc(val interface{}, key string) (warns []
 	value := val.(string)
 	_, err := time.ParseDuration(value)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("%s must be duration. [e.g 1s, 10m, 2h, 5d], got: %s", key, value))
+		errs = append(errs, fmt.Errorf("expected %q to be duration. [e.g 1s, 10m, 2h, 2h35m0s], got: %s", key, value))
 	}
 	return
 }

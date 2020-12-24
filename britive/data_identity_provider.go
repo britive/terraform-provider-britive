@@ -2,11 +2,12 @@ package britive
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //DataSourceIdentityProvider - Terraform IdentityProvider DataSource
@@ -14,68 +15,41 @@ type DataSourceIdentityProvider struct {
 	Resource *schema.Resource
 }
 
-//NewDataSourceIdentityProvider - Initialises new DataSourceIdentityProvider
+//NewDataSourceIdentityProvider - Initializes new DataSourceIdentityProvider
 func NewDataSourceIdentityProvider() *DataSourceIdentityProvider {
-	dsip := &DataSourceIdentityProvider{}
-	dsip.Resource = &schema.Resource{
-		ReadContext: dsip.resourceRead,
+	dataSourceIdentityProvider := &DataSourceIdentityProvider{}
+	dataSourceIdentityProvider.Resource = &schema.Resource{
+		ReadContext: dataSourceIdentityProvider.resourceRead,
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-			},
-			"description": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
-			},
-			"type": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The name of the identity provider",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 		},
 	}
-	return dsip
+	return dataSourceIdentityProvider
 }
 
-func (dsip *DataSourceIdentityProvider) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (dataSourceIdentityProvider *DataSourceIdentityProvider) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
 
 	identityProviderName := d.Get("name").(string)
 
-	if identityProviderName == "" {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("Name must be passed to get identity provider"),
-		})
-		return diags
-	}
-
 	identityProvider, err := c.GetIdentityProviderByName(identityProviderName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return diag.FromErr(NewNotFoundErrorf("identity provider %s", identityProviderName))
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	if identityProvider == nil {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("No identity provider found matching %s", identityProviderName),
-		})
-		return diags
-	}
 	d.SetId(identityProvider.ID)
+
 	if err := d.Set("name", identityProvider.Name); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("description", identityProvider.Description); err != nil {
-		return diag.FromErr(err)
-	}
-	if err := d.Set("type", identityProvider.Type); err != nil {
-		return diag.FromErr(err)
-	}
 
-	return diags
+	return nil
 }

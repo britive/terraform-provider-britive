@@ -36,7 +36,7 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 		return nil, err
 	}
 	if profilePermissions == nil || len(*profilePermissions) == 0 {
-		return nil, fmt.Errorf("No profiles permissions matching for the resource /paps/%s/permissions/%s/type/%s", profileID, profilePermission.Name, profilePermission.Type)
+		return nil, ErrNotFound
 	}
 
 	var pp *ProfilePermission
@@ -48,7 +48,7 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 	}
 
 	if pp == nil {
-		return nil, fmt.Errorf("No profiles permissions matching for the resource /paps/%s/permissions/%s/type/%s", profileID, profilePermission.Name, profilePermission.Type)
+		return nil, ErrNotFound
 	}
 
 	return pp, nil
@@ -56,12 +56,12 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 
 // ExecuteProfilePermissionRequest - Add/delete permission from profile
 func (c *Client) ExecuteProfilePermissionRequest(profileID string, ppr ProfilePermissionRequest) error {
-	pprb, err := json.Marshal(ppr)
+	profilePermissionRequestBody, err := json.Marshal(ppr)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/permissions", c.APIBaseURL, profileID), strings.NewReader(string(pprb)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/permissions", c.APIBaseURL, profileID), strings.NewReader(string(profilePermissionRequestBody)))
 	if err != nil {
 		return err
 	}

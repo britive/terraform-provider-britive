@@ -10,8 +10,8 @@ import (
 
 func TestBritiveProfileIdentity(t *testing.T) {
 	applicationName := "Azure-ValueLabs"
-	profileName := "BPAT - New Britive Profile Identity Test"
-	profileDescription := "BPAT - New Britive Profile Identity Test Description"
+	profileName := "AT - New Britive Profile Identity Test"
+	profileDescription := "AT - New Britive Profile Identity Test Description"
 	username := "britiveprovideracceptancetest"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
@@ -56,11 +56,11 @@ func testAccCheckBritiveProfileIdentityExists(n string) resource.TestCheckFunc {
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return NewNotFoundErrorf("%s in state", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Profile Idenity ID set")
+			return NewNotFoundErrorf("ID for %s in state", n)
 		}
 
 		return nil

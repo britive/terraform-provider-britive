@@ -2,7 +2,7 @@ package britive
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -10,6 +10,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceProfile - Terraform Resource for Profile
@@ -20,7 +21,7 @@ type ResourceProfile struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceProfile - Initialisation of new profile resource
+//NewResourceProfile - Initialization of new profile resource
 func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProfile {
 	rp := &ResourceProfile{
 		helper:       NewResourceProfileHelper(),
@@ -37,48 +38,57 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 		},
 		Schema: map[string]*schema.Schema{
 			"app_container_id": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The application id to associate the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The identity of the Britive application",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"app_name": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
-				Description: "The application name to associate the profile",
+				Description: "The name of the Britive application",
 			},
 			"name": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The name of the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The name of the Britive profile",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"description": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The description of the profile",
+				Description: "The description of the Britive profile",
 			},
 			"disabled": &schema.Schema{
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
-				Description: "To disable the profile",
+				Description: "To disable the Britive profile",
 			},
 			"associations": &schema.Schema{
 				Type:        schema.TypeList,
 				Required:    true,
-				Description: "Associations for the profile",
+				Description: "The list of associations for the Britive profile",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"type": &schema.Schema{
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "The type of association",
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The type of association, can be any one from the list Environment, EnvironmentGroup, ApplicationResource",
+							ValidateFunc: validation.StringInSlice([]string{"Environment", "EnvironmentGroup", "ApplicationResource"}, false),
 						},
 						"value": &schema.Schema{
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The association value",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+						"resource_parent_name": &schema.Schema{
 							Type:        schema.TypeString,
-							Required:    true,
-							Description: "The value of association",
+							Optional:    true,
+							Description: "The parent name of resource. Required only if the association type is ApplicationResource",
 						},
 					},
 				},
@@ -87,30 +97,30 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: rp.validation.DurationValidateFunc,
-				Description:  "The profile expiration time out as duration",
+				Description:  "The expiration time for the Britive profile",
 			},
 			"extendable": &schema.Schema{
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
-				Description: "The flag whether profile expiration is extendable or not",
+				Description: "The Boolean flag that indicates whether profile expiry is extendable or not",
 			},
 			"notification_prior_to_expiration": &schema.Schema{
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: rp.validation.DurationValidateFunc,
-				Description:  "The profile expiration notification as duration",
+				Description:  "he profile expiry notification as a time value",
 			},
 			"extension_duration": &schema.Schema{
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: rp.validation.DurationValidateFunc,
-				Description:  "The profile expiration extenstion as duration",
+				Description:  "The profile expiry extension as a time value",
 			},
 			"extension_limit": &schema.Schema{
 				Type:        schema.TypeInt,
 				Optional:    true,
-				Description: "The profile expiration extension repeat limit",
+				Description: "The repetition limit for extending the profile expiry",
 			},
 		},
 	}
@@ -126,7 +136,10 @@ func (rp *ResourceProfile) resourceCreate(ctx context.Context, d *schema.Resourc
 
 	profile := britive.Profile{}
 
-	rp.helper.mapResourceToModel(d, m, &profile, false)
+	err := rp.helper.mapResourceToModel(d, m, &profile, false)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
 	log.Printf("[INFO] Creating new profile: %#v", profile)
 
@@ -180,8 +193,10 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 		hasChanges = true
 
 		profile := britive.Profile{}
-		rp.helper.mapResourceToModel(d, m, &profile, true)
-
+		err := rp.helper.mapResourceToModel(d, m, &profile, true)
+		if err != nil {
+			return diag.FromErr(err)
+		}
 		log.Printf("[INFO] Updating profile: %#v", profile)
 
 		up, err := c.UpdateProfile(appContainerID, profileID, profile)
@@ -243,14 +258,26 @@ func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m inter
 	}
 	appName := d.Get("app_name").(string)
 	profileName := d.Get("name").(string)
+	if strings.TrimSpace(appName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("app_name")
+	}
+	if strings.TrimSpace(profileName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("name")
+	}
 
 	log.Printf("[INFO] Importing profile: %s/%s", appName, profileName)
 
 	app, err := c.GetApplicationByName(appName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("application %s", appName)
+	}
 	if err != nil {
 		return nil, err
 	}
 	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("profile %s", profileName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +300,7 @@ type ResourceProfileHelper struct {
 	Resource *schema.Resource
 }
 
-//NewResourceProfileHelper - Initialisation of new profile resource helper
+//NewResourceProfileHelper - Initialization of new profile resource helper
 func NewResourceProfileHelper() *ResourceProfileHelper {
 	return &ResourceProfileHelper{}
 }
@@ -324,7 +351,7 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 		}
 		log.Printf("[INFO] Submitted Update profile %s associations: %#v", profileID, associations)
 	} else {
-		return fmt.Errorf("Invalid associations passed %v", as)
+		return NewNotFoundErrorf("associations %v", as)
 	}
 	return nil
 }
@@ -350,7 +377,7 @@ func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m i
 		profile.Extendable = extendable
 		notificationPriorToExpirationString := d.Get("notification_prior_to_expiration").(string)
 		if notificationPriorToExpirationString == "" {
-			return fmt.Errorf("Mising required variable notification_prior_to_expiration")
+			return NewNotEmptyOrWhiteSpaceError("notification_prior_to_expiration")
 		}
 		notificationPriorToExpiration, err := time.ParseDuration(notificationPriorToExpirationString)
 		if err != nil {
@@ -361,7 +388,7 @@ func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m i
 
 		extensionDurationString := d.Get("extension_duration").(string)
 		if extensionDurationString == "" {
-			return fmt.Errorf("Mising required variable extension_duration")
+			return NewNotEmptyOrWhiteSpaceError("extension_duration")
 		}
 		extensionDuration, err := time.ParseDuration(extensionDurationString)
 		if err != nil {
@@ -383,6 +410,9 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	log.Printf("[INFO] Reading profile %s", profileID)
 
 	profile, err := c.GetProfile(profileID)
+	if errors.Is(err, britive.ErrNotFound) {
+		return NewNotFoundErrorf("profile %s", profileID)
+	}
 	if err != nil {
 		return err
 	}
@@ -460,7 +490,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 			}
 		}
 		if a == nil {
-			return nil, fmt.Errorf("Unable to get association related to ID %s in root environment", association.Value)
+			return nil, NewNotFoundErrorf("association %s", association.Value)
 		}
 		profileAssociation := make(map[string]interface{})
 		profileAssociation["type"] = association.Type

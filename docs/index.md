@@ -80,4 +80,4 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
   }
   ```
 
-**Note:** If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from the config file.
+~> If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from the config file.

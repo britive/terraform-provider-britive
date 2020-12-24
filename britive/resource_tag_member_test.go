@@ -10,8 +10,8 @@ import (
 
 func TestBritiveTagMember(t *testing.T) {
 	identityProviderName := "Britive"
-	tagName := "BPAT - New Britive Tag Member Test"
-	tagDescription := "BPAT - New Britive Tag Member Test Description"
+	tagName := "AT - New Britive Tag Member Test"
+	tagDescription := "AT - New Britive Tag Member Test Description"
 	username := "britiveprovideracceptancetest"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
@@ -52,11 +52,11 @@ func testAccCheckBritiveTagMemberExists(n string) resource.TestCheckFunc {
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return NewNotFoundErrorf("%s in state", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No TagID set")
+			return NewNotFoundErrorf("ID for %s in state", n)
 		}
 
 		return nil

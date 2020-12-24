@@ -38,10 +38,19 @@ func (c *Client) GetTagMember(tagID string, userID string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
 	user := &User{}
 	err = json.Unmarshal(body, user)
 	if err != nil {
 		return nil, err
+	}
+
+	if user == nil {
+		return nil, ErrNotFound
 	}
 
 	return user, nil

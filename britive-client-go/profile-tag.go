@@ -37,7 +37,7 @@ func (c *Client) GetProfileTag(profileID string, tagID string) (*ProfileTag, err
 	}
 
 	if profileTags == nil || len(*profileTags) == 0 {
-		return nil, fmt.Errorf("No profiles tags matching for the resource /paps/%s/user-tags/%s", profileID, tagID)
+		return nil, ErrNotFound
 	}
 
 	var profileTag *ProfileTag
@@ -49,24 +49,24 @@ func (c *Client) GetProfileTag(profileID string, tagID string) (*ProfileTag, err
 	}
 
 	if profileTag == nil {
-		return nil, fmt.Errorf("No profiles tags matching for the resource /paps/%s/user-tags/%s", profileID, tagID)
+		return nil, ErrNotFound
 	}
 
 	return profileTag, nil
 }
 
 func (c *Client) createOrUpdateProfileTag(method string, profileTag ProfileTag) (*ProfileTag, error) {
-	var ptapb []byte
+	var profileTagBody []byte
 	var err error
 	if profileTag.AccessPeriod == nil {
-		ptapb = []byte("{}")
+		profileTagBody = []byte("{}")
 	} else {
-		ptapb, err = json.Marshal(*profileTag.AccessPeriod)
+		profileTagBody, err = json.Marshal(*profileTag.AccessPeriod)
 		if err != nil {
 			return nil, err
 		}
 	}
-	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/user-tags/%s", c.APIBaseURL, profileTag.ProfileID, profileTag.TagID), strings.NewReader(string(ptapb)))
+	req, err := http.NewRequest(method, fmt.Sprintf("%s/paps/%s/user-tags/%s", c.APIBaseURL, profileTag.ProfileID, profileTag.TagID), strings.NewReader(string(profileTagBody)))
 	if err != nil {
 		return nil, err
 	}

@@ -52,11 +52,19 @@ func (c *Client) getUser(resourceURL string) (*User, error) {
 		return nil, err
 	}
 
-	user := User{}
-	err = json.Unmarshal(body, &user)
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
+	user := &User{}
+	err = json.Unmarshal(body, user)
 	if err != nil {
 		return nil, err
 	}
 
-	return &user, nil
+	if user == nil {
+		return nil, ErrNotFound
+	}
+
+	return user, nil
 }

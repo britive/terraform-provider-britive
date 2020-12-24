@@ -2,11 +2,12 @@ package britive
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //DataSourceApplication - Terraform Application DataSource
@@ -14,44 +15,41 @@ type DataSourceApplication struct {
 	Resource *schema.Resource
 }
 
-//NewDataSourceApplication - Initialises new DataSourceApplication
+//NewDataSourceApplication - Initializes new DataSourceApplication
 func NewDataSourceApplication() *DataSourceApplication {
-	dsa := &DataSourceApplication{}
-	dsa.Resource = &schema.Resource{
-		ReadContext: dsa.resourceRead,
+	dataSourceApplication := &DataSourceApplication{}
+	dataSourceApplication.Resource = &schema.Resource{
+		ReadContext: dataSourceApplication.resourceRead,
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The name of the application",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 		},
 	}
-	return dsa
+	return dataSourceApplication
 }
 
-func (dsa *DataSourceApplication) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (dataSourceApplication *DataSourceApplication) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
 
 	applicationName := d.Get("name").(string)
 
-	if applicationName == "" {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  fmt.Sprintf("Name must be passed to get application"),
-		})
-		return diags
-	}
 	application, err := c.GetApplicationByName(applicationName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return diag.FromErr(NewNotFoundErrorf("application %s", applicationName))
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	d.SetId(application.AppContainerID)
+
 	if err := d.Set("name", application.CatalogAppDisplayName); err != nil {
 		return diag.FromErr(err)
 	}
 
-	return diags
+	return nil
 }

@@ -9,8 +9,8 @@ import (
 )
 
 func TestBritiveProfile(t *testing.T) {
-	name := "BPAT - New Britive Profile Test"
-	description := "BPAT - New Britive Profile Test Description"
+	name := "AT - New Britive Profile Test"
+	description := "AT - New Britive Profile Test Description"
 	applicationName := "Azure-ValueLabs"
 	resourceName := "britive_profile.new"
 	associationType := "Environment"
@@ -80,11 +80,11 @@ func testAccCheckBritiveProfileExists(n string) resource.TestCheckFunc {
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return NewNotFoundErrorf("%s in state", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No ProfileID set")
+			return NewNotFoundErrorf("ID for %s in state", n)
 		}
 
 		return nil

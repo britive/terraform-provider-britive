@@ -39,18 +39,20 @@ func Provider(v string) *schema.Provider {
 				Type:        schema.TypeString,
 				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_TENANT", nil),
+				Description: "This is the Britive Tenant URL",
 			},
 			"token": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_TOKEN", nil),
+				Description: "This is the API Token to interact with your Britive API",
 			},
 			"config_path": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_CONFIG", "~/.britive/tf.config"),
-				Description: "Path to the britive config file, defaults to ~/.britive/tf.config",
+				Description: "This is the file path for Britive provider configuration. The default configuration path is ~/.britive/tf.config",
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
@@ -78,7 +80,7 @@ func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, e
 			return "", "", nil
 		}
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Printf("[DEBUG] Terraform config file %s not exists, error %s", path, err)
+			log.Printf("[DEBUG] Terraform config file %s does not exist, error %s", path, err)
 			return "", "", nil
 		}
 		log.Printf("[DEBUG] Terraform configuration file is: %s", path)
@@ -94,7 +96,7 @@ func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, e
 		err = json.Unmarshal(configBytes, &config)
 		if err != nil {
 			log.Printf("[DEBUG] Failed to parse config file %s", path)
-			return "", "", fmt.Errorf("Invalid terraform configuration file. Error %v", err)
+			return "", "", fmt.Errorf("Invalid terraform configuration file format. Error %v", err)
 		}
 		return config.Tenant, config.Token, nil
 	}
@@ -117,13 +119,13 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	if tenant == "" {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
-			Summary:  "Initialising provider, tenant parameter is missing",
+			Summary:  "Initializing provider, tenant parameter is missing",
 		})
 	}
 	if token == "" {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
-			Summary:  "Initialising provider, token parameter is missing",
+			Summary:  "Initializing provider, token parameter is missing",
 		})
 	}
 	if diags != nil && len(diags) > 0 {

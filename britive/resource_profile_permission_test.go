@@ -10,8 +10,8 @@ import (
 
 func TestBritiveProfilePermission(t *testing.T) {
 	applicationName := "Azure-ValueLabs"
-	profileName := "BPAT - New Britive Profile Permission Test"
-	profileDescription := "BPAT - New Britive Profile Permission Test Description"
+	profileName := "AT - New Britive Profile Permission Test"
+	profileDescription := "AT - New Britive Profile Permission Test Description"
 	permissionName := "Application Developer"
 	permissionType := "role"
 	resource.Test(t, resource.TestCase{
@@ -58,11 +58,11 @@ func testAccCheckBritiveProfilePermissionExists(n string) resource.TestCheckFunc
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return NewNotFoundErrorf("%s in state", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Profile Idenity ID set")
+			return NewNotFoundErrorf("ID for %s in state", n)
 		}
 
 		return nil

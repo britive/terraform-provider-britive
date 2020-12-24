@@ -2,6 +2,7 @@ package britive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -20,7 +21,7 @@ type ResourceProfileTag struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceProfileTag - Initialisation of new profile tag resource
+//NewResourceProfileTag - Initialization of new profile tag resource
 func NewResourceProfileTag(importHelper *ImportHelper) *ResourceProfileTag {
 	rpt := &ResourceProfileTag{
 		helper:       NewResourceProfileTagHelper(),
@@ -42,10 +43,11 @@ func NewResourceProfileTag(importHelper *ImportHelper) *ResourceProfileTag {
 				Description: "The application name of the application, profile is assciated with",
 			},
 			"profile_id": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The identifier of the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The identifier of the profile",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"profile_name": &schema.Schema{
 				Type:        schema.TypeString,
@@ -54,10 +56,11 @@ func NewResourceProfileTag(importHelper *ImportHelper) *ResourceProfileTag {
 				Description: "The name of the profile",
 			},
 			"tag_name": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The tag associate with the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The tag associate with the profile",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"access_period": &schema.Schema{
 				Type:        schema.TypeList,
@@ -175,19 +178,37 @@ func (rpt *ResourceProfileTag) resourceStateImporter(d *schema.ResourceData, m i
 	appName := d.Get("app_name").(string)
 	profileName := d.Get("profile_name").(string)
 	tagName := d.Get("tag_name").(string)
+	if strings.TrimSpace(appName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("app_name")
+	}
+	if strings.TrimSpace(profileName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("profile_name")
+	}
+	if strings.TrimSpace(tagName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("tag_name")
+	}
 
 	log.Printf("[INFO] Importing profile tag: %s/%s/%s", appName, profileName, tagName)
 
 	app, err := c.GetApplicationByName(appName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("application %s", appName)
+	}
 	if err != nil {
 		return nil, err
 	}
 	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("profile %s", profileName)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	tag, err := c.GetTagByName(tagName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("tag %s", tagName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -210,16 +231,16 @@ func (rpt *ResourceProfileTag) resourceStateImporter(d *schema.ResourceData, m i
 type ResourceProfileTagHelper struct {
 }
 
-//NewResourceProfileTagHelper - Initialisation of new profile tag resource helper
+//NewResourceProfileTagHelper - Initialization of new profile tag resource helper
 func NewResourceProfileTagHelper() *ResourceProfileTagHelper {
 	return &ResourceProfileTagHelper{}
 }
 
 //region Profile Tag Helper functions
 
-func (rpth *ResourceProfileTagHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
+func (resourceProfileTagHelper *ResourceProfileTagHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
-	profileID, tagID, err := rpth.parseUniqueID(d.Id())
+	profileID, tagID, err := resourceProfileTagHelper.parseUniqueID(d.Id())
 	if err != nil {
 		return err
 	}
@@ -227,11 +248,14 @@ func (rpth *ResourceProfileTagHelper) getAndMapModelToResource(d *schema.Resourc
 	log.Printf("[INFO] Reading profile tag: %s/%s", profileID, tagID)
 
 	pt, err := c.GetProfileTag(profileID, tagID)
+	if errors.Is(err, britive.ErrNotFound) {
+		return NewNotFoundErrorf("tag %s in profile %s", tagID, profileID)
+	}
 	if err != nil {
 		return err
 	}
 
-	log.Printf("[INFO] Recieved profile tag: %#v", pt)
+	log.Printf("[INFO] Received profile tag: %#v", pt)
 
 	d.Set("profile_id", profileID)
 
@@ -248,11 +272,14 @@ func (rpth *ResourceProfileTagHelper) getAndMapModelToResource(d *schema.Resourc
 	return nil
 }
 
-func (rpth *ResourceProfileTagHelper) getAndMapResourceToModel(d *schema.ResourceData, m interface{}) (*britive.ProfileTag, error) {
+func (resourceProfileTagHelper *ResourceProfileTagHelper) getAndMapResourceToModel(d *schema.ResourceData, m interface{}) (*britive.ProfileTag, error) {
 	c := m.(*britive.Client)
 	profileID := d.Get("profile_id").(string)
 	tagName := d.Get("tag_name").(string)
 	tag, err := c.GetTagByName(tagName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("tag %s", tagName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -282,14 +309,14 @@ func (rpth *ResourceProfileTagHelper) getAndMapResourceToModel(d *schema.Resourc
 	return &profileTag, nil
 }
 
-func (rpth *ResourceProfileTagHelper) generateUniqueID(profileID string, tagID string) string {
+func (resourceProfileTagHelper *ResourceProfileTagHelper) generateUniqueID(profileID string, tagID string) string {
 	return fmt.Sprintf("paps/%s/tags/%s", profileID, tagID)
 }
 
-func (rpth *ResourceProfileTagHelper) parseUniqueID(ID string) (profileID string, tagID string, err error) {
+func (resourceProfileTagHelper *ResourceProfileTagHelper) parseUniqueID(ID string) (profileID string, tagID string, err error) {
 	profileTagParts := strings.Split(ID, "/")
 	if len(profileTagParts) < 4 {
-		err = fmt.Errorf("Invalid profile tag reference, please check the state for %s", ID)
+		err = NewInvalidResourceIDError("profile tag", ID)
 		return
 	}
 	profileID = profileTagParts[1]

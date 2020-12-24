@@ -2,6 +2,7 @@ package britive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -20,7 +21,7 @@ type ResourceProfileIdentity struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceProfileIdentity - Initialisation of new profile identity resource
+//NewResourceProfileIdentity - Initialization of new profile identity resource
 func NewResourceProfileIdentity(importHelper *ImportHelper) *ResourceProfileIdentity {
 	rpt := &ResourceProfileIdentity{
 		helper:       NewResourceProfileIdentityHelper(),
@@ -39,13 +40,14 @@ func NewResourceProfileIdentity(importHelper *ImportHelper) *ResourceProfileIden
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
-				Description: "The application name of the application, profile is assciated with",
+				Description: "The name of the application, profile is assciated with",
 			},
 			"profile_id": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The identifier of the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The identifier of the profile",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"profile_name": &schema.Schema{
 				Type:        schema.TypeString,
@@ -54,10 +56,11 @@ func NewResourceProfileIdentity(importHelper *ImportHelper) *ResourceProfileIden
 				Description: "The name of the profile",
 			},
 			"username": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The identity associate with the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The identity associate with the profile",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"access_period": &schema.Schema{
 				Type:        schema.TypeList,
@@ -120,11 +123,14 @@ func (rpt *ResourceProfileIdentity) resourceRead(ctx context.Context, d *schema.
 	log.Printf("[INFO] Reading profile identity: %s/%s", profileID, userID)
 
 	pt, err := c.GetProfileIdentity(profileID, userID)
+	if errors.Is(err, britive.ErrNotFound) {
+		return diag.FromErr(NewNotFoundErrorf("identity %s in profile %s", userID, profileID))
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	log.Printf("[INFO] Recieved profile identity: %#v", pt)
+	log.Printf("[INFO] Received profile identity: %#v", pt)
 	d.SetId(rpt.helper.generateUniqueID(profileID, userID))
 
 	if pt.AccessPeriod != nil {
@@ -196,19 +202,37 @@ func (rpt *ResourceProfileIdentity) resourceStateImporter(d *schema.ResourceData
 	appName := d.Get("app_name").(string)
 	profileName := d.Get("profile_name").(string)
 	username := d.Get("username").(string)
+	if strings.TrimSpace(appName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("app_name")
+	}
+	if strings.TrimSpace(profileName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("profile_name")
+	}
+	if strings.TrimSpace(username) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("username")
+	}
 
 	log.Printf("[INFO] Importing profile identity: %s/%s/%s", appName, profileName, username)
 
 	app, err := c.GetApplicationByName(appName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("application %s", appName)
+	}
 	if err != nil {
 		return nil, err
 	}
 	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("profile %s", profileName)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	user, err := c.GetUserByName(username)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("identity %s", username)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -229,18 +253,21 @@ func (rpt *ResourceProfileIdentity) resourceStateImporter(d *schema.ResourceData
 type ResourceProfileIdentityHelper struct {
 }
 
-//NewResourceProfileIdentityHelper - Initialisation of new profile identity resource helper
+//NewResourceProfileIdentityHelper - Initialization of new profile identity resource helper
 func NewResourceProfileIdentityHelper() *ResourceProfileIdentityHelper {
 	return &ResourceProfileIdentityHelper{}
 }
 
 //region Profile Identity Helper functions
 
-func (rpth *ResourceProfileIdentityHelper) getAndMapResourceToModel(d *schema.ResourceData, m interface{}) (*britive.ProfileIdentity, error) {
+func (resourceProfileIdentityHelper *ResourceProfileIdentityHelper) getAndMapResourceToModel(d *schema.ResourceData, m interface{}) (*britive.ProfileIdentity, error) {
 	c := m.(*britive.Client)
 	profileID := d.Get("profile_id").(string)
 	username := d.Get("username").(string)
 	identity, err := c.GetUserByName(username)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("identity %s", username)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -277,14 +304,14 @@ func (rpth *ResourceProfileIdentityHelper) getAndMapResourceToModel(d *schema.Re
 	return &profileIdentity, nil
 }
 
-func (rpth *ResourceProfileIdentityHelper) generateUniqueID(profileID string, userID string) string {
+func (resourceProfileIdentityHelper *ResourceProfileIdentityHelper) generateUniqueID(profileID string, userID string) string {
 	return fmt.Sprintf("paps/%s/users/%s", profileID, userID)
 }
 
-func (rpth *ResourceProfileIdentityHelper) parseUniqueID(ID string) (profileID string, userID string, err error) {
+func (resourceProfileIdentityHelper *ResourceProfileIdentityHelper) parseUniqueID(ID string) (profileID string, userID string, err error) {
 	profileIdentityParts := strings.Split(ID, "/")
 	if len(profileIdentityParts) < 4 {
-		err = fmt.Errorf("Invalid profile identity reference, please check the state for %s", ID)
+		err = NewInvalidResourceIDError("profile identity", ID)
 		return
 	}
 	profileID = profileIdentityParts[1]

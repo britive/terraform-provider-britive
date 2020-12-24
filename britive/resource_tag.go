@@ -2,12 +2,14 @@ package britive
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceTag - Terraform Resource for Tag
@@ -17,7 +19,7 @@ type ResourceTag struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceTag - Initialises new tag resource
+//NewResourceTag - Initializes new tag resource
 func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 	rt := &ResourceTag{
 		helper:       NewResourceTagHelper(),
@@ -33,31 +35,33 @@ func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 		},
 		Schema: map[string]*schema.Schema{
 			"name": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The name of the tag",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The name of Britive tag",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"description": &schema.Schema{
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The description of the tag",
+				Description: "The description of the Britive tag",
 			},
 			"disabled": &schema.Schema{
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
-				Description: "To disable the tag",
+				Description: "To disable the Britive tag",
 			},
 			"identity_provider_id": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The id of the identity provider associated with tag",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The unique identity of the identity provider associated with the Britive tag",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"external": &schema.Schema{
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Computed:    true,
-				Description: "The flag whether tag is external or not",
+				Description: "The boolean attribute that indicates whether the tag is external or not",
 			},
 		},
 	}
@@ -105,6 +109,9 @@ func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData,
 
 	log.Printf("[INFO] Reading tag %s", tagID)
 	tag, err := c.GetTag(tagID)
+	if errors.Is(err, britive.ErrNotFound) {
+		return diag.FromErr(NewNotFoundErrorf("tag %s", tagID))
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -184,9 +191,16 @@ func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface
 
 	tagName := d.Get("name").(string)
 
+	if strings.TrimSpace(tagName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("name")
+	}
+
 	log.Printf("[INFO] Importing tag: %s", tagName)
 
 	tag, err := c.GetTagByName(tagName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("tag %s", tagName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +222,7 @@ func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface
 type ResourceTagHelper struct {
 }
 
-//NewResourceTagHelper - Initialises new tag resource helper
+//NewResourceTagHelper - Initializes new tag resource helper
 func NewResourceTagHelper() *ResourceTagHelper {
 	return &ResourceTagHelper{}
 }

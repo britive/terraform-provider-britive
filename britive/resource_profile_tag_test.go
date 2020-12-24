@@ -10,9 +10,9 @@ import (
 
 func TestBritiveProfileTag(t *testing.T) {
 	identityProviderName := "Britive"
-	tagName := "BPAT - New Britive Tag Test"
+	tagName := "AT - New Britive Tag Test"
 	applicationName := "Azure-ValueLabs"
-	profileName := "BPAT - New Britive Profile Tag Test"
+	profileName := "AT - New Britive Profile Tag Test"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,
@@ -36,7 +36,7 @@ func testAccCheckBritiveProfileTagConfig(identityProviderName, tagName, applicat
 
 	resource "britive_tag" "new" {
 		name = "%s"
-		description = "BPAT - Profile Tag Test"
+		description = "AT - Profile Tag Test"
 		identity_provider_id = data.britive_identity_provider.existing.id
 	}
 
@@ -67,11 +67,11 @@ func testAccCheckBritiveProfileTagExists(n string) resource.TestCheckFunc {
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return NewNotFoundErrorf("%s in state", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Profile Tag ID set")
+			return NewNotFoundErrorf("ID for %s in state", n)
 		}
 
 		return nil

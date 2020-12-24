@@ -2,6 +2,7 @@ package britive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 //ResourceProfilePermission - Terraform Resource for Profile Permission
@@ -18,7 +20,7 @@ type ResourceProfilePermission struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceProfilePermission - Initialisation of new profile permission resource
+//NewResourceProfilePermission - Initialization of new profile permission resource
 func NewResourceProfilePermission(importHelper *ImportHelper) *ResourceProfilePermission {
 	rpp := &ResourceProfilePermission{
 		helper:       NewResourceProfilePermissionHelper(),
@@ -39,10 +41,11 @@ func NewResourceProfilePermission(importHelper *ImportHelper) *ResourceProfilePe
 				Description: "The application name of the application, profile is assciated with",
 			},
 			"profile_id": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The identifier of the profile",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The identifier of the profile",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"profile_name": &schema.Schema{
 				Type:        schema.TypeString,
@@ -51,16 +54,18 @@ func NewResourceProfilePermission(importHelper *ImportHelper) *ResourceProfilePe
 				Description: "The name of the profile",
 			},
 			"permission_name": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The name of permission",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The name of permission",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"permission_type": &schema.Schema{
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The type of permission",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The type of permission",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 		},
 	}
@@ -109,6 +114,9 @@ func (rpp *ResourceProfilePermission) resourceRead(ctx context.Context, d *schem
 	log.Printf("[INFO] Reading profile permission:  %s, %#v", profilePermission.ProfileID, *profilePermission)
 
 	pp, err := c.GetProfilePermission(profilePermission.ProfileID, *profilePermission)
+	if errors.Is(err, britive.ErrNotFound) {
+		return diag.FromErr(NewNotFoundErrorf("permission %s of type %s in profile %s", profilePermission.Name, profilePermission.Type, profilePermission.ProfileID))
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -156,19 +164,40 @@ func (rpp *ResourceProfilePermission) resourceStateImporter(d *schema.ResourceDa
 	profileName := d.Get("profile_name").(string)
 	permissionName := d.Get("permission_name").(string)
 	permissionType := d.Get("permission_type").(string)
+	if strings.TrimSpace(appName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("app_name")
+	}
+	if strings.TrimSpace(profileName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("profile_name")
+	}
+	if strings.TrimSpace(permissionName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("permission_name")
+	}
+	if strings.TrimSpace(permissionType) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("permission_type")
+	}
 
 	log.Printf("[INFO] Importing profile permission: %s/%s/%s/%s", appName, profileName, permissionName, permissionType)
 
 	app, err := c.GetApplicationByName(appName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("application %s", appName)
+	}
 	if err != nil {
 		return nil, err
 	}
 	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("profile %s", profileName)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	profilePermission, err := c.GetProfilePermission(profile.ProfileID, britive.ProfilePermission{Name: permissionName, Type: permissionType})
+	if errors.Is(err, britive.ErrNotFound) {
+		return nil, NewNotFoundErrorf("permission %s of type %s in profile %s", permissionName, permissionType, profileName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -187,20 +216,20 @@ func (rpp *ResourceProfilePermission) resourceStateImporter(d *schema.ResourceDa
 type ResourceProfilePermissionHelper struct {
 }
 
-//NewResourceProfilePermissionHelper - Initialisation of new profile tag resource helper
+//NewResourceProfilePermissionHelper - Initialization of new profile tag resource helper
 func NewResourceProfilePermissionHelper() *ResourceProfilePermissionHelper {
 	return &ResourceProfilePermissionHelper{}
 }
 
-func (rpph *ResourceProfilePermissionHelper) generateUniqueID(profilePermission britive.ProfilePermission) string {
+func (resourceProfilePermissionHelper *ResourceProfilePermissionHelper) generateUniqueID(profilePermission britive.ProfilePermission) string {
 	return fmt.Sprintf("paps/%s/permissions/%s/type/%s", profilePermission.ProfileID, profilePermission.Name, profilePermission.Type)
 }
 
-func (rpph *ResourceProfilePermissionHelper) parseUniqueID(ID string) (*britive.ProfilePermission, error) {
+func (resourceProfilePermissionHelper *ResourceProfilePermissionHelper) parseUniqueID(ID string) (*britive.ProfilePermission, error) {
 	profileMemberParts := strings.Split(ID, "/")
 
 	if len(profileMemberParts) < 6 {
-		return nil, fmt.Errorf("Invalid profile member reference, please check the state for %s", ID)
+		return nil, NewInvalidResourceIDError("profile permission", ID)
 
 	}
 	profilePermission := &britive.ProfilePermission{
