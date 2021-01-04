@@ -13,7 +13,7 @@ func (c *Client) GetAssignedTagMembers(tagID string) (*[]User, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, tagLockName)
+	body, err := c.doRequestWithLock(req, tagID)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (c *Client) GetTagMember(tagID string, userID string) (*User, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, tagLockName)
+	body, err := c.doRequestWithLock(req, tagID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (c *Client) CreateTagMember(tagID string, userID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, tagLockName)
+	_, err = c.doRequestWithLock(req, tagID)
 
 	return err
 }
@@ -75,7 +75,7 @@ func (c *Client) DeleteTagMember(tagID string, userID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, tagLockName)
+	_, err = c.doRequestWithLock(req, tagID)
 
 	return err
 }
