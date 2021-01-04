@@ -4,7 +4,11 @@ import (
 	"errors"
 )
 
-const emptyString = ""
+const (
+	emptyString     = ""
+	tagLockName     = "tag"
+	profileLockName = "profile"
+)
 
 var (
 	//ErrNotFound - godoc

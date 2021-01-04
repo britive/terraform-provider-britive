@@ -381,12 +381,14 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 		return err
 	}
 	log.Printf("[INFO] Submitted Update profile %s associations: %#v", profileID, associationScopes)
-	log.Printf("[INFO] Updating profile %s association resources: %#v", profileID, associationResources)
-	err = c.SaveProfileAssociationResourceScopes(profileID, associationResources)
-	if err != nil {
-		return err
+	if resources != nil && len(*resources) > 0 {
+		log.Printf("[INFO] Updating profile %s association resources: %#v", profileID, associationResources)
+		err = c.SaveProfileAssociationResourceScopes(profileID, associationResources)
+		if err != nil {
+			return err
+		}
+		log.Printf("[INFO] Submitted Update profile %s association resources: %#v", profileID, associationResources)
 	}
-	log.Printf("[INFO] Submitted Update profile %s association resources: %#v", profileID, associationResources)
 	return nil
 }
 
@@ -537,18 +539,20 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 			profileAssociations = append(profileAssociations, profileAssociation)
 			break
 		case "ApplicationResource":
-			var par *britive.ProfileAssociationResource
-			for _, r := range *resources {
-				if r.NativeID == association.Value {
-					par = &r
-					break
+			if resources != nil && len(*resources) > 0 {
+				var par *britive.ProfileAssociationResource
+				for _, r := range *resources {
+					if r.NativeID == association.Value {
+						par = &r
+						break
+					}
 				}
+				profileAssociation := make(map[string]interface{})
+				profileAssociation["type"] = association.Type
+				profileAssociation["value"] = par.Name
+				profileAssociation["parent_name"] = par.ParentName
+				profileAssociations = append(profileAssociations, profileAssociation)
 			}
-			profileAssociation := make(map[string]interface{})
-			profileAssociation["type"] = association.Type
-			profileAssociation["value"] = par.Name
-			profileAssociation["parent_name"] = par.ParentName
-			profileAssociations = append(profileAssociations, profileAssociation)
 			break
 		}
 
