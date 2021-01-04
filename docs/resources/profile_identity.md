@@ -23,19 +23,19 @@ resource "britive_profile_identity" "new" {
 
 The following arguments are supported:
 
-* `profile_id` (Required): The identifier of the profile.
+* `profile_id` - (Required) The identifier of the profile.
 
-* `username` (Required): The name of the identity.
+* `username` - (Required) The name of the identity.
 
-* `access_period` (Optional): The access period of the identity in a profile.
+* `access_period` - (Optional) The access period of the identity in a profile.
 
   The format of an `access_period` is documented below.
 
 ### `access_period` block supports
 
-* `start` - The start of the access period for the associated identity.
+* `start` - (Required) The start of the access period for the associated identity.
 
-* `end` - The end of the access period for the associated identity.
+* `end` - (Required) The end of the access period for the associated identity.
 
 ## Attribute Reference
 

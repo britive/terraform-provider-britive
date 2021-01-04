@@ -23,19 +23,19 @@ resource "britive_profile_tag" "new" {
 
 The following arguments are supported:
 
-* `profile_id` (Required): The identifier of the profile.
+* `profile_id` - (Required) The identifier of the profile.
 
-* `tag_name` (Required): The name of the tag.
+* `tag_name` - (Required) The name of the tag.
 
-* `access_period` (Optional): The access period of the tag in the Britive profile.
+* `access_period` - (Optional) The access period of the tag in the Britive profile.
 
   The format of `access_period` is documented below.
 
 ### `access_period` block supports
 
-* `start` - The start of the access period for the associated tag.
+* `start` - (Required) The start of the access period for the associated tag.
 
-* `end` - The end of the access period for the associated tag.
+* `end` - (Required) The end of the access period for the associated tag.
 
 ## Attribute Reference
 

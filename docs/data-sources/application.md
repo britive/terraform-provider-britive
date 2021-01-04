@@ -20,7 +20,7 @@ out "britive_application_my_app" {
 
 The following argument is supported:
 
-* `name` - (Required): The name of the application.
+* `name` - (Required) The name of the application.
 
 ## Attribute Reference
 

@@ -19,7 +19,7 @@ resource "britive_tag" "new" {
 
 The following argument is supported:
 
-* `name` - (Required): The name of the identity provider.
+* `name` - (Required) The name of the identity provider.
 
 ## Attribute Reference
 

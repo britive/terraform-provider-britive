@@ -20,13 +20,13 @@ resource "britive_tag" "new" {
 
 The following arguments are supported:
 
-* `name` - (Required): The name of Britive tag.
+* `name` - (Required) The name of Britive tag.
 
-* `description` - (Optional): A description of the Britive tag.
+* `description` - (Optional) A description of the Britive tag.
 
-* `identity_provider_id` - (Required): The unique identity of the identity provider associated with the Britive tag.
+* `identity_provider_id` - (Required) The unique identity of the identity provider associated with the Britive tag.
 
-* `disabled` - (Optional): By default, the Britive tag is enabled. To disable a tag set `disabled = true`.
+* `disabled` - (Optional) The status of the Britive tag. By default, the Britive tag is enabled. To disable a Britive tag, set `disabled = true`.
 
 ## Attribute Reference
 
