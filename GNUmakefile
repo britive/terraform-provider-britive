@@ -9,7 +9,7 @@ BINARY		 := terraform-provider-${NAME}
 VERSION      := 1.0
 OS_ARCH      := $(shell go env GOOS)_$(shell go env GOARCH)
 
-default: testacc
+default: build
 
 build:
 	go get
@@ -20,7 +20,7 @@ install: build
 	mkdir -p ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
 	mv ${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
 
-.PHONY: testacc
+.PHONY: build
 
 testacc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
