@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 // GetIdentityProviders - Returns all identity providers
@@ -35,7 +36,7 @@ func (c *Client) GetIdentityProvider(identityProviderID string) (*IdentityProvid
 
 // GetIdentityProviderByName - Returns identity provider by name
 func (c *Client) GetIdentityProviderByName(name string) (*IdentityProvider, error) {
-	resourceURL := fmt.Sprintf("%s/identity-providers?metadata=false&name=%s", c.APIBaseURL, name)
+	resourceURL := fmt.Sprintf("%s/identity-providers?metadata=false&name=%s", c.APIBaseURL, url.QueryEscape(name))
 	return c.getIdentityProvider(resourceURL)
 }
 

@@ -22,18 +22,7 @@ terraform {
 
 # Configure the Britive Provider
 provider "britive" {
-  tenant = "https://company.britive.com"
-  token  = "xxxx"
-}
-```
-
-Terraform 0.12:
-
-```hcl
-
-# Configure the Britive Provider
-provider "britive" {
-  tenant = "https://company.britive.com"
+  tenant = https://company.britive.com
   token  = "xxxx"
 }
 ```
@@ -47,7 +36,7 @@ The Britive provider offers a flexible means of providing credentials for authen
 
 ### Environment Variables
 
-You can provide your credentials via the `BRITIVE_TENANT` and `BRITIVE_TOKEN`, environment variables, representing your Britive Tenant URL (that is, `"https://company.britive.com"`) and Britive API Token, respectively.
+You can provide your credentials via the `BRITIVE_TENANT` and `BRITIVE_TOKEN`, environment variables, representing your Britive Tenant URL (that is, `https://company.britive.com`) and Britive API Token, respectively.
 
 ```hcl
 provider "britive" {}
@@ -56,8 +45,8 @@ provider "britive" {}
 Usage:
 
 ```sh
-$ export BRITIVE_TENANT="https://company.britive.com"
-$ export BRITIVE_TOKEN="xxxx"
+$ export BRITIVE_TENANT=https://company.britive.com
+$ export BRITIVE_TOKEN=xxxx
 $ terraform plan
 ```
 
