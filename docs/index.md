@@ -22,7 +22,7 @@ terraform {
 
 # Configure the Britive Provider
 provider "britive" {
-  tenant = https://company.britive.com
+  tenant = "https://company.britive.com"
   token  = "xxxx"
 }
 ```
