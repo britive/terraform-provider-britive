@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -335,7 +336,7 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	for _, a := range as {
 		s := a.(map[string]interface{})
 		associationType := s["type"].(string)
-		associationName := s["value"].(string)
+		associationValue := s["value"].(string)
 		var rootAssociations []britive.Association
 		isAssociationExists := false
 		switch associationType {
@@ -346,7 +347,7 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 				rootAssociations = appRootEnvironmentGroup.Environments
 			}
 			for _, aeg := range rootAssociations {
-				if aeg.Name == associationName {
+				if aeg.Name == associationValue || aeg.ID == associationValue {
 					isAssociationExists = true
 					associationScopes = rph.appendProfileAssociations(associationScopes, associationType, aeg.ID)
 					break
@@ -355,11 +356,12 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 			break
 		case "ApplicationResource":
 			associationParentName := s["parent_name"].(string)
-			if strings.TrimSpace(associationParentName) == "" {
+			associationID, err := strconv.ParseInt(associationValue, 10, 64)
+			if err != nil && strings.TrimSpace(associationParentName) == "" {
 				return NewNotEmptyOrWhiteSpaceError("associations.parent_name")
 			}
 			for _, r := range *resources {
-				if r.Name == associationName && r.ParentName == associationParentName {
+				if r.ID == associationID || (r.Name == associationValue && r.ParentName == associationParentName) {
 					isAssociationExists = true
 					associationResources = rph.appendProfileAssociations(associationResources, associationType, r.NativeID)
 					break
@@ -490,7 +492,7 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 			return err
 		}
 	}
-	associations, err := rph.mapProfileAssociationsModelToResource(profile.AppContainerID, profile.ProfileID, profile.Associations, m)
+	associations, err := rph.mapProfileAssociationsModelToResource(profile.AppContainerID, profile.ProfileID, profile.Associations, d, m)
 	if err != nil {
 		return err
 	}
@@ -500,7 +502,7 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	return nil
 }
 
-func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appContainerID string, profileID string, associations []britive.ProfileAssociation, m interface{}) ([]interface{}, error) {
+func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appContainerID string, profileID string, associations []britive.ProfileAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
 	c := m.(*britive.Client)
 	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
 	if err != nil {
@@ -513,6 +515,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 	if len(associations) == 0 || (appRootEnvironmentGroup == nil && (resources == nil || len(*resources) == 0)) {
 		return make([]interface{}, 0), nil
 	}
+	inputAssociations := d.Get("associations").([]interface{})
 	profileAssociations := make([]interface{}, 0)
 	for _, association := range associations {
 		var rootAssociations []britive.Association
@@ -534,8 +537,18 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 				return nil, NewNotFoundErrorf("association %s", association.Value)
 			}
 			profileAssociation := make(map[string]interface{})
+			associationValue := a.Name
+			for _, inputAssociation := range inputAssociations {
+				ia := inputAssociation.(map[string]interface{})
+				iat := ia["type"].(string)
+				iav := ia["value"].(string)
+				if association.Type == iat && a.ID == iav {
+					associationValue = a.ID
+					break
+				}
+			}
 			profileAssociation["type"] = association.Type
-			profileAssociation["value"] = a.Name
+			profileAssociation["value"] = associationValue
 			profileAssociations = append(profileAssociations, profileAssociation)
 			break
 		case "ApplicationResource":
@@ -548,9 +561,27 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 					}
 				}
 				profileAssociation := make(map[string]interface{})
+				associationValue := par.Name
+				parentNameRequired := true
+				for _, inputAssociation := range inputAssociations {
+					ia := inputAssociation.(map[string]interface{})
+					iat := ia["type"].(string)
+					iav := ia["value"].(string)
+					iaParentName := ia["parent_name"].(string)
+					iaID, err := strconv.ParseInt(iav, 10, 64)
+					if err == nil && association.Type == iat && par.ID == iaID {
+						associationValue = strconv.FormatInt(par.ID, 10)
+						if iaParentName == "" {
+							parentNameRequired = false
+						}
+						break
+					}
+				}
 				profileAssociation["type"] = association.Type
-				profileAssociation["value"] = par.Name
-				profileAssociation["parent_name"] = par.ParentName
+				profileAssociation["value"] = associationValue
+				if parentNameRequired {
+					profileAssociation["parent_name"] = par.ParentName
+				}
 				profileAssociations = append(profileAssociations, profileAssociation)
 			}
 			break
