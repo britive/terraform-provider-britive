@@ -38,55 +38,55 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 			State: rp.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
-			"app_container_id": &schema.Schema{
+			"app_container_id": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				Description:  "The identity of the Britive application",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"app_name": &schema.Schema{
+			"app_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
 				Description: "The name of the Britive application",
 			},
-			"name": &schema.Schema{
+			"name": {
 				Type:         schema.TypeString,
 				Required:     true,
 				Description:  "The name of the Britive profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"description": &schema.Schema{
+			"description": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The description of the Britive profile",
 			},
-			"disabled": &schema.Schema{
+			"disabled": {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
 				Description: "To disable the Britive profile",
 			},
-			"associations": &schema.Schema{
+			"associations": {
 				Type:        schema.TypeList,
 				Required:    true,
 				Description: "The list of associations for the Britive profile",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"type": &schema.Schema{
+						"type": {
 							Type:         schema.TypeString,
 							Required:     true,
 							Description:  "The type of association, should be one of [Environment, EnvironmentGroup, ApplicationResource]",
 							ValidateFunc: validation.StringInSlice([]string{"Environment", "EnvironmentGroup", "ApplicationResource"}, false),
 						},
-						"value": &schema.Schema{
+						"value": {
 							Type:         schema.TypeString,
 							Required:     true,
 							Description:  "The association value",
 							ValidateFunc: validation.StringIsNotWhiteSpace,
 						},
-						"parent_name": &schema.Schema{
+						"parent_name": {
 							Type:        schema.TypeString,
 							Optional:    true,
 							Description: "The parent name of the resource. Required only if the association type is ApplicationResource",
@@ -94,31 +94,31 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 					},
 				},
 			},
-			"expiration_duration": &schema.Schema{
+			"expiration_duration": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: rp.validation.DurationValidateFunc,
 				Description:  "The expiration time for the Britive profile",
 			},
-			"extendable": &schema.Schema{
+			"extendable": {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
 				Description: "The Boolean flag that indicates whether profile expiry is extendable or not",
 			},
-			"notification_prior_to_expiration": &schema.Schema{
+			"notification_prior_to_expiration": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: rp.validation.DurationValidateFunc,
 				Description:  "he profile expiry notification as a time value",
 			},
-			"extension_duration": &schema.Schema{
+			"extension_duration": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: rp.validation.DurationValidateFunc,
 				Description:  "The profile expiry extension as a time value",
 			},
-			"extension_limit": &schema.Schema{
+			"extension_limit": {
 				Type:        schema.TypeInt,
 				Optional:    true,
 				Description: "The repetition limit for extending the profile expiry",

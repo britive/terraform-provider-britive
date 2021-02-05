@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -34,30 +35,30 @@ func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 			State: rt.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
-			"name": &schema.Schema{
+			"name": {
 				Type:         schema.TypeString,
 				Required:     true,
 				Description:  "The name of Britive tag",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"description": &schema.Schema{
+			"description": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The description of the Britive tag",
 			},
-			"disabled": &schema.Schema{
+			"disabled": {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
 				Description: "To disable the Britive tag",
 			},
-			"identity_provider_id": &schema.Schema{
+			"identity_provider_id": {
 				Type:         schema.TypeString,
 				Required:     true,
 				Description:  "The unique identity of the identity provider associated with the Britive tag",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"external": &schema.Schema{
+			"external": {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Computed:    true,
@@ -73,6 +74,11 @@ func NewResourceTag(importHelper *ImportHelper) *ResourceTag {
 func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
+	err := rt.helper.validateForExternalTag(d, m)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	tag := britive.Tag{}
 	tag.Name = d.Get("name").(string)
 	tag.Description = d.Get("description").(string)
@@ -81,8 +87,9 @@ func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceDat
 	} else {
 		tag.Status = "Active"
 	}
+
 	tag.UserTagIdentityProviders = []britive.UserTagIdentityProvider{
-		britive.UserTagIdentityProvider{
+		{
 			IdentityProvider: britive.IdentityProvider{
 				ID: d.Get("identity_provider_id").(string),
 			},
@@ -104,6 +111,11 @@ func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData,
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
+
+	err := rt.helper.validateForExternalTag(d, m)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
 	tagID := d.Id()
 
@@ -128,6 +140,12 @@ func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData,
 
 func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
+
+	err := rt.helper.validateForExternalTag(d, m)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	tagID := d.Id()
 	var hasChanges bool
 	if d.HasChange("name") || d.HasChange("description") {
@@ -169,10 +187,15 @@ func (rt *ResourceTag) resourceDelete(ctx context.Context, d *schema.ResourceDat
 
 	var diags diag.Diagnostics
 
+	err := rt.helper.validateForExternalTag(d, m)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	tagID := d.Id()
 
 	log.Printf("[INFO] Deleting tag: %s", tagID)
-	err := c.DeleteTag(tagID)
+	err = c.DeleteTag(tagID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -206,6 +229,11 @@ func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface
 	}
 
 	log.Printf("[INFO] Imported tag: %#v", tag)
+
+	if tag.External.(bool) {
+		return nil, fmt.Errorf("Importing external tag is not supported. Attempted to import tag '%s'", tagName)
+	}
+
 	d.SetId(tag.ID)
 
 	err = rt.helper.mapModelToResource(tag, d, m)
@@ -246,6 +274,24 @@ func (rth *ResourceTagHelper) mapModelToResource(tag *britive.Tag, d *schema.Res
 	}
 	if err := d.Set("external", tag.External); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (rth *ResourceTagHelper) validateForExternalTag(d *schema.ResourceData, m interface{}) error {
+	identityProviderID := d.Get("identity_provider_id").(string)
+	if identityProviderID == "" {
+		return nil
+	}
+
+	c := m.(*britive.Client)
+
+	identityProvider, err := c.GetIdentityProvider(identityProviderID)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(identityProvider.Type, "DEFAULT") {
+		return fmt.Errorf("Managing external tag is not supported. Attempted to manage tag '%s'", d.Get("name").(string))
 	}
 	return nil
 }

@@ -36,46 +36,46 @@ func NewResourceProfileIdentity(importHelper *ImportHelper) *ResourceProfileIden
 			State: rpt.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
-			"app_name": &schema.Schema{
+			"app_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
 				Description: "The name of the application, profile is assciated with",
 			},
-			"profile_id": &schema.Schema{
+			"profile_id": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				Description:  "The identifier of the profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"profile_name": &schema.Schema{
+			"profile_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
 				Description: "The name of the profile",
 			},
-			"username": &schema.Schema{
+			"username": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				Description:  "The identity associate with the profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"access_period": &schema.Schema{
+			"access_period": {
 				Type:        schema.TypeList,
 				MaxItems:    1,
 				Optional:    true,
 				Description: "The access period for the associated identity",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"start": &schema.Schema{
+						"start": {
 							Type:         schema.TypeString,
 							Required:     true,
 							ValidateFunc: validation.IsRFC3339Time,
 							Description:  "The start of the access period for the associated identity",
 						},
-						"end": &schema.Schema{
+						"end": {
 							Type:         schema.TypeString,
 							Required:     true,
 							ValidateFunc: validation.IsRFC3339Time,

@@ -34,33 +34,33 @@ func NewResourceProfilePermission(importHelper *ImportHelper) *ResourceProfilePe
 			State: rpp.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
-			"app_name": &schema.Schema{
+			"app_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
 				Description: "The application name of the application, profile is assciated with",
 			},
-			"profile_id": &schema.Schema{
+			"profile_id": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				Description:  "The identifier of the profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"profile_name": &schema.Schema{
+			"profile_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
 				Description: "The name of the profile",
 			},
-			"permission_name": &schema.Schema{
+			"permission_name": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				Description:  "The name of permission",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"permission_type": &schema.Schema{
+			"permission_type": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,

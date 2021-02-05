@@ -21,7 +21,7 @@ func NewDataSourceApplication() *DataSourceApplication {
 	dataSourceApplication.Resource = &schema.Resource{
 		ReadContext: dataSourceApplication.resourceRead,
 		Schema: map[string]*schema.Schema{
-			"name": &schema.Schema{
+			"name": {
 				Type:         schema.TypeString,
 				Required:     true,
 				Description:  "The name of the application",

@@ -21,11 +21,17 @@ func NewDataSourceIdentityProvider() *DataSourceIdentityProvider {
 	dataSourceIdentityProvider.Resource = &schema.Resource{
 		ReadContext: dataSourceIdentityProvider.resourceRead,
 		Schema: map[string]*schema.Schema{
-			"name": &schema.Schema{
+			"name": {
 				Type:         schema.TypeString,
 				Required:     true,
 				Description:  "The name of the identity provider",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+			},
+			"type": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The type of the identity provider",
 			},
 		},
 	}
@@ -48,6 +54,10 @@ func (dataSourceIdentityProvider *DataSourceIdentityProvider) resourceRead(ctx c
 	d.SetId(identityProvider.ID)
 
 	if err := d.Set("name", identityProvider.Name); err != nil {
+		return diag.FromErr(err)
+	}
+
+	if err := d.Set("type", identityProvider.Type); err != nil {
 		return diag.FromErr(err)
 	}
 

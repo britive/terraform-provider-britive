@@ -35,13 +35,13 @@ func Provider(v string) *schema.Provider {
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
-			"tenant": &schema.Schema{
+			"tenant": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_TENANT", nil),
 				Description: "This is the Britive Tenant URL",
 			},
-			"token": &schema.Schema{
+			"token": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,

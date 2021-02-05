@@ -34,20 +34,20 @@ func NewResourceTagMember(importHelper *ImportHelper) *ResourceTagMember {
 			State: rtm.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
-			"tag_id": &schema.Schema{
+			"tag_id": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				Description:  "The identifier of the Britive tag",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-			"tag_name": &schema.Schema{
+			"tag_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
 				Description: "The name of the Britive tag",
 			},
-			"username": &schema.Schema{
+			"username": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
