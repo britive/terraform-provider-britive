@@ -9,6 +9,7 @@ import (
 
 // GetProfileAssociationResources - Returns a all associations linked with profile
 func (c *Client) GetProfileAssociationResources(profileID string) (*[]ProfileAssociationResource, error) {
+	//TODO: Warning Recursion - Get by Filter
 	requestURL := fmt.Sprintf("%s/paps/%s/resources", c.APIBaseURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {

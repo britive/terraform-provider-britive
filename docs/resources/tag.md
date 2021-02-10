@@ -2,6 +2,9 @@
 
 This resource allows you to create and configure a Britive tag.
 
+!> This resource does not allow you to add external tags.  
+If you try to add an external tag using this resource, an error message will be displayed.
+
 ## Example Usage
 
 ```hcl
