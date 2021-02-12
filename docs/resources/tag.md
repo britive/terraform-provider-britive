@@ -2,7 +2,7 @@
 
 This resource allows you to create and configure a Britive tag.
 
-!> This resource does not allow you to add external tags.  
+!> This resource does not allow you to add external tags. External tags are tags managed by Identity Providers other than the Britive Default Identity Provider.  
 If you try to add an external tag using this resource, an error message will be displayed.
 
 ## Example Usage
