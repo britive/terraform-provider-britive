@@ -14,7 +14,7 @@ func (c *Client) GetApplications() (*[]Application, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (c *Client) GetApplication(appContainerID string) (*Application, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (c *Client) GetApplicationByName(name string) (*Application, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}

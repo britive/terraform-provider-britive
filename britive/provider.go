@@ -87,7 +87,7 @@ func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, e
 		configFile, err := os.Open(path)
 		if err != nil {
 			log.Printf("[DEBUG] Unable to open Terraform configuration file %s", path)
-			return "", "", fmt.Errorf("Unable to open terraform configuration file. Error %v", err)
+			return "", "", fmt.Errorf("unable to open terraform configuration file. error %v", err)
 		}
 		defer configFile.Close()
 
@@ -96,7 +96,7 @@ func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, e
 		err = json.Unmarshal(configBytes, &config)
 		if err != nil {
 			log.Printf("[DEBUG] Failed to parse config file %s", path)
-			return "", "", fmt.Errorf("Invalid terraform configuration file format. Error %v", err)
+			return "", "", fmt.Errorf("invalid terraform configuration file format. error %v", err)
 		}
 		return config.Tenant, config.Token, nil
 	}

@@ -14,7 +14,7 @@ func (c *Client) GetIdentityProviders() (*[]IdentityProvider, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (c *Client) getIdentityProvider(resourceURL string) (*IdentityProvider, err
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}

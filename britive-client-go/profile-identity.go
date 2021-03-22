@@ -15,7 +15,7 @@ func (c *Client) GetProfileIdentities(profileID string) (*[]ProfileIdentity, err
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileID)
+	body, err := c.DoWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (c *Client) GetProfileIdentity(profileID string, userID string) (*ProfileId
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileID)
+	body, err := c.DoWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (c *Client) createOrUpdateProfileIdentity(method string, profileIdentity Pr
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileIdentity.ProfileID)
+	body, err := c.DoWithLock(req, profileIdentity.ProfileID)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (c *Client) DeleteProfileIdentity(profileID string, userID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, profileID)
+	_, err = c.DoWithLock(req, profileID)
 
 	return err
 }

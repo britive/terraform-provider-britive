@@ -231,7 +231,7 @@ func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface
 	log.Printf("[INFO] Imported tag: %#v", tag)
 
 	if tag.External.(bool) {
-		return nil, fmt.Errorf("Importing external tags is not supported. Attempted to import tag '%s'", tagName)
+		return nil, fmt.Errorf("importing external tags is not supported. attempted to import tag '%s'", tagName)
 	}
 
 	d.SetId(tag.ID)
@@ -291,7 +291,7 @@ func (rth *ResourceTagHelper) validateForExternalTag(d *schema.ResourceData, m i
 		return err
 	}
 	if !strings.EqualFold(identityProvider.Type, "DEFAULT") {
-		return fmt.Errorf("Managing external tags is not supported. Attempted to manage tag '%s'", d.Get("name").(string))
+		return fmt.Errorf("managing external tags is not supported. attempted to manage tag '%s'", d.Get("name").(string))
 	}
 	return nil
 }

@@ -14,7 +14,7 @@ func (c *Client) GetApplicationRootEnvironmentGroup(appContainerID string) (*App
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}

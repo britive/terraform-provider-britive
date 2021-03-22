@@ -134,7 +134,7 @@ func (rpt *ResourceProfileIdentity) resourceRead(ctx context.Context, d *schema.
 	d.SetId(rpt.helper.generateUniqueID(profileID, userID))
 
 	if pt.AccessPeriod != nil {
-		accessPeriods := make([]interface{}, 1, 1)
+		accessPeriods := make([]interface{}, 1)
 		accessPeriod := make(map[string]interface{})
 		accessPeriod["start"] = pt.AccessPeriod.Start.Format(time.RFC3339)
 		accessPeriod["end"] = pt.AccessPeriod.End.Format(time.RFC3339)

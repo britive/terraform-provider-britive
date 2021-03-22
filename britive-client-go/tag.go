@@ -15,7 +15,7 @@ func (c *Client) GetTags() (*[]Tag, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (c *Client) GetTagByName(name string) (*Tag, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (c *Client) GetTag(tagID string) (*Tag, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (c *Client) CreateTag(tag Tag) (*Tag, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, tagLockName)
+	body, err := c.DoWithLock(req, tagLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (c *Client) UpdateTag(tagID string, tag Tag) (*Tag, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, tagLockName)
+	body, err := c.DoWithLock(req, tagLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (c *Client) EnableOrDisableTag(tagID string, disabled bool) (*Tag, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, tagLockName)
+	body, err := c.DoWithLock(req, tagLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (c *Client) DeleteTag(tagID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, tagLockName)
+	_, err = c.DoWithLock(req, tagLockName)
 	if err != nil {
 		return err
 	}

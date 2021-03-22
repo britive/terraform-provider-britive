@@ -14,7 +14,7 @@ func (c *Client) GetAssignedProfileTags(profileID string) (*[]ProfileTag, error)
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileID)
+	body, err := c.DoWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *Client) GetProfileTag(profileID string, tagID string) (*ProfileTag, err
 
 	var profileTag *ProfileTag
 	for _, t := range *profileTags {
-		if strings.ToLower(t.TagID) == strings.ToLower(tagID) {
+		if strings.EqualFold(t.TagID, tagID) {
 			profileTag = &t
 			break
 		}
@@ -71,7 +71,7 @@ func (c *Client) createOrUpdateProfileTag(method string, profileTag ProfileTag) 
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileTag.ProfileID)
+	body, err := c.DoWithLock(req, profileTag.ProfileID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (c *Client) DeleteProfileTag(profileID string, tagID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, profileID)
+	_, err = c.DoWithLock(req, profileID)
 
 	return err
 }

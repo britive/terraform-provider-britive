@@ -22,7 +22,7 @@ func (ih *ImportHelper) ParseImportID(idRegexes []string, d *schema.ResourceData
 	for _, idFormat := range idRegexes {
 		re, err := regexp.Compile(idFormat)
 		if err != nil {
-			return fmt.Errorf("Invalid import format. %s", err)
+			return fmt.Errorf("invalid import format. %s", err)
 		}
 
 		if fieldValues := re.FindStringSubmatch(d.Id()); fieldValues != nil {
@@ -52,5 +52,5 @@ func (ih *ImportHelper) ParseImportID(idRegexes []string, d *schema.ResourceData
 			return nil
 		}
 	}
-	return fmt.Errorf("Import value %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
+	return fmt.Errorf("import value %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
 }

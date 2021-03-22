@@ -14,7 +14,7 @@ func (c *Client) GetAssignedProfilePermissions(profileID string) (*[]ProfilePerm
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileID)
+	body, err := c.DoWithLock(req, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (c *Client) GetProfilePermission(profileID string, profilePermission Profil
 
 	var pp *ProfilePermission
 	for _, p := range *profilePermissions {
-		if strings.ToLower(p.Name) == strings.ToLower(profilePermission.Name) && strings.ToLower(p.Type) == strings.ToLower(profilePermission.Type) {
+		if strings.EqualFold(p.Name, profilePermission.Name) && strings.EqualFold(p.Type, profilePermission.Type) {
 			pp = &p
 			break
 		}
@@ -66,7 +66,7 @@ func (c *Client) ExecuteProfilePermissionRequest(profileID string, ppr ProfilePe
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, profileID)
+	_, err = c.DoWithLock(req, profileID)
 	if err != nil {
 		return err
 	}

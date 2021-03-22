@@ -7,25 +7,59 @@ import (
 	"strings"
 )
 
-// GetProfileAssociationResources - Returns a all associations linked with profile
-func (c *Client) GetProfileAssociationResources(profileID string) (*[]ProfileAssociationResource, error) {
-	//TODO: Warning Recursion - Get by Filter
-	requestURL := fmt.Sprintf("%s/paps/%s/resources", c.APIBaseURL, profileID)
-	req, err := http.NewRequest("GET", requestURL, nil)
+// GetProfileAssociationResource - Returns a all associations linked with profile
+func (c *Client) GetProfileAssociationResource(profileID string, name string, parentName string) (*ProfileAssociationResource, error) {
+	filter := fmt.Sprintf("name eq %s", name)
+	profileAssociationResources, err := c.getProfileAssociationResource(profileID, filter)
 	if err != nil {
 		return nil, err
 	}
+	var profileAssociationResource *ProfileAssociationResource
+	for _, p := range profileAssociationResources {
+		if p.ParentName == parentName {
+			profileAssociationResource = &p
+			break
+		}
+	}
+	if profileAssociationResource == nil {
+		return nil, ErrNotFound
+	}
+	return profileAssociationResource, nil
+}
 
-	body, err := c.doRequestWithLock(req, profileID)
+// GetProfileAssociationResourceByNativeID - Returns a all associations linked with profile
+func (c *Client) GetProfileAssociationResourceByID(profileID string, id int64) (*ProfileAssociationResource, error) {
+	filter := fmt.Sprintf(`id eq %d`, id)
+	return c.getUniqueProfileAssociationResource(profileID, filter)
+}
+
+// GetProfileAssociationResourceByNativeID - Returns a all associations linked with profile
+func (c *Client) GetProfileAssociationResourceByNativeID(profileID string, nativeID string) (*ProfileAssociationResource, error) {
+	filter := fmt.Sprintf(`nativeId eq "%s"`, nativeID)
+	return c.getUniqueProfileAssociationResource(profileID, filter)
+}
+
+func (c *Client) getUniqueProfileAssociationResource(profileID string, filter string) (*ProfileAssociationResource, error) {
+	profileAssociationResources, err := c.getProfileAssociationResource(profileID, filter)
 	if err != nil {
 		return nil, err
 	}
+	if len(profileAssociationResources) == 0 {
+		return nil, ErrNotFound
+	}
+	return &profileAssociationResources[0], nil
+}
+
+func (c *Client) getProfileAssociationResource(profileID string, filter string) ([]ProfileAssociationResource, error) {
+	endpoint := fmt.Sprintf("paps/%s/resources", profileID)
 	profileAssociationResources := make([]ProfileAssociationResource, 0)
-	err = json.Unmarshal(body, &profileAssociationResources)
-	if err != nil {
-		return nil, err
-	}
-	return &profileAssociationResources, nil
+	err := client.NewQueryRequest().
+		WithLock(profileID).
+		WithFilter(filter).
+		WithResult(&profileAssociationResources).
+		Query(endpoint)
+
+	return profileAssociationResources, err
 }
 
 // SaveProfileAssociationScopes - Save profile associations
@@ -39,7 +73,7 @@ func (c *Client) SaveProfileAssociationScopes(profileID string, associations []P
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, profileID)
+	_, err = c.DoWithLock(req, profileID)
 
 	return err
 }
@@ -55,7 +89,7 @@ func (c *Client) SaveProfileAssociationResourceScopes(profileID string, associat
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, profileID)
+	_, err = c.DoWithLock(req, profileID)
 
 	return err
 }

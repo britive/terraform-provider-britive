@@ -14,7 +14,7 @@ func (c *Client) GetUsers() (*[]User, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (c *Client) getUser(resourceURL string) (*User, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequest(req)
+	body, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,7 @@ func (c *Client) GetProfiles(appContainerID string) (*[]Profile, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileLockName)
+	body, err := c.DoWithLock(req, profileLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile,
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileLockName)
+	body, err := c.DoWithLock(req, profileLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (c *Client) GetProfile(profileID string) (*Profile, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileLockName)
+	body, err := c.DoWithLock(req, profileLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileLockName)
+	body, err := c.DoWithLock(req, profileLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (c *Client) UpdateProfile(appContainerID string, profileID string, profile 
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.doRequestWithLock(req, profileLockName)
+	body, err := c.DoWithLock(req, profileLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string,
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileLockName)
+	body, err := c.DoWithLock(req, profileLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, profileLockName)
+	_, err = c.DoWithLock(req, profileLockName)
 	if err != nil {
 		return err
 	}
