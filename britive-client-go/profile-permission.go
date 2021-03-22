@@ -7,50 +7,36 @@ import (
 	"strings"
 )
 
-// GetAssignedProfilePermissions - Returns all permissions assigned to profile
-func (c *Client) GetAssignedProfilePermissions(profileID string) (*[]ProfilePermission, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/permissions?filter=assigned", c.APIBaseURL, profileID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := c.DoWithLock(req, profileID)
-	if err != nil {
-		return nil, err
-	}
-
-	profilePermissions := make([]ProfilePermission, 0)
-	err = json.Unmarshal(body, &profilePermissions)
-	if err != nil {
-		return nil, err
-	}
-
-	return &profilePermissions, nil
-}
-
 // GetProfilePermission - Returns a specifc permission associated with profile
 func (c *Client) GetProfilePermission(profileID string, profilePermission ProfilePermission) (*ProfilePermission, error) {
-	//TODO: Warning Recursion - Get by Name
-	profilePermissions, err := c.GetAssignedProfilePermissions(profileID)
+	filter := fmt.Sprintf("name eq %s", profilePermission.Name)
+	endpoint := fmt.Sprintf("paps/%s/permissions", profileID)
+
+	profilePermissions := make([]ProfilePermission, 0)
+
+	err := client.NewQueryRequest().
+		WithLock(profileID).
+		WithFilter(filter).
+		WithResult(&profilePermissions).
+		Query(endpoint)
+
 	if err != nil {
 		return nil, err
 	}
-	if profilePermissions == nil || len(*profilePermissions) == 0 {
+	if len(profilePermissions) == 0 {
 		return nil, ErrNotFound
 	}
 
 	var pp *ProfilePermission
-	for _, p := range *profilePermissions {
-		if strings.EqualFold(p.Name, profilePermission.Name) && strings.EqualFold(p.Type, profilePermission.Type) {
+	for _, p := range profilePermissions {
+		if strings.EqualFold(p.Type, profilePermission.Type) {
 			pp = &p
 			break
 		}
 	}
-
 	if pp == nil {
 		return nil, ErrNotFound
 	}
-
 	return pp, nil
 }
 

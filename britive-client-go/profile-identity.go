@@ -8,27 +8,6 @@ import (
 	"time"
 )
 
-// GetProfileIdentities - Returns all identities assigned to profile
-func (c *Client) GetProfileIdentities(profileID string) (*[]ProfileIdentity, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/users?filter=assigned", c.APIBaseURL, profileID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := c.DoWithLock(req, profileID)
-	if err != nil {
-		return nil, err
-	}
-
-	profileIdentities := make([]ProfileIdentity, 0)
-	err = json.Unmarshal(body, &profileIdentities)
-	if err != nil {
-		return nil, err
-	}
-
-	return &profileIdentities, nil
-}
-
 // GetProfileIdentity - Returns a specifc identity from profile
 func (c *Client) GetProfileIdentity(profileID string, userID string) (*ProfileIdentity, error) {
 	requestURL := fmt.Sprintf("%s/paps/%s/users/%s", c.APIBaseURL, profileID, userID)
