@@ -28,12 +28,6 @@ func (c *Client) GetProfileAssociationResource(profileID string, name string, pa
 }
 
 // GetProfileAssociationResourceByNativeID - Returns a all associations linked with profile
-func (c *Client) GetProfileAssociationResourceByID(profileID string, id int64) (*ProfileAssociationResource, error) {
-	filter := fmt.Sprintf(`id eq %d`, id)
-	return c.getUniqueProfileAssociationResource(profileID, filter)
-}
-
-// GetProfileAssociationResourceByNativeID - Returns a all associations linked with profile
 func (c *Client) GetProfileAssociationResourceByNativeID(profileID string, nativeID string) (*ProfileAssociationResource, error) {
 	filter := fmt.Sprintf(`nativeId eq "%s"`, nativeID)
 	return c.getUniqueProfileAssociationResource(profileID, filter)

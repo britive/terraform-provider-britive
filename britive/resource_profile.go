@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
@@ -351,16 +350,10 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 			}
 		case "ApplicationResource":
 			associationParentName := s["parent_name"].(string)
-			associationID, err := strconv.ParseInt(associationValue, 10, 64)
-			if err != nil && strings.TrimSpace(associationParentName) == "" {
+			if strings.TrimSpace(associationParentName) == "" {
 				return NewNotEmptyOrWhiteSpaceError("associations.parent_name")
 			}
-			var r *britive.ProfileAssociationResource
-			if associationID > 0 {
-				r, err = c.GetProfileAssociationResourceByID(profileID, associationID)
-			} else {
-				r, err = c.GetProfileAssociationResource(profileID, associationValue, associationParentName)
-			}
+			r, err := c.GetProfileAssociationResource(profileID, associationValue, associationParentName)
 			if errors.Is(err, britive.ErrNotFound) {
 				isAssociationExists = false
 			} else if err != nil {
@@ -558,27 +551,9 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 				return nil, NewNotFoundErrorf("application resource %s", association.Value)
 			}
 			profileAssociation := make(map[string]interface{})
-			associationValue := par.Name
-			parentNameRequired := true
-			for _, inputAssociation := range inputAssociations {
-				ia := inputAssociation.(map[string]interface{})
-				iat := ia["type"].(string)
-				iav := ia["value"].(string)
-				iaParentName := ia["parent_name"].(string)
-				iaID, err := strconv.ParseInt(iav, 10, 64)
-				if err == nil && association.Type == iat && par.ID == iaID {
-					associationValue = strconv.FormatInt(par.ID, 10)
-					if iaParentName == "" {
-						parentNameRequired = false
-					}
-					break
-				}
-			}
 			profileAssociation["type"] = association.Type
-			profileAssociation["value"] = associationValue
-			if parentNameRequired {
-				profileAssociation["parent_name"] = par.ParentName
-			}
+			profileAssociation["value"] = par.Name
+			profileAssociation["parent_name"] = par.ParentName
 			profileAssociations = append(profileAssociations, profileAssociation)
 		}
 
