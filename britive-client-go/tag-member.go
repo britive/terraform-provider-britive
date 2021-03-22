@@ -6,27 +6,6 @@ import (
 	"net/http"
 )
 
-// GetAssignedTagMembers - Returns all members assigned to tag
-func (c *Client) GetAssignedTagMembers(tagID string) (*[]User, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s/users?filter=assigned", c.APIBaseURL, tagID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := c.doRequestWithLock(req, tagID)
-	if err != nil {
-		return nil, err
-	}
-
-	users := make([]User, 0)
-	err = json.Unmarshal(body, &users)
-	if err != nil {
-		return nil, err
-	}
-
-	return &users, nil
-}
-
 // GetTagMember - Returns a specifc member assigned to tag
 func (c *Client) GetTagMember(tagID string, userID string) (*User, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags/%s/users/%s?filter=assigned", c.APIBaseURL, tagID, userID), nil)
@@ -34,7 +13,7 @@ func (c *Client) GetTagMember(tagID string, userID string) (*User, error) {
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, tagID)
+	body, err := c.DoWithLock(req, tagID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +42,7 @@ func (c *Client) CreateTagMember(tagID string, userID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, tagID)
+	_, err = c.DoWithLock(req, tagID)
 
 	return err
 }
@@ -75,7 +54,7 @@ func (c *Client) DeleteTagMember(tagID string, userID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, tagID)
+	_, err = c.DoWithLock(req, tagID)
 
 	return err
 }

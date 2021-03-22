@@ -322,11 +322,7 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	if err != nil {
 		return err
 	}
-	resources, err := c.GetProfileAssociationResources(profileID)
-	if err != nil {
-		return err
-	}
-	if appRootEnvironmentGroup == nil && (resources == nil || len(*resources) == 0) {
+	if appRootEnvironmentGroup == nil {
 		return nil
 	}
 	associationScopes := make([]britive.ProfileAssociation, 0)
@@ -353,21 +349,27 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 					break
 				}
 			}
-			break
 		case "ApplicationResource":
 			associationParentName := s["parent_name"].(string)
 			associationID, err := strconv.ParseInt(associationValue, 10, 64)
 			if err != nil && strings.TrimSpace(associationParentName) == "" {
 				return NewNotEmptyOrWhiteSpaceError("associations.parent_name")
 			}
-			for _, r := range *resources {
-				if r.ID == associationID || (r.Name == associationValue && r.ParentName == associationParentName) {
-					isAssociationExists = true
-					associationResources = rph.appendProfileAssociations(associationResources, associationType, r.NativeID)
-					break
-				}
+			var r *britive.ProfileAssociationResource
+			if associationID > 0 {
+				r, err = c.GetProfileAssociationResourceByID(profileID, associationID)
+			} else {
+				r, err = c.GetProfileAssociationResource(profileID, associationValue, associationParentName)
 			}
-			break
+			if errors.Is(err, britive.ErrNotFound) {
+				isAssociationExists = false
+			} else if err != nil {
+				return err
+			} else if r != nil {
+				isAssociationExists = true
+				associationResources = rph.appendProfileAssociations(associationResources, associationType, r.NativeID)
+			}
+
 		}
 		if !isAssociationExists {
 			unmatchedAssociations = append(unmatchedAssociations, s)
@@ -383,7 +385,7 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 		return err
 	}
 	log.Printf("[INFO] Submitted Update profile %s associations: %#v", profileID, associationScopes)
-	if resources != nil && len(*resources) > 0 {
+	if len(associationResources) > 0 {
 		log.Printf("[INFO] Updating profile %s association resources: %#v", profileID, associationResources)
 		err = c.SaveProfileAssociationResourceScopes(profileID, associationResources)
 		if err != nil {
@@ -508,11 +510,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 	if err != nil {
 		return nil, err
 	}
-	resources, err := c.GetProfileAssociationResources(profileID)
-	if err != nil {
-		return nil, err
-	}
-	if len(associations) == 0 || (appRootEnvironmentGroup == nil && (resources == nil || len(*resources) == 0)) {
+	if len(associations) == 0 || appRootEnvironmentGroup == nil {
 		return make([]interface{}, 0), nil
 	}
 	inputAssociations := d.Get("associations").([]interface{})
@@ -550,41 +548,38 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 			profileAssociation["type"] = association.Type
 			profileAssociation["value"] = associationValue
 			profileAssociations = append(profileAssociations, profileAssociation)
-			break
 		case "ApplicationResource":
-			if resources != nil && len(*resources) > 0 {
-				var par *britive.ProfileAssociationResource
-				for _, r := range *resources {
-					if r.NativeID == association.Value {
-						par = &r
-						break
-					}
-				}
-				profileAssociation := make(map[string]interface{})
-				associationValue := par.Name
-				parentNameRequired := true
-				for _, inputAssociation := range inputAssociations {
-					ia := inputAssociation.(map[string]interface{})
-					iat := ia["type"].(string)
-					iav := ia["value"].(string)
-					iaParentName := ia["parent_name"].(string)
-					iaID, err := strconv.ParseInt(iav, 10, 64)
-					if err == nil && association.Type == iat && par.ID == iaID {
-						associationValue = strconv.FormatInt(par.ID, 10)
-						if iaParentName == "" {
-							parentNameRequired = false
-						}
-						break
-					}
-				}
-				profileAssociation["type"] = association.Type
-				profileAssociation["value"] = associationValue
-				if parentNameRequired {
-					profileAssociation["parent_name"] = par.ParentName
-				}
-				profileAssociations = append(profileAssociations, profileAssociation)
+			par, err := c.GetProfileAssociationResourceByNativeID(profileID, association.Value)
+			if errors.Is(err, britive.ErrNotFound) {
+				return nil, NewNotFoundErrorf("application resource %s", association.Value)
+			} else if err != nil {
+				return nil, err
+			} else if par == nil {
+				return nil, NewNotFoundErrorf("application resource %s", association.Value)
 			}
-			break
+			profileAssociation := make(map[string]interface{})
+			associationValue := par.Name
+			parentNameRequired := true
+			for _, inputAssociation := range inputAssociations {
+				ia := inputAssociation.(map[string]interface{})
+				iat := ia["type"].(string)
+				iav := ia["value"].(string)
+				iaParentName := ia["parent_name"].(string)
+				iaID, err := strconv.ParseInt(iav, 10, 64)
+				if err == nil && association.Type == iat && par.ID == iaID {
+					associationValue = strconv.FormatInt(par.ID, 10)
+					if iaParentName == "" {
+						parentNameRequired = false
+					}
+					break
+				}
+			}
+			profileAssociation["type"] = association.Type
+			profileAssociation["value"] = associationValue
+			if parentNameRequired {
+				profileAssociation["parent_name"] = par.ParentName
+			}
+			profileAssociations = append(profileAssociations, profileAssociation)
 		}
 
 	}

@@ -7,52 +7,26 @@ import (
 	"strings"
 )
 
-// GetAssignedProfileTags - Returns all tags assigned to profile
-func (c *Client) GetAssignedProfileTags(profileID string) (*[]ProfileTag, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/user-tags?filter=assigned", c.APIBaseURL, profileID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := c.doRequestWithLock(req, profileID)
-	if err != nil {
-		return nil, err
-	}
-
-	profileTags := make([]ProfileTag, 0)
-	err = json.Unmarshal(body, &profileTags)
-	if err != nil {
-		return nil, err
-	}
-
-	return &profileTags, nil
-}
-
 // GetProfileTag - Returns a specifc tag from profile
 func (c *Client) GetProfileTag(profileID string, tagID string) (*ProfileTag, error) {
-	//TODO: Warning Recursion - Get single instead of array
-	profileTags, err := c.GetAssignedProfileTags(profileID)
+	endpoint := fmt.Sprintf("paps/%s/user-tags", profileID)
+	filter := fmt.Sprintf(`id eq %s`, tagID)
+
+	profileTags := make([]ProfileTag, 0)
+
+	err := client.NewQueryRequest().
+		WithLock(profileID).
+		WithFilter(filter).
+		WithResult(&profileTags).
+		Query(endpoint)
+
 	if err != nil {
 		return nil, err
 	}
-
-	if profileTags == nil || len(*profileTags) == 0 {
+	if len(profileTags) == 0 {
 		return nil, ErrNotFound
 	}
-
-	var profileTag *ProfileTag
-	for _, t := range *profileTags {
-		if strings.ToLower(t.TagID) == strings.ToLower(tagID) {
-			profileTag = &t
-			break
-		}
-	}
-
-	if profileTag == nil {
-		return nil, ErrNotFound
-	}
-
-	return profileTag, nil
+	return &profileTags[0], nil
 }
 
 func (c *Client) createOrUpdateProfileTag(method string, profileTag ProfileTag) (*ProfileTag, error) {
@@ -71,7 +45,7 @@ func (c *Client) createOrUpdateProfileTag(method string, profileTag ProfileTag) 
 		return nil, err
 	}
 
-	body, err := c.doRequestWithLock(req, profileTag.ProfileID)
+	body, err := c.DoWithLock(req, profileTag.ProfileID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +75,7 @@ func (c *Client) DeleteProfileTag(profileID string, tagID string) error {
 		return err
 	}
 
-	_, err = c.doRequestWithLock(req, profileID)
+	_, err = c.DoWithLock(req, profileID)
 
 	return err
 }

@@ -164,3 +164,13 @@ type ProfileIdentity struct {
 	CheckStatus  string      `json:"checkStatus,omitempty"`
 	Message      string      `json:"message,omitempty"`
 }
+
+//PaginationResponse - godoc
+type PaginationResponse struct {
+	Count  int           `json:"count"`
+	Page   int           `json:"page"`
+	Size   int           `json:"size"`
+	Sort   string        `json:"sort,omitempty"`
+	Filter string        `json:"filter,omitempty"`
+	Data   []interface{} `json:"data"`
+}

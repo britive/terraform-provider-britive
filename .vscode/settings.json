@@ -1,8 +1,10 @@
 {
     "cSpell.words": [
+        "Unshallow",
         "britive",
         "godoc",
         "hashicorp",
-        "mitchellh"
+        "mitchellh",
+        "testacc"
     ]
 }
