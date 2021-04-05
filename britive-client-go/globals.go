@@ -12,5 +12,6 @@ const (
 
 var (
 	//ErrNotFound - godoc
-	ErrNotFound = errors.New("could not find")
+	ErrNotFound  = errors.New("could not find")
+	ErrNoContent = errors.New("no content")
 )

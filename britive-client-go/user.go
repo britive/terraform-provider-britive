@@ -7,27 +7,6 @@ import (
 	"net/url"
 )
 
-// GetUsers - Returns all users
-func (c *Client) GetUsers() (*[]User, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/users", c.APIBaseURL), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := c.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	users := make([]User, 0)
-	err = json.Unmarshal(body, &users)
-	if err != nil {
-		return nil, err
-	}
-
-	return &users, nil
-}
-
 // GetUser - Returns user by user id
 func (c *Client) GetUser(userID string) (*User, error) {
 	resourceURL := fmt.Sprintf("%s/users/%s", c.APIBaseURL, userID)

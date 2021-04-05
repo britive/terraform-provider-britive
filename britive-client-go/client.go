@@ -189,6 +189,10 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode == http.StatusNoContent {
+		return []byte(emptyString), ErrNoContent
+	}
+
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
@@ -199,6 +203,11 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	}
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
+		var httpErrorResponse HTTPErrorResponse
+		err = json.Unmarshal(body, &httpErrorResponse)
+		if err == nil && httpErrorResponse.Message != emptyString {
+			return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+		}
 		return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
 	}
 

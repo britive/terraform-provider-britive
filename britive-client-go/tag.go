@@ -8,27 +8,6 @@ import (
 	"strings"
 )
 
-// GetTags - Returns all tags
-func (c *Client) GetTags() (*[]Tag, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-tags", c.APIBaseURL), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := c.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	tags := make([]Tag, 0)
-	err = json.Unmarshal(body, &tags)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tags, nil
-}
-
 // GetTagByName - Returns a specifc tag by name
 func (c *Client) GetTagByName(name string) (*Tag, error) {
 	filter := fmt.Sprintf(`name eq "%s"`, name)

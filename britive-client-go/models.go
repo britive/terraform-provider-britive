@@ -10,6 +10,14 @@ type Config struct {
 	Token  string `json:"token"`
 }
 
+//HTTPErrorResponse - godoc
+type HTTPErrorResponse struct {
+	Status    int64       `json:"status"`
+	Message   string      `json:"message"`
+	ErrorCode string      `json:"errorCode"`
+	Details   interface{} `json:"details"`
+}
+
 //Tag - godoc
 type Tag struct {
 	ID                       string                    `json:"userTagId,omitempty"`
@@ -173,4 +181,22 @@ type PaginationResponse struct {
 	Sort   string        `json:"sort,omitempty"`
 	Filter string        `json:"filter,omitempty"`
 	Data   []interface{} `json:"data"`
+}
+
+//UserAttribute - godoc
+type UserAttribute struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	DataType    string `json:"dataType"`
+	MultiValued bool   `json:"multiValued"`
+	BuiltIn     bool   `json:"builtIn"`
+}
+
+//SessionAttribute - godoc
+type SessionAttribute struct {
+	AttributeSchemaID string `json:"attributeSchemaId"`
+	MappingName       string `json:"mappingName"`
+	Transitive        bool   `json:"transitive"`
+	ID                string `json:"id,omitempty"`
 }

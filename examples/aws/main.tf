@@ -15,7 +15,7 @@ variable "name" {
 }
 
 locals {
-  resource_name_prefix = "${var.name}-2020-11-02"
+  resource_name_prefix = "${var.name}-2021-04-04"
 }
 
 data "britive_identity_provider" "idp" {
@@ -47,32 +47,31 @@ resource "britive_profile" "new" {
   extension_duration               = "12m30s"
   extension_limit                  = 2
   associations {
-    type  = "Environment"
-    value = "QA Subscription"
+    type  = "EnvironmentGroup"
+    value = "QA"
   }
 }
 
 resource "britive_profile_permission" "new" {
   profile_id      = britive_profile.new.id
-  permission_name = "Application Developer"
+  permission_name = "AmazonCognitoPowerUser"
   permission_type = "role"
 }
 
 resource "britive_profile_tag" "new" {
   profile_id = britive_profile.new.id
   tag_name   = "${local.resource_name_prefix}-Tag"
-  access_period {
-    start = "2020-11-01T06:00:00Z"
-    end   = "2020-11-05T06:00:00Z"
-  }
   depends_on = [britive_tag.new, britive_tag_member.new]
 }
 
 resource "britive_profile_identity" "new" {
   profile_id = britive_profile.new.id
   username   = "terraformexample2@britive.com"
-  access_period {
-    start = "2020-11-02T06:00:00Z"
-    end   = "2020-11-06T06:00:00Z"
-  }
+}
+
+resource "britive_profile_session_attribute" "new" {
+  profile_id = britive_profile.new.id
+  attribute_name = "Date Of Birth"
+  mapping_name = "dob"
+  transitive = true
 }
