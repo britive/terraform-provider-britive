@@ -34,6 +34,6 @@ In addition to the above arguments, the following attribute is exported.
 You can import the Britive tag member using any of these accepted formats:
 
 ```sh
-$ terraform import britive_tag_member.new tags/{{tag_name}}/users/{{username}}
-$ terraform import britive_tag_member.new {{tag_name}}/{{username}}
+terraform import britive_tag_member.new tags/{{tag_name}}/users/{{username}}
+terraform import britive_tag_member.new {{tag_name}}/{{username}}
 ```

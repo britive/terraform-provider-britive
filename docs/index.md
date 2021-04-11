@@ -45,9 +45,9 @@ provider "britive" {}
 Usage:
 
 ```sh
-$ export BRITIVE_TENANT=https://company.britive.com
-$ export BRITIVE_TOKEN=xxxx
-$ terraform plan
+export BRITIVE_TENANT=https://company.britive.com
+export BRITIVE_TOKEN=xxxx
+terraform plan
 ```
 
 ## Argument Reference

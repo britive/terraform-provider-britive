@@ -48,6 +48,6 @@ In addition to the above argument, the following attribute is exported.
 You can import a Britive profile using any of these accepted formats:
 
 ```sh
-$ terraform import britive_profile_identity.new apps/{{app_name}}/paps/{{profile_name}}/users/{{username}}
-$ terraform import britive_profile_identity.new {{app_name}}/{{profile_name}}/{{username}}
+terraform import britive_profile_identity.new apps/{{app_name}}/paps/{{profile_name}}/users/{{username}}
+terraform import britive_profile_identity.new {{app_name}}/{{profile_name}}/{{username}}
 ```

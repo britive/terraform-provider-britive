@@ -43,6 +43,6 @@ In addition to the above arguments, the following attributes are exported.
 You can import the Britive tag using any of these accepted formats:
 
 ```sh
-$ terraform import britive_tag.new tags/{{tag_name}}
-$ terraform import britive_tag.new {{tag_name}}
+terraform import britive_tag.new tags/{{tag_name}}
+terraform import britive_tag.new {{tag_name}}
 ```

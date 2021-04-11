@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/iancoleman/strcase"
 )
 
 //ResourceProfileSessionAttribute - Terraform Resource for Profile Session Attribute
@@ -63,7 +64,7 @@ func NewResourceProfileSessionAttribute(importHelper *ImportHelper) *ResourcePro
 			},
 			"mapping_name": {
 				Type:         schema.TypeString,
-				Required:     true,
+				Optional:     true,
 				Description:  "The attribute mapping name associate with the profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
@@ -276,7 +277,10 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 
 	d.Set("profile_id", profileID)
 	d.Set("attribute_name", attribute.Name)
-	d.Set("mapping_name", pt.MappingName)
+	stateMappingName := d.Get("mapping_name").(string)
+	if stateMappingName != "" || pt.MappingName != strcase.ToLowerCamel(attribute.Name) {
+		d.Set("mapping_name", pt.MappingName)
+	}
 	d.Set("transitive", pt.Transitive)
 
 	return nil
@@ -293,6 +297,9 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 	}
 	if err != nil {
 		return nil, err
+	}
+	if mappingName == "" {
+		mappingName = strcase.ToLowerCamel(attributeName)
 	}
 	profileSessionAttribute := britive.SessionAttribute{
 		AttributeSchemaID: attribute.ID,

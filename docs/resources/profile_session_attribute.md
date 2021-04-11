@@ -28,7 +28,7 @@ The following arguments are supported:
 
 * `attribute_name` - (Required) The name of attribute.
 
-* `mapping_name` - (Required) The name for attribute mapping.
+* `mapping_name` - (Optional) The name for attribute mapping. If omitted, camelCase of `attribute_name` value will be used.
 
 * `transitive` - (Optional) The Boolean flag that indicates whether the attribute is transitive or not. The default value is `false`
 
@@ -43,6 +43,6 @@ In addition to the above arguments, the following attribute is exported.
 You can import a Britive profile using any of these accepted formats:
 
 ```sh
-$ terraform import britive_profile_session_attribute.new apps/{{app_name}}/paps/{{profile_name}}/session-attributes/{{attribute_name}}
-$ terraform import britive_profile_session_attribute.new {{app_name}}/{{profile_name}}/{{attribute_name}}
+terraform import britive_profile_session_attribute.new apps/{{app_name}}/paps/{{profile_name}}/session-attributes/{{attribute_name}}
+terraform import britive_profile_session_attribute.new {{app_name}}/{{profile_name}}/{{attribute_name}}
 ```
