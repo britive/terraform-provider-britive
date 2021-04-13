@@ -26,9 +26,9 @@ The following arguments are supported:
 
 * `profile_id` - (Required) The identifier of the profile.
 
-* `attribute_name` - (Required) The name of attribute.
+* `attribute_name` - (Required) The name of attribute. This field is immutable. Changing `attribute_name` after creating the resource will delete the existing resource and creates a new resource with the new name.
 
-* `mapping_name` - (Optional) The name for attribute mapping. If omitted, camelCase of `attribute_name` value will be used.
+* `mapping_name` - (Required) The name for attribute mapping.
 
 * `transitive` - (Optional) The Boolean flag that indicates whether the attribute is transitive or not. The default value is `false`
 
