@@ -23,9 +23,9 @@ resource "britive_profile_tag" "new" {
 
 The following arguments are supported:
 
-* `profile_id` - (Required) The identifier of the profile.
+* `profile_id` - (Required, Forces new resource) The identifier of the profile.
 
-* `tag_name` - (Required) The name of the tag.
+* `tag_name` - (Required, Forces new resource) The name of the tag.
 
 * `access_period` - (Optional) The access period of the tag in the Britive profile.
 

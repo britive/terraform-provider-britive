@@ -29,7 +29,7 @@ resource "britive_profile" "new" {
 
 The following arguments are supported:
 
-* `app_container_id` - (Required) The identity of the Britive application.
+* `app_container_id` - (Required, Forces new resource) The identity of the Britive application.
 
 * `name` - (Required) The name of the Britive profile.
 

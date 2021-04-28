@@ -55,11 +55,18 @@ func NewResourceProfileSessionAttribute(importHelper *ImportHelper) *ResourcePro
 				Description: "The name of the profile",
 			},
 			"attribute_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				ForceNew:    true,
+				Description: "The attribute name associate with the profile",
+			},
+			"attribute_type": {
 				Type:         schema.TypeString,
-				Required:     true,
+				Optional:     true,
 				ForceNew:     true,
-				Description:  "The attribute name associate with the profile",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
+				Description:  "The type of attribute associate with the profile, should be one of [Static, Identity]",
+				Default:      "Identity",
+				ValidateFunc: validation.StringInSlice([]string{"Static", "Identity"}, false),
 			},
 			"mapping_name": {
 				Type:         schema.TypeString,
@@ -113,11 +120,11 @@ func (rpt *ResourceProfileSessionAttribute) resourceRead(ctx context.Context, d 
 }
 
 func (rpt *ResourceProfileSessionAttribute) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	if !d.HasChange("attribute_name") &&
-		!d.HasChange("mapping_name") &&
+	if !d.HasChange("mapping_name") &&
 		!d.HasChange("transitive") {
 		return nil
 	}
+
 	c := m.(*britive.Client)
 	profileID, sessionAttributeID, err := rpt.helper.parseUniqueID(d.Id())
 	if err != nil {
@@ -169,23 +176,27 @@ func (rpt *ResourceProfileSessionAttribute) resourceDelete(ctx context.Context, 
 
 func (rpt *ResourceProfileSessionAttribute) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rpt.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/tags/(?P<attribute_name>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<attribute_name>[^/]+)"}, d); err != nil {
+	if err := rpt.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/session-attributes/type/(?P<attribute_type>[^/]+)/mapping-name/(?P<mapping_name>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<attribute_type>[^/]+)/(?P<mapping_name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 	appName := d.Get("app_name").(string)
 	profileName := d.Get("profile_name").(string)
-	attributeName := d.Get("attribute_name").(string)
+	attributeType := d.Get("attribute_type").(string)
+	mappingName := d.Get("mapping_name").(string)
 	if strings.TrimSpace(appName) == "" {
 		return nil, NewNotEmptyOrWhiteSpaceError("app_name")
 	}
 	if strings.TrimSpace(profileName) == "" {
 		return nil, NewNotEmptyOrWhiteSpaceError("profile_name")
 	}
-	if strings.TrimSpace(attributeName) == "" {
-		return nil, NewNotEmptyOrWhiteSpaceError("attribute_name")
+	if strings.TrimSpace(attributeType) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("attribute_type")
+	}
+	if strings.TrimSpace(mappingName) == "" {
+		return nil, NewNotEmptyOrWhiteSpaceError("mapping_name")
 	}
 
-	log.Printf("[INFO] Importing profile session attribute: %s/%s/%s", appName, profileName, attributeName)
+	log.Printf("[INFO] Importing profile session attribute: %s/%s/%s/%s", appName, profileName, attributeType, mappingName)
 
 	app, err := c.GetApplicationByName(appName)
 	if errors.Is(err, britive.ErrNotFound) {
@@ -202,17 +213,9 @@ func (rpt *ResourceProfileSessionAttribute) resourceStateImporter(d *schema.Reso
 		return nil, err
 	}
 
-	attribute, err := c.GetAttributeByName(attributeName)
+	sessionAttribute, err := c.GetProfileSessionAttributeByTypeAndMappingName(profile.ProfileID, attributeType, mappingName)
 	if errors.Is(err, britive.ErrNotFound) {
-		return nil, NewNotFoundErrorf("attribute %s", attributeName)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	sessionAttribute, err := c.GetProfileSessionAttributeByAttributeID(profile.ProfileID, attribute.ID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, NewNotFoundErrorf("session attribute %s", attribute.ID)
+		return nil, NewNotFoundErrorf("session attribute with type %s and mapping name %s", attributeType, mappingName)
 	}
 	if err != nil {
 		return nil, err
@@ -226,7 +229,7 @@ func (rpt *ResourceProfileSessionAttribute) resourceStateImporter(d *schema.Reso
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[INFO] Imported profile session attribute: %s/%s/%s", appName, profileName, attributeName)
+	log.Printf("[INFO] Imported profile session attribute: %s/%s/%s/%s", appName, profileName, attributeType, mappingName)
 	return []*schema.ResourceData{d}, nil
 }
 
@@ -262,20 +265,25 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 
 	log.Printf("[INFO] Received profile session attribute: %#v", pt)
 
-	log.Printf("[INFO] Reading attribute: %s/%s", profileID, sessionAttributeID)
+	var attributeName string
+	if pt.AttributeSchemaID != "" {
+		log.Printf("[INFO] Reading attribute: %s/%s", profileID, sessionAttributeID)
 
-	attribute, err := c.GetAttribute(pt.AttributeSchemaID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return NewNotFoundErrorf("attribute %s", pt.AttributeSchemaID)
+		attribute, err := c.GetAttribute(pt.AttributeSchemaID)
+		if errors.Is(err, britive.ErrNotFound) {
+			return NewNotFoundErrorf("attribute %s", pt.AttributeSchemaID)
+		}
+		if err != nil {
+			return err
+		}
+
+		log.Printf("[INFO] Received attribute: %#v", attribute)
+
+		attributeName = attribute.Name
 	}
-	if err != nil {
-		return err
-	}
-
-	log.Printf("[INFO] Received attribute: %#v", attribute)
-
 	d.Set("profile_id", profileID)
-	d.Set("attribute_name", attribute.Name)
+	d.Set("attribute_name", attributeName)
+	d.Set("attribute_type", pt.SessionAttributeType)
 	d.Set("mapping_name", pt.MappingName)
 	d.Set("transitive", pt.Transitive)
 
@@ -286,18 +294,37 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 	c := m.(*britive.Client)
 	attributeName := d.Get("attribute_name").(string)
 	mappingName := d.Get("mapping_name").(string)
+	attributeType := d.Get("attribute_type").(string)
 	transitive := d.Get("transitive").(bool)
-	attribute, err := c.GetAttributeByName(attributeName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, NewNotFoundErrorf("session attribute %s", attributeName)
+	if attributeName == "" && (attributeType == "" || strings.EqualFold(attributeType, "Identity")) {
+		return nil, NewNotEmptyOrWhiteSpaceError("attribute_name")
 	}
-	if err != nil {
-		return nil, err
+	if strings.EqualFold(attributeType, "Static") && attributeName != "" {
+		return nil, fmt.Errorf("expected attribute_name should be empty when attribute_type value is Static")
+	}
+	var attributeSchemaId string
+	var attributeValue string
+	if attributeName != "" {
+		attribute, err := c.GetAttributeByName(attributeName)
+		if errors.Is(err, britive.ErrNotFound) {
+			return nil, NewNotFoundErrorf("session attribute %s", attributeName)
+		}
+		if err != nil {
+			return nil, err
+		}
+		attributeSchemaId = attribute.ID
+	} else {
+		attributeValue = "IT"
+	}
+	if attributeType == "" {
+		attributeType = "Identity"
 	}
 	profileSessionAttribute := britive.SessionAttribute{
-		AttributeSchemaID: attribute.ID,
-		MappingName:       mappingName,
-		Transitive:        transitive,
+		AttributeSchemaID:    attributeSchemaId,
+		MappingName:          mappingName,
+		Transitive:           transitive,
+		SessionAttributeType: attributeType,
+		AttributeValue:       attributeValue,
 	}
 	return &profileSessionAttribute, nil
 }

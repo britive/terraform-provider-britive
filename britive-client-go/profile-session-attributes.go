@@ -88,8 +88,8 @@ func (c *Client) GetProfileSessionAttribute(profileID string, sessionAttributeID
 	return &sessionAttribute, nil
 }
 
-// GetProfileSessionAttributeByAttributeID - Returns profile session attributes
-func (c *Client) GetProfileSessionAttributeByAttributeID(profileID string, attributeID string) (*SessionAttribute, error) {
+// GetProfileSessionAttributeByTypeAndMappingName - Returns profile session attributes
+func (c *Client) GetProfileSessionAttributeByTypeAndMappingName(profileID, attributeType, mappingName string) (*SessionAttribute, error) {
 	sessionAttributes, err := c.GetProfileSessionAttributes(profileID)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (c *Client) GetProfileSessionAttributeByAttributeID(profileID string, attri
 	}
 	var sessionAttribute SessionAttribute
 	for _, sa := range *sessionAttributes {
-		if sa.AttributeSchemaID == attributeID {
+		if strings.EqualFold(sa.SessionAttributeType, attributeType) && strings.EqualFold(sa.MappingName, mappingName) {
 			sessionAttribute = sa
 			break
 		}

@@ -24,9 +24,11 @@ resource "britive_profile_session_attribute" "new" {
 
 The following arguments are supported:
 
-* `profile_id` - (Required) The identifier of the profile.
+* `profile_id` - (Required, Forces new resource) The identifier of the profile.
 
-* `attribute_name` - (Required) The name of attribute. This field is immutable. Changing `attribute_name` after creating the resource will delete the existing resource and creates a new resource with the new name.
+* `attribute_name` - (Optional, Forces new resource) The name of attribute.
+
+* `attribute_type` - (Optional, Forces new resource) The type of attribute, should be one of [Static, Identity]. The default value is `Identity`
 
 * `mapping_name` - (Required) The name for attribute mapping.
 
@@ -43,6 +45,6 @@ In addition to the above arguments, the following attribute is exported.
 You can import a Britive profile using any of these accepted formats:
 
 ```sh
-terraform import britive_profile_session_attribute.new apps/{{app_name}}/paps/{{profile_name}}/session-attributes/{{attribute_name}}
-terraform import britive_profile_session_attribute.new {{app_name}}/{{profile_name}}/{{attribute_name}}
+terraform import britive_profile_session_attribute.new apps/{{app_name}}/paps/{{profile_name}}/session-attributes/type/{{attribute_type}}/mapping-name/{{mapping_name}}
+terraform import britive_profile_session_attribute.new {{app_name}}/{{profile_name}}/{{attribute_type}}/{{mapping_name}}
 ```

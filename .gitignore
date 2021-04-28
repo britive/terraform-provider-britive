@@ -49,3 +49,4 @@ vendor/
 **/.terraformrc
 **/terraform.rc
 terraform-provider-britive
+.terraform.lock.hcl

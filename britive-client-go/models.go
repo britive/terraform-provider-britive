@@ -195,8 +195,10 @@ type UserAttribute struct {
 
 //SessionAttribute - godoc
 type SessionAttribute struct {
-	AttributeSchemaID string `json:"attributeSchemaId"`
-	MappingName       string `json:"mappingName"`
-	Transitive        bool   `json:"transitive"`
-	ID                string `json:"id,omitempty"`
+	AttributeSchemaID    string `json:"attributeSchemaId"`
+	MappingName          string `json:"mappingName"`
+	Transitive           bool   `json:"transitive"`
+	SessionAttributeType string `json:"sessionAttributeType"`
+	AttributeValue       string `json:"attributeValue"`
+	ID                   string `json:"id,omitempty"`
 }

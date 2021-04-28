@@ -20,11 +20,11 @@ resource "britive_profile_permission" "new" {
 
 The following arguments are supported:
 
-* `profile_id` - (Required) The identifier of the profile.
+* `profile_id` - (Required, Forces new resource) The identifier of the profile.
 
-* `permission_name` - (Required) The name of permission.
+* `permission_name` - (Required, Forces new resource) The name of permission.
 
-* `permission_type` - (Required) The type of permission.
+* `permission_type` - (Required, Forces new resource) The type of permission.
 
 ## Attribute Reference
 
