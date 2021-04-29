@@ -15,7 +15,7 @@ variable "name" {
 }
 
 locals {
-  resource_name_prefix = "${var.name}-2021-04-04"
+  resource_name_prefix = "${var.name}-2021-04-29"
 }
 
 data "britive_identity_provider" "idp" {
@@ -69,9 +69,18 @@ resource "britive_profile_identity" "new" {
   username   = "terraformexample2@britive.com"
 }
 
-resource "britive_profile_session_attribute" "new" {
+resource "britive_profile_session_attribute" "user_new" {
   profile_id = britive_profile.new.id
+  attribute_type = "Identity"
   attribute_name = "Date Of Birth"
   mapping_name = "dob"
-  transitive = true
+  transitive = false
+}
+
+resource "britive_profile_session_attribute" "static_new" {
+  profile_id = britive_profile.new.id
+  attribute_type = "Static"
+  attribute_value = "IT"
+  mapping_name = "department"
+  transitive = false
 }

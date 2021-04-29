@@ -13,6 +13,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
+//SessionAttributeType - godoc
+type SessionAttributeType string
+
+const (
+	//SessionAttributeTypeStatic - godoc
+	SessionAttributeTypeStatic SessionAttributeType = "Static"
+	//SessionAttributeTypeIdentity - godoc
+	SessionAttributeTypeIdentity SessionAttributeType = "Identity"
+)
+
 //ResourceProfileSessionAttribute - Terraform Resource for Profile Session Attribute
 type ResourceProfileSessionAttribute struct {
 	Resource     *schema.Resource
@@ -68,6 +78,11 @@ func NewResourceProfileSessionAttribute(importHelper *ImportHelper) *ResourcePro
 				Default:      "Identity",
 				ValidateFunc: validation.StringInSlice([]string{"Static", "Identity"}, false),
 			},
+			"attribute_value": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The attribute value associate with the profile",
+			},
 			"mapping_name": {
 				Type:         schema.TypeString,
 				Required:     true,
@@ -121,6 +136,7 @@ func (rpt *ResourceProfileSessionAttribute) resourceRead(ctx context.Context, d 
 
 func (rpt *ResourceProfileSessionAttribute) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	if !d.HasChange("mapping_name") &&
+		!d.HasChange("attribute_value") &&
 		!d.HasChange("transitive") {
 		return nil
 	}
@@ -266,7 +282,8 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 	log.Printf("[INFO] Received profile session attribute: %#v", pt)
 
 	var attributeName string
-	if pt.AttributeSchemaID != "" {
+	var attributeValue string
+	if strings.EqualFold(pt.SessionAttributeType, string(SessionAttributeTypeIdentity)) || pt.AttributeSchemaID != "" {
 		log.Printf("[INFO] Reading attribute: %s/%s", profileID, sessionAttributeID)
 
 		attribute, err := c.GetAttribute(pt.AttributeSchemaID)
@@ -280,10 +297,13 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 		log.Printf("[INFO] Received attribute: %#v", attribute)
 
 		attributeName = attribute.Name
+	} else {
+		attributeValue = pt.AttributeValue
 	}
 	d.Set("profile_id", profileID)
 	d.Set("attribute_name", attributeName)
 	d.Set("attribute_type", pt.SessionAttributeType)
+	d.Set("attribute_value", attributeValue)
 	d.Set("mapping_name", pt.MappingName)
 	d.Set("transitive", pt.Transitive)
 
@@ -295,16 +315,20 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 	attributeName := d.Get("attribute_name").(string)
 	mappingName := d.Get("mapping_name").(string)
 	attributeType := d.Get("attribute_type").(string)
+	attributeValuePassed := d.Get("attribute_value").(string)
 	transitive := d.Get("transitive").(bool)
-	if attributeName == "" && (attributeType == "" || strings.EqualFold(attributeType, "Identity")) {
-		return nil, NewNotEmptyOrWhiteSpaceError("attribute_name")
-	}
-	if strings.EqualFold(attributeType, "Static") && attributeName != "" {
-		return nil, fmt.Errorf("expected attribute_name should be empty when attribute_type value is Static")
+	if attributeType == "" {
+		attributeType = string(SessionAttributeTypeIdentity)
 	}
 	var attributeSchemaId string
 	var attributeValue string
-	if attributeName != "" {
+	if strings.EqualFold(attributeType, string(SessionAttributeTypeIdentity)) {
+		if attributeName == "" {
+			return nil, NewNotEmptyOrWhiteSpaceError("attribute_name")
+		}
+		if attributeValuePassed != "" {
+			return nil, fmt.Errorf("expected attribute_value should be empty when attribute_type is %s", attributeType)
+		}
 		attribute, err := c.GetAttributeByName(attributeName)
 		if errors.Is(err, britive.ErrNotFound) {
 			return nil, NewNotFoundErrorf("session attribute %s", attributeName)
@@ -314,10 +338,13 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 		}
 		attributeSchemaId = attribute.ID
 	} else {
-		attributeValue = "IT"
-	}
-	if attributeType == "" {
-		attributeType = "Identity"
+		if attributeValuePassed == "" {
+			return nil, NewNotEmptyOrWhiteSpaceError("attribute_value")
+		}
+		if attributeName != "" {
+			return nil, fmt.Errorf("expected attribute_name should be empty when attribute_type is %s", attributeType)
+		}
+		attributeValue = attributeValuePassed
 	}
 	profileSessionAttribute := britive.SessionAttribute{
 		AttributeSchemaID:    attributeSchemaId,

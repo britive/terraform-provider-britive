@@ -12,11 +12,22 @@ resource "britive_profile" "new" {
     # ...
 }
 
-resource "britive_profile_session_attribute" "new" {
+# Static Attribute
+resource "britive_profile_session_attribute" "static_new" {
   profile_id = britive_profile.new.id
+  attribute_type = "Static"
+  attribute_value = "IT"
+  mapping_name = "department"
+  transitive = false
+}
+
+# User Attribute
+resource "britive_profile_session_attribute" "user_new" {
+  profile_id = britive_profile.new.id
+  attribute_type = "Identity"  
   attribute_name = "Date Of Birth"
   mapping_name = "dob"
-  transitive = true
+  transitive = false
 }
 ```
 
@@ -26,9 +37,11 @@ The following arguments are supported:
 
 * `profile_id` - (Required, Forces new resource) The identifier of the profile.
 
-* `attribute_name` - (Optional, Forces new resource) The name of attribute.
-
 * `attribute_type` - (Optional, Forces new resource) The type of attribute, should be one of [Static, Identity]. The default value is `Identity`
+
+* `attribute_name` - (Optional, Required when `attribute_type` is Identity, Forces new resource) The name of attribute.
+
+* `attribute_value` - (Optional, Required when `attribute_type` is Static) The value of attribute.
 
 * `mapping_name` - (Required) The name for attribute mapping.
 
