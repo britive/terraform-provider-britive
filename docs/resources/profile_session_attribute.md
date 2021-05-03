@@ -2,7 +2,7 @@
 
 This resource allows you to add or remove session attributes from a Britive profile.
 
-!> This resource is only supported from AWS Applications.  
+!> This resource is only supported for AWS Applications.  
 If you try to add a session attribute using this resource for other than AWS applications, an error message will be displayed.
 
 ## Example Usage
