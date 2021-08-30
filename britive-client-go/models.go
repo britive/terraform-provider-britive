@@ -79,6 +79,7 @@ type Profile struct {
 	NotificationPriorToExpiration *int64               `json:"notificationPriorToExpiration,omitempty"`
 	ExtensionDuration             *int64               `json:"extensionDuration,omitempty"`
 	ExtensionLimit                interface{}          `json:"extensionLimit,omitempty"`
+	DestinationUrl                string               `json:"destinationUrl,omitempty"`
 }
 
 //Application - godoc

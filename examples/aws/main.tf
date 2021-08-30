@@ -46,6 +46,7 @@ resource "britive_profile" "new" {
   notification_prior_to_expiration = "10m0s"
   extension_duration               = "12m30s"
   extension_limit                  = 2
+  destination_url                  = ""
   associations {
     type  = "EnvironmentGroup"
     value = "QA"

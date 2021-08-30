@@ -122,6 +122,11 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 				Optional:    true,
 				Description: "The repetition limit for extending the profile expiry",
 			},
+			"destination_url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The destination url to redirect user after checkout",
+			},
 		},
 	}
 	return rp
@@ -188,7 +193,8 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 		d.HasChange("extendable") ||
 		d.HasChange("notification_prior_to_expiration") ||
 		d.HasChange("extension_duration") ||
-		d.HasChange("extension_limit") {
+		d.HasChange("extension_limit") ||
+		d.HasChange("destination_url") {
 
 		hasChanges = true
 
@@ -405,6 +411,7 @@ func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m i
 		return err
 	}
 	profile.ExpirationDuration = int64(expirationDuration / time.Millisecond)
+	profile.DestinationUrl = d.Get("destination_url").(string)
 	extendable := d.Get("extendable").(bool)
 	if extendable {
 		profile.Extendable = extendable
@@ -486,6 +493,9 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 		if err := d.Set("extension_limit", profile.ExtensionLimit); err != nil {
 			return err
 		}
+	}
+	if err := d.Set("destination_url", profile.DestinationUrl); err != nil {
+		return err
 	}
 	associations, err := rph.mapProfileAssociationsModelToResource(profile.AppContainerID, profile.ProfileID, profile.Associations, d, m)
 	if err != nil {
