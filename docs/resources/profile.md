@@ -21,7 +21,8 @@ resource "britive_profile" "new" {
     associations {
       type  = "Environment"
       value = "QA Subscription"
-    }
+    },
+    destination_url                  = "https://console.aws.amazon.com"
 }
 ```
 
@@ -46,6 +47,8 @@ The following arguments are supported:
 * `extension_duration` - (Optional) The Britive profile expiry extension duration as a time value. For example: `12m30s`
 
 * `extension_limit` - (Optional) The Britive profile expiry extension limit. For example: `2`
+
+* `destination_url` - (Optional) The console URL where the user will be redirected upon checking out the profile. For example: `https://console.aws.amazon.com`
 
 * `associations` - (Required) The list of associations for the Britive profile.
 
