@@ -1,4 +1,4 @@
-# britive_identity_provider Data Source
+# britive_identity_provider Data Source 
 
 Use this data source to retrieve the identity provider information.
 
