@@ -5,9 +5,10 @@ import (
 )
 
 const (
-	emptyString     = ""
-	tagLockName     = "tag"
-	profileLockName = "profile"
+	emptyString         = ""
+	tagLockName         = "tag"
+	profileLockName     = "profile"
+	permissionsLockName = "permissions"
 )
 
 var (

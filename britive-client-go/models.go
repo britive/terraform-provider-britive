@@ -203,3 +203,13 @@ type SessionAttribute struct {
 	AttributeValue       string `json:"attributeValue"`
 	ID                   string `json:"id,omitempty"`
 }
+
+//Permissions - godoc
+type Permissions struct {
+	PermissionID string        `json:"id,omitempty"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description,omitempty"`
+	Consumer     string        `json:"consumer"`
+	Resources    []interface{} `json:"resources"`
+	Actions      []interface{} `json:"actions"`
+}
