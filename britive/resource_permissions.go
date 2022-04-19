@@ -161,7 +161,7 @@ func (rp *ResourcePermissions) resourceDelete(ctx context.Context, d *schema.Res
 
 func (rp *ResourcePermissions) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rp.importHelper.ParseImportID([]string{"api/v1/policy-admin/policies/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
+	if err := rp.importHelper.ParseImportID([]string{"api/v1/policy-admin/permissions/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 	permissionName := d.Get("name").(string)
