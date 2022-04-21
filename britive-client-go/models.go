@@ -184,7 +184,7 @@ type SessionAttribute struct {
 }
 
 //Permissions - godoc
-type Permissions struct {
+type Permission struct {
 	PermissionID string        `json:"id,omitempty"`
 	Name         string        `json:"name"`
 	Description  string        `json:"description,omitempty"`

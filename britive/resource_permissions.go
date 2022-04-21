@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -11,18 +12,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-//ResourcePermissions - Terraform Resource for Permissions
-type ResourcePermissions struct {
+//ResourcePermission - Terraform Resource for Permission
+type ResourcePermission struct {
 	Resource     *schema.Resource
-	helper       *ResourcePermissionsHelper
+	helper       *ResourcePermissionHelper
 	validation   *Validation
 	importHelper *ImportHelper
 }
 
-//NewResourcePermissions - Initializes new permission resource
-func NewResourcePermissions(v *Validation, importHelper *ImportHelper) *ResourcePermissions {
-	rp := &ResourcePermissions{
-		helper:       NewResourcePermissionsHelper(),
+//NewResourcePermission - Initializes new permission resource
+func NewResourcePermission(v *Validation, importHelper *ImportHelper) *ResourcePermission {
+	rp := &ResourcePermission{
+		helper:       NewResourcePermissionHelper(),
 		validation:   v,
 		importHelper: importHelper,
 	}
@@ -73,34 +74,34 @@ func NewResourcePermissions(v *Validation, importHelper *ImportHelper) *Resource
 
 //region Permission Resource Context Operations
 
-func (rp *ResourcePermissions) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rp *ResourcePermission) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
 
-	permissions := britive.Permissions{}
+	permission := britive.Permission{}
 
-	err := rp.helper.mapResourceToModel(d, m, &permissions, false)
+	err := rp.helper.mapResourceToModel(d, m, &permission, false)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	log.Printf("[INFO] Adding new permission: %#v", permissions)
+	log.Printf("[INFO] Adding new permission: %#v", permission)
 
-	pm, err := c.AddPermission(permissions)
+	pm, err := c.AddPermission(permission)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	log.Printf("[INFO] Submitted new permission: %#v", pm)
-	d.SetId(pm.PermissionID)
+	d.SetId(rp.helper.generateUniqueID(pm.PermissionID))
 
 	rp.resourceRead(ctx, d, m)
 
 	return diags
 }
 
-func (rp *ResourcePermissions) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rp *ResourcePermission) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	var diags diag.Diagnostics
 
@@ -113,27 +114,31 @@ func (rp *ResourcePermissions) resourceRead(ctx context.Context, d *schema.Resou
 	return diags
 }
 
-func (rp *ResourcePermissions) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rp *ResourcePermission) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	permissionID := d.Id()
+	permissionID, err := rp.helper.parseUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
 	var hasChanges bool
 	if d.HasChange("name") || d.HasChange("description") || d.HasChange("consumer") || d.HasChange("resources") || d.HasChange("actions") {
 		hasChanges = true
-		permissions := britive.Permissions{}
+		permission := britive.Permission{}
 
-		err := rp.helper.mapResourceToModel(d, m, &permissions, true)
+		err := rp.helper.mapResourceToModel(d, m, &permission, true)
 		if err != nil {
 			return diag.FromErr(err)
 		}
 
-		up, err := c.UpdatePermission(permissionID, permissions)
+		old_name, _ := d.GetChange("name")
+		up, err := c.UpdatePermission(permission, old_name.(string))
 		if err != nil {
 			return diag.FromErr(err)
 		}
 
 		log.Printf("[INFO] Submitted updated permission: %#v", up)
-		d.SetId(permissionID)
+		d.SetId(rp.helper.generateUniqueID(permissionID))
 	}
 	if hasChanges {
 		return rp.resourceRead(ctx, d, m)
@@ -141,15 +146,18 @@ func (rp *ResourcePermissions) resourceUpdate(ctx context.Context, d *schema.Res
 	return nil
 }
 
-func (rp *ResourcePermissions) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rp *ResourcePermission) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
 	var diags diag.Diagnostics
 
-	permissionID := d.Id()
+	permissionID, err := rp.helper.parseUniqueID(d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
 	log.Printf("[INFO] Deleting permission: %s", permissionID)
-	err := c.DeletePermission(permissionID)
+	err = c.DeletePermission(permissionID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -159,9 +167,9 @@ func (rp *ResourcePermissions) resourceDelete(ctx context.Context, d *schema.Res
 	return diags
 }
 
-func (rp *ResourcePermissions) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
+func (rp *ResourcePermission) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rp.importHelper.ParseImportID([]string{"api/v1/policy-admin/permissions/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
+	if err := rp.importHelper.ParseImportID([]string{"permissions/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 	permissionName := d.Get("name").(string)
@@ -171,7 +179,7 @@ func (rp *ResourcePermissions) resourceStateImporter(d *schema.ResourceData, m i
 
 	log.Printf("[INFO] Importing permission: %s", permissionName)
 
-	permissions, err := c.GetPermissionByName(permissionName)
+	permission, err := c.GetPermissionByName(permissionName)
 	if errors.Is(err, britive.ErrNotFound) {
 		return nil, NewNotFoundErrorf("permission %s", permissionName)
 	}
@@ -179,7 +187,7 @@ func (rp *ResourcePermissions) resourceStateImporter(d *schema.ResourceData, m i
 		return nil, err
 	}
 
-	d.SetId(permissions.PermissionID)
+	d.SetId(rp.helper.generateUniqueID(permission.PermissionID))
 
 	err = rp.helper.getAndMapModelToResource(d, m)
 	if err != nil {
@@ -191,65 +199,90 @@ func (rp *ResourcePermissions) resourceStateImporter(d *schema.ResourceData, m i
 
 //endregion
 
-//ResourcePermissionsHelper - Resource Permission helper functions
-type ResourcePermissionsHelper struct {
+//ResourcePermissionHelper - Resource Permission helper functions
+type ResourcePermissionHelper struct {
 }
 
 //NewResourcePermissionsHelper - Initializes new permission resource helper
-func NewResourcePermissionsHelper() *ResourcePermissionsHelper {
-	return &ResourcePermissionsHelper{}
+func NewResourcePermissionHelper() *ResourcePermissionHelper {
+	return &ResourcePermissionHelper{}
 }
 
 //region Permissions Resource helper functions
 
-func (rph *ResourcePermissionsHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, permissions *britive.Permissions, isUpdate bool) error {
+func (rph *ResourcePermissionHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, permission *britive.Permission, isUpdate bool) error {
 
-	permissions.Name = d.Get("name").(string)
-	permissions.Description = d.Get("description").(string)
-	permissions.Consumer = d.Get("consumer").(string)
+	permission.Name = d.Get("name").(string)
+	permission.Description = d.Get("description").(string)
+	permission.Consumer = d.Get("consumer").(string)
 
 	res := d.Get("resources").([]interface{})
-	permissions.Resources = append(permissions.Resources, res...)
+	permission.Resources = append(permission.Resources, res...)
 
 	act := d.Get("actions").([]interface{})
-	permissions.Actions = append(permissions.Actions, act...)
+	permission.Actions = append(permission.Actions, act...)
 
 	return nil
 }
 
-func (rph *ResourcePermissionsHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
+func (rph *ResourcePermissionHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
 
-	permissionID := d.Id()
+	permissionID, err := rph.parseUniqueID(d.Id())
+	if err != nil {
+		return err
+	}
 
 	log.Printf("[INFO] Reading permission %s", permissionID)
 
-	permissions, err := c.GetPermission(permissionID)
+	permissionRes, err := c.GetPermission(permissionID)
 	if errors.Is(err, britive.ErrNotFound) {
 		return NewNotFoundErrorf("permission %s", permissionID)
 	}
 	if err != nil {
 		return err
 	}
+	permission, err := c.GetPermissionByName(permissionRes.Name)
+	if errors.Is(err, britive.ErrNotFound) {
+		return NewNotFoundErrorf("role %s", permissionRes.Name)
+	}
+	if err != nil {
+		return err
+	}
 
-	log.Printf("[INFO] Received permission %#v", permissions)
+	log.Printf("[INFO] Received permission %#v", permission)
 
-	if err := d.Set("name", permissions.Name); err != nil {
+	if err := d.Set("name", permission.Name); err != nil {
 		return err
 	}
-	if err := d.Set("description", permissions.Description); err != nil {
+	if err := d.Set("description", permission.Description); err != nil {
 		return err
 	}
-	if err := d.Set("consumer", permissions.Consumer); err != nil {
+	if err := d.Set("consumer", permission.Consumer); err != nil {
 		return err
 	}
-	if err := d.Set("resources", permissions.Resources); err != nil {
+	if err := d.Set("resources", permission.Resources); err != nil {
 		return err
 	}
-	if err := d.Set("actions", permissions.Actions); err != nil {
+	if err := d.Set("actions", permission.Actions); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (resourcePermissionHelper *ResourcePermissionHelper) generateUniqueID(permissionID string) string {
+	return fmt.Sprintf("permissions/%s", permissionID)
+}
+
+func (resourcePermissionHelper *ResourcePermissionHelper) parseUniqueID(ID string) (permissionID string, err error) {
+	permissionParts := strings.Split(ID, "/")
+	if len(permissionParts) < 2 {
+		err = NewInvalidResourceIDError("permission", ID)
+		return
+	}
+
+	permissionID = permissionParts[1]
+	return
 }
 
 //endregion

@@ -28,7 +28,7 @@ func Provider(v string) *schema.Provider {
 	resourceProfile := NewResourceProfile(validation, importHelper)
 	resourceProfilePermission := NewResourceProfilePermission(importHelper)
 	resourceProfileSessionAttribute := NewResourceProfileSessionAttribute(importHelper)
-	resourcePermissions := NewResourcePermissions(validation, importHelper)
+	resourcePermission := NewResourcePermission(validation, importHelper)
 	resourceRole := NewResourceRole(validation, importHelper)
 	resourceProfilePolicy := NewResourceProfilePolicy(importHelper)
 
@@ -63,7 +63,7 @@ func Provider(v string) *schema.Provider {
 			"britive_profile":                   resourceProfile.Resource,
 			"britive_profile_permission":        resourceProfilePermission.Resource,
 			"britive_profile_session_attribute": resourceProfileSessionAttribute.Resource,
-			"britive_permissions":               resourcePermissions.Resource,
+			"britive_permission":                resourcePermission.Resource,
 			"britive_role":                      resourceRole.Resource,
 			"britive_profile_policy":            resourceProfilePolicy.Resource,
 		},
