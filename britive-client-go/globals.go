@@ -10,6 +10,7 @@ const (
 	profileLockName    = "profile"
 	permissionLockName = "permissions"
 	roleLockName       = "role"
+	policyLockName     = "policy"
 )
 
 var (

@@ -183,7 +183,7 @@ type SessionAttribute struct {
 	ID                   string `json:"id,omitempty"`
 }
 
-//Permissions - godoc
+//Permission - godoc
 type Permission struct {
 	PermissionID string        `json:"id,omitempty"`
 	Name         string        `json:"name"`
@@ -199,4 +199,19 @@ type Role struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description,omitempty"`
 	Permissions interface{} `json:"permissions,omitempty"`
+}
+
+//Policy - godoc
+type Policy struct {
+	PolicyID    string      `json:"id,omitempty"`
+	Name        string      `json:"name,omitempty"`
+	Description string      `json:"description,omitempty"`
+	Condition   string      `json:"condition,omitempty"`
+	Members     interface{} `json:"members,omitempty"`
+	Roles       interface{} `json:"roles,omitempty"`
+	Permissions interface{} `json:"permissions,omitempty"`
+	AccessType  string      `json:"accessType,omitempty"`
+	IsActive    bool        `json:"isActive,omitempty"`
+	IsDraft     bool        `json:"isDraft,omitempty"`
+	IsReadOnly  bool        `json:"isReadOnly,omitempty"`
 }
