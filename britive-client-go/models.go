@@ -192,3 +192,11 @@ type Permissions struct {
 	Resources    []interface{} `json:"resources"`
 	Actions      []interface{} `json:"actions"`
 }
+
+//Resource - godoc
+type Role struct {
+	RoleID      string      `json:"id,omitempty"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	Permissions interface{} `json:"permissions,omitempty"`
+}

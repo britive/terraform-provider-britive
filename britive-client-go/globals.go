@@ -9,6 +9,7 @@ const (
 	tagLockName         = "tag"
 	profileLockName     = "profile"
 	permissionsLockName = "permissions"
+	roleLockName        = "role"
 )
 
 var (
