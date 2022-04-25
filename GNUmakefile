@@ -6,7 +6,7 @@ HOSTNAME	 := github.com
 NAMESPACE	 := britive
 NAME 		 := britive
 BINARY		 := terraform-provider-${NAME}
-VERSION      := 1.0
+VERSION      := 2.0
 OS_ARCH      := $(shell go env GOOS)_$(shell go env GOARCH)
 
 default: build

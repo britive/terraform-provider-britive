@@ -148,9 +148,9 @@ type ProfilePolicy struct {
 	Members     interface{} `json:"members,omitempty"`
 	Consumer    string      `json:"consumer,omitempty"`
 	AccessType  string      `json:"accessType,omitempty"`
-	IsActive    bool        `json:"isActive,omitempty"`
-	IsDraft     bool        `json:"isDraft,omitempty"`
-	IsReadOnly  bool        `json:"isReadOnly,omitempty"`
+	IsActive    bool        `json:"isActive"`
+	IsDraft     bool        `json:"isDraft"`
+	IsReadOnly  bool        `json:"isReadOnly"`
 }
 
 //PaginationResponse - godoc
@@ -211,7 +211,7 @@ type Policy struct {
 	Roles       interface{} `json:"roles,omitempty"`
 	Permissions interface{} `json:"permissions,omitempty"`
 	AccessType  string      `json:"accessType,omitempty"`
-	IsActive    bool        `json:"isActive,omitempty"`
-	IsDraft     bool        `json:"isDraft,omitempty"`
-	IsReadOnly  bool        `json:"isReadOnly,omitempty"`
+	IsActive    bool        `json:"isActive"`
+	IsDraft     bool        `json:"isDraft"`
+	IsReadOnly  bool        `json:"isReadOnly"`
 }

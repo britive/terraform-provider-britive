@@ -57,16 +57,19 @@ func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy
 			"is_active": {
 				Type:        schema.TypeBool,
 				Optional:    true,
+				Default:     true,
 				Description: "Is the policy active",
 			},
 			"is_draft": {
 				Type:        schema.TypeBool,
 				Optional:    true,
+				Default:     false,
 				Description: "Is the policy a draft",
 			},
 			"is_read_only": {
 				Type:        schema.TypeBool,
 				Optional:    true,
+				Default:     false,
 				Description: "Is the policy read only",
 			},
 			"consumer": {
