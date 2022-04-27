@@ -15,7 +15,7 @@ terraform {
   required_providers {
     britive = {
       source = "britive/britive"
-      version = "~> 2.0"
+      version = ">= 2.0"
     }
   }
 }
