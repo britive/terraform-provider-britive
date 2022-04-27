@@ -50,7 +50,7 @@ func NewResourceRole(v *Validation, importHelper *ImportHelper) *ResourceRole {
 			},
 			"permissions": {
 				Type:         schema.TypeString,
-				Optional:     true,
+				Required:     true,
 				Description:  "Permissions of the role",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},

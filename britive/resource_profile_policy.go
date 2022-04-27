@@ -75,12 +75,14 @@ func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy
 			"consumer": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Is the policy read only",
+				Default:     "papservice",
+				Description: "The consumer service",
 			},
 			"access_type": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Is the policy read only",
+				Default:     "Allow",
+				Description: "Type of access for the policy",
 			},
 			"members": {
 				Type:         schema.TypeString,

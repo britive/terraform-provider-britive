@@ -68,7 +68,8 @@ func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 			"access_type": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Is the policy read only",
+				Default:     "Allow",
+				Description: "Type of access for the policy",
 			},
 			"members": {
 				Type:         schema.TypeString,

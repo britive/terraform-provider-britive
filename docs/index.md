@@ -15,7 +15,7 @@ terraform {
   required_providers {
     britive = {
       source = "britive/britive"
-      version = "~> 1.0"
+      version = "~> 2.0"
     }
   }
 }
@@ -28,6 +28,8 @@ provider "britive" {
 ```
 
 ## Authentication
+
+!>Hard-coded credentials are not recommended in the terraform configuration, as this risks secret leakage should this file ever be committed to a public version control system. This mode of authentication will be deprecated in future releases.
 
 The Britive provider offers a flexible means of providing credentials for authentication. The following methods are supported, in this order, and explained below:
 
