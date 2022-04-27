@@ -8,7 +8,7 @@ Use the navigation to the left to read about the available resources.
 
 ## Example Usage
 
-Terraform 0.13 and later:
+Terraform 0.13.7 and later:
 
 ```hcl
 terraform {
