@@ -1,0 +1,140 @@
+# britive_policy Resource
+
+This resource allows you to create and configure a policy.
+
+## Example Usage
+
+```hcl
+resource "britive_policy" "new" {
+    # ...
+}
+
+resource "britive_policy" "new" {
+    name         = "New Policy"
+    description  = "New Policy Description"
+    access_type  = "Allow"
+    members      = jsonencode(
+        {
+            serviceIdentities = [
+                {
+                    name = "service-identity-45B"
+                },
+                {
+                    name = "service-identity-99"
+                },
+            ]
+            tags              = [
+                {
+                    name = "tag_004"
+                },
+                {
+                    name = "tag_005"
+                },
+            ]
+            tokens            = [
+                {
+                    name = "token_01"
+                },
+                {
+                    name = "token_12"
+                },
+            ]
+            users             = [
+                {
+                    name = "apennyworth"
+                },
+                {
+                    name = "skyle"
+                },
+            ]
+        }
+    )
+    permissions  = jsonencode(
+        [
+            {
+                name = "Permission_20"
+            },
+            {
+                name = britive_permission.new.name
+            },
+        ]
+    )
+    roles        = jsonencode(
+        [
+            {
+                name = "Role_21"
+            },
+            {
+                name = britive_role.new.name
+            },
+        ]
+    )
+    condition    = jsonencode(
+        {
+            approval     = {
+                approvers          = {
+                    tags    = [
+                        "tag_08",
+                        "tag_11",
+                    ]
+                    userIds = [
+                        "hdent",
+                        "jblake",
+                    ]
+                }
+                notificationMedium = "Email"
+                timeToApprove      = 30
+                validFor           = 120
+            }
+            ipAddress    = "192.162.0.0/16,10.10.0.10"
+            timeOfAccess = {
+                from = "03:30:00"
+                to   = "12:30:00"
+            }
+        }
+    )
+    is_active    = true
+    is_draft     = false
+    is_read_only = false
+}
+```
+
+## Argument Reference
+
+The following arguments are supported:
+
+* `name` - (Required) The name of the policy.
+
+* `description` - (Optional) A description of the policy.
+
+* `access_type` - (Optional) Type of access the policy provides. This can have two values "Allow"/"Deny". Defaults to "Allow".
+
+* `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags`, `tokens` and `users`
+
+* `permissions` - (Optional) Permissions associated to the policy. Either a role/permission is to be assigned to a policy.
+
+* `roles` - (Optional) Roles associated to the policy. Either a role/permission is to be assigned to a policy.
+
+* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium`. The `timeToApprove` and `validFor` are provided in minutes. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be a range in format of "YYYY-MM-DD HH:MM:SS" or scheduled daily by passing the range in "HH:MM:SS".
+
+* `is_active` - (Optional) Indicates if a policy is active. Boolean value accepts true/false. Defaults to true. 
+
+* `is_draft` - (Optional) Indicates if a policy is a draft. Boolean value accepts true/false. Defaults to false.
+
+* `is_read_only` - (Optional) Indicates if a policy is read only. Boolean value accepts true/false. Defaults to false.
+
+
+## Attribute Reference
+
+In addition to the above arguments, the following attribute is exported.
+
+* `id` - An identifier of the policy with format `policies/{{name}}`
+
+## Import
+
+You can import a policy using any of these accepted formats:
+
+```SH
+terraform import britive_policy.new policies/{{name}}
+terraform import britive_policy.new {{name}}
+```

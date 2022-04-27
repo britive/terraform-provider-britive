@@ -1,9 +1,5 @@
 package britive
 
-import (
-	"time"
-)
-
 //Config - godoc
 type Config struct {
 	Tenant string `json:"tenant"`
@@ -142,36 +138,19 @@ type ProfileAssociationResource struct {
 	Type        string      `json:"type,omitempty"`
 }
 
-//TimePeriod - godoc
-type TimePeriod struct {
-	Start time.Time `json:"start"`
-	End   time.Time `json:"end"`
-}
-
-//ProfileTag - godoc
-type ProfileTag struct {
-	ProfileID    string      `json:"papId,omitempty"`
-	TagID        string      `json:"userTagId,omitempty"`
-	Name         string      `json:"name,omitempty"`
-	Description  string      `json:"description,omitempty"`
-	Status       string      `json:"status,omitempty"`
-	UserCount    interface{} `json:"userCount,omitempty"`
-	AccessPeriod *TimePeriod `json:"accessPeriod,omitempty"`
-	CheckStatus  string      `json:"checkStatus,omitempty"`
-	Message      string      `json:"message,omitempty"`
-}
-
-//ProfileIdentity - godoc
-type ProfileIdentity struct {
-	ProfileID    string      `json:"papId,omitempty"`
-	UserID       string      `json:"userId,omitempty"`
-	Name         string      `json:"name,omitempty"`
-	Username     string      `json:"username,omitempty"`
-	UserType     string      `json:"userType,omitempty"`
-	Status       string      `json:"status,omitempty"`
-	AccessPeriod *TimePeriod `json:"accessPeriod,omitempty"`
-	CheckStatus  string      `json:"checkStatus,omitempty"`
-	Message      string      `json:"message,omitempty"`
+//ProfilePolicy - godoc
+type ProfilePolicy struct {
+	ProfileID   string      `json:"papId,omitempty"`
+	PolicyID    string      `json:"id,omitempty"`
+	Name        string      `json:"name,omitempty"`
+	Description string      `json:"description,omitempty"`
+	Condition   string      `json:"condition,omitempty"`
+	Members     interface{} `json:"members,omitempty"`
+	Consumer    string      `json:"consumer,omitempty"`
+	AccessType  string      `json:"accessType,omitempty"`
+	IsActive    bool        `json:"isActive"`
+	IsDraft     bool        `json:"isDraft"`
+	IsReadOnly  bool        `json:"isReadOnly"`
 }
 
 //PaginationResponse - godoc
@@ -202,4 +181,37 @@ type SessionAttribute struct {
 	SessionAttributeType string `json:"sessionAttributeType"`
 	AttributeValue       string `json:"attributeValue"`
 	ID                   string `json:"id,omitempty"`
+}
+
+//Permission - godoc
+type Permission struct {
+	PermissionID string        `json:"id,omitempty"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description,omitempty"`
+	Consumer     string        `json:"consumer"`
+	Resources    []interface{} `json:"resources"`
+	Actions      []interface{} `json:"actions"`
+}
+
+//Resource - godoc
+type Role struct {
+	RoleID      string      `json:"id,omitempty"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	Permissions interface{} `json:"permissions"`
+}
+
+//Policy - godoc
+type Policy struct {
+	PolicyID    string      `json:"id,omitempty"`
+	Name        string      `json:"name,omitempty"`
+	Description string      `json:"description,omitempty"`
+	Condition   string      `json:"condition,omitempty"`
+	Members     interface{} `json:"members,omitempty"`
+	Roles       interface{} `json:"roles,omitempty"`
+	Permissions interface{} `json:"permissions,omitempty"`
+	AccessType  string      `json:"accessType,omitempty"`
+	IsActive    bool        `json:"isActive"`
+	IsDraft     bool        `json:"isDraft"`
+	IsReadOnly  bool        `json:"isReadOnly"`
 }
