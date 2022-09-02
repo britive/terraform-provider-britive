@@ -2,4 +2,4 @@
 
 BUG FIXES:
 
-* provider: Terraform Plan/Apply gives intermittent time-outs (PAB-11775 - v1)
+* provider: Terraform Plan/Apply gives intermittent time-outs (PAB-11775)
