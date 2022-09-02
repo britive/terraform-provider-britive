@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 var (
@@ -32,7 +31,7 @@ type Client struct {
 func NewClient(apiBaseURL, token, version string) (*Client, error) {
 	syncOnce.Do(func() {
 		client = &Client{
-			HTTPClient: &http.Client{Timeout: 10 * time.Second},
+			HTTPClient: &http.Client{Timeout: 0},
 			APIBaseURL: apiBaseURL,
 			Token:      token,
 			Version:    version,
