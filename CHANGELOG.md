@@ -1,12 +1,5 @@
-## 0.1.0 (Unreleased)
+## 1.0.17
 
-FEATURES:
+BUG FIXES:
 
-* **New Resource:** `britive_tag`
-* **New Resource:** `britive_tag_member`
-* **New Resource:** `britive_profile`
-* **New Resource:** `britive_profile_tag`
-* **New Resource:** `britive_profile_permission`
-* **New Resource:** `britive_profile_identity`
-* **New Data Source:** `britive_application`
-* **New Data Source:** `britive_identity_provider`
+* provider: Terraform Plan/Apply gives intermittent time-outs (PAB-11775 - v1)
