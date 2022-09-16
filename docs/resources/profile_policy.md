@@ -1,7 +1,9 @@
-# britive_profile_policy Resource (New)
+# britive_profile_policy Resource
 
 -> This resource is compatible only with enhanced Britive profiles feature.
    Resources britive_profile_identity and britive_profile_tag are replaced by britive_profile_policy. 
+
+!> Please update the approval block, under the condition argument, to include `validFor` and  `isValidForInDays` variable. Existing profile policies should be updated with `validFor`, else any action on the resource will fail with error "Error: PP-0005: Please provide validation time for approval: validFor"   
 
 This resource allows you to create and configure the policy associated to a profile.
 
@@ -57,8 +59,10 @@ resource "britive_profile_policy" "new" {
                         "rdawes",
                     ]
                 }
+                isValidForInDays   = true
                 notificationMedium = "Email"
                 timeToApprove      = 630
+                validFor           = 2
             }
             ipAddress    = "192.162.0.0/16,10.10.0.10"
             timeOfAccess = {
@@ -87,7 +91,7 @@ The following arguments are supported:
 
 * `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags` and `users`
 
-* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium` and `timeToApprove` in minutes. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be a range in format of "YYYY-MM-DD HH:MM:SS" or scheduled daily by passing the range in "HH:MM:SS". 
+* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium` and `timeToApprove` in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be a range in format of "YYYY-MM-DD HH:MM:SS" or scheduled daily by passing the range in "HH:MM:SS". 
 
 * `access_type` - (Optional) Type of access the policy provides. This can have two values "Allow"/"Deny". Defaults to "Allow".
 
@@ -111,5 +115,5 @@ You can import a policy for the profile using any of these accepted formats:
 
 ```SH
 terraform import britive_profile_policy.new paps/{{profile_id}}/policies/{{policy_name}}
-terraform import britive_role.new {{profile_id}}/{{policy_name}}
+terraform import britive_profile_policy.new {{profile_id}}/{{policy_name}}
 ```

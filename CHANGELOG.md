@@ -1,5 +1,6 @@
-## 2.0.1
+## 2.0.2
 
-BUG FIXES:
+ENHANCEMENTS:
 
-* provider: Terraform Plan/Apply gives intermittent time-outs (PAB-11775)
+* resource/britive_policy: Added variable "isValidForInDays" to support approval validity in days.
+* resource/britive_profile_policy: Added variable "isValidForInDays" to support approval validity in days.

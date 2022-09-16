@@ -1,5 +1,7 @@
 # britive_policy Resource
 
+!> Please update the approval block, under the condition argument, to include `isValidForInDays` variable.
+
 This resource allows you to create and configure a policy.
 
 ## Example Usage
@@ -82,6 +84,7 @@ resource "britive_policy" "new" {
                         "jblake",
                     ]
                 }
+                isValidForInDays   = false
                 notificationMedium = "Email"
                 timeToApprove      = 30
                 validFor           = 120
@@ -115,7 +118,7 @@ The following arguments are supported:
 
 * `roles` - (Optional) Roles associated to the policy. Either a role/permission is to be assigned to a policy.
 
-* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium`. The `timeToApprove` and `validFor` are provided in minutes. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be a range in format of "YYYY-MM-DD HH:MM:SS" or scheduled daily by passing the range in "HH:MM:SS".
+* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium`. The `timeToApprove` is provided in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be a range in format of "YYYY-MM-DD HH:MM:SS" or scheduled daily by passing the range in "HH:MM:SS".
 
 * `is_active` - (Optional) Indicates if a policy is active. Boolean value accepts true/false. Defaults to true. 
 
