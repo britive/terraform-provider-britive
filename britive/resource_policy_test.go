@@ -16,8 +16,8 @@ func TestBritivePolicy(t *testing.T) {
 	roleDescription := "AT - Britive Role Test Description"
 	policyName := "AT - Britive Policy Test"
 	policyDescription := "AT - Britive Policy Test Description"
-	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2022-09-21 17:06:06")
-	timeOfAccessTo := time.Now().AddDate(0, 0, 7).Format("2022-09-21 17:06:06")
+	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2006-01-02 15:04:05")
+	timeOfAccessTo := time.Now().AddDate(0, 0, 7).Format("2006-01-02 15:04:05")
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,
