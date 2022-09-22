@@ -48,11 +48,8 @@ func testAccCheckBritiveRoleConfig(permissionName, permissionDescription, roleNa
 		permissions = jsonencode(
 			[
 				{
-					name = "UserViewPermission"
-				},
-				{
 					name = britive_permission.new.name
-				}
+				},
 			]
 		)
 	}`, permissionName, permissionDescription, roleName, roleDescription)
