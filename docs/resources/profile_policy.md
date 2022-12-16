@@ -3,7 +3,7 @@
 -> This resource is compatible only with enhanced Britive profiles feature.
    Resources britive_profile_identity and britive_profile_tag are replaced by britive_profile_policy. 
 
-!> Please update the approval block, under the condition argument, to include `validFor` and  `isValidForInDays` variable. Existing profile policies should be updated with `validFor`, else any action on the resource will fail with error "Error: PP-0005: Please provide validation time for approval: validFor"   
+!> Please update the timeOfAccess block, under the condition argument, to include `dateSchedule` and `daysSchedule` block. Existing profile policies should be updated, else any action on the resource will fail with error "Error: PP-0005: Condition json is not valid".
 
 This resource allows you to create and configure the policy associated to a profile.
 
@@ -66,8 +66,20 @@ resource "britive_profile_policy" "new" {
             }
             ipAddress    = "192.162.0.0/16,10.10.0.10"
             timeOfAccess = {
-                from = "2022-04-29 14:30:00"
-                to   = "2022-04-29 20:30:00"
+                "dateSchedule": {
+                    "fromDate": "2022-10-29 10:30:00",
+                    "toDate": "2022-11-05 18:30:00",
+                    "timezone": "Asia/Calcutta"
+                },
+                "daysSchedule": {
+                    "fromTime": "16:30:00",
+                    "toTime": "19:30:00",
+                    "timezone": "Asia/Calcutta",
+                    "days": [
+                        "SATURDAY",
+                        "SUNDAY"
+                    ]
+                }
             }
         }
     )
@@ -91,7 +103,7 @@ The following arguments are supported:
 
 * `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags` and `users`
 
-* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium` and `timeToApprove` in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be a range in format of "YYYY-MM-DD HH:MM:SS" or scheduled daily by passing the range in "HH:MM:SS". 
+* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium` and `timeToApprove` in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be scheduled based on date, days, both or `null`. The `dateSchedule` should contain the `fromDate`, `toDate` in format of "YYYY-MM-DD HH:MM:SS" and `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If `dateSchedule` is not required, it has to be set to `null`. The `daysSchedule` should contain the `fromTime`, `toTime` in format of "HH:MM:SS", `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones and `days` as a list of strings. If `daysSchedule` is not required, it has to be set to `null`
 
 * `access_type` - (Optional) Type of access the policy provides. This can have two values "Allow"/"Deny". Defaults to "Allow".
 
