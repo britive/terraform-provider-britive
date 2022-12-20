@@ -41,7 +41,7 @@ func NewClient(apiBaseURL, token, version string) (*Client, error) {
 	return client, nil
 }
 
-//QueryRequest - godoc
+// QueryRequest - godoc
 type QueryRequest struct {
 	Client      *Client
 	QueryParams map[string]string
@@ -49,7 +49,7 @@ type QueryRequest struct {
 	Result      interface{}
 }
 
-//SortDirection - godoc
+// SortDirection - godoc
 type SortDirection string
 
 const (
@@ -59,7 +59,7 @@ const (
 	SortDirectionDescending SortDirection = "desc"
 )
 
-//WithQuery - godoc
+// WithQuery - godoc
 func (gpr *QueryRequest) WithQuery(query string) *QueryRequest {
 	if query != emptyString {
 		gpr.QueryParams["query"] = url.QueryEscape(query)
@@ -67,7 +67,7 @@ func (gpr *QueryRequest) WithQuery(query string) *QueryRequest {
 	return gpr
 }
 
-//WithFilter - godoc
+// WithFilter - godoc
 func (gpr *QueryRequest) WithFilter(filter string) *QueryRequest {
 	if filter != emptyString {
 		gpr.QueryParams["filter"] = url.QueryEscape(filter)
@@ -75,7 +75,7 @@ func (gpr *QueryRequest) WithFilter(filter string) *QueryRequest {
 	return gpr
 }
 
-//WithSort - godoc
+// WithSort - godoc
 func (gpr *QueryRequest) WithSort(name string, direction SortDirection) *QueryRequest {
 	if name != emptyString && direction != emptyString {
 		gpr.QueryParams["sort"] = fmt.Sprintf("%s,%s", name, direction)
@@ -83,7 +83,7 @@ func (gpr *QueryRequest) WithSort(name string, direction SortDirection) *QueryRe
 	return gpr
 }
 
-//WithSize - godoc
+// WithSize - godoc
 func (gpr *QueryRequest) WithSize(size int) *QueryRequest {
 	if size > 0 {
 		gpr.QueryParams["size"] = strconv.Itoa(size)
@@ -91,13 +91,13 @@ func (gpr *QueryRequest) WithSize(size int) *QueryRequest {
 	return gpr
 }
 
-//WithLock - godoc
+// WithLock - godoc
 func (gpr *QueryRequest) WithLock(lock string) *QueryRequest {
 	gpr.Lock = lock
 	return gpr
 }
 
-//WithResult - godoc
+// WithResult - godoc
 func (gpr *QueryRequest) WithResult(result interface{}) *QueryRequest {
 	gpr.Result = result
 	return gpr
@@ -111,7 +111,7 @@ func (c *Client) NewQueryRequest() *QueryRequest {
 	}
 }
 
-//Query - godoc
+// Query - godoc
 func (gpr *QueryRequest) Query(endpoint string) error {
 	const size = 10
 	var page = 0
@@ -168,14 +168,14 @@ func (gpr *QueryRequest) Query(endpoint string) error {
 	return nil
 }
 
-//DoWithLock - Perform Britive API call with lock
+// DoWithLock - Perform Britive API call with lock
 func (c *Client) DoWithLock(req *http.Request, key string) ([]byte, error) {
 	c.lock(key)
 	defer c.unlock(key)
 	return c.Do(req)
 }
 
-//Do - Perform Britive API call
+// Do - Perform Britive API call
 func (c *Client) Do(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
 	req.Header.Set("Content-Type", "application/json")
@@ -213,7 +213,7 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	return body, err
 }
 
-//Lock to lock based on key
+// Lock to lock based on key
 func (c *Client) lock(key interface{}) {
 	mutex := &sync.Mutex{}
 	actual, _ := c.SyncMap.LoadOrStore(key, mutex)
@@ -226,7 +226,7 @@ func (c *Client) lock(key interface{}) {
 	}
 }
 
-//Unlock to unlock based on key
+// Unlock to unlock based on key
 func (c *Client) unlock(key interface{}) {
 	actual, exist := c.SyncMap.Load(key)
 	if !exist {
@@ -235,4 +235,43 @@ func (c *Client) unlock(key interface{}) {
 	actualMutex := actual.(*sync.Mutex)
 	c.SyncMap.Delete(key)
 	actualMutex.Unlock()
+}
+
+func ArrayOfMapsEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "[]"
+	}
+
+	if new == emptyString {
+		new = "[]"
+	}
+
+	oldArray := []map[string]interface{}{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := []map[string]interface{}{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for _, v := range oldArray {
+			for _, p := range newArray {
+				if reflect.DeepEqual(v, p) {
+					equalCount++
+				}
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+	return true
 }

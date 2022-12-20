@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-//ResourcePermission - Terraform Resource for Permission
+// ResourcePermission - Terraform Resource for Permission
 type ResourcePermission struct {
 	Resource     *schema.Resource
 	helper       *ResourcePermissionHelper
@@ -20,7 +20,7 @@ type ResourcePermission struct {
 	importHelper *ImportHelper
 }
 
-//NewResourcePermission - Initializes new permission resource
+// NewResourcePermission - Initializes new permission resource
 func NewResourcePermission(v *Validation, importHelper *ImportHelper) *ResourcePermission {
 	rp := &ResourcePermission{
 		helper:       NewResourcePermissionHelper(),
@@ -52,7 +52,7 @@ func NewResourcePermission(v *Validation, importHelper *ImportHelper) *ResourceP
 				Description: "The consumer service",
 			},
 			"resources": {
-				Type:        schema.TypeList,
+				Type:        schema.TypeSet,
 				Required:    true,
 				Description: "Comma separated list of resources",
 				Elem: &schema.Schema{
@@ -60,7 +60,7 @@ func NewResourcePermission(v *Validation, importHelper *ImportHelper) *ResourceP
 				},
 			},
 			"actions": {
-				Type:        schema.TypeList,
+				Type:        schema.TypeSet,
 				Required:    true,
 				Description: "Actions to be performed on the resource",
 				Elem: &schema.Schema{
@@ -199,11 +199,11 @@ func (rp *ResourcePermission) resourceStateImporter(d *schema.ResourceData, m in
 
 //endregion
 
-//ResourcePermissionHelper - Resource Permission helper functions
+// ResourcePermissionHelper - Resource Permission helper functions
 type ResourcePermissionHelper struct {
 }
 
-//NewResourcePermissionsHelper - Initializes new permission resource helper
+// NewResourcePermissionsHelper - Initializes new permission resource helper
 func NewResourcePermissionHelper() *ResourcePermissionHelper {
 	return &ResourcePermissionHelper{}
 }
@@ -216,11 +216,11 @@ func (rph *ResourcePermissionHelper) mapResourceToModel(d *schema.ResourceData, 
 	permission.Description = d.Get("description").(string)
 	permission.Consumer = d.Get("consumer").(string)
 
-	res := d.Get("resources").([]interface{})
-	permission.Resources = append(permission.Resources, res...)
+	res := d.Get("resources").(*schema.Set)
+	permission.Resources = append(permission.Resources, res.List()...)
 
-	act := d.Get("actions").([]interface{})
-	permission.Actions = append(permission.Actions, act...)
+	act := d.Get("actions").(*schema.Set)
+	permission.Actions = append(permission.Actions, act.List()...)
 
 	return nil
 }

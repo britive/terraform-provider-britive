@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-//ResourceProfile - Terraform Resource for Profile
+// ResourceProfile - Terraform Resource for Profile
 type ResourceProfile struct {
 	Resource     *schema.Resource
 	helper       *ResourceProfileHelper
@@ -21,7 +21,7 @@ type ResourceProfile struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceProfile - Initialization of new profile resource
+// NewResourceProfile - Initialization of new profile resource
 func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProfile {
 	rp := &ResourceProfile{
 		helper:       NewResourceProfileHelper(),
@@ -68,7 +68,7 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 				Description: "To disable the Britive profile",
 			},
 			"associations": {
-				Type:        schema.TypeList,
+				Type:        schema.TypeSet,
 				Required:    true,
 				Description: "The list of associations for the Britive profile",
 				Elem: &schema.Resource{
@@ -301,12 +301,12 @@ func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m inter
 
 //endregion
 
-//ResourceProfileHelper - Resource Profile helper functions
+// ResourceProfileHelper - Resource Profile helper functions
 type ResourceProfileHelper struct {
 	Resource *schema.Resource
 }
 
-//NewResourceProfileHelper - Initialization of new profile resource helper
+// NewResourceProfileHelper - Initialization of new profile resource helper
 func NewResourceProfileHelper() *ResourceProfileHelper {
 	return &ResourceProfileHelper{}
 }
@@ -332,9 +332,9 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	}
 	associationScopes := make([]britive.ProfileAssociation, 0)
 	associationResources := make([]britive.ProfileAssociation, 0)
-	as := d.Get("associations").([]interface{})
+	as := d.Get("associations").(*schema.Set)
 	unmatchedAssociations := make([]interface{}, 0)
-	for _, a := range as {
+	for _, a := range as.List() {
 		s := a.(map[string]interface{})
 		associationType := s["type"].(string)
 		associationValue := s["value"].(string)
@@ -516,7 +516,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 	if len(associations) == 0 || appRootEnvironmentGroup == nil {
 		return make([]interface{}, 0), nil
 	}
-	inputAssociations := d.Get("associations").([]interface{})
+	inputAssociations := d.Get("associations").(*schema.Set)
 	profileAssociations := make([]interface{}, 0)
 	for _, association := range associations {
 		var rootAssociations []britive.Association
@@ -539,7 +539,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 			}
 			profileAssociation := make(map[string]interface{})
 			associationValue := a.Name
-			for _, inputAssociation := range inputAssociations {
+			for _, inputAssociation := range inputAssociations.List() {
 				ia := inputAssociation.(map[string]interface{})
 				iat := ia["type"].(string)
 				iav := ia["value"].(string)
