@@ -275,3 +275,65 @@ func ArrayOfMapsEqual(old, new string) bool {
 	}
 	return true
 }
+
+func MembersEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string][]map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string][]map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "serviceIdentities":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "tags":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "tokens":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "users":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+	return true
+}

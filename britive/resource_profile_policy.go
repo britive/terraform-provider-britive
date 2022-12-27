@@ -14,14 +14,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-//ResourceProfilePolicy - Terraform Resource for Profile Policy
+// ResourceProfilePolicy - Terraform Resource for Profile Policy
 type ResourceProfilePolicy struct {
 	Resource     *schema.Resource
 	helper       *ResourceProfilePolicyHelper
 	importHelper *ImportHelper
 }
 
-//NewResourceProfilePolicy - Initialization of new profile policy resource
+// NewResourceProfilePolicy - Initialization of new profile policy resource
 func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy {
 	rpp := &ResourceProfilePolicy{
 		helper:       NewResourceProfilePolicyHelper(),
@@ -89,6 +89,9 @@ func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy
 				Optional:     true,
 				Description:  "Members of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return britive.MembersEqual(old, new)
+				},
 			},
 			"condition": {
 				Type:         schema.TypeString,
@@ -233,11 +236,11 @@ func (rpp *ResourceProfilePolicy) resourceStateImporter(d *schema.ResourceData, 
 
 //endregion
 
-//ResourceProfilePolicyHelper - Terraform Resource for Profile Policy Helper
+// ResourceProfilePolicyHelper - Terraform Resource for Profile Policy Helper
 type ResourceProfilePolicyHelper struct {
 }
 
-//NewResourceProfilePolicyHelper - Initialization of new profile policy resource helper
+// NewResourceProfilePolicyHelper - Initialization of new profile policy resource helper
 func NewResourceProfilePolicyHelper() *ResourceProfilePolicyHelper {
 	return &ResourceProfilePolicyHelper{}
 }
