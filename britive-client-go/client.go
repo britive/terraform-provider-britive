@@ -552,7 +552,7 @@ func TimeOfAccessBlockEqual(old, new string) bool {
 					equalCount++
 				}
 			case "daysSchedule":
-				if reflect.DeepEqual(memOld, memNew) {
+				if DaysScheduleBlockEqual(string(memOld), string(memNew)) {
 					equalCount++
 				}
 			default:
@@ -577,4 +577,78 @@ func SliceIgnoreOrderEqual(old, new []string) bool {
 	sort.Strings(new)
 
 	return reflect.DeepEqual(old, new)
+}
+
+func DaysScheduleBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	oldArray := make(map[string]interface{})
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := make(map[string]interface{})
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "fromTime":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "toTime":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "timezone":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "days":
+				oldDaysInterface := val.([]interface{})
+				newDaysInterface := newArray[key].([]interface{})
+
+				oldDaysSlice := make([]string, len(oldDaysInterface))
+				for i, v := range oldDaysInterface {
+					oldDaysSlice[i] = v.(string)
+				}
+				newDaysSlice := make([]string, len(newDaysInterface))
+				for i, v := range newDaysInterface {
+					newDaysSlice[i] = v.(string)
+				}
+
+				if SliceIgnoreOrderEqual(oldDaysSlice, newDaysSlice) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
 }
