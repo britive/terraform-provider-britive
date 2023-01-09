@@ -85,6 +85,9 @@ func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 				Optional:     true,
 				Description:  "Condition of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return britive.ConditionEqual(old, new)
+				},
 			},
 			"permissions": {
 				Type:         schema.TypeString,

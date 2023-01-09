@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"reflect"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -336,4 +337,244 @@ func MembersEqual(old, new string) bool {
 		return false
 	}
 	return true
+}
+
+func ConditionEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "approval":
+				if ApprovalBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "ipAddress":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "timeOfAccess":
+				if TimeOfAccessBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func ApprovalBlockEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "approvers":
+				if ApproversBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "isValidForInDays":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "notificationMedium":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "timeToApprove":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "validFor":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func ApproversBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	oldArray := make(map[string][]string)
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := make(map[string][]string)
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			switch key {
+			case "tags":
+				if SliceIgnoreOrderEqual(val, newArray[key]) {
+					equalCount++
+				}
+			case "userIds":
+				if SliceIgnoreOrderEqual(val, newArray[key]) {
+					equalCount++
+				}
+			case "channelIds":
+				if SliceIgnoreOrderEqual(val, newArray[key]) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func TimeOfAccessBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "dateSchedule":
+				if reflect.DeepEqual(memOld, memNew) {
+					equalCount++
+				}
+			case "daysSchedule":
+				if reflect.DeepEqual(memOld, memNew) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func SliceIgnoreOrderEqual(old, new []string) bool {
+	if len(old) != len(new) {
+		return false
+	}
+	sort.Strings(old)
+	sort.Strings(new)
+
+	return reflect.DeepEqual(old, new)
 }
