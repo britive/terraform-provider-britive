@@ -377,7 +377,7 @@ func ConditionEqual(old, new string) bool {
 					equalCount++
 				}
 			case "ipAddress":
-				if string(memOld) == string(memNew) {
+				if IPAddressBlockEqual(string(memOld), string(memNew)) {
 					equalCount++
 				}
 			case "timeOfAccess":
@@ -651,4 +651,21 @@ func DaysScheduleBlockEqual(old, new string) bool {
 	}
 
 	return true
+}
+
+func IPAddressBlockEqual(old, new string) bool {
+	oldSlice := strings.Split(old, ",")
+	newSlice := strings.Split(new, ",")
+	if len(oldSlice) != len(newSlice) {
+		return false
+	}
+	oldMap := make(map[string]int, len(oldSlice))
+	newMap := make(map[string]int, len(newSlice))
+	for _, v := range oldSlice {
+		oldMap[v]++
+	}
+	for _, v := range newSlice {
+		newMap[v]++
+	}
+	return reflect.DeepEqual(oldMap, newMap)
 }
