@@ -654,18 +654,26 @@ func DaysScheduleBlockEqual(old, new string) bool {
 }
 
 func IPAddressBlockEqual(old, new string) bool {
-	oldSlice := strings.Split(old, ",")
-	newSlice := strings.Split(new, ",")
-	if len(oldSlice) != len(newSlice) {
+
+	if old == emptyString {
+		old = ""
+	}
+
+	if new == emptyString {
+		new = ""
+	}
+
+	if len(old) != len(new) {
 		return false
 	}
-	oldMap := make(map[string]int, len(oldSlice))
-	newMap := make(map[string]int, len(newSlice))
-	for _, v := range oldSlice {
-		oldMap[v]++
-	}
-	for _, v := range newSlice {
-		newMap[v]++
-	}
-	return reflect.DeepEqual(oldMap, newMap)
+
+	old = strings.TrimPrefix(old, "\"")
+	new = strings.TrimPrefix(new, "\"")
+	old = strings.TrimSuffix(old, "\"")
+	new = strings.TrimSuffix(new, "\"")
+
+	oldSlice := strings.Split(strings.TrimSpace(old), ",")
+	newSlice := strings.Split(strings.TrimSpace(new), ",")
+
+	return SliceIgnoreOrderEqual(oldSlice, newSlice)
 }
