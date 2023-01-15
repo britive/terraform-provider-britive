@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"reflect"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,7 +42,7 @@ func NewClient(apiBaseURL, token, version string) (*Client, error) {
 	return client, nil
 }
 
-//QueryRequest - godoc
+// QueryRequest - godoc
 type QueryRequest struct {
 	Client      *Client
 	QueryParams map[string]string
@@ -49,7 +50,7 @@ type QueryRequest struct {
 	Result      interface{}
 }
 
-//SortDirection - godoc
+// SortDirection - godoc
 type SortDirection string
 
 const (
@@ -59,7 +60,7 @@ const (
 	SortDirectionDescending SortDirection = "desc"
 )
 
-//WithQuery - godoc
+// WithQuery - godoc
 func (gpr *QueryRequest) WithQuery(query string) *QueryRequest {
 	if query != emptyString {
 		gpr.QueryParams["query"] = url.QueryEscape(query)
@@ -67,7 +68,7 @@ func (gpr *QueryRequest) WithQuery(query string) *QueryRequest {
 	return gpr
 }
 
-//WithFilter - godoc
+// WithFilter - godoc
 func (gpr *QueryRequest) WithFilter(filter string) *QueryRequest {
 	if filter != emptyString {
 		gpr.QueryParams["filter"] = url.QueryEscape(filter)
@@ -75,7 +76,7 @@ func (gpr *QueryRequest) WithFilter(filter string) *QueryRequest {
 	return gpr
 }
 
-//WithSort - godoc
+// WithSort - godoc
 func (gpr *QueryRequest) WithSort(name string, direction SortDirection) *QueryRequest {
 	if name != emptyString && direction != emptyString {
 		gpr.QueryParams["sort"] = fmt.Sprintf("%s,%s", name, direction)
@@ -83,7 +84,7 @@ func (gpr *QueryRequest) WithSort(name string, direction SortDirection) *QueryRe
 	return gpr
 }
 
-//WithSize - godoc
+// WithSize - godoc
 func (gpr *QueryRequest) WithSize(size int) *QueryRequest {
 	if size > 0 {
 		gpr.QueryParams["size"] = strconv.Itoa(size)
@@ -91,13 +92,13 @@ func (gpr *QueryRequest) WithSize(size int) *QueryRequest {
 	return gpr
 }
 
-//WithLock - godoc
+// WithLock - godoc
 func (gpr *QueryRequest) WithLock(lock string) *QueryRequest {
 	gpr.Lock = lock
 	return gpr
 }
 
-//WithResult - godoc
+// WithResult - godoc
 func (gpr *QueryRequest) WithResult(result interface{}) *QueryRequest {
 	gpr.Result = result
 	return gpr
@@ -111,7 +112,7 @@ func (c *Client) NewQueryRequest() *QueryRequest {
 	}
 }
 
-//Query - godoc
+// Query - godoc
 func (gpr *QueryRequest) Query(endpoint string) error {
 	const size = 10
 	var page = 0
@@ -168,14 +169,14 @@ func (gpr *QueryRequest) Query(endpoint string) error {
 	return nil
 }
 
-//DoWithLock - Perform Britive API call with lock
+// DoWithLock - Perform Britive API call with lock
 func (c *Client) DoWithLock(req *http.Request, key string) ([]byte, error) {
 	c.lock(key)
 	defer c.unlock(key)
 	return c.Do(req)
 }
 
-//Do - Perform Britive API call
+// Do - Perform Britive API call
 func (c *Client) Do(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
 	req.Header.Set("Content-Type", "application/json")
@@ -213,7 +214,7 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	return body, err
 }
 
-//Lock to lock based on key
+// Lock to lock based on key
 func (c *Client) lock(key interface{}) {
 	mutex := &sync.Mutex{}
 	actual, _ := c.SyncMap.LoadOrStore(key, mutex)
@@ -226,7 +227,7 @@ func (c *Client) lock(key interface{}) {
 	}
 }
 
-//Unlock to unlock based on key
+// Unlock to unlock based on key
 func (c *Client) unlock(key interface{}) {
 	actual, exist := c.SyncMap.Load(key)
 	if !exist {
@@ -235,4 +236,444 @@ func (c *Client) unlock(key interface{}) {
 	actualMutex := actual.(*sync.Mutex)
 	c.SyncMap.Delete(key)
 	actualMutex.Unlock()
+}
+
+func ArrayOfMapsEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "[]"
+	}
+
+	if new == emptyString {
+		new = "[]"
+	}
+
+	oldArray := []map[string]interface{}{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := []map[string]interface{}{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for _, v := range oldArray {
+			for _, p := range newArray {
+				if reflect.DeepEqual(v, p) {
+					equalCount++
+				}
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+	return true
+}
+
+func MembersEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string][]map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string][]map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "serviceIdentities":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "tags":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "tokens":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "users":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+	return true
+}
+
+func ConditionEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "approval":
+				if ApprovalBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "ipAddress":
+				if IPAddressBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "timeOfAccess":
+				if TimeOfAccessBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func ApprovalBlockEqual(old, new string) bool {
+
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "approvers":
+				if ApproversBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "isValidForInDays":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "notificationMedium":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "timeToApprove":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "validFor":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func ApproversBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	oldArray := make(map[string][]string)
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := make(map[string][]string)
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			switch key {
+			case "tags":
+				if SliceIgnoreOrderEqual(val, newArray[key]) {
+					equalCount++
+				}
+			case "userIds":
+				if SliceIgnoreOrderEqual(val, newArray[key]) {
+					equalCount++
+				}
+			case "channelIds":
+				if SliceIgnoreOrderEqual(val, newArray[key]) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func TimeOfAccessBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	var oldArray map[string]interface{}
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	var newArray map[string]interface{}
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "dateSchedule":
+				if reflect.DeepEqual(memOld, memNew) {
+					equalCount++
+				}
+			case "daysSchedule":
+				if DaysScheduleBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func SliceIgnoreOrderEqual(old, new []string) bool {
+	if len(old) != len(new) {
+		return false
+	}
+	sort.Strings(old)
+	sort.Strings(new)
+
+	return reflect.DeepEqual(old, new)
+}
+
+func DaysScheduleBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	oldArray := make(map[string]interface{})
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := make(map[string]interface{})
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			memOld, err := json.Marshal(val)
+			if err != nil {
+				panic(err)
+			}
+			memNew, err := json.Marshal(newArray[key])
+			if err != nil {
+				panic(err)
+			}
+			switch key {
+			case "fromTime":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "toTime":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "timezone":
+				if string(memOld) == string(memNew) {
+					equalCount++
+				}
+			case "days":
+				oldDaysInterface := val.([]interface{})
+				newDaysInterface := newArray[key].([]interface{})
+
+				oldDaysSlice := make([]string, len(oldDaysInterface))
+				for i, v := range oldDaysInterface {
+					oldDaysSlice[i] = v.(string)
+				}
+				newDaysSlice := make([]string, len(newDaysInterface))
+				for i, v := range newDaysInterface {
+					newDaysSlice[i] = v.(string)
+				}
+
+				if SliceIgnoreOrderEqual(oldDaysSlice, newDaysSlice) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func IPAddressBlockEqual(old, new string) bool {
+
+	if old == emptyString {
+		old = ""
+	}
+
+	if new == emptyString {
+		new = ""
+	}
+
+	if len(old) != len(new) {
+		return false
+	}
+
+	old = strings.TrimPrefix(old, "\"")
+	new = strings.TrimPrefix(new, "\"")
+	old = strings.TrimSuffix(old, "\"")
+	new = strings.TrimSuffix(new, "\"")
+
+	oldSlice := strings.Split(strings.TrimSpace(old), ",")
+	newSlice := strings.Split(strings.TrimSpace(new), ",")
+
+	return SliceIgnoreOrderEqual(oldSlice, newSlice)
 }

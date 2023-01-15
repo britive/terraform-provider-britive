@@ -14,14 +14,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-//ResourcePolicy - Terraform Resource for Policy
+// ResourcePolicy - Terraform Resource for Policy
 type ResourcePolicy struct {
 	Resource     *schema.Resource
 	helper       *ResourcePolicyHelper
 	importHelper *ImportHelper
 }
 
-//NewResourcePolicy - Initialization of new policy resource
+// NewResourcePolicy - Initialization of new policy resource
 func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 	rp := &ResourcePolicy{
 		helper:       NewResourcePolicyHelper(),
@@ -76,24 +76,36 @@ func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 				Optional:     true,
 				Description:  "Members of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return britive.MembersEqual(old, new)
+				},
 			},
 			"condition": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				Description:  "Condition of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return britive.ConditionEqual(old, new)
+				},
 			},
 			"permissions": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				Description:  "Permissions of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return britive.ArrayOfMapsEqual(old, new)
+				},
 			},
 			"roles": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				Description:  "Roles of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return britive.ArrayOfMapsEqual(old, new)
+				},
 			},
 		},
 	}
@@ -227,11 +239,11 @@ func (rp *ResourcePolicy) resourceStateImporter(d *schema.ResourceData, m interf
 
 //endregion
 
-//ResourceProfilePolicyHelper - Terraform Resource for Policy Helper
+// ResourceProfilePolicyHelper - Terraform Resource for Policy Helper
 type ResourcePolicyHelper struct {
 }
 
-//NewResourcePolicyHelper - Initialization of new policy resource helper
+// NewResourcePolicyHelper - Initialization of new policy resource helper
 func NewResourcePolicyHelper() *ResourcePolicyHelper {
 	return &ResourcePolicyHelper{}
 }

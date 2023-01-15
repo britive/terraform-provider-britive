@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-//ResourceRole - Terraform Resource for Role
+// ResourceRole - Terraform Resource for Role
 type ResourceRole struct {
 	Resource     *schema.Resource
 	helper       *ResourceRoleHelper
@@ -22,7 +22,7 @@ type ResourceRole struct {
 	importHelper *ImportHelper
 }
 
-//NewResourceRole - Initializes new role resource
+// NewResourceRole - Initializes new role resource
 func NewResourceRole(v *Validation, importHelper *ImportHelper) *ResourceRole {
 	rr := &ResourceRole{
 		helper:       NewResourceRoleHelper(),
@@ -53,6 +53,9 @@ func NewResourceRole(v *Validation, importHelper *ImportHelper) *ResourceRole {
 				Required:     true,
 				Description:  "Permissions of the role",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					return britive.ArrayOfMapsEqual(old, new)
+				},
 			},
 		},
 	}
@@ -187,11 +190,11 @@ func (rr *ResourceRole) resourceStateImporter(d *schema.ResourceData, m interfac
 
 //endregion
 
-//ResourceRoleHelper - Resource Role helper functions
+// ResourceRoleHelper - Resource Role helper functions
 type ResourceRoleHelper struct {
 }
 
-//NewResourceRoleHelper - Initializes new role resource helper
+// NewResourceRoleHelper - Initializes new role resource helper
 func NewResourceRoleHelper() *ResourceRoleHelper {
 	return &ResourceRoleHelper{}
 }

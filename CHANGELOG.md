@@ -1,6 +1,6 @@
-## 2.0.3
+## 2.0.4
 
-ENHANCEMENTS:
+BUG FIXES:
 
-* resource/britive_policy: Update timeOfAccess to include dateSchedule and daysSchedule
-* resource/britive_profile_policy: Update timeOfAccess to include dateSchedule and daysSchedule
+* provider: Terraform Plan/Apply Always Shows Changes (PAB-11776/PAB-10854)
+* resource/britive_policy,resource/britive_profile_policy: Terraform Provider gives whitespace changes diff for conditions under policy/profile-policy (PAB-10853)
