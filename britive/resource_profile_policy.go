@@ -167,7 +167,8 @@ func (rpp *ResourceProfilePolicy) resourceUpdate(ctx context.Context, d *schema.
 		profilePolicy.PolicyID = policyID
 		profilePolicy.ProfileID = profileID
 
-		upp, err := c.UpdateProfilePolicy(profilePolicy)
+		old_name, _ := d.GetChange("policy_name")
+		upp, err := c.UpdateProfilePolicy(profilePolicy, old_name.(string))
 		if err != nil {
 			return diag.FromErr(err)
 		}
