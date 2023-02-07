@@ -37,13 +37,14 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 	resource "britive_permission" "new" {
 		name = "%s"
 		description = "%s"
-		consumer    = "authz"
+		consumer    = "secretmanager"
 		resources   = [
 			"*",
 		]
 		actions     = [
-			"authz.action.list",
-			"authz.action.read",
+			"authz.policy.list",
+			"authz.policy.read",
+			"sm.secret.read",
 		]
 	}
 
