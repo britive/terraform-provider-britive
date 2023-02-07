@@ -66,10 +66,10 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 		permissions = jsonencode(
 			[
 				{
-					name = "UserViewPermission"
+					name = britive_permission.new.name
 				},
 				{
-					name = britive_permission.new.name
+					name = britive_permission.new1.name
 				}
 			]
 		)
@@ -81,10 +81,10 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 		permissions = jsonencode(
 			[
 				{
-					name = "UserViewPermission"
+					name = britive_permission.new.name
 				},
 				{
-					name = britive_permission.new.name
+					name = britive_permission.new1.name
 				}
 			]
 		)
