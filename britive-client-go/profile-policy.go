@@ -95,7 +95,7 @@ func (c *Client) CreateProfilePolicy(profilePolicy ProfilePolicy) (*ProfilePolic
 }
 
 // UpdateProfilePolicy - Update profile policy
-func (c *Client) UpdateProfilePolicy(profilePolicy ProfilePolicy) (*ProfilePolicy, error) {
+func (c *Client) UpdateProfilePolicy(profilePolicy ProfilePolicy, policyName string) (*ProfilePolicy, error) {
 	var profilePolicyBody []byte
 	var err error
 	profilePolicyBody, err = json.Marshal(profilePolicy)
@@ -103,7 +103,7 @@ func (c *Client) UpdateProfilePolicy(profilePolicy ProfilePolicy) (*ProfilePolic
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s/policies/%s", c.APIBaseURL, profilePolicy.ProfileID, profilePolicy.Name), strings.NewReader(string(profilePolicyBody)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s/policies/%s", c.APIBaseURL, profilePolicy.ProfileID, policyName), strings.NewReader(string(profilePolicyBody)))
 	if err != nil {
 		return nil, err
 	}
