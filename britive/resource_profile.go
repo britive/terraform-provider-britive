@@ -88,6 +88,7 @@ func NewResourceProfile(v *Validation, importHelper *ImportHelper) *ResourceProf
 						"parent_name": {
 							Type:        schema.TypeString,
 							Optional:    true,
+							Default:     "",
 							Description: "The parent name of the resource. Required only if the association type is ApplicationResource",
 						},
 					},
