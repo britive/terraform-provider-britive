@@ -40,6 +40,12 @@ The following arguments are supported:
 
 * `expiration_duration` - (Required) The expiration time for the Britive profile. For example, `25m0s`
 
+* `destination_url` - (Optional) The console URL where the user will be redirected upon checking out the profile. For example: `https://console.aws.amazon.com`
+
+* `associations` - (Required) The list of associations for the Britive profile.
+
+The following arguments are supported, except for AWS profiles:
+
 * `extendable` - (Optional) The Boolean flag that indicates whether profile expiry is extendable or not. The default value is `false`.
 
 * `notification_prior_to_expiration` - (Optional) The Britive profile expiry notification as a time value. For example, `10m0s`
@@ -48,11 +54,7 @@ The following arguments are supported:
 
 * `extension_limit` - (Optional) The Britive profile expiry extension limit. For example: `2`
 
-* `destination_url` - (Optional) The console URL where the user will be redirected upon checking out the profile. For example: `https://console.aws.amazon.com`
-
-* `associations` - (Required) The list of associations for the Britive profile.
-
-  The format of `associations` is documented below.
+The format of `associations` is documented below.
 
 ### `associations` block supports
 
