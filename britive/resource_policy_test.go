@@ -10,10 +10,10 @@ import (
 )
 
 func TestBritivePolicy(t *testing.T) {
-	permissionName := "AT - Britive Permission Test"
-	permissionDescription := "AT - Britive Permission Test Description"
-	roleName := "AT - Britive Role Test"
-	roleDescription := "AT - Britive Role Test Description"
+	permissionName := "AT - Britive Permission Test Policy"
+	permissionDescription := "AT - Britive Permission Test Policy Description"
+	roleName := "AT - Britive Role Test Policy"
+	roleDescription := "AT - Britive Role Test Policy Description"
 	policyName := "AT - Britive Policy Test"
 	policyDescription := "AT - Britive Policy Test Description"
 	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2006-01-02 15:04:05")
@@ -34,9 +34,9 @@ func TestBritivePolicy(t *testing.T) {
 
 func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, roleName, roleDescription, policyName, policyDescription, timeOfAccessFrom, timeOfAccessTo string) string {
 	return fmt.Sprintf(`
-	resource "britive_permission" "new" {
-		name = "%s"
-		description = "%s"
+	resource "britive_permission" "new_permission_policy_1" {
+		name = "%s1"
+		description = "%s1"
 		consumer    = "secretmanager"
 		resources   = [
 			"*",
@@ -48,9 +48,9 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 		]
 	}
 
-	resource "britive_permission" "new1" {
-		name = "%s1"
-		description = "%s1"
+	resource "britive_permission" "new_permission_policy_2" {
+		name = "%s2"
+		description = "%s2"
 		consumer    = "authz"
 		resources   = [
 			"*",
@@ -61,31 +61,31 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 		]
 	}
 
-	resource "britive_role" "new" {
-		name = "%s"
-		description = "%s"
-		permissions = jsonencode(
-			[
-				{
-					name = britive_permission.new.name
-				},
-				{
-					name = britive_permission.new1.name
-				}
-			]
-		)
-	}
-
-	resource "britive_role" "new1" {
+	resource "britive_role" "new_role_policy_1" {
 		name = "%s1"
 		description = "%s1"
 		permissions = jsonencode(
 			[
 				{
-					name = britive_permission.new.name
+					name = britive_permission.new_permission_policy_1.name
 				},
 				{
-					name = britive_permission.new1.name
+					name = britive_permission.new_permission_policy_2.name
+				}
+			]
+		)
+	}
+
+	resource "britive_role" "new_role_policy_2" {
+		name = "%s2"
+		description = "%s2"
+		permissions = jsonencode(
+			[
+				{
+					name = britive_permission.new_permission_policy_1.name
+				},
+				{
+					name = britive_permission.new_permission_policy_2.name
 				}
 			]
 		)
@@ -134,20 +134,20 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 		permissions  = jsonencode(
 			[
 				{
-					name = britive_permission.new.name
+					name = britive_permission.new_permission_policy_1.name
 				},
 				{
-					name = britive_permission.new1.name
+					name = britive_permission.new_permission_policy_2.name
 				},
 			]
 		)
 		roles        = jsonencode(
 			[
 				{
-					name = britive_role.new.name
+					name = britive_role.new_role_policy_1.name
 				},
 				{
-					name = britive_role.new1.name
+					name = britive_role.new_role_policy_2.name
 				},
 			]
 		)

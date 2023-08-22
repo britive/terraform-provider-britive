@@ -11,9 +11,9 @@ import (
 
 func TestBritiveProfilePolicy(t *testing.T) {
 	applicationName := "AWS-ValueLabs"
-	profileName := "AT - Britive Profile Test"
-	profilePolicyName := "AT - Britive Profile Policy Test"
-	profilePolicyDescription := "AT - Britive Profile Policy Test Description"
+	profileName := "AT - New Britive Profile Policy Test"
+	profilePolicyName := "AT - New Britive Profile Policy Test"
+	profilePolicyDescription := "AT - New Britive Profile Policy Test Description"
 	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2006-01-02 15:04:05")
 	timeOfAccessTo := time.Now().AddDate(0, 0, 7).Format("2006-01-02 15:04:05")
 	resource.Test(t, resource.TestCase{
