@@ -29,9 +29,9 @@ func TestBritiveRole(t *testing.T) {
 
 func testAccCheckBritiveRoleConfig(permissionName, permissionDescription, roleName, roleDescription string) string {
 	return fmt.Sprintf(`
-	resource "britive_permission" "new" {
-		name = "%s"
-		description = "%s"
+	resource "britive_permission" "new_permission_role_1" {
+		name = "%s1"
+		description = "%s1"
 		consumer    = "authz"
 		resources   = [
 			"*",
@@ -42,9 +42,9 @@ func testAccCheckBritiveRoleConfig(permissionName, permissionDescription, roleNa
 		]
 	}
 
-	resource "britive_permission" "new1" {
-		name = "%s1"
-		description = "%s1"
+	resource "britive_permission" "new_permission_role_2" {
+		name = "%s2"
+		description = "%s2"
 		consumer    = "diagnostics"
 		resources   = [
 			"*",
@@ -61,10 +61,10 @@ func testAccCheckBritiveRoleConfig(permissionName, permissionDescription, roleNa
 		permissions = jsonencode(
 			[
 				{
-					name = britive_permission.new.name
+					name = britive_permission.new_permission_role_1.name
 				},
 				{
-					name = britive_permission.new1.name
+					name = britive_permission.new_permission_role_2.name
 				},
 			]
 		)
