@@ -440,8 +440,20 @@ func ApprovalBlockEqual(old, new string) bool {
 					equalCount++
 				}
 			case "notificationMedium":
-				if string(memOld) == string(memNew) {
-					equalCount++
+				if val == nil {
+					val = "{}"
+				}
+				if newArray[key] == nil {
+					newArray[key] = "{}"
+				}
+				if reflect.TypeOf(val).Name() == "string" || reflect.TypeOf(newArray[key]).Name() == "string" {
+					if string(memOld) == string(memNew) {
+						equalCount++
+					}
+				} else {
+					if ArrayOfInterfaceEqual(val, newArray[key]) {
+						equalCount++
+					}
 				}
 			case "timeToApprove":
 				if string(memOld) == string(memNew) {
@@ -579,6 +591,21 @@ func SliceIgnoreOrderEqual(old, new []string) bool {
 	return reflect.DeepEqual(old, new)
 }
 
+func ArrayOfInterfaceEqual(old, new interface{}) bool {
+	oldInterface := old.([]interface{})
+	newInterface := new.([]interface{})
+
+	oldSlice := make([]string, len(oldInterface))
+	for i, v := range oldInterface {
+		oldSlice[i] = v.(string)
+	}
+	newSlice := make([]string, len(newInterface))
+	for i, v := range newInterface {
+		newSlice[i] = v.(string)
+	}
+	return SliceIgnoreOrderEqual(oldSlice, newSlice)
+}
+
 func DaysScheduleBlockEqual(old, new string) bool {
 	equalCount := 0
 
@@ -624,19 +651,7 @@ func DaysScheduleBlockEqual(old, new string) bool {
 					equalCount++
 				}
 			case "days":
-				oldDaysInterface := val.([]interface{})
-				newDaysInterface := newArray[key].([]interface{})
-
-				oldDaysSlice := make([]string, len(oldDaysInterface))
-				for i, v := range oldDaysInterface {
-					oldDaysSlice[i] = v.(string)
-				}
-				newDaysSlice := make([]string, len(newDaysInterface))
-				for i, v := range newDaysInterface {
-					newDaysSlice[i] = v.(string)
-				}
-
-				if SliceIgnoreOrderEqual(oldDaysSlice, newDaysSlice) {
+				if ArrayOfInterfaceEqual(val, newArray[key]) {
 					equalCount++
 				}
 			default:
