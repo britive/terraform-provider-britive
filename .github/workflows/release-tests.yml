@@ -1,0 +1,35 @@
+name: Release Tests
+on:
+  workflow_dispatch:
+
+jobs:
+  acceptance-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      
+      - name: Unshallow
+        run: git fetch --prune --unshallow
+      
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.8
+          terraform_wrapper: false
+
+      - name: Run test
+        run: make testacc
+        env:
+          GO_FLAGS: -mod=vendor
+          GO111MODULE: on
+          BRITIVE_RELEASE_TEST_TENANT: ${{ secrets.BRITIVE_RELEASE_TEST_TENANT }}
+          BRITIVE_RELEASE_TEST_TOKEN: ${{ secrets.BRITIVE_RELEASE_TEST_TOKEN }}
