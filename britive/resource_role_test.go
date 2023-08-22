@@ -9,8 +9,8 @@ import (
 )
 
 func TestBritiveRole(t *testing.T) {
-	permissionName := "AT - Britive Permission Test"
-	permissionDescription := "AT - Britive Permission Test Description"
+	permissionName := "AT - Britive Permission Test Role"
+	permissionDescription := "AT - Britive Permission Test Role Description"
 	roleName := "AT - Britive Role Test"
 	roleDescription := "AT - Britive Role Test Description"
 	resource.Test(t, resource.TestCase{

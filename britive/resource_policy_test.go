@@ -10,10 +10,10 @@ import (
 )
 
 func TestBritivePolicy(t *testing.T) {
-	permissionName := "AT - Britive Permission Test"
-	permissionDescription := "AT - Britive Permission Test Description"
-	roleName := "AT - Britive Role Test"
-	roleDescription := "AT - Britive Role Test Description"
+	permissionName := "AT - Britive Permission Test Policy"
+	permissionDescription := "AT - Britive Permission Test Policy Description"
+	roleName := "AT - Britive Role Test Policy"
+	roleDescription := "AT - Britive Role Test Policy Description"
 	policyName := "AT - Britive Policy Test"
 	policyDescription := "AT - Britive Policy Test Description"
 	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2006-01-02 15:04:05")
