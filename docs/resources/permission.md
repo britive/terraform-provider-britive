@@ -6,10 +6,6 @@ This resource allows you to create and configure a permission.
 
 ```hcl
 resource "britive_permission" "new" {
-    # ...
-}
-
-resource "britive_permission" "new" {
     name        = "My Permission"
     description = "View permission description"
     consumer    = "authz"

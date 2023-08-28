@@ -5,10 +5,6 @@ This resource allows you to add or remove permissions from a Britive profile.
 ## Example Usage
 
 ```hcl
-resource "britive_profile" "new" {
-    # ...
-}
-
 resource "britive_profile_permission" "new" {
     profile_id = britive_profile.new.id
     permission_name = "Application Developer"

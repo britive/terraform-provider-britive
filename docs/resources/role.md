@@ -6,10 +6,6 @@ This resource allows you to create and configure a role.
 
 ```hcl
 resource "britive_role" "new" {
-    # ...
-}
-
-resource "britive_role" "new" {
     name        = "My Role"
     description = "My Role description"
     permissions = jsonencode(
@@ -18,7 +14,7 @@ resource "britive_role" "new" {
                 name = "My Permission"
             },
             {
-                name = britive_permission.new_perm.name
+                name = britive_permission.new.name
             }
         ]
     )

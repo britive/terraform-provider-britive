@@ -2,15 +2,13 @@
 
 !> Please update the timeOfAccess block, under the condition argument, to include `dateSchedule` and `daysSchedule` block. Existing policies should be updated, else any action on the resource will fail with error "Error: PP-0005: Condition json is not valid".
 
+-> Multiple notification mediums are now supported, `notificationMedium` can be defined as a list of strings.
+
 This resource allows you to create and configure a policy.
 
 ## Example Usage
 
 ```hcl
-resource "britive_policy" "new" {
-    # ...
-}
-
 resource "britive_policy" "new" {
     name         = "New Policy"
     description  = "New Policy Description"
@@ -85,7 +83,10 @@ resource "britive_policy" "new" {
                     ]
                 }
                 isValidForInDays   = false
-                notificationMedium = "Email"
+                notificationMedium = [
+                    "Teams",
+                    "Email"
+                ]
                 timeToApprove      = 30
                 validFor           = 120
             }
@@ -130,7 +131,7 @@ The following arguments are supported:
 
 * `roles` - (Optional) Roles associated to the policy. Either a role/permission is to be assigned to a policy.
 
-* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium`. The `timeToApprove` is provided in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be scheduled based on date, days, both or `null`. The `dateSchedule` should contain the `fromDate`, `toDate` in format of "YYYY-MM-DD HH:MM:SS" and `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If `dateSchedule` is not required, it has to be set to `null`. The `daysSchedule` should contain the `fromTime`, `toTime` in format of "HH:MM:SS", `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones and `days` as a list of strings. If `daysSchedule` is not required, it has to be set to `null` 
+* `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium` as a list of strings. The `timeToApprove` is provided in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR or dotted decimal format. The `timeOfAccess` can be scheduled based on date, days, both or `null`. The `dateSchedule` should contain the `fromDate`, `toDate` in format of "YYYY-MM-DD HH:MM:SS" and `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If `dateSchedule` is not required, it has to be set to `null`. The `daysSchedule` should contain the `fromTime`, `toTime` in format of "HH:MM:SS", `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones and `days` as a list of strings. If `daysSchedule` is not required, it has to be set to `null` 
 
 * `is_active` - (Optional) Indicates if a policy is active. Boolean value accepts true/false. Defaults to true. 
 

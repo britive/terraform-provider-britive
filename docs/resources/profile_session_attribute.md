@@ -8,10 +8,6 @@ If you try to add a session attribute using this resource for other than AWS app
 ## Example Usage
 
 ```hcl
-resource "britive_profile" "new" {
-    # ...
-}
-
 # Static Attribute
 resource "britive_profile_session_attribute" "static_new" {
   profile_id = britive_profile.new.id
