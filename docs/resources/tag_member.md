@@ -5,10 +5,6 @@ This resource allows you to add or remove a member to the Britive tag.
 ## Example Usage
 
 ```hcl
-resource "britive_tag" "new" {
-    # ...
-}
-
 resource "britive_tag_member" "new" {
     tag_id = britive_tag.new.id
     username = "MyMemberUserName"
