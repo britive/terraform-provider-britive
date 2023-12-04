@@ -89,18 +89,12 @@ func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy
 				Optional:     true,
 				Description:  "Members of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
-				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					return britive.MembersEqual(old, new)
-				},
 			},
 			"condition": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				Description:  "Condition of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
-				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					return britive.ConditionEqual(old, new)
-				},
 			},
 		},
 	}
@@ -168,8 +162,16 @@ func (rpp *ResourceProfilePolicy) resourceUpdate(ctx context.Context, d *schema.
 		profilePolicy.ProfileID = profileID
 
 		old_name, _ := d.GetChange("policy_name")
+		oldMem, _ := d.GetChange("members")
+		oldCon, _ := d.GetChange("condition")
 		upp, err := c.UpdateProfilePolicy(profilePolicy, old_name.(string))
 		if err != nil {
+			if errState := d.Set("members", oldMem.(string)); errState != nil {
+				return diag.FromErr(errState)
+			}
+			if errState := d.Set("condition", oldCon.(string)); errState != nil {
+				return diag.FromErr(errState)
+			}
 			return diag.FromErr(err)
 		}
 
@@ -320,14 +322,27 @@ func (rpph *ResourceProfilePolicyHelper) getAndMapModelToResource(d *schema.Reso
 	if err := d.Set("is_read_only", profilePolicy.IsReadOnly); err != nil {
 		return err
 	}
-	if err := d.Set("condition", profilePolicy.Condition); err != nil {
+
+	newCon := d.Get("condition")
+	if britive.ConditionEqual(profilePolicy.Condition, newCon.(string)) {
+		if err := d.Set("condition", newCon.(string)); err != nil {
+			return err
+		}
+	} else if err := d.Set("condition", profilePolicy.Condition); err != nil {
 		return err
 	}
+
 	mem, err := json.Marshal(profilePolicy.Members)
 	if err != nil {
 		return err
 	}
-	if err := d.Set("members", string(mem)); err != nil {
+
+	newMem := d.Get("members")
+	if britive.MembersEqual(string(mem), newMem.(string)) {
+		if err := d.Set("members", newMem.(string)); err != nil {
+			return err
+		}
+	} else if err := d.Set("members", string(mem)); err != nil {
 		return err
 	}
 	return nil
