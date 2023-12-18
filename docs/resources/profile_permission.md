@@ -20,7 +20,7 @@ The following arguments are supported:
 
 * `permission_name` - (Required, Forces new resource) The name of permission.
 
-* `permission_type` - (Required, Forces new resource) The type of permission.
+* `permission_type` - (Required, Forces new resource) The type of permission. The value is case-sensitive and must be updated by getting the same from the API response for an import. (https://docs.britive.com/docs/manage-profile-permissions)
 
 ## Attribute Reference
 
