@@ -87,3 +87,29 @@ func (c *Client) SaveProfileAssociationResourceScopes(profileID string, associat
 
 	return err
 }
+
+// Get the application type for a given application ID
+func (c *Client) GetApplicationType(appContainerID string) (*ApplicationType, error) {
+	resourceURL := fmt.Sprintf("%s/apps/%s", c.APIBaseURL, appContainerID)
+	req, err := http.NewRequest("GET", resourceURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
+	applicationType := &ApplicationType{}
+	err = json.Unmarshal(body, applicationType)
+	if err != nil {
+		return nil, err
+	}
+
+	return applicationType, nil
+}

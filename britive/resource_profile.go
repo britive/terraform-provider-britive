@@ -331,6 +331,11 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	if appRootEnvironmentGroup == nil {
 		return nil
 	}
+	applicationType, err := c.GetApplicationType(appContainerID)
+	if err != nil {
+		return err
+	}
+	appType := applicationType.ApplicationType
 	associationScopes := make([]britive.ProfileAssociation, 0)
 	associationResources := make([]britive.ProfileAssociation, 0)
 	as := d.Get("associations").(*schema.Set)
@@ -345,6 +350,11 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 		case "EnvironmentGroup", "Environment":
 			if associationType == "EnvironmentGroup" {
 				rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
+				if appType == "AWS" && strings.EqualFold("root", associationValue) {
+					associationValue = "Root"
+				} else if appType == "AWS Standalone" && strings.EqualFold("root", associationValue) {
+					associationValue = "root"
+				}
 			} else {
 				rootAssociations = appRootEnvironmentGroup.Environments
 			}
@@ -518,6 +528,11 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 		return make([]interface{}, 0), nil
 	}
 	inputAssociations := d.Get("associations").(*schema.Set)
+	applicationType, err := c.GetApplicationType(appContainerID)
+	if err != nil {
+		return nil, err
+	}
+	appType := applicationType.ApplicationType
 	profileAssociations := make([]interface{}, 0)
 	for _, association := range associations {
 		var rootAssociations []britive.Association
@@ -544,6 +559,9 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 				ia := inputAssociation.(map[string]interface{})
 				iat := ia["type"].(string)
 				iav := ia["value"].(string)
+				if association.Type == "EnvironmentGroup" && (appType == "AWS" || appType == "AWS Standalone") && strings.EqualFold("root", a.Name) && strings.EqualFold("root", iav) {
+					associationValue = iav
+				}
 				if association.Type == iat && a.ID == iav {
 					associationValue = a.ID
 					break
