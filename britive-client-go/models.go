@@ -148,11 +148,11 @@ type ProfilePolicy struct {
 	ProfileID   string      `json:"papId,omitempty"`
 	PolicyID    string      `json:"id,omitempty"`
 	Name        string      `json:"name,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Condition   string      `json:"condition,omitempty"`
-	Members     interface{} `json:"members,omitempty"`
-	Consumer    string      `json:"consumer,omitempty"`
-	AccessType  string      `json:"accessType,omitempty"`
+	Description string      `json:"description"`
+	Condition   string      `json:"condition"`
+	Members     interface{} `json:"members"`
+	Consumer    string      `json:"consumer"`
+	AccessType  string      `json:"accessType"`
 	IsActive    bool        `json:"isActive"`
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`
@@ -210,12 +210,12 @@ type Role struct {
 type Policy struct {
 	PolicyID    string      `json:"id,omitempty"`
 	Name        string      `json:"name,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Condition   string      `json:"condition,omitempty"`
-	Members     interface{} `json:"members,omitempty"`
-	Roles       interface{} `json:"roles,omitempty"`
-	Permissions interface{} `json:"permissions,omitempty"`
-	AccessType  string      `json:"accessType,omitempty"`
+	Description string      `json:"description"`
+	Condition   string      `json:"condition"`
+	Members     interface{} `json:"members"`
+	Roles       interface{} `json:"roles"`
+	Permissions interface{} `json:"permissions"`
+	AccessType  string      `json:"accessType"`
 	IsActive    bool        `json:"isActive"`
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`

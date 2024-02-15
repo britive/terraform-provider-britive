@@ -45,6 +45,7 @@ func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 			"description": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Default:     "",
 				Description: "The description of the policy",
 			},
 			"is_active": {
@@ -74,24 +75,28 @@ func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 			"members": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "{}",
 				Description:  "Members of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"condition": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "",
 				Description:  "Condition of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"permissions": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "[]",
 				Description:  "Permissions of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"roles": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "[]",
 				Description:  "Roles of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},

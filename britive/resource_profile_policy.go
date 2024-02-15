@@ -52,6 +52,7 @@ func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy
 			"description": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Default:     "",
 				Description: "The description of the profile policy",
 			},
 			"is_active": {
@@ -87,12 +88,14 @@ func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy
 			"members": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "{}",
 				Description:  "Members of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"condition": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "",
 				Description:  "Condition of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
