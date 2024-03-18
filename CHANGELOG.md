@@ -1,7 +1,9 @@
-## 2.0.7
+## 2.0.8
 
 BUG FIXES:
 
-* resource/britive_policy, resource/britive_profile_policy: Support multiple notification medium (PAB-15019)
-* resource/britive_policy, resource/britive_profile_policy: Documentation update - Support multiple notification medium (PAB-15122)
-* resource/britive_permission, resource/britive_policy, resource/britive_profile_permission, resource/britive_profile_policy, resource/britive_profile_session_attribute, resource/britive_role, resource/britive_tag_member: Documentation update - example corrections (PAB-15155)
+* resource/britive_policy, resource/britive_profile_policy, resource/britive_role: Preserve the order as provided in the configuration (PAB-13026)
+* resource/britive_profile: Consistency of Root value of EnvironmentGroup in AWS Standalone and AWS Org apps (PAB-15750)
+* resource/britive_policy, resource/britive_profile_policy: Avoid diff seen in ipaddress list having space after comma (PAB-15918)
+* resource/britive_policy, resource/britive_profile_policy: Approval block removal not reflecting in the application (PAB-16240)
+* resource/britive_profile_permission: Documentation update - Profile permission type restriction (PAB-15304)
