@@ -1,8 +1,6 @@
 # britive_policy Resource
 
-!> Please update the timeOfAccess block, under the condition argument, to include `dateSchedule` and `daysSchedule` block. Existing policies should be updated, else any action on the resource will fail with error "Error: PP-0005: Condition json is not valid".
-
--> Multiple notification mediums are now supported, `notificationMedium` can be defined as a list of strings.
+-> When using this version for the first time, you may encounter noisy diffs caused by the reordering of resource argument values. 
 
 This resource allows you to create and configure a policy.
 

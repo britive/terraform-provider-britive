@@ -1,5 +1,7 @@
 # britive_role Resource
 
+-> When using this version for the first time, you may encounter noisy diffs caused by the reordering of resource argument values. 
+
 This resource allows you to create and configure a role.
 
 ## Example Usage

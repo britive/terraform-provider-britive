@@ -690,5 +690,12 @@ func IPAddressBlockEqual(old, new string) bool {
 	oldSlice := strings.Split(strings.TrimSpace(old), ",")
 	newSlice := strings.Split(strings.TrimSpace(new), ",")
 
+	for i := range oldSlice {
+		oldSlice[i] = strings.TrimSpace(oldSlice[i])
+	}
+	for j := range newSlice {
+		newSlice[j] = strings.TrimSpace(newSlice[j])
+	}
+
 	return SliceIgnoreOrderEqual(oldSlice, newSlice)
 }

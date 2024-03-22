@@ -1,12 +1,12 @@
 package britive
 
-//Config - godoc
+// Config - godoc
 type Config struct {
 	Tenant string `json:"tenant"`
 	Token  string `json:"token"`
 }
 
-//HTTPErrorResponse - godoc
+// HTTPErrorResponse - godoc
 type HTTPErrorResponse struct {
 	Status    int64       `json:"status"`
 	Message   string      `json:"message"`
@@ -14,7 +14,7 @@ type HTTPErrorResponse struct {
 	Details   interface{} `json:"details"`
 }
 
-//Tag - godoc
+// Tag - godoc
 type Tag struct {
 	ID                       string                    `json:"userTagId,omitempty"`
 	Name                     string                    `json:"name"`
@@ -24,13 +24,13 @@ type Tag struct {
 	External                 interface{}               `json:"external,omitempty"`
 }
 
-//UserTagIdentityProvider - godoc
+// UserTagIdentityProvider - godoc
 type UserTagIdentityProvider struct {
 	IdentityProvider IdentityProvider `json:"identityProvider"`
 	ExternalID       interface{}      `json:"externalId,omitempty"`
 }
 
-//IdentityProvider - godoc
+// IdentityProvider - godoc
 type IdentityProvider struct {
 	ID          string `json:"id"`
 	Name        string `json:"name,omitempty"`
@@ -38,7 +38,7 @@ type IdentityProvider struct {
 	Type        string `json:"type,omitempty"`
 }
 
-//User - godoc
+// User - godoc
 type User struct {
 	AdminRoles       []AdminRole      `json:"adminRoles,omitempty"`
 	Type             string           `json:"type,omitempty"`
@@ -56,13 +56,13 @@ type User struct {
 	UserID           string           `json:"userId,omitempty"`
 }
 
-//AdminRole - godoc
+// AdminRole - godoc
 type AdminRole struct {
 	Name        string `json:"name,omitempty"`
 	DisplayName string `json:"displayName,omitempty"`
 }
 
-//Profile - godoc
+// Profile - godoc
 type Profile struct {
 	ProfileID                     string               `json:"papId,omitempty"`
 	AppContainerID                string               `json:"appContainerId"`
@@ -78,13 +78,13 @@ type Profile struct {
 	DestinationUrl                string               `json:"destinationUrl,omitempty"`
 }
 
-//Application - godoc
+// Application - godoc
 type Application struct {
 	AppContainerID        string `json:"appContainerId"`
 	CatalogAppDisplayName string `json:"catalogAppDisplayName,omitempty"`
 }
 
-//ProfilePermission - godoc
+// ProfilePermission - godoc
 type ProfilePermission struct {
 	ProfileID   string      `json:"papId,omitempty"`
 	Name        string      `json:"name"`
@@ -94,19 +94,19 @@ type ProfilePermission struct {
 	Message     string      `json:"message,omitempty"`
 }
 
-//ProfilePermissionRequest - godoc
+// ProfilePermissionRequest - godoc
 type ProfilePermissionRequest struct {
 	Operation  string            `json:"op"`
 	Permission ProfilePermission `json:"permission"`
 }
 
-//ApplicationRootEnvironmentGroup - godoc
+// ApplicationRootEnvironmentGroup - godoc
 type ApplicationRootEnvironmentGroup struct {
 	EnvironmentGroups []Association `json:"environmentGroups,omitempty"`
 	Environments      []Association `json:"environments,omitempty"`
 }
 
-//Association - godoc
+// Association - godoc
 type Association struct {
 	ID               string      `json:"id,omitempty"`
 	Name             string      `json:"name"`
@@ -118,7 +118,7 @@ type Association struct {
 	Status           string      `json:"status,omitempty"`
 }
 
-//ProfileAssociation - godoc
+// ProfileAssociation - godoc
 type ProfileAssociation struct {
 	ProfileAssociationID interface{} `json:"papScopeId,omitempty"`
 	Type                 string      `json:"type"`
@@ -127,7 +127,7 @@ type ProfileAssociation struct {
 	ProfileID            string      `json:"papId,omitempty"`
 }
 
-//ProfileAssociationResource - godoc
+// ProfileAssociationResource - godoc
 type ProfileAssociationResource struct {
 	ID          int64       `json:"id,omitempty"`
 	Name        string      `json:"name"`
@@ -138,22 +138,27 @@ type ProfileAssociationResource struct {
 	Type        string      `json:"type,omitempty"`
 }
 
-//ProfilePolicy - godoc
+// ApplicationType - godoc
+type ApplicationType struct {
+	ApplicationType string `json:"catalogAppName,omitempty"`
+}
+
+// ProfilePolicy - godoc
 type ProfilePolicy struct {
 	ProfileID   string      `json:"papId,omitempty"`
 	PolicyID    string      `json:"id,omitempty"`
 	Name        string      `json:"name,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Condition   string      `json:"condition,omitempty"`
-	Members     interface{} `json:"members,omitempty"`
-	Consumer    string      `json:"consumer,omitempty"`
-	AccessType  string      `json:"accessType,omitempty"`
+	Description string      `json:"description"`
+	Condition   string      `json:"condition"`
+	Members     interface{} `json:"members"`
+	Consumer    string      `json:"consumer"`
+	AccessType  string      `json:"accessType"`
 	IsActive    bool        `json:"isActive"`
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`
 }
 
-//PaginationResponse - godoc
+// PaginationResponse - godoc
 type PaginationResponse struct {
 	Count  int           `json:"count"`
 	Page   int           `json:"page"`
@@ -163,7 +168,7 @@ type PaginationResponse struct {
 	Data   []interface{} `json:"data"`
 }
 
-//UserAttribute - godoc
+// UserAttribute - godoc
 type UserAttribute struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -173,7 +178,7 @@ type UserAttribute struct {
 	BuiltIn     bool   `json:"builtIn"`
 }
 
-//SessionAttribute - godoc
+// SessionAttribute - godoc
 type SessionAttribute struct {
 	AttributeSchemaID    string `json:"attributeSchemaId"`
 	MappingName          string `json:"mappingName"`
@@ -183,7 +188,7 @@ type SessionAttribute struct {
 	ID                   string `json:"id,omitempty"`
 }
 
-//Permission - godoc
+// Permission - godoc
 type Permission struct {
 	PermissionID string        `json:"id,omitempty"`
 	Name         string        `json:"name"`
@@ -193,7 +198,7 @@ type Permission struct {
 	Actions      []interface{} `json:"actions"`
 }
 
-//Resource - godoc
+// Resource - godoc
 type Role struct {
 	RoleID      string      `json:"id,omitempty"`
 	Name        string      `json:"name"`
@@ -201,16 +206,16 @@ type Role struct {
 	Permissions interface{} `json:"permissions"`
 }
 
-//Policy - godoc
+// Policy - godoc
 type Policy struct {
 	PolicyID    string      `json:"id,omitempty"`
 	Name        string      `json:"name,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Condition   string      `json:"condition,omitempty"`
-	Members     interface{} `json:"members,omitempty"`
-	Roles       interface{} `json:"roles,omitempty"`
-	Permissions interface{} `json:"permissions,omitempty"`
-	AccessType  string      `json:"accessType,omitempty"`
+	Description string      `json:"description"`
+	Condition   string      `json:"condition"`
+	Members     interface{} `json:"members"`
+	Roles       interface{} `json:"roles"`
+	Permissions interface{} `json:"permissions"`
+	AccessType  string      `json:"accessType"`
 	IsActive    bool        `json:"isActive"`
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`

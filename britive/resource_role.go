@@ -53,9 +53,6 @@ func NewResourceRole(v *Validation, importHelper *ImportHelper) *ResourceRole {
 				Required:     true,
 				Description:  "Permissions of the role",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
-				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					return britive.ArrayOfMapsEqual(old, new)
-				},
 			},
 		},
 	}
@@ -123,8 +120,12 @@ func (rr *ResourceRole) resourceUpdate(ctx context.Context, d *schema.ResourceDa
 		}
 
 		old_name, _ := d.GetChange("name")
+		oldPerm, _ := d.GetChange("permissions")
 		ur, err := c.UpdateRole(role, old_name.(string))
 		if err != nil {
+			if errState := d.Set("permissions", oldPerm.(string)); errState != nil {
+				return diag.FromErr(errState)
+			}
 			return diag.FromErr(err)
 		}
 
@@ -247,7 +248,13 @@ func (rrh *ResourceRoleHelper) getAndMapModelToResource(d *schema.ResourceData, 
 	if err != nil {
 		return err
 	}
-	if err := d.Set("permissions", string(perm)); err != nil {
+
+	newPerm := d.Get("permissions")
+	if britive.ArrayOfMapsEqual(string(perm), newPerm.(string)) {
+		if err := d.Set("permissions", newPerm.(string)); err != nil {
+			return err
+		}
+	} else if err := d.Set("permissions", string(perm)); err != nil {
 		return err
 	}
 	return nil

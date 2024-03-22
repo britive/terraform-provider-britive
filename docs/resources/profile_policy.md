@@ -1,11 +1,6 @@
 # britive_profile_policy Resource
 
--> This resource is compatible only with enhanced Britive profiles feature.
-   Resources britive_profile_identity and britive_profile_tag are replaced by britive_profile_policy. 
-
-!> Please update the timeOfAccess block, under the condition argument, to include `dateSchedule` and `daysSchedule` block. Existing profile policies should be updated, else any action on the resource will fail with error "Error: PP-0005: Condition json is not valid".
-
--> Multiple notification mediums are now supported, `notificationMedium` can be defined as a list of strings.
+-> When using this version for the first time, you may encounter noisy diffs caused by the reordering of resource argument values. 
 
 This resource allows you to create and configure the policy associated to a profile.
 

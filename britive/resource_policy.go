@@ -45,6 +45,7 @@ func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 			"description": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Default:     "",
 				Description: "The description of the policy",
 			},
 			"is_active": {
@@ -74,38 +75,30 @@ func NewResourcePolicy(importHelper *ImportHelper) *ResourcePolicy {
 			"members": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "{}",
 				Description:  "Members of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
-				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					return britive.MembersEqual(old, new)
-				},
 			},
 			"condition": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "",
 				Description:  "Condition of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
-				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					return britive.ConditionEqual(old, new)
-				},
 			},
 			"permissions": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "[]",
 				Description:  "Permissions of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
-				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					return britive.ArrayOfMapsEqual(old, new)
-				},
 			},
 			"roles": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Default:      "[]",
 				Description:  "Roles of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
-				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-					return britive.ArrayOfMapsEqual(old, new)
-				},
 			},
 		},
 	}
@@ -171,8 +164,24 @@ func (rp *ResourcePolicy) resourceUpdate(ctx context.Context, d *schema.Resource
 		}
 
 		old_name, _ := d.GetChange("name")
+		oldMem, _ := d.GetChange("members")
+		oldCon, _ := d.GetChange("condition")
+		oldPerm, _ := d.GetChange("permissions")
+		oldRole, _ := d.GetChange("roles")
 		up, err := c.UpdatePolicy(policy, old_name.(string))
 		if err != nil {
+			if errState := d.Set("members", oldMem.(string)); errState != nil {
+				return diag.FromErr(errState)
+			}
+			if errState := d.Set("condition", oldCon.(string)); errState != nil {
+				return diag.FromErr(errState)
+			}
+			if errState := d.Set("permissions", oldPerm.(string)); errState != nil {
+				return diag.FromErr(errState)
+			}
+			if errState := d.Set("roles", oldRole.(string)); errState != nil {
+				return diag.FromErr(errState)
+			}
 			return diag.FromErr(err)
 		}
 
@@ -311,7 +320,13 @@ func (rph *ResourcePolicyHelper) getAndMapModelToResource(d *schema.ResourceData
 	if err := d.Set("is_read_only", policy.IsReadOnly); err != nil {
 		return err
 	}
-	if err := d.Set("condition", policy.Condition); err != nil {
+
+	newCon := d.Get("condition")
+	if britive.ConditionEqual(policy.Condition, newCon.(string)) {
+		if err := d.Set("condition", newCon.(string)); err != nil {
+			return err
+		}
+	} else if err := d.Set("condition", policy.Condition); err != nil {
 		return err
 	}
 
@@ -319,7 +334,13 @@ func (rph *ResourcePolicyHelper) getAndMapModelToResource(d *schema.ResourceData
 	if err != nil {
 		return err
 	}
-	if err := d.Set("members", string(mem)); err != nil {
+
+	newMem := d.Get("members")
+	if britive.MembersEqual(string(mem), newMem.(string)) {
+		if err := d.Set("members", newMem.(string)); err != nil {
+			return err
+		}
+	} else if err := d.Set("members", string(mem)); err != nil {
 		return err
 	}
 
@@ -327,7 +348,13 @@ func (rph *ResourcePolicyHelper) getAndMapModelToResource(d *schema.ResourceData
 	if err != nil {
 		return err
 	}
-	if err := d.Set("permissions", string(perm)); err != nil {
+
+	newPerm := d.Get("permissions")
+	if britive.ArrayOfMapsEqual(string(perm), newPerm.(string)) {
+		if err := d.Set("permissions", newPerm.(string)); err != nil {
+			return err
+		}
+	} else if err := d.Set("permissions", string(perm)); err != nil {
 		return err
 	}
 
@@ -335,7 +362,13 @@ func (rph *ResourcePolicyHelper) getAndMapModelToResource(d *schema.ResourceData
 	if err != nil {
 		return err
 	}
-	if err := d.Set("roles", string(role)); err != nil {
+
+	newRole := d.Get("roles")
+	if britive.ArrayOfMapsEqual(string(role), newRole.(string)) {
+		if err := d.Set("roles", newRole.(string)); err != nil {
+			return err
+		}
+	} else if err := d.Set("roles", string(role)); err != nil {
 		return err
 	}
 
