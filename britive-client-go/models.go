@@ -143,6 +143,12 @@ type ApplicationType struct {
 	ApplicationType string `json:"catalogAppName,omitempty"`
 }
 
+// EnvAccId - godoc
+type EnvAccId struct {
+	AccountId     string `json:"accountId,omitempty"`
+	EnvironmentId string `json:"environmentId,omitempty"`
+}
+
 // ProfilePolicy - godoc
 type ProfilePolicy struct {
 	ProfileID   string      `json:"papId,omitempty"`

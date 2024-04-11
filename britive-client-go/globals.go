@@ -11,6 +11,8 @@ const (
 	permissionLockName = "permissions"
 	roleLockName       = "role"
 	policyLockName     = "policy"
+	accountId          = "accountId"
+	environmentId      = "environmentId"
 )
 
 var (

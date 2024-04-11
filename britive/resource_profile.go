@@ -363,6 +363,13 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 					isAssociationExists = true
 					associationScopes = rph.appendProfileAssociations(associationScopes, associationType, aeg.ID)
 					break
+				} else if associationType == "Environment" && appType == "AWS Standalone" {
+					newAssociationValue := c.GetEnvId(appContainerID, associationValue)
+					if aeg.ID == newAssociationValue {
+						isAssociationExists = true
+						associationScopes = rph.appendProfileAssociations(associationScopes, associationType, aeg.ID)
+						break
+					}
 				}
 			}
 		case "ApplicationResource":
@@ -565,6 +572,12 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 				if association.Type == iat && a.ID == iav {
 					associationValue = a.ID
 					break
+				} else if association.Type == "Environment" && appType == "AWS Standalone" {
+					envId := c.GetEnvId(appContainerID, iav)
+					if association.Type == iat && a.ID == envId {
+						associationValue = iav
+						break
+					}
 				}
 			}
 			profileAssociation["type"] = association.Type
