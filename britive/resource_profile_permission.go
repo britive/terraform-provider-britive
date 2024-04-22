@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -13,14 +14,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-//ResourceProfilePermission - Terraform Resource for Profile Permission
+// ResourceProfilePermission - Terraform Resource for Profile Permission
 type ResourceProfilePermission struct {
 	Resource     *schema.Resource
 	helper       *ResourceProfilePermissionHelper
 	importHelper *ImportHelper
 }
 
-//NewResourceProfilePermission - Initialization of new profile permission resource
+// NewResourceProfilePermission - Initialization of new profile permission resource
 func NewResourceProfilePermission(importHelper *ImportHelper) *ResourceProfilePermission {
 	rpp := &ResourceProfilePermission{
 		helper:       NewResourceProfilePermissionHelper(),
@@ -157,7 +158,7 @@ func (rpp *ResourceProfilePermission) resourceDelete(ctx context.Context, d *sch
 
 func (rpp *ResourceProfilePermission) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rpp.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/permissions/(?P<permission_name>[^/]+)/type/(?P<permission_type>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<permission_name>[^/]+)/(?P<permission_type>[^/]+)"}, d); err != nil {
+	if err := rpp.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/permissions/(?P<permission_name>.+)/type/(?P<permission_type>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<permission_name>.+)/(?P<permission_type>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 	appName := d.Get("app_name").(string)
@@ -212,11 +213,11 @@ func (rpp *ResourceProfilePermission) resourceStateImporter(d *schema.ResourceDa
 	return []*schema.ResourceData{d}, nil
 }
 
-//ResourceProfilePermissionHelper - Terraform Resource for Profile Permission Helper
+// ResourceProfilePermissionHelper - Terraform Resource for Profile Permission Helper
 type ResourceProfilePermissionHelper struct {
 }
 
-//NewResourceProfilePermissionHelper - Initialization of new profile tag resource helper
+// NewResourceProfilePermissionHelper - Initialization of new profile tag resource helper
 func NewResourceProfilePermissionHelper() *ResourceProfilePermissionHelper {
 	return &ResourceProfilePermissionHelper{}
 }
@@ -226,16 +227,22 @@ func (resourceProfilePermissionHelper *ResourceProfilePermissionHelper) generate
 }
 
 func (resourceProfilePermissionHelper *ResourceProfilePermissionHelper) parseUniqueID(ID string) (*britive.ProfilePermission, error) {
-	profileMemberParts := strings.Split(ID, "/")
+	idFormat := "paps/([^/]+)/permissions/(.+)/type/([^/]+)"
 
-	if len(profileMemberParts) < 6 {
+	re, err := regexp.Compile(idFormat)
+	if err != nil {
+		return nil, err
+	}
+
+	fieldValues := re.FindStringSubmatch(ID)
+	if fieldValues != nil {
+		profilePermission := &britive.ProfilePermission{
+			ProfileID: fieldValues[1],
+			Name:      fieldValues[2],
+			Type:      fieldValues[3],
+		}
+		return profilePermission, nil
+	} else {
 		return nil, NewInvalidResourceIDError("profile permission", ID)
-
 	}
-	profilePermission := &britive.ProfilePermission{
-		ProfileID: profileMemberParts[1],
-		Name:      profileMemberParts[3],
-		Type:      profileMemberParts[5],
-	}
-	return profilePermission, nil
 }
