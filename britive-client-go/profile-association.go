@@ -113,3 +113,29 @@ func (c *Client) GetApplicationType(appContainerID string) (*ApplicationType, er
 
 	return applicationType, nil
 }
+
+// Get the environment id on passing accountId for AWS Standalone apps. Return empty string otherwise.
+func (c *Client) GetEnvId(appContainerID string, accountId string) string {
+	resourceURL := fmt.Sprintf("%s/apps/%s/envAccounts/%s", c.APIBaseURL, appContainerID, accountId)
+	req, err := http.NewRequest("GET", resourceURL, nil)
+	if err != nil {
+		return emptyString
+	}
+
+	body, err := c.Do(req)
+	if err != nil {
+		return emptyString
+	}
+
+	if string(body) == emptyString {
+		return emptyString
+	}
+
+	envAccId := &EnvAccId{}
+	err = json.Unmarshal(body, envAccId)
+	if err != nil {
+		return emptyString
+	}
+
+	return envAccId.EnvironmentId
+}
