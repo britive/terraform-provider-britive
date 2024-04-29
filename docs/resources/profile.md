@@ -60,7 +60,7 @@ The format of `associations` is documented below.
 
 * `type` - (Required) The type of association, should be one of [Environment, EnvironmentGroup, ApplicationResource].
 
-* `value` - (Required) The association value.
+* `value` - (Required) The association value. For AWS applications, one of the following should be used: EnvironmentID, EnvironmentName, or AccountID.
 
 * `parent_name` - (Optional) The parent name of the resource. Required only if the association type is ApplicationResource.
 
