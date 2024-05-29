@@ -88,3 +88,47 @@ func (c *Client) GetApplicationByName(name string) (*Application, error) {
 
 	return &applications[0], nil
 }
+func (c *Client) GetEnvDetails(appId string, envType string, field string) ([]string, error) {
+	var envList []string
+	var envValue string
+
+	resourceURL := fmt.Sprintf("%s/apps/%s/root-environment-group?view=summary&type=%s", c.APIBaseURL, appId, envType)
+	req, err := http.NewRequest("GET", resourceURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
+	appEnvs := make([]ApplicationEnvironment, 0)
+
+	err = json.Unmarshal(body, &appEnvs)
+	if err != nil {
+		return nil, err
+	}
+
+	if appEnvs == nil {
+		return nil, ErrNotFound
+	}
+
+	for _, appEnv := range appEnvs {
+		switch field {
+		case "id":
+			envValue = appEnv.EnvironmentID
+		case "name":
+			envValue = appEnv.EnvironmentName
+		default:
+			return nil, ErrNotFound
+		}
+		envList = append(envList, envValue)
+	}
+
+	return envList, nil
+}

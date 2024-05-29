@@ -84,6 +84,13 @@ type Application struct {
 	CatalogAppDisplayName string `json:"catalogAppDisplayName,omitempty"`
 }
 
+// Application Environment - godoc
+type ApplicationEnvironment struct {
+	EnvironmentID   string `json:"id"`
+	EnvironmentName string `json:"name"`
+	EnvironmentType string `json:"type"`
+}
+
 // ProfilePermission - godoc
 type ProfilePermission struct {
 	ProfileID   string      `json:"papId,omitempty"`
