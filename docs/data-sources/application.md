@@ -19,16 +19,8 @@ output "britive_application_my_app_env_ids" {
     value = data.britive_application.my_app.environment_ids
 }
 
-output "britive_application_my_app_env_names" {
-    value = data.britive_application.my_app.environment_names
-}
-
 output "britive_application_my_app_env_group_ids" {
     value = data.britive_application.my_app.environment_group_ids
-}
-
-output "britive_application_my_app_env_group_names" {
-    value = data.britive_application.my_app.environment_group_names
 }
 ```
 
@@ -43,7 +35,5 @@ The following argument is supported:
 In addition to the above argument, the following attribute is exported:
 
 * `id` - An identifier for the application.
-* `environment_ids` - A set of environment ids for the application.
-* `environment_names` - A set of environment names for the application.
-* `environment_group_ids` - A set of environment group ids for the application.
-* `environment_group_names` - A set of environment group names for the application.
+* `environment_ids` - A list of environment ids for the application.
+* `environment_group_ids` - A list of environment group ids for the application.
