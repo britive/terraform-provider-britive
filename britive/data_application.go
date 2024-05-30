@@ -10,12 +10,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-//DataSourceApplication - Terraform Application DataSource
+// DataSourceApplication - Terraform Application DataSource
 type DataSourceApplication struct {
 	Resource *schema.Resource
 }
 
-//NewDataSourceApplication - Initializes new DataSourceApplication
+// NewDataSourceApplication - Initializes new DataSourceApplication
 func NewDataSourceApplication() *DataSourceApplication {
 	dataSourceApplication := &DataSourceApplication{}
 	dataSourceApplication.Resource = &schema.Resource{
@@ -26,6 +26,20 @@ func NewDataSourceApplication() *DataSourceApplication {
 				Required:     true,
 				Description:  "The name of the application",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+			},
+			"environment_ids": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Computed:    true,
+				Description: "A set of environment ids for the application",
+				Elem:        &schema.Schema{Type: schema.TypeString},
+			},
+			"environment_group_ids": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Computed:    true,
+				Description: "A set of environment group ids for the application",
+				Elem:        &schema.Schema{Type: schema.TypeString},
 			},
 		},
 	}
@@ -50,6 +64,18 @@ func (dataSourceApplication *DataSourceApplication) resourceRead(ctx context.Con
 	if err := d.Set("name", application.CatalogAppDisplayName); err != nil {
 		return diag.FromErr(err)
 	}
+
+	envIdList, err := c.GetEnvDetails(d.Id(), "environments", "id")
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.Set("environment_ids", envIdList)
+
+	envGrpIdList, err := c.GetEnvDetails(d.Id(), "environmentGroups", "id")
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.Set("environment_group_ids", envGrpIdList)
 
 	return nil
 }
