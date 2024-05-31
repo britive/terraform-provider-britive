@@ -2,7 +2,6 @@ package britive
 
 import (
 	"fmt"
-	"log"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -46,7 +45,6 @@ func testAccCheckDataApplicationSet(resourceName, attributeName string, expected
 		}
 
 		setAttribute, ok := rs.Primary.Attributes[attributeName+".%"]
-		log.Printf("[INFO] Value of setAttribute is %s", setAttribute)
 		if !ok {
 			return fmt.Errorf("attribute not found: %s", attributeName)
 		}
