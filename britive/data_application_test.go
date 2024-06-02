@@ -22,7 +22,7 @@ func TestDataApplication(t *testing.T) {
 				Config: testAccCheckDataApplicationConfig(applicationName),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "id", appId),
-					testAccCheckDataApplicationSet(resourceName, "environment_ids", env_ids),
+					testAccCheckDataApplicationSet(resourceName, "britive_application.appDetails.environment_ids", env_ids),
 					testAccCheckDataApplicationSet(resourceName, "environment_group_ids", env_group_ids),
 				),
 			},
