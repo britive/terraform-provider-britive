@@ -46,7 +46,7 @@ func testAccCheckDataApplicationSet(resourceName, attributeName string, expected
 
 		setAttribute, ok := rs.Primary.Attributes[attributeName+".%"]
 		if !ok {
-			return fmt.Errorf("attribute not found: %s", attributeName)
+			return fmt.Errorf("attribute not found: %s, value of setAttribute is %s", attributeName, setAttribute)
 		}
 
 		setSize := len(expectedValues)
