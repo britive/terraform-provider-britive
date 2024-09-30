@@ -341,6 +341,7 @@ func MembersEqual(old, new string) bool {
 
 func ConditionEqual(old, new string) bool {
 
+	count := 3
 	equalCount := 0
 
 	if old == emptyString {
@@ -361,37 +362,37 @@ func ConditionEqual(old, new string) bool {
 		panic(err)
 	}
 
-	if len(oldArray) == len(newArray) {
-		for key, val := range oldArray {
-			memOld, err := json.Marshal(val)
-			if err != nil {
-				panic(err)
-			}
-			memNew, err := json.Marshal(newArray[key])
-			if err != nil {
-				panic(err)
-			}
-			switch key {
-			case "approval":
-				if ApprovalBlockEqual(string(memOld), string(memNew)) {
-					equalCount++
-				}
-			case "ipAddress":
-				if IPAddressBlockEqual(string(memOld), string(memNew)) {
-					equalCount++
-				}
-			case "timeOfAccess":
-				if TimeOfAccessBlockEqual(string(memOld), string(memNew)) {
-					equalCount++
-				}
-			default:
-				return false
-			}
+	items := []string{"approval", "ipAddress", "timeOfAccess"}
+
+	for i := 0; i < count; i++ {
+		memOld := []byte(emptyString)
+		memNew := []byte(emptyString)
+		memOld, err := json.Marshal(oldArray[items[i]])
+		if err != nil {
+			panic(err)
 		}
-		if equalCount != len(newArray) {
+		memNew, err = json.Marshal(newArray[items[i]])
+		if err != nil {
+			panic(err)
+		}
+		switch items[i] {
+		case "approval":
+			if ApprovalBlockEqual(string(memOld), string(memNew)) {
+				equalCount++
+			}
+		case "ipAddress":
+			if IPAddressBlockEqual(string(memOld), string(memNew)) {
+				equalCount++
+			}
+		case "timeOfAccess":
+			if TimeOfAccessBlockEqual(string(memOld), string(memNew)) {
+				equalCount++
+			}
+		default:
 			return false
 		}
-	} else {
+	}
+	if equalCount != count {
 		return false
 	}
 

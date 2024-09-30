@@ -1,5 +1,5 @@
-## 2.0.10
+## 2.0.11
 
-ENHANCEMENTS:
+BUG FIXES:
 
-* data-source/britive_application: Retrieve environment details of a Britive application (PAB-16521)
+* resource/britive_policy, resource/britive_profile_policy: Reordering changes consistently seen due to null fields in condition block (PAB-18018)
