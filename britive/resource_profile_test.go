@@ -11,10 +11,10 @@ import (
 func TestBritiveProfile(t *testing.T) {
 	name := "AT - New Britive Profile Test"
 	description := "AT - New Britive Profile Test Description"
-	applicationName := "Azure-ValueLabs"
+	applicationName := "DO NOT DELETE - Azure TF Plugin"
 	resourceName := "britive_profile.new"
-	associationType := "Environment"
-	associationValue := "QA Subscription"
+	associationType := "EnvironmentGroup"
+	associationValue := "QA"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,
@@ -52,7 +52,7 @@ func testAccCheckBritiveProfileConfig(name string, description string, applicati
 		expiration_duration = "25m0s"
 		associations {
 			type  = "Environment"
-			value = "QA Subscription"
+			value = "Subscription 1"
 		}
 	}`, applicationName, name, description)
 }

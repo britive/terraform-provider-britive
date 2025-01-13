@@ -700,3 +700,53 @@ func IPAddressBlockEqual(old, new string) bool {
 
 	return SliceIgnoreOrderEqual(oldSlice, newSlice)
 }
+
+func ConditionConstraintEqual(newTitle, newExpression, newDescription string, constraintResult *ConditionConstraintResult) bool {
+	equalCount := 0
+
+	if newTitle == emptyString {
+		newTitle = ""
+	}
+
+	if newExpression == emptyString {
+		newExpression = ""
+	}
+
+	if newDescription == emptyString {
+		newDescription = ""
+	}
+
+	for _, co := range constraintResult.Result {
+		if newTitle == co.Title {
+			equalCount++
+		}
+		if newExpression == co.Expression {
+			equalCount++
+		}
+		if newDescription == co.Description {
+			equalCount++
+		}
+	}
+	if equalCount != 3 {
+		return false
+	}
+	return true
+}
+
+func ConstraintEqual(newName string, constraintResult *ConstraintResult) bool {
+	equalCount := 0
+
+	if newName == emptyString {
+		newName = ""
+	}
+
+	for _, co := range constraintResult.Result {
+		if newName == co.Name {
+			equalCount++
+		}
+	}
+	if equalCount != 1 {
+		return false
+	}
+	return true
+}

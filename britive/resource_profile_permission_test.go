@@ -9,7 +9,7 @@ import (
 )
 
 func TestBritiveProfilePermission(t *testing.T) {
-	applicationName := "Azure-ValueLabs"
+	applicationName := "DO NOT DELETE - Azure TF Plugin"
 	profileName := "AT - New Britive Profile Permission Test"
 	profileDescription := "AT - New Britive Profile Permission Test Description"
 	permissionName := "Application Developer"
@@ -40,8 +40,8 @@ func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, pr
 		description = "%s"
 		expiration_duration = "25m0s"
 		associations {
-			type  = "Environment"
-			value = "QA Subscription"
+			type  = "EnvironmentGroup"
+			value = "Root"
 		}
 	}
 

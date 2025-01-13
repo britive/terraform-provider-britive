@@ -9,7 +9,7 @@ import (
 )
 
 func TestBritiveProfileSessionAttribute(t *testing.T) {
-	applicationName := "AWS-ValueLabs"
+	applicationName := "DO NOT DELETE - Azure TF Plugin"
 	profileName := "AT - New Britive Profile Session Attribute Test"
 	attributeName := "Date Of Birth"
 	mappingName := "dob"

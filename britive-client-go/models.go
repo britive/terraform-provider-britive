@@ -107,6 +107,28 @@ type ProfilePermissionRequest struct {
 	Permission ProfilePermission `json:"permission"`
 }
 
+// Condition Constraint - godoc
+type ConditionConstraint struct {
+	Title       string `json:"title"`
+	Expression  string `json:"expression"`
+	Description string `json:"description"`
+}
+
+// Condition Constraint Result - godoc
+type ConditionConstraintResult struct {
+	Result []ConditionConstraint `json:"result"`
+}
+
+// Constraint - godoc
+type Constraint struct {
+	Name string `json:"name"`
+}
+
+// Constraint Result - godoc
+type ConstraintResult struct {
+	Result []Constraint `json:"result"`
+}
+
 // ApplicationRootEnvironmentGroup - godoc
 type ApplicationRootEnvironmentGroup struct {
 	EnvironmentGroups []Association `json:"environmentGroups,omitempty"`
