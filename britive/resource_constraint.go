@@ -45,7 +45,7 @@ func NewResourceConstraint(importHelper *ImportHelper) *ResourceConstraint {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
-				Description:  "The permission associated with the profile",
+				Description:  "Name of the permission associated with the profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"permission_type": {
@@ -53,7 +53,7 @@ func NewResourceConstraint(importHelper *ImportHelper) *ResourceConstraint {
 				Optional:     true,
 				ForceNew:     true,
 				Default:      "role",
-				Description:  "The permission associated with the profile",
+				Description:  "The type of permission",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"constraint_type": {

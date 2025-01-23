@@ -43,14 +43,14 @@ func NewDataSourceConstraints() *DataSourceConstraints {
 			"permission_name": {
 				Type:         schema.TypeString,
 				Required:     true,
-				Description:  "The name of permission",
+				Description:  "Name of the permission associated with the profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"permission_type": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				Default:      "role",
-				Description:  "The name of permission",
+				Description:  "The type of permission",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"constraint_types": {
