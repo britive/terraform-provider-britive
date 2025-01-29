@@ -53,21 +53,21 @@ resource "britive_constraint" "new1" {
 
 The following arguments are supported:
 
-* `profile_id` - (Required, Forces new resource) The identifier of the profile.
+* `profile_id` - (Required, ForceNew) The identifier of the profile.
 
-* `permission_name` - (Required, Forces new resource) Name of the permission associated with the profile.
+* `permission_name` - (Required, ForceNew) Name of the permission associated with the profile.
 
-* `permission_type` - (Optional, Forces new resource) The type of permission. Defaults to "role". The value is case-sensitive and must be updated by getting the same from the API response for an import. (https://docs.britive.com/docs/manage-profile-permissions)
+* `permission_type` - (Optional, ForceNew) The type of permission. The value is case-sensitive and must be updated by getting the same from the API response for an import (https://docs.britive.com/docs/manage-profile-permissions). Default: `"role"`.
 
-* `constraint_type` - (Required, Forces new resource) The constraint type for a given profile permission. The value is case-sensitive and must be updated by getting the same from the britive_supported_constraints data source for an import.
+* `constraint_type` - (Required, ForceNew) The constraint type for a given profile permission. The value is case-sensitive and must be updated by getting the same from the britive_supported_constraints data source.
 
-* `name` - (Optional, Forces new resource) Name of the constraint. If `name` is set, then `title`, `expression`, and `description` cannot be set, and vice versa.
+* `name` - (Optional, ForceNew) Name of the constraint. If `name` is set, then `title`, `expression`, and `description` cannot be set, and vice versa.
 
-* `title` - (Optional, Forces new resource) Title of the condition constraint. Used only with the `condition` constraint type.
+* `title` - (Optional, ForceNew) Title of the condition constraint. Used only with the `condition` constraint type.
 
-* `expression` - (Optional, Forces new resource) Expression of the condition constraint. Used only with the `condition` constraint type.
+* `expression` - (Optional, ForceNew) Expression of the condition constraint. Used only with the `condition` constraint type.
 
-* `description` - (Optional, Forces new resource) Description of the condition constraint. Used only with the `condition` constraint type.
+* `description` - (Optional, ForceNew) Description of the condition constraint. Used only with the `condition` constraint type.
 
 ## Attribute Reference
 

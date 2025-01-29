@@ -91,7 +91,7 @@ resource "britive_profile_policy" "new" {
 
 The following arguments are supported:
 
-* `profile_id` - (Required, Forces new resource) The identifier of the profile.
+* `profile_id` - (Required, ForceNew) The identifier of the profile.
 
 * `policy_name` - (Required) The name of the profile-policy.
 
@@ -101,15 +101,15 @@ The following arguments are supported:
 
 * `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string. Includes the username for `tags` and `userIds` under `approvers`. The `approval` block also includes the `notificationMedium` as a list of strings. The `timeToApprove` is provided in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively. The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR, dotted decimal format or `null`. The `timeOfAccess` can be scheduled based on date, days, both or `null`. The `dateSchedule` should contain the `fromDate`, `toDate` in format of "YYYY-MM-DD HH:MM:SS" and `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If `dateSchedule` is not required, it has to be set to `null`. The `daysSchedule` should contain the `fromTime`, `toTime` in format of "HH:MM:SS", `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones and `days` as a list of strings. If `daysSchedule` is not required, it has to be set to `null`
 
-* `access_type` - (Optional) Type of access the policy provides. This can have two values "Allow"/"Deny". Defaults to "Allow".
+* `access_type` - (Optional) Type of access the policy provides. This can have two values "Allow"/"Deny". Default: `"Allow"`.
 
-* `consumer` - (Optional) A component/entity that will use the policy engine for access decisions. Defaults to "papservice". Do not provide any other value.
+* `consumer` - (Optional) A component/entity that will use the policy engine for access decisions. Default: `"papservice"`. Do not provide any other value.
 
-* `is_active` - (Optional) Indicates if a policy is active. Boolean value accepts true/false. Defaults to true. 
+* `is_active` - (Optional) Indicates if a policy is active. Boolean value accepts true/false. Default: `true`. 
 
-* `is_draft` - (Optional) Indicates if a policy is a draft. Boolean value accepts true/false. Defaults to false.
+* `is_draft` - (Optional) Indicates if a policy is a draft. Boolean value accepts true/false. Default: `false`.
 
-* `is_read_only` - (Optional) Indicates if a policy is read only. Boolean value accepts true/false. Defaults to false.
+* `is_read_only` - (Optional) Indicates if a policy is read only. Boolean value accepts true/false. Default: `false`.
 
 ## Attribute Reference
 

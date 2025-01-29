@@ -50,11 +50,11 @@ data "britive_supported_constraints" "test" {
 
 ## Argument Reference
 
-The following argument is supported:
+The following arguments are supported:
 
 * `profile_id` - (Required) The identifier of the profile.
 * `permission_name` - (Required) Name of the permission associated with the profile.
-* `permission_type` - (Optional) The type of permission. Defaults to "role". 
+* `permission_type` - (Optional) The type of permission. Default: `"role"`.
 
 ## Attribute Reference
 
