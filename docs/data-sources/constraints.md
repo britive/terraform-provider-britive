@@ -2,7 +2,7 @@
 
 Use this data source to retrieve the supported constraint types for a profile permission.
 
-The permission should be asscoiated to the profile, to fetch the supported constraint types.
+The permission should be associated to the profile, to fetch the supported constraint types.
 
 -> This data source is only supported for GCP and Okta Applications.
 

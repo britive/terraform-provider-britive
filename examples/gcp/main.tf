@@ -6,7 +6,7 @@ terraform {
     }
   }
 }
-source  = "britive/britive"
+
 provider "britive" {
 }
 
@@ -75,4 +75,28 @@ resource "britive_profile_identity" "new" {
     start = "2020-11-02T06:00:00Z"
     end   = "2020-11-06T06:00:00Z"
   }
+}
+
+data "britive_supported_constraints" "new" {
+  profile_id = britive_profile.new.id
+  permission_name = britive_profile_permission.new.permission_name
+  permission_type = britive_profile_permission.new.permission_type
+}
+
+output "britive_supported_constraints_output" {
+    value = data.britive_supported_constraints.new.constraint_types
+}
+
+resource "britive_constraint" "new" {
+  profile_id = britive_profile.new.id
+  permission_name = britive_profile_permission.new.permission_name
+  constraint_type = "approval.datasets"
+  name = "my-first-constraint.dataset"
+}
+
+resource "britive_constraint" "new1" {
+  profile_id = britive_profile.new.id
+  permission_name = britive_profile_permission.new.permission_name
+  constraint_type = "approval.datasets"
+  name = "my-second-constraint.dataset"
 }

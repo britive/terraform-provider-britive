@@ -1,6 +1,6 @@
 # britive_constraint Resource
 
-This resource allows you to create and configure constraints on the permission associated to a profile.
+This resource allows you to create and configure a constraint on the permission associated to a profile.
 
 -> This resource is only supported for GCP and Okta Applications.
 
@@ -59,7 +59,7 @@ The following arguments are supported:
 
 * `permission_type` - (Optional, Forces new resource) The type of permission. Defaults to "role". The value is case-sensitive and must be updated by getting the same from the API response for an import. (https://docs.britive.com/docs/manage-profile-permissions)
 
-* `constraint_type` - (Required, Forces new resource) The constraint type for a given profile permission.
+* `constraint_type` - (Required, Forces new resource) The constraint type for a given profile permission. The value is case-sensitive and must be updated by getting the same from the britive_supported_constraints data source for an import.
 
 * `name` - (Optional, Forces new resource) Name of the constraint. If `name` is set, then `title`, `expression`, and `description` cannot be set, and vice versa.
 
