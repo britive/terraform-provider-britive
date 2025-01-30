@@ -13,6 +13,7 @@ const (
 	policyLockName     = "policy"
 	accountId          = "accountId"
 	environmentId      = "environmentId"
+	constraintLockName = "constraint"
 )
 
 var (

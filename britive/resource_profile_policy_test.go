@@ -10,7 +10,7 @@ import (
 )
 
 func TestBritiveProfilePolicy(t *testing.T) {
-	applicationName := "AWS-ValueLabs"
+	applicationName := "DO NOT DELETE - Azure TF Plugin"
 	profileName := "AT - New Britive Profile Policy Test"
 	profilePolicyName := "AT - New Britive Profile Policy Test"
 	profilePolicyDescription := "AT - New Britive Profile Policy Test Description"

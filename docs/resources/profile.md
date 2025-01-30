@@ -30,7 +30,7 @@ resource "britive_profile" "new" {
 
 The following arguments are supported:
 
-* `app_container_id` - (Required, Forces new resource) The identity of the Britive application.
+* `app_container_id` - (Required, ForceNew) The identity of the Britive application.
 
 * `name` - (Required) The name of the Britive profile.
 
@@ -46,7 +46,7 @@ The following arguments are supported:
 
 The following arguments are supported, except for AWS profiles:
 
-* `extendable` - (Optional) The Boolean flag that indicates whether profile expiry is extendable or not. The default value is `false`.
+* `extendable` - (Optional) The Boolean flag that indicates whether profile expiry is extendable or not. Default: `false`.
 
 * `notification_prior_to_expiration` - (Optional) The Britive profile expiry notification as a time value. For example, `10m0s`
 

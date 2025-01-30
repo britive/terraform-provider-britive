@@ -17,7 +17,7 @@ import (
 
 var version string
 
-//Provider - Britive Provider
+// Provider - Britive Provider
 func Provider(v string) *schema.Provider {
 	version = v
 	validation := NewValidation()
@@ -32,9 +32,11 @@ func Provider(v string) *schema.Provider {
 	resourceRole := NewResourceRole(validation, importHelper)
 	resourcePolicy := NewResourcePolicy(importHelper)
 	resourceProfilePolicy := NewResourceProfilePolicy(importHelper)
+	resourceConstraint := NewResourceConstraint(importHelper)
 
 	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
 	dataSourceApplication := NewDataSourceApplication()
+	dataSourceConstraints := NewDataSourceConstraints()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -68,10 +70,12 @@ func Provider(v string) *schema.Provider {
 			"britive_role":                      resourceRole.Resource,
 			"britive_policy":                    resourcePolicy.Resource,
 			"britive_profile_policy":            resourceProfilePolicy.Resource,
+			"britive_constraint":                resourceConstraint.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
-			"britive_identity_provider": dataSourceIdentityProvider.Resource,
-			"britive_application":       dataSourceApplication.Resource,
+			"britive_identity_provider":     dataSourceIdentityProvider.Resource,
+			"britive_application":           dataSourceApplication.Resource,
+			"britive_supported_constraints": dataSourceConstraints.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

@@ -15,9 +15,9 @@ resource "britive_tag_member" "new" {
 
 The following arguments are supported:
 
-* `tag_id` - (Required, Forces new resource) The identifier of the Britive tag.
+* `tag_id` - (Required, ForceNew) The identifier of the Britive tag.
 
-* `username` - (Required, Forces new resource) The username of the user added to the Britive tag.
+* `username` - (Required, ForceNew) The username of the user added to the Britive tag.
 
 ## Attribute Reference
 

@@ -1,5 +1,6 @@
-## 2.0.11
+## 2.1.0
 
-BUG FIXES:
+FEATURES:
 
-* resource/britive_policy, resource/britive_profile_policy: Reordering changes consistently seen due to null fields in condition block (PAB-18018)
+* **New Resource:** `britive_constraint`: Create and configure a constraint on the permission associated to a profile. (PAB-13152)
+* **New Data Source:** `britive_supported_constraints`: Retrieve the supported constraint types for a profile permission. (PAB-13152)

@@ -31,17 +31,17 @@ resource "britive_profile_session_attribute" "user_new" {
 
 The following arguments are supported:
 
-* `profile_id` - (Required, Forces new resource) The identifier of the profile.
+* `profile_id` - (Required, ForceNew) The identifier of the profile.
 
-* `attribute_type` - (Optional, Forces new resource) The type of attribute, should be one of [Static, Identity]. The default value is `Identity`
+* `attribute_type` - (Optional, ForceNew) The type of attribute, should be one of [Static, Identity]. Default: `"Identity"`.
 
-* `attribute_name` - (Optional, Required when `attribute_type` is Identity, Forces new resource) The name of attribute.
+* `attribute_name` - (Optional, Required when `attribute_type` is Identity, ForceNew) The name of attribute.
 
 * `attribute_value` - (Optional, Required when `attribute_type` is Static) The value of attribute.
 
 * `mapping_name` - (Required) The name for attribute mapping.
 
-* `transitive` - (Optional) The Boolean flag that indicates whether the attribute is transitive or not. The default value is `false`
+* `transitive` - (Optional) The Boolean flag that indicates whether the attribute is transitive or not. Default: `false`.
 
 ## Attribute Reference
 

@@ -16,11 +16,11 @@ resource "britive_profile_permission" "new" {
 
 The following arguments are supported:
 
-* `profile_id` - (Required, Forces new resource) The identifier of the profile.
+* `profile_id` - (Required, ForceNew) The identifier of the profile.
 
-* `permission_name` - (Required, Forces new resource) The name of permission.
+* `permission_name` - (Required, ForceNew) The name of permission.
 
-* `permission_type` - (Required, Forces new resource) The type of permission. The value is case-sensitive and must be updated by getting the same from the API response for an import. (https://docs.britive.com/docs/manage-profile-permissions)
+* `permission_type` - (Required, ForceNew) The type of permission. The value is case-sensitive and must be updated by getting the same from the API response for an import. (https://docs.britive.com/docs/manage-profile-permissions)
 
 ## Attribute Reference
 

@@ -9,9 +9,10 @@ import (
 )
 
 func TestBritiveProfilePermission(t *testing.T) {
-	applicationName := "Azure-ValueLabs"
+	applicationName := "DO NOT DELETE - Azure TF Plugin"
 	profileName := "AT - New Britive Profile Permission Test"
 	profileDescription := "AT - New Britive Profile Permission Test Description"
+	associationValue := "QA"
 	permissionName := "Application Developer"
 	permissionType := "role"
 	resource.Test(t, resource.TestCase{
@@ -19,7 +20,7 @@ func TestBritiveProfilePermission(t *testing.T) {
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, profileDescription, permissionName, permissionType),
+				Config: testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, profileDescription, associationValue, permissionName, permissionType),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveProfilePermissionExists("britive_profile_permission.new"),
 				),
@@ -28,7 +29,7 @@ func TestBritiveProfilePermission(t *testing.T) {
 	})
 }
 
-func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, profileDescription, permissionName, permissionType string) string {
+func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, profileDescription, associationValue, permissionName, permissionType string) string {
 	return fmt.Sprintf(`
 	data "britive_application" "app" {
 		name = "%s"
@@ -40,8 +41,8 @@ func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, pr
 		description = "%s"
 		expiration_duration = "25m0s"
 		associations {
-			type  = "Environment"
-			value = "QA Subscription"
+			type  = "EnvironmentGroup"
+			value = "%s"
 		}
 	}
 
@@ -49,7 +50,7 @@ func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, pr
 		profile_id = britive_profile.new.id
 		permission_name = "%s"
 		permission_type = "%s"
-	}`, applicationName, profileName, profileDescription, permissionName, permissionType)
+	}`, applicationName, profileName, profileDescription, associationValue, permissionName, permissionType)
 
 }
 
