@@ -9,7 +9,7 @@ import (
 )
 
 func TestBritiveProfileSessionAttribute(t *testing.T) {
-	applicationName := "DO NOT DELETE - Azure TF Plugin"
+	applicationName := "DO NOT DELETE - AWS TF Plugin"
 	profileName := "AT - New Britive Profile Session Attribute Test"
 	attributeName := "Date Of Birth"
 	mappingName := "dob"
@@ -39,7 +39,7 @@ func testAccCheckBritiveProfileSessionAttributeConfig(applicationName, profileNa
 		expiration_duration = "25m0s"
 		associations {
 			type  = "EnvironmentGroup"
-			value = "QA"
+			value = "Root"
 		}
 	}
 

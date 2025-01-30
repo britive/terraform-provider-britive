@@ -13,6 +13,7 @@ func TestBritiveConstraint(t *testing.T) {
 	applicationName := "DO NOT DELETE - GCP TF Plugin"
 	profileName := "AT - New Britive Constraint Test"
 	profileDescription := "AT - New Britive Constraint Test Description"
+	associationValue := "britive-gdev-cis.net"
 	permissionName := "BigQuery Data Owner"
 	permissionType := "role"
 	constraintType := "bigquery.datasets"
@@ -28,7 +29,7 @@ func TestBritiveConstraint(t *testing.T) {
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDescription, permissionName, permissionType, constraintType, constraintName, permissionConditionName, constraintConditionType, constraintTitle, constraintDescription, constraintExpression),
+				Config: testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDescription, associationValue, permissionName, permissionType, constraintType, constraintName, permissionConditionName, constraintConditionType, constraintTitle, constraintDescription, constraintExpression),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveConstraintExists("britive_constraint.new"),
 					testAccCheckBritiveConstraintExists("britive_constraint.new_condition"),
@@ -38,7 +39,7 @@ func TestBritiveConstraint(t *testing.T) {
 	})
 }
 
-func testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDescription, permissionName, permissionType, constraintType, constraintName, permissionConditionName, constraintConditionType, constraintTitle, constraintDescription, constraintExpression string) string {
+func testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDescription, associationValue, permissionName, permissionType, constraintType, constraintName, permissionConditionName, constraintConditionType, constraintTitle, constraintDescription, constraintExpression string) string {
 	return fmt.Sprintf(`
 	data "britive_application" "app" {
 		name = "%s"
@@ -51,7 +52,7 @@ func testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDe
 		expiration_duration = "25m0s"
 		associations {
 			type  = "EnvironmentGroup"
-			value = "Root"
+			value = "%s"
 		}
 	}
 
@@ -83,7 +84,7 @@ func testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDe
 		title           = "%s"
     	description     = "%s"
     	expression      = "%s"
-	}`, applicationName, profileName, profileDescription, permissionName, permissionType, constraintType, constraintName, permissionConditionName, permissionType, constraintConditionType, constraintTitle, constraintDescription, constraintExpression)
+	}`, applicationName, profileName, profileDescription, associationValue, permissionName, permissionType, constraintType, constraintName, permissionConditionName, permissionType, constraintConditionType, constraintTitle, constraintDescription, constraintExpression)
 
 }
 

@@ -164,7 +164,7 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 							"britiveprovideracceptancetest1",
 						]
 					}
-					notificationMedium = "Email"
+					notificationMedium = ["Email"]
 					timeToApprove      = 30
 					isValidForInDays   = false
 					validFor           = 120
