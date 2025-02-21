@@ -514,6 +514,10 @@ func ApproversBlockEqual(old, new string) bool {
 				if SliceIgnoreOrderEqual(val, newArray[key]) {
 					equalCount++
 				}
+			case "slackAppChannels":
+				if SliceIgnoreOrderEqual(val, newArray[key]) {
+					equalCount++
+				}
 			default:
 				return false
 			}
