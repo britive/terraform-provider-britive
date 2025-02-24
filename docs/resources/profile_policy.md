@@ -51,13 +51,29 @@ resource "britive_profile_policy" "new" {
                         "bwayne",
                         "rdawes"
                     ],
-                    channelIds: [
+                    channelIds = [
                         "channel_id_01",
                         "channel_id_02"
                     ],
-                    slackAppChannels: [
+                    slackAppChannels = [
                         "slack_app_channel_id_01",
                         "slack_app_channel_id_02"
+                    ],
+                    teamsAppChannels = [
+                        {
+                            team = "team_name_1",
+                            channels = [
+                                "team_1_channel_name_1",
+                                "team_1_channel_name_2"
+                            ]
+                        },
+                        {
+                            team = "team_name_2",
+                            channels = [
+                                "team_2_channel_name_1",
+                                "team_2_channel_name_2"
+                            ]
+                        }
                     ]
                 }
                 isValidForInDays   = true
@@ -108,7 +124,7 @@ The following arguments are supported:
 * `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags` and `users`
 
 * `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string.
- * The `approvers` block under `approval` includes the username for `tags` and `userIds`, and/or slack channel Ids for `channelIds` and `slackAppChannels` as a list of strings.
+ * The `approvers` block under `approval` includes the username for `tags` and `userIds`, and/or slack channel Ids for `channelIds` and `slackAppChannels` as a list of strings. It also includes the `teamsAppChannels`, as a list of maps. Each map containing the keys `team` as the name of the team and `channels` as names of the channels to the corresponding team.
  * The `approval` block also includes the `notificationMedium` as a list of strings. The `timeToApprove` is provided in minutes, `validFor` can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively.
  * The condition based on `ipAddress` should be specified as comma separated IP addresses in CIDR, dotted decimal format or `null`.
  * The `timeOfAccess` can be scheduled based on date, days, both or `null`.

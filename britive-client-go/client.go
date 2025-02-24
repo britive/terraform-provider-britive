@@ -489,12 +489,14 @@ func ApproversBlockEqual(old, new string) bool {
 		new = "{}"
 	}
 
-	oldArray := make(map[string][]string)
+	oldArray := make(map[string][]interface{})
+
 	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
 		panic(err)
 	}
 
-	newArray := make(map[string][]string)
+	newArray := make(map[string][]interface{})
+
 	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
 		panic(err)
 	}
@@ -503,19 +505,23 @@ func ApproversBlockEqual(old, new string) bool {
 		for key, val := range oldArray {
 			switch key {
 			case "tags":
-				if SliceIgnoreOrderEqual(val, newArray[key]) {
+				if ArrayOfInterfaceEqual(val, newArray[key]) {
 					equalCount++
 				}
 			case "userIds":
-				if SliceIgnoreOrderEqual(val, newArray[key]) {
+				if ArrayOfInterfaceEqual(val, newArray[key]) {
 					equalCount++
 				}
 			case "channelIds":
-				if SliceIgnoreOrderEqual(val, newArray[key]) {
+				if ArrayOfInterfaceEqual(val, newArray[key]) {
 					equalCount++
 				}
 			case "slackAppChannels":
-				if SliceIgnoreOrderEqual(val, newArray[key]) {
+				if ArrayOfInterfaceEqual(val, newArray[key]) {
+					equalCount++
+				}
+			case "teamsAppChannels":
+				if TeamsAppChannelsBlockEqual(val, newArray[key]) {
 					equalCount++
 				}
 			default:
@@ -752,5 +758,86 @@ func ConstraintEqual(newName string, constraintResult *ConstraintResult) bool {
 	if equalCount != 1 {
 		return false
 	}
+	return true
+}
+
+func TeamsAppChannelsBlockEqual(oldSlice, newSlice []interface{}) bool {
+	equalCount := 0
+
+	if oldSlice == nil {
+		oldSlice = make([]interface{}, 0)
+	}
+
+	if newSlice == nil {
+		newSlice = make([]interface{}, 0)
+	}
+
+	var oldArray []map[string]interface{}
+	var newArray []map[string]interface{}
+
+	for _, val := range oldSlice {
+		oldMap, err := val.(map[string]interface{})
+		if err != true {
+			panic(err)
+		}
+		oldArray = append(oldArray, oldMap)
+	}
+
+	for _, val := range newSlice {
+		newMap, err := val.(map[string]interface{})
+		if err != true {
+			panic(err)
+		}
+		newArray = append(newArray, newMap)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for _, oldVal := range oldArray {
+			for _, newVal := range newArray {
+				if TeamsAppChannelsMapEqual(oldVal, newVal) {
+					equalCount++
+				}
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func TeamsAppChannelsMapEqual(oldMap, newMap map[string]interface{}) bool {
+	count := 2
+	equalCount := 0
+
+	if len(oldMap) == len(newMap) {
+		for oldKey, oldVal := range oldMap {
+			for newKey, newVal := range newMap {
+				if strings.EqualFold(oldKey, newKey) {
+					switch oldKey {
+					case "team":
+						if oldVal.(string) == newVal.(string) {
+							equalCount++
+						}
+					case "channels":
+						if ArrayOfInterfaceEqual(oldVal, newVal) {
+							equalCount++
+						}
+					default:
+						return false
+					}
+				}
+			}
+		}
+		if equalCount != count {
+			return false
+		}
+	} else {
+		return false
+	}
+
 	return true
 }
