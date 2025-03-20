@@ -191,7 +191,7 @@ type ProfilePolicy struct {
 	IsActive     bool                       `json:"isActive"`
 	IsDraft      bool                       `json:"isDraft"`
 	IsReadOnly   bool                       `json:"isReadOnly"`
-	Associations []ProfilePolicyAssociation `json:"scopes,omitempty"`
+	Associations []ProfilePolicyAssociation `json:"scopes"`
 }
 
 type ProfilePolicyAssociation struct {
