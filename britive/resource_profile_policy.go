@@ -278,7 +278,6 @@ func NewResourceProfilePolicyHelper() *ResourceProfilePolicyHelper {
 //region ProfilePolicy Resource helper functions
 
 func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, profilePolicy *britive.ProfilePolicy, isUpdate bool) error {
-	c := m.(*britive.Client)
 	profilePolicy.ProfileID = d.Get("profile_id").(string)
 	profilePolicy.Name = d.Get("policy_name").(string)
 	profilePolicy.Description = d.Get("description").(string)
@@ -290,15 +289,11 @@ func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceDa
 	profilePolicy.Condition = d.Get("condition").(string)
 	json.Unmarshal([]byte(d.Get("members").(string)), &profilePolicy.Members)
 
-	appId, err := c.RetrieveAppIdGivenProfileId(profilePolicy.ProfileID)
+	associations, err := rpph.getProfilePolicyAssociations(profilePolicy.ProfileID, d, m)
 	if err != nil {
 		return err
 	}
-
-	profilePolicy.Associations, err = rpph.getProfilePolicyAssociations(appId, profilePolicy.ProfileID, d, m)
-	if err != nil {
-		return err
-	}
+	profilePolicy.Associations = associations
 
 	return nil
 }
@@ -380,12 +375,7 @@ func (rpph *ResourceProfilePolicyHelper) getAndMapModelToResource(d *schema.Reso
 		return err
 	}
 
-	appId, err := c.RetrieveAppIdGivenProfileId(profilePolicy.ProfileID)
-	if err != nil {
-		return err
-	}
-
-	associations, err := rpph.mapProfilePolicyAssociationsModelToResource(appId, profilePolicy.ProfileID, profilePolicy.Associations, d, m)
+	associations, err := rpph.mapProfilePolicyAssociationsModelToResource(profilePolicy.ProfileID, profilePolicy.Associations, d, m)
 	if err != nil {
 		return err
 	}
@@ -422,23 +412,29 @@ func (rpph *ResourceProfilePolicyHelper) appendProfilePolicyAssociations(associa
 	return associations
 }
 
-func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(appContainerID string, profileID string, d *schema.ResourceData, m interface{}) ([]britive.ProfilePolicyAssociation, error) {
+func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID string, d *schema.ResourceData, m interface{}) ([]britive.ProfilePolicyAssociation, error) {
 	c := m.(*britive.Client)
 	associationScopes := make([]britive.ProfilePolicyAssociation, 0)
 	as := d.Get("associations").(*schema.Set)
 	if as == nil {
 		return associationScopes, nil
 	}
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
+
+	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
 	if err != nil {
-		return nil, err
+		return associationScopes, err
+	}
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
+	if err != nil {
+		return associationScopes, err
 	}
 	if appRootEnvironmentGroup == nil {
-		return nil, nil
+		return associationScopes, nil
 	}
-	applicationType, err := c.GetApplicationType(appContainerID)
+	applicationType, err := c.GetApplicationType(appId)
 	if err != nil {
-		return nil, err
+		return associationScopes, err
 	}
 	appType := applicationType.ApplicationType
 	unmatchedAssociations := make([]interface{}, 0)
@@ -464,7 +460,7 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(appContain
 				associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
 				break
 			} else if associationType == "Environment" && appType == "AWS Standalone" {
-				newAssociationValue := c.GetEnvId(appContainerID, associationValue)
+				newAssociationValue := c.GetEnvId(appId, associationValue)
 				if aeg.ID == newAssociationValue {
 					isAssociationExists = true
 					associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
@@ -483,25 +479,31 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(appContain
 	return associationScopes, nil
 }
 
-func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToResource(appContainerID string, profileID string, associations []britive.ProfilePolicyAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
+func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToResource(profileID string, associations []britive.ProfilePolicyAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
 	c := m.(*britive.Client)
+	profilePolicyAssociations := make([]interface{}, 0)
 	inputAssociations := d.Get("associations").(*schema.Set)
 	if inputAssociations == nil {
-		return nil, nil
+		return profilePolicyAssociations, nil
 	}
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
+
+	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
 	if err != nil {
-		return nil, err
+		return profilePolicyAssociations, err
+	}
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
+	if err != nil {
+		return profilePolicyAssociations, err
 	}
 	if len(associations) == 0 || appRootEnvironmentGroup == nil {
-		return make([]interface{}, 0), nil
+		return profilePolicyAssociations, nil
 	}
-	applicationType, err := c.GetApplicationType(appContainerID)
+	applicationType, err := c.GetApplicationType(appId)
 	if err != nil {
-		return nil, err
+		return profilePolicyAssociations, err
 	}
 	appType := applicationType.ApplicationType
-	profilePolicyAssociations := make([]interface{}, 0)
 	for _, association := range associations {
 		var rootAssociations []britive.Association
 		if association.Type == "EnvironmentGroup" {
@@ -517,7 +519,7 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 			}
 		}
 		if a == nil {
-			return nil, NewNotFoundErrorf("association %s", association.Value)
+			return profilePolicyAssociations, NewNotFoundErrorf("association %s", association.Value)
 		}
 		profilePolicyAssociation := make(map[string]interface{})
 		associationValue := a.Name
@@ -532,7 +534,7 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 				associationValue = a.ID
 				break
 			} else if association.Type == "Environment" && appType == "AWS Standalone" {
-				envId := c.GetEnvId(appContainerID, iav)
+				envId := c.GetEnvId(appId, iav)
 				if association.Type == iat && a.ID == envId {
 					associationValue = iav
 					break
