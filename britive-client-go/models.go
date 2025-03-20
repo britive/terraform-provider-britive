@@ -180,17 +180,23 @@ type EnvAccId struct {
 
 // ProfilePolicy - godoc
 type ProfilePolicy struct {
-	ProfileID   string      `json:"papId,omitempty"`
-	PolicyID    string      `json:"id,omitempty"`
-	Name        string      `json:"name,omitempty"`
-	Description string      `json:"description"`
-	Condition   string      `json:"condition"`
-	Members     interface{} `json:"members"`
-	Consumer    string      `json:"consumer"`
-	AccessType  string      `json:"accessType"`
-	IsActive    bool        `json:"isActive"`
-	IsDraft     bool        `json:"isDraft"`
-	IsReadOnly  bool        `json:"isReadOnly"`
+	ProfileID    string                     `json:"papId,omitempty"`
+	PolicyID     string                     `json:"id,omitempty"`
+	Name         string                     `json:"name,omitempty"`
+	Description  string                     `json:"description"`
+	Condition    string                     `json:"condition"`
+	Members      interface{}                `json:"members"`
+	Consumer     string                     `json:"consumer"`
+	AccessType   string                     `json:"accessType"`
+	IsActive     bool                       `json:"isActive"`
+	IsDraft      bool                       `json:"isDraft"`
+	IsReadOnly   bool                       `json:"isReadOnly"`
+	Associations []ProfilePolicyAssociation `json:"scopes,omitempty"`
+}
+
+type ProfilePolicyAssociation struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 // PaginationResponse - godoc
