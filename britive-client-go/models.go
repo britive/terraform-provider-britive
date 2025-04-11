@@ -270,3 +270,27 @@ type Policy struct {
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`
 }
+
+// Server Access Resource - godoc
+type ServerAccessResource struct {
+	ResourceID                  string                   `json:"resourceId,omitempty"`
+	Name                        string                   `json:"name"`
+	Description                 string                   `json:"description"`
+	ResourceType                ServerAccessResourceType `json:"resourceType"`
+	ResourceTypeParameterValues map[string]string        `json:"paramValues"`
+	ResourceLabels              map[string][]string      `json:"resourceLabels"`
+}
+
+// Server Access Resource Type - godoc
+type ServerAccessResourceType struct {
+	// ResourceTypeID string `json:"id,omitempty"`
+	Name string `json:"name"`
+}
+
+// Broker Pool - godoc
+type BrokerPool struct {
+	BrokerPoolID string `json:"brokerPoolId,omitempty"`
+	Name         string `json:"brokerPoolName"`
+	Description  string `json:"brokerPoolDesc,omitempty"`
+	Count        int    `json:"brokerCount,omitempty"`
+}
