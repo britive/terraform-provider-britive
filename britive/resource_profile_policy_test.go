@@ -44,6 +44,14 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 			type  = "EnvironmentGroup"
 			value = "QA"
 		}
+		associations {
+			type  = "EnvironmentGroup"
+			value = "Stage"
+		}
+		associations {
+			type  = "EnvironmentGroup"
+			value = "Dev"
+		}
 	}
 
 	resource "britive_profile_policy" "new" {
@@ -121,6 +129,14 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 				]
 			}
 		)
+		associations {
+			type  = "EnvironmentGroup"
+			value = "Dev"
+		}
+		associations {
+			type  = "EnvironmentGroup"
+			value = "QA"
+		}
 	}`, applicationName, profileName, profilePolicyName, profilePolicyDescription, timeOfAccessFrom, timeOfAccessTo)
 
 }
