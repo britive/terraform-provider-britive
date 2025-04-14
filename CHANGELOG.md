@@ -2,4 +2,4 @@
 
 ENHANCEMENTS:
 
-* resource/britive_profile_policy: Terraform support for profile optimization in profile policy (PAB-19752)
+* resource/britive_profile_policy: Terraform support for profile optimization(PAB-19752)
