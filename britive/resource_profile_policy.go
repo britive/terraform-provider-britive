@@ -99,6 +99,27 @@ func NewResourceProfilePolicy(importHelper *ImportHelper) *ResourceProfilePolicy
 				Description:  "Condition of the policy",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
+			"associations": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "The list of associations for the Britive profile policy",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"type": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The type of association, should be one of [Environment, EnvironmentGroup]",
+							ValidateFunc: validation.StringInSlice([]string{"Environment", "EnvironmentGroup"}, false),
+						},
+						"value": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The association value",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+					},
+				},
+			},
 		},
 	}
 	return rpp
@@ -147,7 +168,7 @@ func (rpp *ResourceProfilePolicy) resourceUpdate(ctx context.Context, d *schema.
 	c := m.(*britive.Client)
 
 	var hasChanges bool
-	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("members") || d.HasChange("condition") {
+	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("members") || d.HasChange("condition") || d.HasChange("associations") {
 		hasChanges = true
 		profileID, policyID, err := rpp.helper.parseUniqueID(d.Id())
 		if err != nil {
@@ -257,7 +278,6 @@ func NewResourceProfilePolicyHelper() *ResourceProfilePolicyHelper {
 //region ProfilePolicy Resource helper functions
 
 func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, profilePolicy *britive.ProfilePolicy, isUpdate bool) error {
-
 	profilePolicy.ProfileID = d.Get("profile_id").(string)
 	profilePolicy.Name = d.Get("policy_name").(string)
 	profilePolicy.Description = d.Get("description").(string)
@@ -268,6 +288,12 @@ func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceDa
 	profilePolicy.IsReadOnly = d.Get("is_read_only").(bool)
 	profilePolicy.Condition = d.Get("condition").(string)
 	json.Unmarshal([]byte(d.Get("members").(string)), &profilePolicy.Members)
+
+	associations, err := rpph.getProfilePolicyAssociations(profilePolicy.ProfileID, d, m)
+	if err != nil {
+		return err
+	}
+	profilePolicy.Associations = associations
 
 	return nil
 }
@@ -348,6 +374,15 @@ func (rpph *ResourceProfilePolicyHelper) getAndMapModelToResource(d *schema.Reso
 	} else if err := d.Set("members", string(mem)); err != nil {
 		return err
 	}
+
+	associations, err := rpph.mapProfilePolicyAssociationsModelToResource(profilePolicy.ProfileID, profilePolicy.Associations, d, m)
+	if err != nil {
+		return err
+	}
+	if err := d.Set("associations", associations); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -368,3 +403,149 @@ func (resourceProfilePolicyHelper *ResourceProfilePolicyHelper) parseUniqueID(ID
 }
 
 //endregion
+
+func (rpph *ResourceProfilePolicyHelper) appendProfilePolicyAssociations(associations []britive.ProfilePolicyAssociation, associationType string, associationID string) []britive.ProfilePolicyAssociation {
+	associations = append(associations, britive.ProfilePolicyAssociation{
+		Type:  associationType,
+		Value: associationID,
+	})
+	return associations
+}
+
+func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID string, d *schema.ResourceData, m interface{}) ([]britive.ProfilePolicyAssociation, error) {
+	c := m.(*britive.Client)
+	associationScopes := make([]britive.ProfilePolicyAssociation, 0)
+	as := d.Get("associations").(*schema.Set)
+	if as == nil {
+		return associationScopes, nil
+	}
+
+	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
+	if err != nil {
+		return associationScopes, err
+	}
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
+	if err != nil {
+		return associationScopes, err
+	}
+	if appRootEnvironmentGroup == nil {
+		return associationScopes, nil
+	}
+	applicationType, err := c.GetApplicationType(appId)
+	if err != nil {
+		return associationScopes, err
+	}
+	appType := applicationType.ApplicationType
+	unmatchedAssociations := make([]interface{}, 0)
+	for _, a := range as.List() {
+		s := a.(map[string]interface{})
+		associationType := s["type"].(string)
+		associationValue := s["value"].(string)
+		var rootAssociations []britive.Association
+		isAssociationExists := false
+		if associationType == "EnvironmentGroup" {
+			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
+			if appType == "AWS" && strings.EqualFold("root", associationValue) {
+				associationValue = "Root"
+			} else if appType == "AWS Standalone" && strings.EqualFold("root", associationValue) {
+				associationValue = "root"
+			}
+		} else {
+			rootAssociations = appRootEnvironmentGroup.Environments
+		}
+		for _, aeg := range rootAssociations {
+			if aeg.Name == associationValue || aeg.ID == associationValue {
+				isAssociationExists = true
+				associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
+				break
+			} else if associationType == "Environment" && appType == "AWS Standalone" {
+				newAssociationValue := c.GetEnvId(appId, associationValue)
+				if aeg.ID == newAssociationValue {
+					isAssociationExists = true
+					associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
+					break
+				}
+			}
+		}
+		if !isAssociationExists {
+			unmatchedAssociations = append(unmatchedAssociations, s)
+		}
+
+	}
+	if len(unmatchedAssociations) > 0 {
+		return nil, NewNotFoundErrorf("associations %v", unmatchedAssociations)
+	}
+	return associationScopes, nil
+}
+
+func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToResource(profileID string, associations []britive.ProfilePolicyAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
+	c := m.(*britive.Client)
+	profilePolicyAssociations := make([]interface{}, 0)
+	inputAssociations := d.Get("associations").(*schema.Set)
+	if inputAssociations == nil {
+		return profilePolicyAssociations, nil
+	}
+
+	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
+	if err != nil {
+		return profilePolicyAssociations, err
+	}
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
+	if err != nil {
+		return profilePolicyAssociations, err
+	}
+	if len(associations) == 0 || appRootEnvironmentGroup == nil {
+		return profilePolicyAssociations, nil
+	}
+	applicationType, err := c.GetApplicationType(appId)
+	if err != nil {
+		return profilePolicyAssociations, err
+	}
+	appType := applicationType.ApplicationType
+	for _, association := range associations {
+		var rootAssociations []britive.Association
+		if association.Type == "EnvironmentGroup" {
+			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
+		} else {
+			rootAssociations = appRootEnvironmentGroup.Environments
+		}
+		var a *britive.Association
+		for _, aeg := range rootAssociations {
+			if aeg.ID == association.Value {
+				a = &aeg
+				break
+			}
+		}
+		if a == nil {
+			return profilePolicyAssociations, NewNotFoundErrorf("association %s", association.Value)
+		}
+		profilePolicyAssociation := make(map[string]interface{})
+		associationValue := a.Name
+		for _, inputAssociation := range inputAssociations.List() {
+			ia := inputAssociation.(map[string]interface{})
+			iat := ia["type"].(string)
+			iav := ia["value"].(string)
+			if association.Type == "EnvironmentGroup" && (appType == "AWS" || appType == "AWS Standalone") && strings.EqualFold("root", a.Name) && strings.EqualFold("root", iav) {
+				associationValue = iav
+			}
+			if association.Type == iat && a.ID == iav {
+				associationValue = a.ID
+				break
+			} else if association.Type == "Environment" && appType == "AWS Standalone" {
+				envId := c.GetEnvId(appId, iav)
+				if association.Type == iat && a.ID == envId {
+					associationValue = iav
+					break
+				}
+			}
+		}
+		profilePolicyAssociation["type"] = association.Type
+		profilePolicyAssociation["value"] = associationValue
+		profilePolicyAssociations = append(profilePolicyAssociations, profilePolicyAssociation)
+
+	}
+	return profilePolicyAssociations, nil
+
+}

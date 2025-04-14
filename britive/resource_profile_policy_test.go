@@ -10,7 +10,7 @@ import (
 )
 
 func TestBritiveProfilePolicy(t *testing.T) {
-	applicationName := "DO NOT DELETE - Azure TF Plugin"
+	applicationName := "DO NOT DELETE - AWS TF Plugin"
 	profileName := "AT - New Britive Profile Policy Test"
 	profilePolicyName := "AT - New Britive Profile Policy Test"
 	profilePolicyDescription := "AT - New Britive Profile Policy Test Description"
@@ -42,7 +42,15 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 		expiration_duration = "25m0s"
 		associations {
 			type  = "EnvironmentGroup"
-			value = "QA"
+			value = "Development"
+		}
+		associations {
+			type  = "EnvironmentGroup"
+			value = "Stage"
+		}
+		associations {
+			type  = "Environment"
+			value = "Sigma Corporate"
 		}
 	}
 
@@ -121,6 +129,14 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 				]
 			}
 		)
+		associations {
+			type  = "EnvironmentGroup"
+			value = "Development"
+		}
+		associations {
+			type  = "Environment"
+			value = "Sigma Corporate"
+		}
 	}`, applicationName, profileName, profilePolicyName, profilePolicyDescription, timeOfAccessFrom, timeOfAccessTo)
 
 }

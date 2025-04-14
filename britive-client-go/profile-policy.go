@@ -129,3 +129,36 @@ func (c *Client) DeleteProfilePolicy(profileID string, policyID string) error {
 
 	return err
 }
+
+// RetrieveAppIdGivenProfileId - Fetch the app Id for a given profile ID
+func (c *Client) RetrieveAppIdGivenProfileId(profileID string) (string, error) {
+	requestURL := fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profileID)
+	req, err := http.NewRequest("GET", requestURL, nil)
+	if err != nil {
+		return emptyString, err
+	}
+
+	body, err := c.DoWithLock(req, profileID)
+	if err != nil {
+		return emptyString, err
+	}
+	if string(body) == emptyString {
+		return emptyString, ErrNotFound
+	}
+
+	application := &Application{}
+	err = json.Unmarshal(body, application)
+	if err != nil {
+		return emptyString, err
+	}
+
+	if application == nil {
+		return emptyString, ErrNotFound
+	}
+
+	if application.AppContainerID == emptyString {
+		return emptyString, ErrNotFound
+	}
+
+	return application.AppContainerID, nil
+}

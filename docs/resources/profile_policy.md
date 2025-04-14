@@ -108,6 +108,14 @@ resource "britive_profile_policy" "new" {
     is_active    = true
     is_draft     = false
     is_read_only = false
+    associations {
+      type  = "Environment"
+      value = "QA Subscription"
+    }
+    associations {
+      type  = "EnvironmentGroup"
+      value = "Development"
+    }
 }
 ```
 
@@ -140,6 +148,8 @@ The following arguments are supported:
 * `is_draft` - (Optional) Indicates if a policy is a draft. Boolean value accepts true/false. Default: `false`.
 
 * `is_read_only` - (Optional) Indicates if a policy is read only. Boolean value accepts true/false. Default: `false`.
+
+* `associations` - (Optional) The set of associations for the Britive profile policy.
 
 ## Attribute Reference
 
