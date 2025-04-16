@@ -14,6 +14,7 @@ const (
 	accountId          = "accountId"
 	environmentId      = "environmentId"
 	constraintLockName = "constraint"
+	resourceTypeLockName = "resourceType"
 )
 
 var (
