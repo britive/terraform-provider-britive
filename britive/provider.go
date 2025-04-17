@@ -10,6 +10,11 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/datasources"
+	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive/resources"
+	"github.com/britive/terraform-provider-britive/britive/resources/resourcemanager"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/mitchellh/go-homedir"
@@ -20,24 +25,24 @@ var version string
 // Provider - Britive Provider
 func Provider(v string) *schema.Provider {
 	version = v
-	validation := NewValidation()
-	importHelper := NewImportHelper()
+	validation := validate.NewValidation()
+	importHelper := imports.NewImportHelper()
 
-	resourceTag := NewResourceTag(importHelper)
-	resourceTagMember := NewResourceTagMember(importHelper)
-	resourceProfile := NewResourceProfile(validation, importHelper)
-	resourceProfilePermission := NewResourceProfilePermission(importHelper)
-	resourceProfileSessionAttribute := NewResourceProfileSessionAttribute(importHelper)
-	resourcePermission := NewResourcePermission(validation, importHelper)
-	resourceRole := NewResourceRole(validation, importHelper)
-	resourcePolicy := NewResourcePolicy(importHelper)
-	resourceProfilePolicy := NewResourceProfilePolicy(importHelper)
-	resourceConstraint := NewResourceConstraint(importHelper)
-	resourceResourceType := NewResourceResourceType(validation, importHelper)
+	resourceTag := resources.NewResourceTag(importHelper)
+	resourceTagMember := resources.NewResourceTagMember(importHelper)
+	resourceProfile := resources.NewResourceProfile(validation, importHelper)
+	resourceProfilePermission := resources.NewResourceProfilePermission(importHelper)
+	resourceProfileSessionAttribute := resources.NewResourceProfileSessionAttribute(importHelper)
+	resourcePermission := resources.NewResourcePermission(validation, importHelper)
+	resourceRole := resources.NewResourceRole(validation, importHelper)
+	resourcePolicy := resources.NewResourcePolicy(importHelper)
+	resourceProfilePolicy := resources.NewResourceProfilePolicy(importHelper)
+	resourceConstraint := resources.NewResourceConstraint(importHelper)
+	resourceResourceType := resourcemanager.NewResourceResourceType(validation, importHelper)
 
-	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
-	dataSourceApplication := NewDataSourceApplication()
-	dataSourceConstraints := NewDataSourceConstraints()
+	dataSourceIdentityProvider := datasources.NewDataSourceIdentityProvider()
+	dataSourceApplication := datasources.NewDataSourceApplication()
+	dataSourceConstraints := datasources.NewDataSourceConstraints()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{

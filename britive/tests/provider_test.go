@@ -1,35 +1,36 @@
-package britive
+package britivetest
 
 import (
 	"os"
 	"testing"
 
+	"github.com/britive/terraform-provider-britive/britive"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/mitchellh/go-homedir"
 )
 
-var TestAccProviders map[string]*schema.Provider
-var TestAccProvider *schema.Provider
-var TestVersion = "1.0.0"
+var testAccProviders map[string]*schema.Provider
+var testAccProvider *schema.Provider
+var testVersion = "1.0.0"
 
 func init() {
-	TestAccProvider = Provider(TestVersion)
-	TestAccProviders = map[string]*schema.Provider{
-		"britive": TestAccProvider,
+	testAccProvider = britive.Provider(testVersion)
+	testAccProviders = map[string]*schema.Provider{
+		"britive": testAccProvider,
 	}
 }
 
 func TestProvider(t *testing.T) {
-	if err := Provider(TestVersion).InternalValidate(); err != nil {
+	if err := britive.Provider(testVersion).InternalValidate(); err != nil {
 		t.Fatalf("err: %s", err)
 	}
 }
 
 func TestProvider_impl(t *testing.T) {
-	var _ *schema.Provider = Provider(TestVersion)
+	var _ *schema.Provider = britive.Provider(testVersion)
 }
 
-func TestAccPreCheck(t *testing.T) {
+func testAccPreCheck(t *testing.T) {
 	configPath, _ := homedir.Expand("~/.britive/tf.config")
 	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
 		return
