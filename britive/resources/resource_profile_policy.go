@@ -475,7 +475,7 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID 
 
 	}
 	if len(unmatchedAssociations) > 0 {
-		return nil, NewNotFoundErrorf("associations %v", unmatchedAssociations)
+		return nil, errs.NewNotFoundErrorf("associations %v", unmatchedAssociations)
 	}
 	return associationScopes, nil
 }
@@ -520,7 +520,7 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 			}
 		}
 		if a == nil {
-			return profilePolicyAssociations, NewNotFoundErrorf("association %s", association.Value)
+			return profilePolicyAssociations, errs.NewNotFoundErrorf("association %s", association.Value)
 		}
 		profilePolicyAssociation := make(map[string]interface{})
 		associationValue := a.Name
