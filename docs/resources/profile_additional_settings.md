@@ -53,7 +53,7 @@ The following arguments are supported:
 
 * `programmatic_access` - (Optional) Boolean attribute, to provide the programmatic access to the profile or not. Overriden if use_app_credential_type is set to true.
 
-* `project_id_for_service_account` - (Optional) The project id for creating service accounts. If set to null or empty string, picks up the app default project id.
+* `project_id_for_service_account` - (Optional) The project id for creating service accounts. If set to null or empty string, picks up the app default project id. Supported only for GCP and GCP Standalone applications.
 
 ## Attribute Reference
 
