@@ -271,7 +271,7 @@ type ResourceType struct {
 }
 
 type Parameter struct {
-	Name        string `json:"name"`
+	ParamName   string `json:"name"`
 	ParamType   string `json:"paramType"`
 	IsMandatory bool   `json:"isMandatory"`
 }

@@ -57,13 +57,25 @@ func NewResourceResourceType(v *validate.Validation, importHelper *imports.Impor
 				Description: "Parameters/Fields of the resource type",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"name": {
-							Type:     schema.TypeString,
-							Required: true,
+						"param_name": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringIsNotWhiteSpace,
 						},
 						"param_type": {
 							Type:     schema.TypeString,
 							Required: true,
+							ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
+								v := strings.ToLower(val.(string))
+								switch v {
+								case "string", "password":
+									//valid
+									return
+								default:
+									errs = append(errs, fmt.Errorf("%q must be one of string or password (case-insensitive), got: %s", key, val))
+								}
+								return
+							},
 						},
 						"is_mandatory": {
 							Type:     schema.TypeBool,
@@ -219,8 +231,8 @@ func (rrth *ResourceResourceTypeHelper) mapResourceToModel(d *schema.ResourceDat
 		parameter := parameters.List()[i]
 		resourceType.Parameters = append(resourceType.Parameters,
 			britive.Parameter{
-				Name:        parameter.(map[string]interface{})["name"].(string),
-				ParamType:   parameter.(map[string]interface{})["param_type"].(string),
+				ParamName:   parameter.(map[string]interface{})["param_name"].(string),
+				ParamType:   strings.ToLower(parameter.(map[string]interface{})["param_type"].(string)),
 				IsMandatory: parameter.(map[string]interface{})["is_mandatory"].(bool),
 			})
 	}
@@ -254,11 +266,21 @@ func (rrth *ResourceResourceTypeHelper) getAndMapModelToResource(d *schema.Resou
 		return err
 	}
 
+	stateParamameters := d.Get("parameters").(*schema.Set)
+	paramMap := make(map[string]string)
+
+	for i := 0; i < len(stateParamameters.List()); i++ {
+		parameter := stateParamameters.List()[i]
+		paramName := parameter.(map[string]interface{})["param_name"].(string)
+		paramType := parameter.(map[string]interface{})["param_type"].(string)
+		paramMap[paramName] = paramType
+	}
+
 	var parameterList []map[string]interface{}
 	for _, parameter := range resourceType.Parameters {
 		parameterList = append(parameterList, map[string]interface{}{
-			"name":         parameter.Name,
-			"param_type":   parameter.ParamType,
+			"param_name":   parameter.ParamName,
+			"param_type":   paramMap[parameter.ParamName],
 			"is_mandatory": parameter.IsMandatory,
 		})
 	}
