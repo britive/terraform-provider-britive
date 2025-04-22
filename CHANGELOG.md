@@ -1,5 +1,5 @@
-## 2.1.2
+## 2.1.3
 
-ENHANCEMENTS:
+FEATURES:
 
-* resource/britive_profile_policy: Terraform support for profile optimization(PAB-19752)
+* **New Resource:** `britive_profile_additional_settings`:  Configure the additional settings (console and programmatic access) associated to a profile (PAB-20027)
