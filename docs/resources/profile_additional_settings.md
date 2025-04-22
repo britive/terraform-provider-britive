@@ -2,7 +2,7 @@
 
 This resource allows you to create and configure the additional settings associated to a profile.
 
--> This resource is only supported for GCP, GCP Standalone and Azure Applications.
+-> This resource is only supported for GCP, GCP Standalone and Azure applications.
 
 ## Example Usage
 
