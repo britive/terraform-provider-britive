@@ -5,16 +5,17 @@ import (
 )
 
 const (
-	emptyString        = ""
-	tagLockName        = "tag"
-	profileLockName    = "profile"
-	permissionLockName = "permissions"
-	roleLockName       = "role"
-	policyLockName     = "policy"
-	accountId          = "accountId"
-	environmentId      = "environmentId"
-	constraintLockName = "constraint"
-	resourceTypeLockName = "resourceType"
+	emptyString              = ""
+	tagLockName              = "tag"
+	profileLockName          = "profile"
+	permissionLockName       = "permissions"
+	roleLockName             = "role"
+	policyLockName           = "policy"
+	accountId                = "accountId"
+	environmentId            = "environmentId"
+	constraintLockName       = "constraint"
+	resourceTypeLockName     = "resourceType"
+	responseTemplateLockName = "responseTemplate"
 )
 
 var (

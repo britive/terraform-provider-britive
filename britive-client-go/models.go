@@ -275,3 +275,12 @@ type Parameter struct {
 	ParamType   string `json:"paramType"`
 	IsMandatory bool   `json:"isMandatory"`
 }
+
+type ResponseTemplate struct {
+	TemplateID             string `json:"templateId,omitempty"`
+	Name                   string `json:"name"`
+	Description            string `json:"description,omitempty"`
+	IsConsoleAccessEnabled bool   `json:"isConsoleAccessEnabled"`
+	ShowOnUI               bool   `json:"show_on_ui"`
+	TemplateData           string `json:"template_data"`
+}
