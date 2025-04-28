@@ -229,6 +229,15 @@ type SessionAttribute struct {
 	ID                   string `json:"id,omitempty"`
 }
 
+// Profile Additional Settings - godoc
+type ProfileAdditionalSettings struct {
+	ProfileID                    string `json:"papId"`
+	UseApplicationCredentialType bool   `json:"useApplicationCredentialType"`
+	ConsoleAccess                bool   `json:"consoleAccess"`
+	ProgrammaticAccess           bool   `json:"programmaticAccess"`
+	ProjectIdForServiceAccount   string `json:"projectIdForServiceAccount"`
+}
+
 // Permission - godoc
 type Permission struct {
 	PermissionID string        `json:"id,omitempty"`

@@ -33,6 +33,7 @@ func Provider(v string) *schema.Provider {
 	resourcePolicy := NewResourcePolicy(importHelper)
 	resourceProfilePolicy := NewResourceProfilePolicy(importHelper)
 	resourceConstraint := NewResourceConstraint(importHelper)
+	resourceProfileAdditionalSettings := NewResourceProfileAdditionalSettings(importHelper)
 
 	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
 	dataSourceApplication := NewDataSourceApplication()
@@ -61,16 +62,17 @@ func Provider(v string) *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"britive_tag":                       resourceTag.Resource,
-			"britive_tag_member":                resourceTagMember.Resource,
-			"britive_profile":                   resourceProfile.Resource,
-			"britive_profile_permission":        resourceProfilePermission.Resource,
-			"britive_profile_session_attribute": resourceProfileSessionAttribute.Resource,
-			"britive_permission":                resourcePermission.Resource,
-			"britive_role":                      resourceRole.Resource,
-			"britive_policy":                    resourcePolicy.Resource,
-			"britive_profile_policy":            resourceProfilePolicy.Resource,
-			"britive_constraint":                resourceConstraint.Resource,
+			"britive_tag":                         resourceTag.Resource,
+			"britive_tag_member":                  resourceTagMember.Resource,
+			"britive_profile":                     resourceProfile.Resource,
+			"britive_profile_permission":          resourceProfilePermission.Resource,
+			"britive_profile_session_attribute":   resourceProfileSessionAttribute.Resource,
+			"britive_permission":                  resourcePermission.Resource,
+			"britive_role":                        resourceRole.Resource,
+			"britive_policy":                      resourcePolicy.Resource,
+			"britive_profile_policy":              resourceProfilePolicy.Resource,
+			"britive_constraint":                  resourceConstraint.Resource,
+			"britive_profile_additional_settings": resourceProfileAdditionalSettings.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider":     dataSourceIdentityProvider.Resource,

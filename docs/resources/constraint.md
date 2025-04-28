@@ -77,7 +77,7 @@ In addition to the above arguments, the following attribute is exported.
 
 ## Import
 
-You can import a Britive profile using any of these accepted formats:
+You can import a Britive constraint using any of these accepted formats:
 
 ```sh
 terraform import britive_constraint.new paps/{{profile_id}}/permissions/{{permission_name}}/{{permission_type}}/constraints/{{constraint_type}}/{{constraint_name or constraint_title}}
