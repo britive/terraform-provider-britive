@@ -261,3 +261,26 @@ type Policy struct {
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`
 }
+
+// ResourceType - godoc
+type ResourceType struct {
+	ResourceTypeID string      `json:"resourceTypeId,omitempty"`
+	Name           string      `json:"name"`
+	Description    string      `json:"description,omitempty"`
+	Parameters     []Parameter `json:"parameters,omitempty"`
+}
+
+type Parameter struct {
+	ParamName   string `json:"name"`
+	ParamType   string `json:"paramType"`
+	IsMandatory bool   `json:"isMandatory"`
+}
+
+type ResponseTemplate struct {
+	TemplateID             string `json:"templateId,omitempty"`
+	Name                   string `json:"name"`
+	Description            string `json:"description,omitempty"`
+	IsConsoleAccessEnabled bool   `json:"isConsoleAccessEnabled"`
+	ShowOnUI               bool   `json:"show_on_ui"`
+	TemplateData           string `json:"template_data"`
+}
