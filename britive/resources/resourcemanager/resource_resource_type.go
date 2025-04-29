@@ -178,7 +178,7 @@ func (rt *ResourceResourceType) resourceDelete(ctx context.Context, d *schema.Re
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	log.Printf("[INFO] resource type %s deleted", resourceTypeID)
+	log.Printf("[INFO] Resource type %s deleted", resourceTypeID)
 	d.SetId("")
 
 	return diags
@@ -186,6 +186,10 @@ func (rt *ResourceResourceType) resourceDelete(ctx context.Context, d *schema.Re
 
 func (rt *ResourceResourceType) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
+	if err := rt.importHelper.ParseImportID([]string{"resource-manager/resource-types/(?P<id>[^/]+)"}, d); err != nil {
+		return nil, err
+	}
+
 	resourceTypeID := d.Id()
 	if strings.TrimSpace(resourceTypeID) == "" {
 		return nil, errs.NewNotEmptyOrWhiteSpaceError("id")
