@@ -284,3 +284,22 @@ type ResponseTemplate struct {
 	ShowOnUI               bool   `json:"show_on_ui"`
 	TemplateData           string `json:"template_data"`
 }
+
+// ResourceTypePermission - Model for resource type permissions
+type ResourceTypePermission struct {
+	PermissionID      string   `json:"permissionId,omitempty"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description,omitempty"`
+	ResourceTypeID    string   `json:"resourceTypeId"`
+	ResourceTypeName  string   `json:"resourceTypeName,omitempty"`
+	IsDraft           bool     `json:"isDraft"`
+	Version           string   `json:"version,omitempty"`
+	CheckinTimeLimit  int      `json:"checkinTimeLimit,omitempty"`
+	CheckoutTimeLimit int      `json:"checkoutTimeLimit,omitempty"`
+	ShowOrigCreds     bool     `json:"showOrigCreds,omitempty"`
+	InlineFileExists  bool     `json:"inlineFileExists,omitempty"`
+	ResponseTemplates []string `json:"responseTemplates,omitempty"`
+	CheckinFileName   string   `json:"checkinFileName,omitempty"`
+	CheckoutFileName  string   `json:"checkoutFileName,omitempty"`
+	Variables         []string `json:"variables,omitempty"`
+}
