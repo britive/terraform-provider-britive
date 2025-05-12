@@ -16,6 +16,7 @@ const (
 	constraintLockName       = "constraint"
 	resourceTypeLockName     = "resourceType"
 	responseTemplateLockName = "responseTemplate"
+	resourceTypePermissions  = "resourceTypePermissions"
 )
 
 var (
