@@ -186,7 +186,7 @@ func (rt *ResourceResourceType) resourceDelete(ctx context.Context, d *schema.Re
 
 func (rt *ResourceResourceType) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rt.importHelper.ParseImportID([]string{"resource-manager/resource-types/(?P<id>[^/]+)"}, d); err != nil {
+	if err := rt.importHelper.ParseImportID([]string{"resource-manager/resource-types/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 
@@ -296,16 +296,9 @@ func (rrth *ResourceResourceTypeHelper) getAndMapModelToResource(d *schema.Resou
 }
 
 func (resourceResourceTypeHelper *ResourceResourceTypeHelper) generateUniqueID(resourceTypeID string) string {
-	return fmt.Sprintf("resource-manager/resource-types/%s", resourceTypeID)
+	return resourceTypeID
 }
 
 func (resourceResourceTypeHelper *ResourceResourceTypeHelper) parseUniqueID(ID string) (resourceTypeID string, err error) {
-	resourceTypeParts := strings.Split(ID, "/")
-	if len(resourceTypeParts) < 3 {
-		err = errs.NewInvalidResourceIDError("resourceType", ID)
-		return
-	}
-
-	resourceTypeID = resourceTypeParts[2]
-	return
+	return ID, nil
 }

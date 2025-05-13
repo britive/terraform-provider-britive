@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
@@ -110,19 +109,11 @@ func (helper *ResourceResponseTemplateHelper) getAndMapModelToResource(d *schema
 }
 
 func (helper *ResourceResponseTemplateHelper) generateUniqueID(templateID string) string {
-	return fmt.Sprintf("resource-manager/response-templates/%s", templateID)
+	return templateID
 }
 
 func (helper *ResourceResponseTemplateHelper) parseUniqueID(ID string) (responseTemplateID string, err error) {
-	responseTemplatesParts := strings.Split(ID, "/")
-
-	if len(responseTemplatesParts) < 3 {
-		err = errs.NewInvalidResourceIDError("responseTemplates", ID)
-		return
-	}
-
-	responseTemplateID = responseTemplatesParts[2]
-	return
+	return ID, nil
 }
 
 func (rrt *ResourceResponseTemplate) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -222,7 +213,7 @@ func (rrt *ResourceResponseTemplate) resourceDelete(ctx context.Context, d *sche
 func (rrt *ResourceResponseTemplate) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
 
-	if err := rrt.importHelper.ParseImportID([]string{"resource-manager/response-templates/(?P<id>[^/]+)"}, d); err != nil {
+	if err := rrt.importHelper.ParseImportID([]string{"resource-manager/response-templates/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 	templateID := d.Id()

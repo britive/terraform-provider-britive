@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
@@ -386,21 +385,17 @@ func (helper *ResourceResourceTypePermissionsHelper) getAndMapModelToResource(d 
 }
 
 func (helper *ResourceResourceTypePermissionsHelper) generateUniqueID(permissionID string) string {
-	return fmt.Sprintf("resource-manager/permissions/%s", permissionID)
+	return permissionID
 }
 
 func (helper *ResourceResourceTypePermissionsHelper) parseUniqueID(ID string) (string, error) {
-	parts := strings.Split(ID, "/")
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid resource ID format: %s", ID)
-	}
-	return parts[2], nil
+	return ID, nil
 }
 
 func (rtp *ResourceResourceTypePermissions) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
 
-	if err := rtp.importHelper.ParseImportID([]string{"resource-manager/permissions/(?P<id>[^/]+)"}, d); err != nil {
+	if err := rtp.importHelper.ParseImportID([]string{"resource-manager/permissions/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 	permissionID := d.Id()
