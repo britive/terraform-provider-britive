@@ -270,3 +270,38 @@ type Policy struct {
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`
 }
+
+type ApplicationRequest struct {
+	CatalogAppId          int    `json:"catalogAppId"`
+	CatalogAppDisplayName string `json:"catalogAppDisplayName"`
+}
+
+type ApplicationResponse struct {
+	AppContainerId        string        `json:"appContainerId"`
+	CatalogAppId          int           `json:"catalogAppId"`
+	CatalogAppDisplayName string        `json:"catalogAppDisplayName"`
+	UserAccountMappings   []interface{} `json:"userAccountMappings,omitempty"`
+	Properties            Properties    `json:"catalogApplication,omitempty"`
+}
+
+type CatalogApplication struct {
+	PropertyTypes []PropertyTypes `json:"propertyTypes"`
+}
+
+type Properties struct {
+	PropertyTypes []PropertyTypes `json:"propertyTypes"`
+}
+
+type PropertyTypes struct {
+	Name  string      `json:"name"`
+	Value interface{} `json:"value"`
+}
+
+type UserMappings struct {
+	UserAccountMappings []UserMapping `json:"userAccountMappings"`
+}
+
+type UserMapping struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}

@@ -34,6 +34,7 @@ func Provider(v string) *schema.Provider {
 	resourceProfilePolicy := NewResourceProfilePolicy(importHelper)
 	resourceConstraint := NewResourceConstraint(importHelper)
 	resourceProfileAdditionalSettings := NewResourceProfileAdditionalSettings(importHelper)
+	resourceApplication := NewResourceApplication(validation, importHelper)
 
 	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
 	dataSourceApplication := NewDataSourceApplication()
@@ -73,6 +74,7 @@ func Provider(v string) *schema.Provider {
 			"britive_profile_policy":              resourceProfilePolicy.Resource,
 			"britive_constraint":                  resourceConstraint.Resource,
 			"britive_profile_additional_settings": resourceProfileAdditionalSettings.Resource,
+			"britive_application":                 resourceApplication.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider":     dataSourceIdentityProvider.Resource,

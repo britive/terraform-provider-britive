@@ -2,9 +2,11 @@ package britive
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // GetApplications - Returns all applications
@@ -29,7 +31,7 @@ func (c *Client) GetApplications() (*[]Application, error) {
 }
 
 // GetApplication - Returns application by id
-func (c *Client) GetApplication(appContainerID string) (*Application, error) {
+func (c *Client) GetApplication(appContainerID string) (*ApplicationResponse, error) {
 	resourceURL := fmt.Sprintf("%s/apps/%s", c.APIBaseURL, appContainerID)
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
@@ -45,14 +47,10 @@ func (c *Client) GetApplication(appContainerID string) (*Application, error) {
 		return nil, ErrNotFound
 	}
 
-	application := &Application{}
+	application := &ApplicationResponse{}
 	err = json.Unmarshal(body, application)
 	if err != nil {
 		return nil, err
-	}
-
-	if application == nil {
-		return nil, ErrNotFound
 	}
 
 	return application, nil
@@ -131,4 +129,91 @@ func (c *Client) GetEnvDetails(appId string, envType string, field string) ([]st
 	}
 
 	return envList, nil
+}
+
+// CreateApplication - Create new application
+func (c *Client) CreateApplication(application ApplicationRequest) (*ApplicationResponse, error) {
+	applicationURL := fmt.Sprintf("%s/apps", c.APIBaseURL)
+	pb, err := json.Marshal(application)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", applicationURL, strings.NewReader(string(pb)))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, applicationLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	applicationResponse := ApplicationResponse{}
+	err = json.Unmarshal(body, &applicationResponse)
+	if err != nil {
+		return nil, err
+	}
+	return &applicationResponse, nil
+}
+
+// Patch Application property types
+func (c *Client) PatchApplicationPropertyTypes(applicationID string, properties Properties) (*ApplicationResponse, error) {
+	propertiesURL := fmt.Sprintf("%s/apps/%s/properties", c.APIBaseURL, applicationID)
+	pb, err := json.Marshal(properties)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", propertiesURL, strings.NewReader(string(pb)))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, applicationLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	applicationResponse := ApplicationResponse{}
+	err = json.Unmarshal(body, &applicationResponse)
+	if err != nil {
+		return nil, err
+	}
+	return &applicationResponse, nil
+}
+
+// Configure User Mappings
+func (c *Client) ConfigureUserMappings(applicationID string, userMappings UserMappings) error {
+	userMappingURL := fmt.Sprintf("%s/apps/%s/user-account-mappings", c.APIBaseURL, applicationID)
+	pb, err := json.Marshal(userMappings)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", userMappingURL, strings.NewReader(string(pb)))
+	if err != nil {
+		return err
+	}
+
+	_, err = c.DoWithLock(req, applicationLockName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteApplication - Delete application
+func (c *Client) DeleteApplication(applicationID string) error {
+	applicationURL := fmt.Sprintf("%s/apps?appContainerId=%s", c.APIBaseURL, applicationID)
+	req, err := http.NewRequest("DELETE", applicationURL, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.DoWithLock(req, applicationLockName)
+	if errors.Is(err, ErrNoContent) || err == nil {
+		return nil
+	}
+	return err
 }
