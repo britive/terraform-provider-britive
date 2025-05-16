@@ -67,6 +67,26 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 					},
 				},
 			},
+			"sensitive_properties": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "Britive application overwrite sensitive properties.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "Britive application property name.",
+						},
+						"value": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Sensitive:   true,
+							Description: "Britive application property value.",
+						},
+					},
+				},
+			},
 			"user_account_mappings": {
 				Type:        schema.TypeSet,
 				Optional:    true,
@@ -174,7 +194,7 @@ func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.Res
 		hasChanges = true
 		// Update user mapping
 	}
-	if d.HasChange("properties") {
+	if d.HasChange("properties") || d.HasChange("sensitive_properties") {
 		hasChanges = true
 		properties := britive.Properties{}
 		err := rt.helper.mapPropertiesResourceToModel(d, m, &properties, false)
@@ -283,7 +303,8 @@ func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.R
 
 func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.ResourceData, m interface{}, properties *britive.Properties, isUpdate bool) error {
 	propertyTypes := d.Get("properties").(*schema.Set)
-	for _, property := range propertyTypes.List() {
+	sensitiveProperties := d.Get("sensitive_properties").(*schema.Set)
+	for _, property := range append(propertyTypes.List(), sensitiveProperties.List()...) {
 		propertyType := britive.PropertyTypes{}
 		propertyType.Name = property.(map[string]interface{})["name"].(string)
 		propertyType.Value = property.(map[string]interface{})["value"].(string)
@@ -337,7 +358,10 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	}
 
 	var stateProperties []map[string]interface{}
+	var stateSensitiveProperties []map[string]interface{}
 	properties := d.Get("properties").(*schema.Set)
+	sensitiveProperties := d.Get("sensitive_properties").(*schema.Set)
+
 	for _, property := range properties.List() {
 		propertyName := property.(map[string]interface{})["name"].(string)
 		stateProperties = append(stateProperties, map[string]interface{}{
@@ -345,31 +369,21 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 			"value": propertiesMap[propertyName],
 		})
 	}
+	for _, property := range sensitiveProperties.List() {
+		propertyName := property.(map[string]interface{})["name"].(string)
+		stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
+			"name":  propertyName,
+			"value": propertiesMap[propertyName],
+		})
+	}
+
 	if err := d.Set("properties", stateProperties); err != nil {
 		return err
 	}
-
-	// paramMap := make(map[string]string)
-
-	// for i := 0; i < len(stateParamameters.List()); i++ {
-	// 	parameter := stateParamameters.List()[i]
-	// 	paramName := parameter.(map[string]interface{})["param_name"].(string)
-	// 	paramType := parameter.(map[string]interface{})["param_type"].(string)
-	// 	paramMap[paramName] = paramType
-	// }
-
-	// var parameterList []map[string]interface{}
-	// for _, parameter := range application.Parameters {
-	// 	parameterList = append(parameterList, map[string]interface{}{
-	// 		"param_name":   parameter.ParamName,
-	// 		"param_type":   paramMap[parameter.ParamName],
-	// 		"is_mandatory": parameter.IsMandatory,
-	// 	})
-	// }
-
-	// if err := d.Set("parameters", parameterList); err != nil {
-	// 	return err
-	// }
+	log.Printf("[INFO] Sensitive properties ======= %#v", stateSensitiveProperties)
+	if err := d.Set("sensitive_properties", stateSensitiveProperties); err != nil {
+		return err
+	}
 	return nil
 }
 
