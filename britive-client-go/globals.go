@@ -17,6 +17,7 @@ const (
 	resourceTypeLockName     = "resourceType"
 	responseTemplateLockName = "responseTemplate"
 	resourceTypePermissions  = "resourceTypePermissions"
+	applicationLockName      = "application"
 )
 
 var (

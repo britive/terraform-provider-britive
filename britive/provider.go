@@ -14,6 +14,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/britive/terraform-provider-britive/britive/resources"
+	application "github.com/britive/terraform-provider-britive/britive/resources/applications"
 	"github.com/britive/terraform-provider-britive/britive/resources/resourcemanager"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -41,6 +42,7 @@ func Provider(v string) *schema.Provider {
 	resourceResourceType := resourcemanager.NewResourceResourceType(validation, importHelper)
 	resourceResponseTemplate := resourcemanager.NewResourceResponseTemplate(importHelper)
 	resourceResourceTypePermissions := resourcemanager.NewResourceResourceTypePermissions(importHelper)
+	resourceApplication := application.NewResourceApplication(validation, importHelper)
 
 	dataSourceIdentityProvider := datasources.NewDataSourceIdentityProvider()
 	dataSourceApplication := datasources.NewDataSourceApplication()
@@ -82,6 +84,7 @@ func Provider(v string) *schema.Provider {
 			"britive_resource_type":             resourceResourceType.Resource,
 			"britive_response_template":         resourceResponseTemplate.Resource,
 			"britive_resource_type_permission":  resourceResourceTypePermissions.Resource,
+			"britive_application":               resourceApplication.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider":     dataSourceIdentityProvider.Resource,
