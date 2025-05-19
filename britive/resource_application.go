@@ -37,16 +37,22 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 			State: rt.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
-			"catalog_app_display_name": {
+			"application_name": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "Britive application name for display.",
+			},
+			"application_type": {
 				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "Britive application catalog name",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
+				Optional:     true,
+				Description:  "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone'",
+				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone"}, true),
 			},
 			"catalog_app_id": {
 				Type:        schema.TypeInt,
 				Optional:    true,
-				Description: "Britive application catalog id",
+				Computed:    true,
+				Description: "Britive application base catalog id.",
 			},
 			"properties": {
 				Type:        schema.TypeSet,
@@ -91,6 +97,7 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 				Type:        schema.TypeSet,
 				Optional:    true,
 				Description: "Application user account",
+				MaxItems:    1,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"name": {
@@ -296,8 +303,17 @@ func NewResourceApplicationHelper() *ResourceApplicationHelper {
 //region Resource Type Resource helper functions
 
 func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.ResourceData, m interface{}, application *britive.ApplicationRequest, isUpdate bool) error {
-	application.CatalogAppId = d.Get("catalog_app_id").(int)
-	application.CatalogAppDisplayName = d.Get("catalog_app_display_name").(string)
+	catalogApps := map[string]int{
+		"snowflake standalone": 9,
+		"snowflake":            10,
+	}
+	catalogAppName := d.Get("application_type").(string)
+	catalogAppId, ok := catalogApps[strings.ToLower(catalogAppName)]
+	if !ok {
+		return errors.New("Application with type %s not supportted")
+	}
+	application.CatalogAppId = catalogAppId
+	application.CatalogAppDisplayName = d.Get("application_name").(string)
 	return nil
 }
 
@@ -347,7 +363,7 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	if err := d.Set("catalog_app_id", application.CatalogAppId); err != nil {
 		return err
 	}
-	if err := d.Set("catalog_app_display_name", application.CatalogAppDisplayName); err != nil {
+	if err := d.Set("application_name", application.CatalogAppDisplayName); err != nil {
 		return err
 	}
 
@@ -382,7 +398,7 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		}
 		stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
 			"name":  propertyName,
-			"value": propertiesMap[propertyName],
+			"value": "tyipotrewe",
 		})
 	}
 
