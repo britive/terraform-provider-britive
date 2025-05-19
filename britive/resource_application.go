@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -132,25 +133,25 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 
 	log.Printf("[INFO] Adding new application: %#v", application)
 
-	rto, err := c.CreateApplication(application)
+	appResponse, err := c.CreateApplication(application)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	log.Printf("[INFO] Submitted new application: %#v", rto)
+	log.Printf("[INFO] Submitted new application: %#v", appResponse)
 
-	d.SetId(rt.helper.generateUniqueID(rto.AppContainerId))
+	d.SetId(rt.helper.generateUniqueID(appResponse.AppContainerId))
 
-	log.Printf("[INFO] Updated state after application submission: %#v", rto)
+	log.Printf("[INFO] Updated state after application submission: %#v", appResponse)
 
 	// Patch properties
 	properties := britive.Properties{}
-	err = rt.helper.mapPropertiesResourceToModel(d, m, &properties, false)
+	err = rt.helper.mapPropertiesResourceToModel(d, m, &properties, appResponse, false)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	log.Printf("[INFO] Updating application properties: %#v", properties)
-	_, err = c.PatchApplicationPropertyTypes(rto.AppContainerId, properties)
+	_, err = c.PatchApplicationPropertyTypes(appResponse.AppContainerId, properties)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -164,7 +165,7 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 	}
 
 	log.Printf("[INFO] Updating user mappings: %#v", userMappings)
-	err = c.ConfigureUserMappings(rto.AppContainerId, userMappings)
+	err = c.ConfigureUserMappings(appResponse.AppContainerId, userMappings)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -203,8 +204,20 @@ func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.Res
 	}
 	if d.HasChange("properties") || d.HasChange("sensitive_properties") {
 		hasChanges = true
+
+		log.Printf("[INFO] Reading application %s", applicationID)
+		application, err := c.GetApplication(applicationID)
+		if errors.Is(err, britive.ErrNotFound) {
+			return diag.FromErr(NewNotFoundErrorf("application %s", applicationID))
+		}
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		log.Printf("[INFO] Received application %#v", application)
+
 		properties := britive.Properties{}
-		err := rt.helper.mapPropertiesResourceToModel(d, m, &properties, false)
+		err = rt.helper.mapPropertiesResourceToModel(d, m, &properties, application, false)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -317,13 +330,28 @@ func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.R
 	return nil
 }
 
-func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.ResourceData, m interface{}, properties *britive.Properties, isUpdate bool) error {
+func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.ResourceData, m interface{}, properties *britive.Properties, appResponse *britive.ApplicationResponse, isUpdate bool) error {
 	propertyTypes := d.Get("properties").(*schema.Set)
 	sensitiveProperties := d.Get("sensitive_properties").(*schema.Set)
+
+	applicationProperties := appResponse.Properties.PropertyTypes
+	propertiesMap := make(map[string]string)
+	for _, property := range applicationProperties {
+		propertiesMap[property.Name] = fmt.Sprintf("%v", property.Type)
+	}
+
 	for _, property := range append(propertyTypes.List(), sensitiveProperties.List()...) {
 		propertyType := britive.PropertyTypes{}
 		propertyType.Name = property.(map[string]interface{})["name"].(string)
-		propertyType.Value = property.(map[string]interface{})["value"].(string)
+		if propertiesMap[propertyType.Name] == "java.lang.Boolean" {
+			propertyValue, err := strconv.ParseBool(property.(map[string]interface{})["value"].(string))
+			if err != nil {
+				return err
+			}
+			propertyType.Value = propertyValue
+		} else {
+			propertyType.Value = property.(map[string]interface{})["value"].(string)
+		}
 		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
 	}
 	return nil
@@ -398,7 +426,7 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		}
 		stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
 			"name":  propertyName,
-			"value": "tyipotrewe",
+			"value": propertiesMap[propertyName],
 		})
 	}
 

@@ -284,10 +284,6 @@ type ApplicationResponse struct {
 	Properties            Properties    `json:"catalogApplication,omitempty"`
 }
 
-type CatalogApplication struct {
-	PropertyTypes []PropertyTypes `json:"propertyTypes"`
-}
-
 type Properties struct {
 	PropertyTypes []PropertyTypes `json:"propertyTypes"`
 }
@@ -295,6 +291,7 @@ type Properties struct {
 type PropertyTypes struct {
 	Name  string      `json:"name"`
 	Value interface{} `json:"value"`
+	Type  string      `json:"type,omitempty"`
 }
 
 type UserMappings struct {
