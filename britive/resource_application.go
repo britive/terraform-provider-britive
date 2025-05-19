@@ -371,6 +371,15 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	}
 	for _, property := range sensitiveProperties.List() {
 		propertyName := property.(map[string]interface{})["name"].(string)
+		if propertiesMap[propertyName] == "*" {
+			for _, sp := range sensitiveProperties.List() {
+				existing := sp.(map[string]interface{})
+				if existing["name"] == propertyName {
+					propertiesMap[propertyName] = existing["value"].(string)
+					break
+				}
+			}
+		}
 		stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
 			"name":  propertyName,
 			"value": propertiesMap[propertyName],
