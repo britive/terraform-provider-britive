@@ -2,6 +2,8 @@ package britive
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -86,9 +88,13 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 							Description: "Britive application property name.",
 						},
 						"value": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Sensitive:   true,
+							Type:      schema.TypeString,
+							Required:  true,
+							Sensitive: true,
+							StateFunc: func(val interface{}) string {
+								hash := md5.Sum([]byte(val.(string)))
+								return hex.EncodeToString(hash[:])
+							},
 							Description: "Britive application property value.",
 						},
 					},
