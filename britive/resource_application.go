@@ -2,8 +2,7 @@ package britive
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -14,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"golang.org/x/crypto/argon2"
 )
 
 // ResourceApplication - Terraform Resource for Application
@@ -40,20 +40,14 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 			State: rt.resourceStateImporter,
 		},
 		Schema: map[string]*schema.Schema{
-			"application_name": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "Britive application name for display.",
-			},
 			"application_type": {
 				Type:         schema.TypeString,
-				Optional:     true,
+				Required:     true,
 				Description:  "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone'",
 				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone"}, true),
 			},
 			"catalog_app_id": {
 				Type:        schema.TypeInt,
-				Optional:    true,
 				Computed:    true,
 				Description: "Britive application base catalog id.",
 			},
@@ -92,8 +86,8 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 							Required:  true,
 							Sensitive: true,
 							StateFunc: func(val interface{}) string {
-								hash := md5.Sum([]byte(val.(string)))
-								return hex.EncodeToString(hash[:])
+								hash := argon2.IDKey([]byte(val.(string)), []byte{}, 1, 64*1024, 4, 32)
+								return base64.RawStdEncoding.EncodeToString(hash)
 							},
 							Description: "Britive application property value.",
 						},
@@ -130,9 +124,13 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 
 	var diags diag.Diagnostics
 
-	application := britive.ApplicationRequest{}
+	applicationName, err := rt.helper.getApplicationName(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
-	err := rt.helper.mapApplicationResourceToModel(d, m, &application, false)
+	application := britive.ApplicationRequest{}
+	err = rt.helper.mapApplicationResourceToModel(d, m, &application, applicationName, false)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -204,10 +202,6 @@ func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.Res
 	}
 
 	var hasChanges bool
-	if d.HasChange("user_account_mappings") {
-		hasChanges = true
-		// Update user mapping
-	}
 	if d.HasChange("properties") || d.HasChange("sensitive_properties") {
 		hasChanges = true
 
@@ -281,7 +275,7 @@ func (rt *ResourceApplication) resourceDelete(ctx context.Context, d *schema.Res
 
 func (rt *ResourceApplication) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rt.importHelper.ParseImportID([]string{"apps/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
+	if err := rt.importHelper.ParseImportID([]string{"application/(?P<id>[^/]+)", "applications/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 
@@ -302,7 +296,7 @@ func (rt *ResourceApplication) resourceStateImporter(d *schema.ResourceData, m i
 
 	d.SetId(rt.helper.generateUniqueID(application.AppContainerId))
 
-	err = rt.helper.getAndMapModelToResource(d, m)
+	err = rt.helper.importAndMapModelToResource(d, m)
 	if err != nil {
 		return nil, err
 	}
@@ -319,9 +313,7 @@ func NewResourceApplicationHelper() *ResourceApplicationHelper {
 	return &ResourceApplicationHelper{}
 }
 
-//region Resource Type Resource helper functions
-
-func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.ResourceData, m interface{}, application *britive.ApplicationRequest, isUpdate bool) error {
+func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.ResourceData, m interface{}, application *britive.ApplicationRequest, applicationName string, isUpdate bool) error {
 	catalogApps := map[string]int{
 		"snowflake standalone": 9,
 		"snowflake":            10,
@@ -332,8 +324,20 @@ func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.R
 		return errors.New("Application with type %s not supportted")
 	}
 	application.CatalogAppId = catalogAppId
-	application.CatalogAppDisplayName = d.Get("application_name").(string)
+	application.CatalogAppDisplayName = applicationName
 	return nil
+}
+
+func (rrth *ResourceApplicationHelper) getApplicationName(d *schema.ResourceData) (string, error) {
+	propertyTypes := d.Get("properties").(*schema.Set)
+	for _, property := range propertyTypes.List() {
+		propertyName := property.(map[string]interface{})["name"].(string)
+		propertyValue := property.(map[string]interface{})["value"].(string)
+		if propertyName == "displayName" {
+			return propertyValue, nil
+		}
+	}
+	return "", errors.New("Missing mandatory property displayName")
 }
 
 func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.ResourceData, m interface{}, properties *britive.Properties, appResponse *britive.ApplicationResponse, isUpdate bool) error {
@@ -397,7 +401,8 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	if err := d.Set("catalog_app_id", application.CatalogAppId); err != nil {
 		return err
 	}
-	if err := d.Set("application_name", application.CatalogAppDisplayName); err != nil {
+
+	if err := d.Set("user_account_mappings", application.UserAccountMappings); err != nil {
 		return err
 	}
 
@@ -439,7 +444,70 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	if err := d.Set("properties", stateProperties); err != nil {
 		return err
 	}
-	log.Printf("[INFO] Sensitive properties ======= %#v", stateSensitiveProperties)
+	if err := d.Set("sensitive_properties", stateSensitiveProperties); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (rrth *ResourceApplicationHelper) importAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
+	c := m.(*britive.Client)
+
+	applicationID, err := rrth.parseUniqueID(d.Id())
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[INFO] Importing application %s", applicationID)
+
+	application, err := c.GetApplication(applicationID)
+	if errors.Is(err, britive.ErrNotFound) {
+		return NewNotFoundErrorf("application %s", applicationID)
+	}
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[INFO] Received application %#v", application)
+
+	catalogApps := map[int]string{
+		9:  "snowflake standalone",
+		10: "snowflake",
+	}
+	catalogAppId := application.CatalogAppId
+	catalogAppType, ok := catalogApps[catalogAppId]
+	if !ok {
+		return errors.New(fmt.Sprintf("Catlog with id %d not supportted", catalogAppId))
+	}
+	if err := d.Set("catalog_app_id", catalogAppId); err != nil {
+		return err
+	}
+
+	if err := d.Set("application_type", catalogAppType); err != nil {
+		return err
+	}
+
+	var stateProperties []map[string]interface{}
+	var stateSensitiveProperties []map[string]interface{}
+	applicationProperties := application.Properties.PropertyTypes
+	for _, property := range applicationProperties {
+		propertyName := property.Name
+
+		if property.Type == "com.britive.pab.api.Secret" || property.Type == "com.britive.pab.api.SecretFile" {
+			stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
+				"name":  propertyName,
+				"value": fmt.Sprintf("%v", property.Value),
+			})
+		} else {
+			stateProperties = append(stateProperties, map[string]interface{}{
+				"name":  propertyName,
+				"value": fmt.Sprintf("%v", property.Value),
+			})
+		}
+	}
+	if err := d.Set("properties", stateProperties); err != nil {
+		return err
+	}
 	if err := d.Set("sensitive_properties", stateSensitiveProperties); err != nil {
 		return err
 	}
