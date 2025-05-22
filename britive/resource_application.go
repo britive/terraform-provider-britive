@@ -77,8 +77,11 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"name": {
-							Type:        schema.TypeString,
-							Required:    true,
+							Type:     schema.TypeString,
+							Required: true,
+							StateFunc: func(val interface{}) string {
+								return val.(string)
+							},
 							Description: "Britive application property name.",
 						},
 						"value": {
@@ -86,8 +89,7 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 							Required:  true,
 							Sensitive: true,
 							StateFunc: func(val interface{}) string {
-								hash := argon2.IDKey([]byte(val.(string)), []byte{}, 1, 64*1024, 4, 32)
-								return base64.RawStdEncoding.EncodeToString(hash)
+								return getHash(val.(string))
 							},
 							Description: "Britive application property value.",
 						},
@@ -135,7 +137,7 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 
-	log.Printf("[INFO] Adding new application: %#v", application)
+	log.Printf("[INFO] Adding new application")
 
 	appResponse, err := c.CreateApplication(application)
 	if err != nil {
@@ -154,12 +156,12 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 
-	log.Printf("[INFO] Updating application properties: %#v", properties)
+	log.Printf("[INFO] Updating application properties")
 	_, err = c.PatchApplicationPropertyTypes(appResponse.AppContainerId, properties)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	log.Printf("[INFO] Updated application properties: %#v", properties)
+	log.Printf("[INFO] Updated application properties")
 
 	// configer user account mappings
 	userMappings := britive.UserMappings{}
@@ -222,12 +224,12 @@ func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.Res
 			return diag.FromErr(err)
 		}
 
-		log.Printf("[INFO] Updating application properties: %#v", properties)
+		log.Printf("[INFO] Updating application properties")
 		_, err = c.PatchApplicationPropertyTypes(applicationID, properties)
 		if err != nil {
 			return diag.FromErr(err)
 		}
-		log.Printf("[INFO] Updated application properties: %#v", properties)
+		log.Printf("[INFO] Updated application properties")
 
 	}
 	if d.HasChange("user_account_mappings") {
@@ -340,6 +342,15 @@ func (rrth *ResourceApplicationHelper) getApplicationName(d *schema.ResourceData
 	return "", errors.New("Missing mandatory property displayName")
 }
 
+func getHash(val string) string {
+	hash := argon2.IDKey([]byte(val), []byte{}, 1, 64*1024, 4, 32)
+	return base64.RawStdEncoding.EncodeToString(hash)
+}
+
+func isHashValue(val string, hash string) bool {
+	return hash == getHash(val)
+}
+
 func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.ResourceData, m interface{}, properties *britive.Properties, appResponse *britive.ApplicationResponse, isUpdate bool) error {
 	propertyTypes := d.Get("properties").(*schema.Set)
 	sensitiveProperties := d.Get("sensitive_properties").(*schema.Set)
@@ -350,7 +361,7 @@ func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.Re
 		propertiesMap[property.Name] = fmt.Sprintf("%v", property.Type)
 	}
 
-	for _, property := range append(propertyTypes.List(), sensitiveProperties.List()...) {
+	for _, property := range propertyTypes.List() {
 		propertyType := britive.PropertyTypes{}
 		propertyType.Name = property.(map[string]interface{})["name"].(string)
 		if propertiesMap[propertyType.Name] == "java.lang.Boolean" {
@@ -364,6 +375,24 @@ func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.Re
 		}
 		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
 	}
+
+	sensitivePropertiesMap := make(map[string]string)
+
+	for _, property := range sensitiveProperties.List() {
+		propertyType := britive.PropertyTypes{}
+		propertyName := property.(map[string]interface{})["name"].(string)
+		propertyValue := property.(map[string]interface{})["value"].(string)
+		if prePropertyValue, ok := sensitivePropertiesMap[propertyName]; ok {
+			if isHashValue(prePropertyValue, propertyValue) {
+				continue
+			}
+		}
+		propertyType.Name = propertyName
+		propertyType.Value = propertyValue
+		sensitivePropertiesMap[propertyName] = propertyValue
+		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
+	}
+
 	return nil
 }
 
