@@ -302,3 +302,13 @@ type UserMapping struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
+
+// Application Entity - godoc
+type ApplicationEntity struct {
+	EntityID      string `json:"id,omitempty"`
+	Type          string `json:"type"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	ParentID      string `json:"parentId"`
+	ParentGroupID string `json:"parentGroupId"`
+}

@@ -86,10 +86,8 @@ func (c *Client) GetApplicationByName(name string) (*Application, error) {
 
 	return &applications[0], nil
 }
-func (c *Client) GetEnvDetails(appId string, envType string, field string) ([]string, error) {
-	var envList []string
-	var envValue string
 
+func (c *Client) GetAppEnvs(appId string, envType string) ([]ApplicationEnvironment, error) {
 	resourceURL := fmt.Sprintf("%s/apps/%s/root-environment-group?view=summary&type=%s", c.APIBaseURL, appId, envType)
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
@@ -115,6 +113,13 @@ func (c *Client) GetEnvDetails(appId string, envType string, field string) ([]st
 	if appEnvs == nil {
 		return nil, ErrNotFound
 	}
+
+	return appEnvs, nil
+}
+
+func (c *Client) GetEnvDetails(appEnvs []ApplicationEnvironment, field string) ([]string, error) {
+	var envList []string
+	var envValue string
 
 	for _, appEnv := range appEnvs {
 		switch field {
@@ -216,4 +221,17 @@ func (c *Client) DeleteApplication(applicationID string) error {
 		return nil
 	}
 	return err
+}
+
+func (c *Client) GetEnvFullDetails(appEnvs []ApplicationEnvironment) ([]map[string]string, error) {
+	envList := make([]map[string]string, len(appEnvs))
+
+	for i, appEnv := range appEnvs {
+		envValue := make(map[string]string)
+		envValue["id"] = appEnv.EnvironmentID
+		envValue["name"] = appEnv.EnvironmentName
+		envList[i] = envValue
+	}
+
+	return envList, nil
 }
