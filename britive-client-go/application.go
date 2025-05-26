@@ -208,6 +208,45 @@ func (c *Client) ConfigureUserMappings(applicationID string, userMappings UserMa
 	return nil
 }
 
+// Create root environment group
+func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId int) error {
+	appEnvGroups, err := c.GetAppEnvs(applicationID, "environmentGroups")
+	if err != nil {
+		return err
+	}
+
+	if len(appEnvGroups) == 0 {
+		var rootAppEntity ApplicationEntity
+
+		rootAppEntity.Name = "root"
+		rootAppEntity.Type = "group"
+		rootAppEntity.ParentID = ""
+
+		rootAppEntityBody, err := json.Marshal(rootAppEntity)
+		if err != nil {
+			return err
+		}
+
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/root-environment-group/groups", c.APIBaseURL, applicationID), strings.NewReader(string(rootAppEntityBody)))
+		if err != nil {
+			return err
+		}
+		body, err := c.DoWithLock(req, applicationID)
+
+		if err != nil {
+			return err
+		}
+		ae := &ApplicationEntity{}
+
+		err = json.Unmarshal(body, ae)
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
 // DeleteApplication - Delete application
 func (c *Client) DeleteApplication(applicationID string) error {
 	applicationURL := fmt.Sprintf("%s/apps?appContainerId=%s", c.APIBaseURL, applicationID)

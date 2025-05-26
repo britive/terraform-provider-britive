@@ -177,6 +177,15 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 	}
 	log.Printf("[INFO] Updated user mappings: %#v", userMappings)
 
+	if application.CatalogAppId == 9 {
+		log.Printf("[INFO] Creating root environment group")
+		err = c.CreateRootEnvironmentGroup(appResponse.AppContainerId, application.CatalogAppId)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		log.Printf("[INFO] Created root environment group")
+	}
+
 	rt.resourceRead(ctx, d, m)
 
 	return diags
