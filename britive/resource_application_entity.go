@@ -238,7 +238,7 @@ func (rae *ResourceApplicationEntity) resourceUpdate(ctx context.Context, d *sch
 		}
 
 		log.Printf("[INFO] Updating application environment properties: %+v", properties)
-		_, err = c.PatchApplicationEnvPropertyTypes(applicationID, ntityID, properties)
+		_, err = c.PatchApplicationEnvPropertyTypes(applicationID, entityID, properties)
 		if err != nil {
 			return diag.FromErr(err)
 		}

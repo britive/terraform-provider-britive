@@ -388,17 +388,26 @@ func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.Re
 	sensitivePropertiesMap := make(map[string]string)
 
 	for _, property := range sensitiveProperties.List() {
-		propertyType := britive.PropertyTypes{}
 		propertyName := property.(map[string]interface{})["name"].(string)
 		propertyValue := property.(map[string]interface{})["value"].(string)
 		if prePropertyValue, ok := sensitivePropertiesMap[propertyName]; ok {
 			if isHashValue(prePropertyValue, propertyValue) {
 				continue
+			} else if isHashValue(propertyValue, prePropertyValue) {
+				sensitivePropertiesMap[propertyName] = propertyValue
+				continue
+			} else {
+				return errors.New("Something wrong with sensitive properties")
 			}
+		} else {
+			sensitivePropertiesMap[propertyName] = propertyValue
 		}
-		propertyType.Name = propertyName
-		propertyType.Value = propertyValue
-		sensitivePropertiesMap[propertyName] = propertyValue
+	}
+
+	for sensitivePropertyName, sensitivePropertyValue := range sensitivePropertiesMap {
+		propertyType := britive.PropertyTypes{}
+		propertyType.Name = sensitivePropertyName
+		propertyType.Value = sensitivePropertyValue
 		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
 	}
 
