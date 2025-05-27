@@ -51,6 +51,11 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 				Computed:    true,
 				Description: "Britive application base catalog id.",
 			},
+			"entity_root_environment_group_id": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "Britive application root environment ID for Snowflake Standalone applications.",
+			},
 			"properties": {
 				Type:        schema.TypeSet,
 				Optional:    true,
@@ -184,6 +189,13 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 			return diag.FromErr(err)
 		}
 		log.Printf("[INFO] Created root environment group")
+		rootEnvID, err := c.GetRootEnvID(appResponse.AppContainerId)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		if err = d.Set("entity_root_environment_group_id", rootEnvID); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	rt.resourceRead(ctx, d, m)

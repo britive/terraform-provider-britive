@@ -273,3 +273,20 @@ func (c *Client) GetEnvFullDetails(appEnvs []ApplicationEnvironment) ([]map[stri
 
 	return envList, nil
 }
+
+func (c *Client) GetRootEnvID(applicationID string) (string, error) {
+	appEnvGroups, err := c.GetAppEnvs(applicationID, "environmentGroups")
+	if err != nil {
+		return "", err
+	}
+	envGrpIdNameList, err := c.GetEnvFullDetails(appEnvGroups)
+	if err != nil {
+		return "", err
+	}
+	for _, envGrp := range envGrpIdNameList {
+		if envGrp["name"] == "root" {
+			return envGrp["id"], err
+		}
+	}
+	return "", errors.New("No root Environment Group ia available for application" + applicationID)
+}
