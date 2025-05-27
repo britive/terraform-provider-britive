@@ -1,5 +1,7 @@
 # britive_application Resource
 
+> **Note:** The resource `britive_application` resource currently supports only Snowflake and Snowflake Standalone application types.
+
 The `britive_application` resource allows you to create and manage applications in Britive.
 
 ## Example Usage Snowflake APP
@@ -56,41 +58,37 @@ resource "britive_application" "application_test_1" {
     name  = "copyAppToEnvProps"
     value = false
   }
-  properties {
-    name  = "iconUrl"
-    value = "<URL>"
-  }
   sensitive_properties {
     name  = "publicKey"
     value = file("${path.module}/rsa_key_public.pub")
   }
   sensitive_properties {
-    name  = "privateKey"
-    value = file("${path.module}/rsa_key.p8")
+    name  = "privateKeyPassword"
+    value = "Password"
   }
 }
 ```
 
 > **Note:** Following `properties` and `sensitive_properties` in the above example are mandatory for creating a valid Snowflake application.  
 > **Properties** include:
-> - `displayName`
-> - `description`
-> - `loginNameForAccountMapping`
-> - `accountId`
-> - `appAccessMethod_static_loginUrl`
-> - `username`
-> - `role`  
-> - `snowflakeSchemaScanFilter`
-> - `maxSessionDurationForProfiles`
-> - `copyAppToEnvProps`
-> - `iconUrl`
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `loginNameForAccountMapping`: Use login name for account mapping.
+> - `accountId`: Account ID.
+> - `appAccessMethod_static_loginUrl`: Login URL.
+> - `username`: Username of the User in Snowflake.
+> - `role`: Custom Role assigned to the user.
+> - `snowflakeSchemaScanFilter`: Skip collecting schema level privileges.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+> - `copyAppToEnvProps`: Use same user, role and keys for all accounts.
 
 **Sensitive Properties** include:
-> - `privateKeyPassword`
-> - `publicKey`
-> - `privateKey`
+> - `privateKeyPassword`: Password of the Private Key.
+> - `publicKey`: Public Key configured for the user.
+> - `privateKey`: Private Key configured for the user.
 
 ## Example Usage Snowflake Standalone APP
+
 ```
 resource "britive_application" "apllication_snowflake_standalone" {
     application_type = "snowFlake standalone"
@@ -110,18 +108,13 @@ resource "britive_application" "apllication_snowflake_standalone" {
       name = "maxSessionDurationForProfiles"
       value = 1000
     }
-    properties {
-      name  = "iconUrl"
-      value = "<URL>"
-   }
 }
 ```
 
 > **Note:** Following `properties` in the above Snowflake Standalone example are mandatory for creating a valid Snowflake Standalone application.  
-> - `displayName`
-> - `description`
-> - `maxSessionDurationForProfiles`
-> - `iconUrl`
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 
 ## Argument Reference
 
@@ -130,7 +123,7 @@ resource "britive_application" "apllication_snowflake_standalone" {
 - `application_type` - (Required) The type of the application. Supported types are `Snowflake` and `Snowflake Standalone`.
 
 ### Optional
-
+- `entity_root_environment_group_id` - (Computed) Britive application root environment ID for Snowflake Standalone applications.
 - `user_account_mappings` - (Optional) A block defining user account mappings for the application. Each block supports:
   - `name` - (Required) The name of the user account mapping.
   - `description` - (Required) The description of the user account mapping.
@@ -158,4 +151,6 @@ Applications can be imported using the application ID:
 
 ```sh
 terraform import britive_application.application_test_1 <application_id>
+terraform import britive_application.application_test_1 application/<application_id>
+terraform import britive_application.application_test_1 applications/<application_id>
 ```
