@@ -182,6 +182,7 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 	}
 	log.Printf("[INFO] Updated user mappings: %#v", userMappings)
 
+	//The root environment group creation can be skipped when PAB-20648 is fixed
 	if application.CatalogAppId == 9 {
 		log.Printf("[INFO] Creating root environment group")
 		err = c.CreateRootEnvironmentGroup(appResponse.AppContainerId, application.CatalogAppId)

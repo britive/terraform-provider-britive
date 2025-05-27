@@ -56,7 +56,7 @@ func NewResourceEntityGroup(importHelper *ImportHelper) *ResourceEntityGroup {
 			},
 			"entity_description": {
 				Type:         schema.TypeString,
-				Required:     true,
+				Required:     true, //Should be set to optional when PAB-20647 is fixed.
 				Description:  "The description of the entity",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
@@ -254,6 +254,10 @@ func (regh *ResourceEntityGroupHelper) getAndMapModelToResource(d *schema.Resour
 	for _, association := range appRootEnvironmentGroup.EnvironmentGroups {
 		if association.ID == entityID {
 			log.Printf("[INFO] Received entity group: %#v", association)
+			// To not allow the import of root environment group
+			if association.ParentID == "" {
+				return fmt.Errorf("`parent_id` cannot be empty")
+			}
 			if err := d.Set("entity_id", entityID); err != nil {
 				return err
 			}
