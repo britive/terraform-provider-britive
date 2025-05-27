@@ -9,16 +9,7 @@ import (
 )
 
 // CreateEntityGroup - Create entity group for an application
-func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntity, applicationID string) (*ApplicationEntity, error) {
-
-	appEnvGroups, err := c.GetAppEnvs(applicationID, "environmentGroups")
-	if err != nil {
-		return nil, err
-	}
-
-	if len(appEnvGroups) == 0 && !(applicationEntity.Name == "root" && applicationEntity.ParentID == "") {
-		return nil, fmt.Errorf("As there is no environment group created yet for this application, please create one with only the exact same values as below\napplication_id = \"%s\"\nentity_name = \"root\"\nparent_id = \"\"", applicationID)
-	}
+func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntityGroup, applicationID string) (*ApplicationEntityGroup, error) {
 
 	applicationEntityBody, err := json.Marshal(applicationEntity)
 	if err != nil {
@@ -36,7 +27,7 @@ func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntity, applicat
 		return nil, err
 	}
 
-	ae := &ApplicationEntity{}
+	ae := &ApplicationEntityGroup{}
 
 	err = json.Unmarshal(body, ae)
 	if err != nil {
@@ -47,7 +38,7 @@ func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntity, applicat
 }
 
 // UpdateEntityGroup - Update the entity group for an application
-func (c *Client) UpdateEntityGroup(applicationEntity ApplicationEntity, applicationID string) (*ApplicationEntity, error) {
+func (c *Client) UpdateEntityGroup(applicationEntity ApplicationEntityGroup, applicationID string) (*ApplicationEntityGroup, error) {
 
 	applicationEntityBody, err := json.Marshal(applicationEntity)
 	if err != nil {
@@ -65,7 +56,7 @@ func (c *Client) UpdateEntityGroup(applicationEntity ApplicationEntity, applicat
 		return nil, err
 	}
 
-	ae := &ApplicationEntity{}
+	ae := &ApplicationEntityGroup{}
 
 	err = json.Unmarshal(body, ae)
 	if err != nil {

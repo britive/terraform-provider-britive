@@ -38,7 +38,7 @@ func NewResourceEntityGroup(importHelper *ImportHelper) *ResourceEntityGroup {
 				Type:         schema.TypeString,
 				Optional:     true,
 				Computed:     true,
-				Description:  "The identity of the Britive application",
+				Description:  "The identity of the application entity of type environment group",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"application_id": {
@@ -55,28 +55,18 @@ func NewResourceEntityGroup(importHelper *ImportHelper) *ResourceEntityGroup {
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"entity_description": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "The description of the entity",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The description of the entity",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
 			"parent_id": {
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "The parent id under which the environment group will be created",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "The parent id under which the environment group will be created",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
-		},
-		CustomizeDiff: func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
-			isParentEmpty := d.Get("parent_id").(string) == ""
-			isEntityNameRoot := d.Get("entity_name").(string) == "root"
-			if isParentEmpty && !isEntityNameRoot {
-				return fmt.Errorf("`parent_id` cannot be empty except for root EnvironmentGroup.")
-			}
-			if !isParentEmpty && isEntityNameRoot {
-				return fmt.Errorf("`parent_id` should be empty \"\" for root EnvironmentGroup.")
-			}
-			return nil
 		},
 	}
 	return reg
@@ -88,7 +78,7 @@ func (reg *ResourceEntityGroup) resourceCreate(ctx context.Context, d *schema.Re
 	c := m.(*britive.Client)
 	var diags diag.Diagnostics
 
-	applicationEntity := britive.ApplicationEntity{}
+	applicationEntity := britive.ApplicationEntityGroup{}
 
 	err := reg.helper.mapResourceToModel(d, m, &applicationEntity, false)
 	if err != nil {
@@ -134,7 +124,7 @@ func (reg *ResourceEntityGroup) resourceUpdate(ctx context.Context, d *schema.Re
 			return diag.FromErr(err)
 		}
 
-		applicationEntity := britive.ApplicationEntity{}
+		applicationEntity := britive.ApplicationEntityGroup{}
 
 		err = reg.helper.mapResourceToModel(d, m, &applicationEntity, true)
 		if err != nil {
@@ -215,7 +205,7 @@ func (reg *ResourceEntityGroup) resourceStateImporter(d *schema.ResourceData, m 
 			if err != nil {
 				return nil, err
 			}
-			log.Printf("[INFO] Imported entity gropup %s for application %s", entityID, applicationID)
+			log.Printf("[INFO] Imported entity group %s for application %s", entityID, applicationID)
 			return []*schema.ResourceData{d}, nil
 		}
 	}
@@ -237,7 +227,7 @@ func NewResourceEntityGroupHelper() *ResourceEntityGroupHelper {
 
 //region EntityGroup Resource helper functions
 
-func (regh *ResourceEntityGroupHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, applicationEntity *britive.ApplicationEntity, isUpdate bool) error {
+func (regh *ResourceEntityGroupHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, applicationEntity *britive.ApplicationEntityGroup, isUpdate bool) error {
 	applicationEntity.Name = d.Get("entity_name").(string)
 	applicationEntity.Description = d.Get("entity_description").(string)
 	applicationEntity.ParentID = d.Get("parent_id").(string)
@@ -290,7 +280,7 @@ func (resourceEntityGroupHelper *ResourceEntityGroupHelper) generateUniqueID(app
 func (resourceEntityGroupHelper *ResourceEntityGroupHelper) parseUniqueID(ID string) (applicationID, entityID string, err error) {
 	applicationEntityParts := strings.Split(ID, "/")
 	if len(applicationEntityParts) < 5 {
-		err = NewInvalidResourceIDError("application entity", ID)
+		err = NewInvalidResourceIDError("application entity group", ID)
 		return
 	}
 

@@ -303,12 +303,18 @@ type UserMapping struct {
 	Description string `json:"description"`
 }
 
-// Application Entity - godoc
-type ApplicationEntity struct {
+// Application Entity Environment - godoc
+type ApplicationEntityEnvironment struct {
 	EntityID      string `json:"id,omitempty"`
-	Type          string `json:"type"`
 	Name          string `json:"name"`
 	Description   string `json:"description"`
-	ParentID      string `json:"parentId"`
 	ParentGroupID string `json:"parentGroupId"`
+}
+
+// Application Entity Group - godoc
+type ApplicationEntityGroup struct {
+	EntityID    string `json:"id,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ParentID    string `json:"parentId"`
 }

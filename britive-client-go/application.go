@@ -216,10 +216,9 @@ func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId i
 	}
 
 	if len(appEnvGroups) == 0 {
-		var rootAppEntity ApplicationEntity
+		var rootAppEntity ApplicationEntityGroup
 
 		rootAppEntity.Name = "root"
-		rootAppEntity.Type = "group"
 		rootAppEntity.ParentID = ""
 
 		rootAppEntityBody, err := json.Marshal(rootAppEntity)
@@ -236,7 +235,7 @@ func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId i
 		if err != nil {
 			return err
 		}
-		ae := &ApplicationEntity{}
+		ae := &ApplicationEntityGroup{}
 
 		err = json.Unmarshal(body, ae)
 		if err != nil {
