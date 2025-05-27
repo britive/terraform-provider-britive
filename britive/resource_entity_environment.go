@@ -248,10 +248,12 @@ func (ree *ResourceEntityEnvironment) resourceStateImporter(d *schema.ResourceDa
 		return nil, NewNotEmptyOrWhiteSpaceError("entity_id")
 	}
 
-	appEnvs := make([]britive.ApplicationEnvironment, 0)
-
 	log.Printf("[INFO] Importing entity %s of type environment for application %s", entityID, applicationID)
 
+	appEnvs, err := c.GetAppEnvs(applicationID, "environments")
+	if err != nil {
+		return nil, err
+	}
 	envIdList, err := c.GetEnvDetails(appEnvs, "id")
 	if err != nil {
 		return nil, err
@@ -262,6 +264,11 @@ func (ree *ResourceEntityEnvironment) resourceStateImporter(d *schema.ResourceDa
 			d.SetId(ree.helper.generateUniqueID(applicationID, entityID))
 
 			err = ree.helper.getAndMapModelToResource(d, m)
+			if err != nil {
+				return nil, err
+			}
+
+			err = ree.helper.importAndMapPropertiesToResource(d, m)
 			if err != nil {
 				return nil, err
 			}
@@ -468,6 +475,52 @@ func (resourceEntityEnvironmentHelper *ResourceEntityEnvironmentHelper) parseUni
 	applicationID = applicationEntityParts[1]
 	entityID = applicationEntityParts[4]
 	return
+}
+
+func (rrth *ResourceEntityEnvironmentHelper) importAndMapPropertiesToResource(d *schema.ResourceData, m interface{}) error {
+	c := m.(*britive.Client)
+
+	applicationID, entityID, err := rrth.parseUniqueID(d.Id())
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[INFO] Importing properties for entity %s for application %s", entityID, applicationID)
+
+	// Get application Environment for entity with type Environment
+	appEnvDetails, err := c.GetApplicationEnvironment(applicationID, entityID)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[INFO] Received entity env %#v", appEnvDetails)
+	//ToDo: check env type should be envrionment
+
+	var stateProperties []map[string]interface{}
+	var stateSensitiveProperties []map[string]interface{}
+	applicationProperties := appEnvDetails.Properties.PropertyTypes
+	for _, property := range applicationProperties {
+		propertyName := property.Name
+
+		if property.Type == "com.britive.pab.api.Secret" || property.Type == "com.britive.pab.api.SecretFile" {
+			stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
+				"name":  propertyName,
+				"value": fmt.Sprintf("%v", property.Value),
+			})
+		} else {
+			stateProperties = append(stateProperties, map[string]interface{}{
+				"name":  propertyName,
+				"value": fmt.Sprintf("%v", property.Value),
+			})
+		}
+	}
+	if err := d.Set("properties", stateProperties); err != nil {
+		return err
+	}
+	if err := d.Set("sensitive_properties", stateSensitiveProperties); err != nil {
+		return err
+	}
+	return nil
 }
 
 //endregion
