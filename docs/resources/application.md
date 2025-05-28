@@ -30,11 +30,11 @@ resource "britive_application" "new" {
   }
   properties {
     name  = "accountId"
-    value = "AccountId"
+    value = "QXZ72233xx"
   }
   properties {
     name  = "appAccessMethod_static_loginUrl"
-    value = "https://<url>"
+    value = "https://snowflake.test.com"
   }
   properties {
     name  = "username"
