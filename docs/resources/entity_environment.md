@@ -81,6 +81,8 @@ resource "britive_entity_environment" "new" {
 }
 ```
 -> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid entity of type environment.  
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
 >**Properties:**
 > - `displayName`- Environment Name.
 > - `description`- Environment Description.

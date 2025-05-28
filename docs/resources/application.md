@@ -72,6 +72,8 @@ resource "britive_application" "new" {
 ```
 
 -> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid Snowflake application.  
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
 >**Properties:**
 > - `displayName`: Application Name.
 > - `description`: Application Description.
