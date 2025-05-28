@@ -65,13 +65,13 @@ func (c *Client) GetApplicationEnvironment(appContainerID string, entityID strin
 		return nil, err
 	}
 
-	applicationEnviornmentDetails := &ApplicationResponse{}
-	err = json.Unmarshal(body, applicationEnviornmentDetails)
+	applicationEnvironmentDetails := &ApplicationResponse{}
+	err = json.Unmarshal(body, applicationEnvironmentDetails)
 	if err != nil {
 		return nil, err
 	}
 
-	return applicationEnviornmentDetails, nil
+	return applicationEnvironmentDetails, nil
 }
 
 // Patch Application property types
