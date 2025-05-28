@@ -270,3 +270,51 @@ type Policy struct {
 	IsDraft     bool        `json:"isDraft"`
 	IsReadOnly  bool        `json:"isReadOnly"`
 }
+
+type ApplicationRequest struct {
+	CatalogAppId          int    `json:"catalogAppId"`
+	CatalogAppDisplayName string `json:"catalogAppDisplayName"`
+}
+
+type ApplicationResponse struct {
+	AppContainerId        string        `json:"appContainerId"`
+	CatalogAppId          int           `json:"catalogAppId"`
+	CatalogAppDisplayName string        `json:"catalogAppDisplayName"`
+	UserAccountMappings   []interface{} `json:"userAccountMappings,omitempty"`
+	Properties            Properties    `json:"catalogApplication,omitempty"`
+}
+
+type Properties struct {
+	PropertyTypes []PropertyTypes `json:"propertyTypes"`
+}
+
+type PropertyTypes struct {
+	Name  string      `json:"name"`
+	Value interface{} `json:"value"`
+	Type  string      `json:"type,omitempty"`
+}
+
+type UserMappings struct {
+	UserAccountMappings []UserMapping `json:"userAccountMappings"`
+}
+
+type UserMapping struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// Application Entity Environment - godoc
+type ApplicationEntityEnvironment struct {
+	EntityID      string `json:"id,omitempty"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	ParentGroupID string `json:"parentGroupId"`
+}
+
+// Application Entity Group - godoc
+type ApplicationEntityGroup struct {
+	EntityID    string `json:"id,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ParentID    string `json:"parentId"`
+}

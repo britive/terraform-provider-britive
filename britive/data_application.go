@@ -41,6 +41,50 @@ func NewDataSourceApplication() *DataSourceApplication {
 				Description: "A set of environment group ids for the application",
 				Elem:        &schema.Schema{Type: schema.TypeString},
 			},
+			"environment_ids_names": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Computed:    true,
+				Description: "A set of map of environment ids and names for the application",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The environment id",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+						"name": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The environment name",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+					},
+				},
+			},
+			"environment_group_ids_names": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Computed:    true,
+				Description: "A set of map of environment group ids and names for the application",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The environment group id",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+						"name": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The environment group name",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+					},
+				},
+			},
 		},
 	}
 	return dataSourceApplication
@@ -65,17 +109,39 @@ func (dataSourceApplication *DataSourceApplication) resourceRead(ctx context.Con
 		return diag.FromErr(err)
 	}
 
-	envIdList, err := c.GetEnvDetails(d.Id(), "environments", "id")
+	appEnvs, err := c.GetAppEnvs(d.Id(), "environments")
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	appEnvGroups, err := c.GetAppEnvs(d.Id(), "environmentGroups")
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	envIdList, err := c.GetEnvDetails(appEnvs, "id")
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	d.Set("environment_ids", envIdList)
 
-	envGrpIdList, err := c.GetEnvDetails(d.Id(), "environmentGroups", "id")
+	envGrpIdList, err := c.GetEnvDetails(appEnvGroups, "id")
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	d.Set("environment_group_ids", envGrpIdList)
+
+	envIdNameList, err := c.GetEnvFullDetails(appEnvs)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.Set("environment_ids_names", envIdNameList)
+
+	envGrpIdNameList, err := c.GetEnvFullDetails(appEnvGroups)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	d.Set("environment_group_ids_names", envGrpIdNameList)
 
 	return nil
 }
