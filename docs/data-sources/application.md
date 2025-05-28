@@ -40,10 +40,14 @@ The following argument is supported:
 
 ## Attribute Reference
 
-In addition to the above argument, the following attribute is exported:
+In addition to the above argument, the following attributes are exported:
 
 * `id` - An identifier for the application.
+
 * `environment_ids` - A set of environment ids for the application.
+
 * `environment_group_ids` - A set of environment group ids for the application.
+
 * `environment_ids_names` - A set of environment ids and their respective names for the application.
+
 * `environment_group_ids_names` - A set of environment group ids and and their respective names for the application.

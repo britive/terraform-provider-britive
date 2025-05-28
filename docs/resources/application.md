@@ -1,13 +1,15 @@
 # britive_application Resource
 
-> **Note:** The resource `britive_application` resource currently supports only Snowflake and Snowflake Standalone application types.
+This resource allows you to create and manage applications in Britive.
 
-The `britive_application` resource allows you to create and manage applications in Britive.
+-> This resource is only supported for Snowflake and Snowflake Standalone applications.
 
-## Example Usage Snowflake APP
+## Example Usage
+
+### Snowflake Application
 
 ```hcl
-resource "britive_application" "application_test_1" {
+resource "britive_application" "new" {
   application_type = "Snowflake"
   
   user_account_mappings {
@@ -54,13 +56,13 @@ resource "britive_application" "application_test_1" {
     name  = "copyAppToEnvProps"
     value = false
   }
-  properties {
-    name  = "copyAppToEnvProps"
-    value = false
+  sensitive_properties {
+    name  = "privateKey"
+    value = file("${path.module}/private_key.key")
   }
   sensitive_properties {
     name  = "publicKey"
-    value = file("${path.module}/rsa_key_public.pub")
+    value = file("${path.module}/public_key.key")
   }
   sensitive_properties {
     name  = "privateKeyPassword"
@@ -69,8 +71,8 @@ resource "britive_application" "application_test_1" {
 }
 ```
 
-> **Note:** Following `properties` and `sensitive_properties` in the above example are mandatory for creating a valid Snowflake application.  
-> **Properties** include:
+-> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid Snowflake application.  
+>**Properties:**
 > - `displayName`: Application Name.
 > - `description`: Application Description.
 > - `loginNameForAccountMapping`: Use login name for account mapping.
@@ -82,27 +84,27 @@ resource "britive_application" "application_test_1" {
 > - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 > - `copyAppToEnvProps`: Use same user, role and keys for all accounts.
 
-**Sensitive Properties** include:
+>**Sensitive Properties:**
 > - `privateKeyPassword`: Password of the Private Key.
 > - `publicKey`: Public Key configured for the user.
 > - `privateKey`: Private Key configured for the user.
 
-## Example Usage Snowflake Standalone APP
+### Snowflake Standalone Application
 
-```
-resource "britive_application" "apllication_snowflake_standalone" {
-    application_type = "snowFlake standalone"
+```hcl
+resource "britive_application" "new" {
+    application_type = "Snowflake Standalone"
     user_account_mappings {
       name = "Mobile"
       description = "Mobile"
     }
     properties {
-      name = "description"
-      value = "Britive Snowflake Standalone APP"
+      name = "displayName"
+      value = "Snowflake App 2"
     }
     properties {
-      name = "displayName"
-      value = "Snowflake Standalone APP"
+      name = "description"
+      value = "Britive Snowflake Standalone App"
     }
     properties {
       name = "maxSessionDurationForProfiles"
@@ -111,46 +113,45 @@ resource "britive_application" "apllication_snowflake_standalone" {
 }
 ```
 
-> **Note:** Following `properties` in the above Snowflake Standalone example are mandatory for creating a valid Snowflake Standalone application.  
+-> The `properties` in the above Snowflake Standalone example are mandatory for creating a valid Snowflake Standalone application.
+>**Properties:**
 > - `displayName`: Application Name.
 > - `description`: Application Description.
 > - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 
 ## Argument Reference
 
-### Required
+The following arguments are supported:
 
-- `application_type` - (Required) The type of the application. Supported types are `Snowflake` and `Snowflake Standalone`.
+* `application_type` - (Required) The type of the application. Supported types are `Snowflake` and `Snowflake Standalone`.
 
-### Optional
-- `entity_root_environment_group_id` - (Computed) Britive application root environment ID for Snowflake Standalone applications.
-- `user_account_mappings` - (Optional) A block defining user account mappings for the application. Each block supports:
+* `user_account_mappings` - (Optional) A block defining user account mappings for the application. Each block supports:
   - `name` - (Required) The name of the user account mapping.
   - `description` - (Required) The description of the user account mapping.
 
-- `properties` - (Optional) A block defining application properties. Each block supports:
+* `properties` - (Optional) A block defining application properties. Each block supports:
   - `name` - (Required) The name of the property.
   - `value` - (Required) The value of the property.
 
-- `sensitive_properties` - (Optional) A block defining sensitive application properties. Each block supports:
+* `sensitive_properties` - (Optional) A block defining sensitive application properties. Each block supports:
   - `name` - (Required) The name of the sensitive property.
   - `value` - (Required) The value of the sensitive property.
 
 ## Attribute Reference
 
-The following attributes are exported:
+In addition to the above arguments, the following attributes are exported.
 
-- `catalog_app_id` - The catalog ID of the application.
-- `properties` - The list of application properties.
-- `sensitive_properties` - The list of sensitive application properties.
-- `user_account_mappings` - The list of user account mappings.
+* `id` - An identifier for the application.
+
+* `catalog_app_id` - The id of the application type.
+
+* `entity_root_environment_group_id` - The root environment group ID for the Snowflake Standalone application.
 
 ## Import
 
-Applications can be imported using the application ID:
+You can import an application using any of these accepted formats:
 
 ```sh
-terraform import britive_application.application_test_1 <application_id>
-terraform import britive_application.application_test_1 application/<application_id>
-terraform import britive_application.application_test_1 applications/<application_id>
+terraform import britive_application.new apps/{{application_id}}
+terraform import britive_application.new {{application_id}}
 ```

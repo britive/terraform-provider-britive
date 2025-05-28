@@ -63,9 +63,11 @@ The following arguments are supported:
 
 * `parent_id` - (Required, ForceNew)  The identity of the parent under which the environment group entity will be created.
 
+-> Refer to the `environment_group_ids_names` attribute of the `britive_application` data source to get the set of group IDs and names for an application.
+
 ## Attribute Reference
 
-In addition to the above arguments, the following attribute is exported.
+In addition to the above arguments, the following attributes are exported.
 
 * `entity_id` - An identifier of the environment group entity.
 
@@ -75,7 +77,7 @@ In addition to the above arguments, the following attribute is exported.
 
 You can import an environment group entity using any of these accepted formats:
 
-```SH
+```sh
 terraform import britive_entity_group.new apps/{{application_id}}/root-environment-group/groups/{{entity_id}}
 terraform import britive_entity_group.new {{application_id}}/groups/{{entity_id}}
 ```

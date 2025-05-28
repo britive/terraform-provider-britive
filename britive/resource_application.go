@@ -299,7 +299,7 @@ func (rt *ResourceApplication) resourceDelete(ctx context.Context, d *schema.Res
 
 func (rt *ResourceApplication) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rt.importHelper.ParseImportID([]string{"application/(?P<id>[^/]+)", "applications/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
+	if err := rt.importHelper.ParseImportID([]string{"apps/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
 
