@@ -145,7 +145,7 @@ func (ree *ResourceEntityEnvironment) resourceCreate(ctx context.Context, d *sch
 		return diag.FromErr(err)
 	}
 
-	log.Printf("[INFO] Updating application environment properties: %+v", properties)
+	log.Printf("[INFO] Updating application environment properties")
 	_, err = c.PatchApplicationEnvPropertyTypes(applicationID, ae.EntityID, properties)
 	if err != nil {
 		return diag.FromErr(err)
@@ -198,7 +198,7 @@ func (ree *ResourceEntityEnvironment) resourceUpdate(ctx context.Context, d *sch
 			return diag.FromErr(err)
 		}
 
-		log.Printf("[INFO] Updating application entity environment properties: %+v", properties)
+		log.Printf("[INFO] Updating application entity environment properties")
 		_, err = c.PatchApplicationEnvPropertyTypes(applicationID, entityID, properties)
 		if err != nil {
 			return diag.FromErr(err)
