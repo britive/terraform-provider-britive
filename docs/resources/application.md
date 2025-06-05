@@ -2,7 +2,7 @@
 
 This resource allows you to create and manage applications in Britive.
 
--> This resource is only supported for Snowflake and Snowflake Standalone applications.
+-> This resource is only supported for the Snowflake, Snowflake Standalone, GCP, GCP Standalone, Google Workspace applications.
 
 ## Example Usage
 
@@ -11,7 +11,7 @@ This resource allows you to create and manage applications in Britive.
 ```hcl
 resource "britive_application" "new" {
   application_type = "Snowflake"
-  
+  version = "1.0"
   user_account_mappings {
     name        = "Mobile"
     description = "Mobile"
@@ -96,6 +96,7 @@ resource "britive_application" "new" {
 ```hcl
 resource "britive_application" "new" {
     application_type = "Snowflake Standalone"
+    version = "1.0"
     user_account_mappings {
       name = "Mobile"
       description = "Mobile"
@@ -121,11 +122,376 @@ resource "britive_application" "new" {
 > - `description`: Application Description.
 > - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 
+### GCP Application
+
+```hcl
+resource "britive_application" "new" {
+  application_type = "GCP"
+  version = "2.0"
+  user_account_mappings {
+    name        = "Mobile"
+    description = "Mobile"
+  }
+  properties {
+    name  = "displayName"
+    value = "GCP App 1"
+  }
+  properties {
+    name  = "description"
+    value = "Britive GCP App"
+  }
+  properties {
+    name  = "programmaticAccess"
+    value = true
+  }
+  properties {
+    name  = "consoleAccess"
+    value = true
+  }
+  properties {
+    name  = "appAccessMethod_static_loginUrl"
+    value = "https://console.cloud.google.com"
+  }
+  properties {
+    name  = "orgId"
+    value = "gcp1"
+  }
+  properties {
+    name  = "gSuiteAdmin"
+    value = "admin@gcp-test.com"
+  }
+  properties {
+    name  = "projectIdForServiceAccount"
+    value = "gcp-project-1"
+  }
+  properties {
+    name  = "acsUrl"
+    value = "test-gcp.com"
+  }
+  properties {
+    name  = "audience"
+    value = "admin@gcp-test.com"
+  }
+  properties {
+    name  = "enableSso"
+    value = true
+  }
+  properties {
+    name  = "primaryDomain"
+    value = "domain1"
+  }
+  properties {
+    name  = "secondaryDomain"
+    value = "domain2"
+  }
+  properties {
+    name  = "replaceDomain"
+    value = true
+  }
+  properties {
+    name  = "scanUsersGroups"
+    value = true
+  }
+  properties {
+    name  = "scanOrganization"
+    value = true
+  }
+  properties {
+    name  = "scanProjectsOnly"
+    value = true
+  }
+  properties {
+    name  = "scanExternalUsersGroups"
+    value = true
+  }
+  properties {
+    name  = "customerId"
+    value = "Cu51XXr123"
+  }
+  properties {
+    name  = "maxSessionDurationForProfiles"
+    value = "12345"
+  }
+  properties {
+    name  = "gcpProjectFilter"
+    value = "gcpFilter1"
+  }
+  properties {
+    name  = "gcpProjectFilterInclusion"
+    value = "gcpFilterInclusion1"
+  }
+  sensitive_properties {
+    name  = "serviceAccountCredentials"
+    value = file("${path.module}/service_key.key")
+  }
+}
+```
+
+-> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid GCP application.
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `programmaticAccess`: Programmatic Access.
+> - `consoleAccess`: Console.
+> - `appAccessMethod_static_loginUrl`: Login URL.
+> - `orgId`: The Organizations Unique Identifier.
+> - `gSuiteAdmin`: G Suite Admin Email.
+> - `projectIdForServiceAccount`: Project ID for creating Service Accounts.
+> - `acsUrl`: ACS URL.
+> - `audience`: Audience.
+> - `enableSso`: Enable SSO.
+> - `primaryDomain`: Email Domain of Britive Users.
+> - `secondaryDomain`: Primary Domain in Google Workspace.
+> - `replaceDomain`: Use another domain for account mapping.
+> - `scanUsersGroups`: Scan users and groups.
+> - `scanOrganization`: Scan all folders and projects.
+> - `scanProjectsOnly`: Scan projects only.
+> - `scanExternalUsersGroups`: Scan external users and groups.
+> - `customerId`: Customer ID in Google Workspace Account Settings.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+> - `gcpProjectFilter`: Exclude projects from scan.
+> - `gcpProjectFilterInclusion`: Include projects in scan.
+
+>**Sensitive Properties:**
+> - `serviceAccountCredentials`: The Service Account Credentials - Content of Private Key File as JSON String.
+
+### GCP Standalone Application
+
+```hcl
+resource "britive_application" "new" {
+  application_type = "GCP Standalone"
+  version = "1.0"
+  user_account_mappings {
+    name        = "Mobile"
+    description = "Mobile"
+  }
+  properties {
+    name  = "displayName"
+    value = "GCP Standalone App 1"
+  }
+  properties {
+    name  = "description"
+    value = "Britive GCP Standalone App"
+  }
+  properties {
+    name  = "programmaticAccess"
+    value = true
+  }
+  properties {
+    name  = "consoleAccess"
+    value = true
+  }
+  properties {
+    name  = "appAccessMethod_static_loginUrl"
+    value = "https://gcp.test.com"
+  }
+  properties {
+    name  = "orgId"
+    value = "gcp1"
+  }
+  properties {
+    name  = "gSuiteAdmin"
+    value = "admin@gcp-test.com"
+  }
+  properties {
+    name  = "projectIdForServiceAccount"
+    value = "gcp-project-1"
+  }
+  properties {
+    name  = "acsUrl"
+    value = "test-gcp.com"
+  }
+  properties {
+    name  = "audience"
+    value = "admin@gcp-test.com"
+  }
+  properties {
+    name  = "enableSso"
+    value = true
+  }
+  properties {
+    name  = "primaryDomain"
+    value = "domain1"
+  }
+  properties {
+    name  = "secondaryDomain"
+    value = "domain2"
+  }
+  properties {
+    name  = "replaceDomain"
+    value = true
+  }
+  properties {
+    name  = "scanUsers"
+    value = true
+  }
+  properties {
+    name  = "scanExternalUsersGroups"
+    value = true
+  }
+  properties {
+    name  = "customerId"
+    value = "Cu51omer123"
+  }
+  properties {
+    name  = "maxSessionDurationForProfiles"
+    value = "12345"
+  }
+  properties {
+    name  = "displayProgrammaticKeys"
+    value = true
+  }
+  properties {
+    name  = "gcpProjectFilter"
+    value = "gcpFilter1"
+  }
+  properties {
+    name  = "gcpProjectFilterInclusion"
+    value = "gcpFilterInclusion1"
+  }
+  sensitive_properties {
+    name  = "serviceAccountCredentials"
+    value = file("${path.module}/service_key.key")
+  }
+}
+```
+
+-> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid GCP Standalone application.
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
+> **Properties:**
+> - `programmaticAccess`: Programmatic Access.
+> - `consoleAccess`: Console.
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `appAccessMethod_static_loginUrl`: Login URL.
+> - `orgId`: The Organization's Unique Identifier.
+> - `gSuiteAdmin`: G Suite Admin Email.
+> - `projectIdForServiceAccount`: Project ID for creating Service Accounts.
+> - `acsUrl`: ACS URL.
+> - `audience`: Audience.
+> - `enableSso`: Enable SSO.
+> - `primaryDomain`: Email Domain of Britive Users.
+> - `secondaryDomain`: Primary Domain in Google Workspace.
+> - `replaceDomain`: Use another domain for account mapping.
+> - `scanUsers`: Scan users.
+> - `scanExternalUsersGroups`: Scan external users and groups.
+> - `customerId`: Customer ID in Google Workspace Account Settings.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+> - `displayProgrammaticKeys`: Display programmatic access keys.
+> - `gcpProjectFilter`: Exclude projects from scan.
+> - `gcpProjectFilterInclusion`: Include projects in scan.
+
+>**Sensitive Properties:**
+> - `serviceAccountCredentials`: The Service Account Credentials - Content of Private Key File as JSON String.
+
+### Google Workspace Application
+
+```hcl
+resource "britive_application" "application_google_workspace" {
+    application_type = "Google Workspace"
+    version = "1.0"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "YS TF Google Workspace"
+    }
+    properties {
+      name = "description"
+      value = "YS TF Google Workspace Description"
+    }
+    properties {
+      name = "appAccessMethod_static_loginUrl"
+      value = "https://console.cloud.google.com"
+    }
+    properties {
+      name = "provisionUserGw"
+      value = "true"
+    }
+    properties {
+      name = "gSuiteAdmin"
+      value = "admin@google-test.com"
+    }
+    properties {
+      name = "acsUrl"
+      value = "test-google.com"
+    }
+    properties {
+      name = "audience"
+      value = "admin@google-test.com"
+    }
+    properties {
+      name = "enableSso"
+      value = true
+    }
+    properties {
+      name = "primaryDomain"
+      value = "domain1"
+    }
+    properties {
+      name = "secondaryDomain"
+      value = "domain2"
+    }
+    properties {
+      name = "replaceDomain"
+      value = true
+    }
+    properties {
+      name = "scanRoles"
+      value = true
+    }
+    properties {
+      name = "scanGroups"
+      value = true
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = "12345
+    }
+    sensitive_properties {
+      name = "serviceAccountCredentials"
+      value = file("${path.module}/service_key.json")
+    }
+}
+```
+
+-> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid Google Workspace application.
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `appAccessMethod_static_loginUrl`: Login URL.
+> - `provisionUserGw`: Create user account for super admin role.
+> - `gSuiteAdmin`: Google Workspace admin email.
+> - `acsUrl`: ACS URL.
+> - `audience`: Audience.
+> - `enableSso`: Enable SSO.
+> - `primaryDomain`: Email Domain of Britive Users.
+> - `secondaryDomain`: Primary Domain in Google Workspace.
+> - `replaceDomain`: Use another domain for account mapping.
+> - `scanRoles`: Scan roles.
+> - `scanGroups`: Scan groups.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+
+>**Sensitive Properties:**
+> - `serviceAccountCredentials`: The Service Account Credentials - Content of Private Key File as JSON String.
+
 ## Argument Reference
 
 The following arguments are supported:
 
-* `application_type` - (Required) The type of the application. Supported types are `Snowflake` and `Snowflake Standalone`.
+* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone` and `Google Workspace`.
+
+* `version` - (Optional) The version of the application resource.  
+  If specified, it must match a supported version for the selected `application_type`.  
+  If omitted, the provider will use the latest available version for selected `application_type`.  
+  See the example usage for each application type above for valid version values.
 
 * `user_account_mappings` - (Optional) A block defining user account mappings for the application. Each block supports:
   - `name` - (Required) The name of the user account mapping.
@@ -143,15 +509,15 @@ The following arguments are supported:
 
 In addition to the above arguments, the following attributes are exported.
 
-* `id` - An identifier for the application.
+* `id` - The unique identifier for the application resource.
 
-* `catalog_app_id` - The id of the application type.
+* `catalog_app_id` - The identifier of the application type in the Britive catalog.
 
-* `entity_root_environment_group_id` - The root environment group ID for the Snowflake Standalone application.
+* `entity_root_environment_group_id` - The root environment group ID (only for Snowflake Standalone applications).
 
 ## Import
 
-You can import an application using any of these accepted formats:
+Applications can be imported using one of the following formats:
 
 ```sh
 terraform import britive_application.new apps/{{application_id}}
