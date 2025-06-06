@@ -280,6 +280,7 @@ type ApplicationResponse struct {
 	AppContainerId        string        `json:"appContainerId"`
 	CatalogAppId          int           `json:"catalogAppId"`
 	CatalogAppDisplayName string        `json:"catalogAppDisplayName"`
+	CatalogAppName        string        `json:"catalogAppName"`
 	UserAccountMappings   []interface{} `json:"userAccountMappings,omitempty"`
 	Properties            Properties    `json:"catalogApplication,omitempty"`
 }

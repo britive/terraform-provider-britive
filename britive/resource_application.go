@@ -136,7 +136,7 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 	var diags diag.Diagnostics
 
 	// Validate properties and sensitive_properties
-	err, version := rt.helper.validatePropertiesAgainstSystemApps(d, c)
+	err, appCatalogDetails := rt.helper.validatePropertiesAgainstSystemApps(d, c)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -147,7 +147,7 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 	}
 
 	application := britive.ApplicationRequest{}
-	err = rt.helper.mapApplicationResourceToModel(d, m, &application, applicationName, version, false)
+	err = rt.helper.mapApplicationResourceToModel(d, m, &application, applicationName, appCatalogDetails, false)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -353,27 +353,8 @@ func NewResourceApplicationHelper() *ResourceApplicationHelper {
 	return &ResourceApplicationHelper{}
 }
 
-func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.ResourceData, m interface{}, application *britive.ApplicationRequest, applicationName string, version string, isUpdate bool) error {
-	c := m.(*britive.Client)
-	appType := d.Get("application_type").(string)
-	systemApps, err := c.GetSystemApps()
-	if err != nil {
-		return fmt.Errorf("failed to fetch system apps: %v", err)
-	}
-
-	var catalogAppId int
-	found := false
-	for _, app := range systemApps {
-		if strings.ToLower(app.Name) == strings.ToLower(appType) && app.Version == version {
-			catalogAppId = app.CatalogAppId
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("Application with type %s not supported", appType)
-	}
-	application.CatalogAppId = catalogAppId
+func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.ResourceData, m interface{}, application *britive.ApplicationRequest, applicationName string, appCatalogDetails *britive.SystemApp, isUpdate bool) error {
+	application.CatalogAppId = appCatalogDetails.CatalogAppId
 	application.CatalogAppDisplayName = applicationName
 	return nil
 }
@@ -561,23 +542,15 @@ func (rrth *ResourceApplicationHelper) importAndMapModelToResource(d *schema.Res
 
 	log.Printf("[INFO] Received application %#v", application)
 
-	catalogApps := map[int]string{
-		9:  "snowflake standalone",
-		10: "snowflake",
-	}
 	catalogAppId := application.CatalogAppId
-	catalogAppType, ok := catalogApps[catalogAppId]
-	if !ok {
-		return errors.New(fmt.Sprintf("Catlog with id %d not supportted", catalogAppId))
-	}
+	catalogAppType := application.CatalogAppName
+
 	if err := d.Set("catalog_app_id", catalogAppId); err != nil {
 		return err
 	}
-
 	if err := d.Set("application_type", catalogAppType); err != nil {
 		return err
 	}
-
 	var stateProperties []map[string]interface{}
 	var stateSensitiveProperties []map[string]interface{}
 	applicationProperties := application.Properties.PropertyTypes
@@ -614,17 +587,17 @@ func (resourceApplicationHelper *ResourceApplicationHelper) parseUniqueID(ID str
 }
 
 // validatePropertiesAgainstSystemApps validates properties and sensitive_properties against system apps
-func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *schema.ResourceData, c *britive.Client) (error, string) {
+func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *schema.ResourceData, c *britive.Client) (error, *britive.SystemApp) {
 	appTypeRaw, ok := d.GetOk("application_type")
 	if !ok {
 		// Return error
-		return fmt.Errorf("Required application_type is not provided"), ""
+		return fmt.Errorf("Required application_type is not provided"), nil
 	}
 	appType := strings.ToLower(appTypeRaw.(string))
 
 	systemApps, err := c.GetSystemApps()
 	if err != nil {
-		return fmt.Errorf("Failed to fetch system apps: %v", err), ""
+		return fmt.Errorf("Failed to fetch system apps: %v", err), nil
 	}
 
 	latestVersion, allAppVersions := getLatestVersion(systemApps, appType)
@@ -646,7 +619,7 @@ func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *sc
 		}
 	}
 	if foundApp == nil {
-		return fmt.Errorf("application_type '%s' with version '%s' not supportted by britive. \nTry %v versions", appType, appVersion, allAppVersions), ""
+		return fmt.Errorf("application_type '%s' with version '%s' not supportted by britive. \nTry %v versions", appType, appVersion, allAppVersions), nil
 	}
 	log.Printf("[Info] Selecting catalog with id %d for application of type %s.", foundApp.CatalogAppId, appTypeRaw)
 
@@ -672,11 +645,11 @@ func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *sc
 		userProps[name] = true
 		pt, ok := allowedProps[name]
 		if !ok {
-			return fmt.Errorf("Property '%s' is not supported for application type '%s'", name, foundApp.Name), ""
+			return fmt.Errorf("Property '%s' is not supported for application type '%s'", name, foundApp.Name), nil
 		}
 		// Type validation for non-sensitive properties
 		if err := validatePropertyValueType(val, pt.Type, name); err != nil {
-			return err, ""
+			return err, nil
 		}
 	}
 	// Validate sensitive_properties
@@ -687,21 +660,21 @@ func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *sc
 		name := propMap["name"].(string)
 		userSensitive[name] = true
 		if _, ok := allowedSensitive[name]; !ok {
-			return fmt.Errorf("sensitive property '%s' is not supported for application type '%s'", name, foundApp.Name), ""
+			return fmt.Errorf("sensitive property '%s' is not supported for application type '%s'", name, foundApp.Name), nil
 		}
 	}
 	// Check required properties
 	for name, pt := range allowedProps {
 		if name != "iconUrl" && pt.Required && !userProps[name] {
-			return fmt.Errorf("Required property '%s' must be provided for application type '%s'", name, foundApp.Name), ""
+			return fmt.Errorf("Required property '%s' must be provided for application type '%s'", name, foundApp.Name), nil
 		}
 	}
 	for name, pt := range allowedSensitive {
 		if pt.Required && !userSensitive[name] {
-			return fmt.Errorf("required sensitive property '%s' must be provided for application type '%s'", name, foundApp.Name), ""
+			return fmt.Errorf("required sensitive property '%s' must be provided for application type '%s'", name, foundApp.Name), nil
 		}
 	}
-	return nil, foundApp.Version
+	return nil, foundApp
 }
 
 func getLatestVersion(systemApps []britive.SystemApp, appType string) (string, []string) {
