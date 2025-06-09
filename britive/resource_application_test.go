@@ -304,6 +304,75 @@ func testAccCheckBritiveApplicationConfig() string {
 		value = "<Service-Key>"
 	}
 	}
+
+	resource "britive_application" "google_workspace_new" {
+    application_type = "Google Workspace"
+    version = "1.0"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - Google Workspace App"
+    }
+    properties {
+      name = "description"
+      value = "AT - Google Workspace App Description"
+    }
+    properties {
+      name = "appAccessMethod_static_loginUrl"
+      value = "https://console-google.com"
+    }
+    properties {
+      name = "provisionUserGw"
+      value = "true"
+    }
+    properties {
+      name = "gSuiteAdmin"
+      value = "admin-google@test.com"
+    }
+    properties {
+      name = "acsUrl"
+      value = "test-google.com"
+    }
+    properties {
+      name = "audience"
+      value = "admin-google@test.com"
+    }
+    properties {
+      name = "enableSso"
+      value = true
+    }
+    properties {
+      name = "primaryDomain"
+      value = "domain1"
+    }
+    properties {
+      name = "secondaryDomain"
+      value = "domain2"
+    }
+    properties {
+      name = "replaceDomain"
+      value = true
+    }
+    properties {
+      name = "scanRoles"
+      value = true
+    }
+    properties {
+      name = "scanGroups"
+      value = true
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = "1500
+    }
+    sensitive_properties {
+      name = "serviceAccountCredentials"
+      value = "<Service-key>"
+    }
+	}
 	`)
 }
 
