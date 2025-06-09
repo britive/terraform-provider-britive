@@ -74,16 +74,37 @@ func testAccCheckBritiveApplicationConfig() string {
 	}
 	sensitive_properties {
 		name  = "privateKey"
-		value = "jgjgjg"
+		value = "<Private Key>"
 	}
 	sensitive_properties {
 		name  = "publicKey"
-		value = "khkghkg"
+		value = "<Public Key>"
 	}
 	sensitive_properties {
 		name  = "privateKeyPassword"
-		value = "Password"
+		value = "<Private Key Password>"
 	}
+	}
+
+	resource "britive_application" "new" {
+    application_type = "Snowflake Standalone"
+    version = "1.0"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - Snowflake Standalone App"
+    }
+    properties {
+      name = "description"
+      value = "AT - Britive Snowflake Standalone App"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1500
+    }
 	}
 	`)
 }
