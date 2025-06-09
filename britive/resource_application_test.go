@@ -86,7 +86,7 @@ func testAccCheckBritiveApplicationConfig() string {
 	}
 	}
 
-	resource "britive_application" "Snowflake_standalone_new" {
+	resource "britive_application" "snowflake_standalone_new" {
     application_type = "Snowflake Standalone"
     version = "1.0"
     user_account_mappings {
@@ -107,7 +107,7 @@ func testAccCheckBritiveApplicationConfig() string {
     }
 	}
 
-	resource "britive_application" "GCP_new" {
+	resource "britive_application" "gcp_new" {
 	application_type = "GCP"
 	version = "2.0"
 	user_account_mappings {
@@ -205,6 +205,103 @@ func testAccCheckBritiveApplicationConfig() string {
 	sensitive_properties {
 		name  = "serviceAccountCredentials"
 		value = "<Service Key>"
+	}
+	}
+
+	resource "britive_application" "gcp_standlone_new" {
+	application_type = "GCP Standalone"
+	version = "1.0"
+	user_account_mappings {
+		name        = "Mobile"
+		description = "Mobile"
+	}
+	properties {
+		name  = "displayName"
+		value = "AT - GCP Standalone App"
+	}
+	properties {
+		name  = "description"
+		value = "AT - Britive GCP Standalone App"
+	}
+	properties {
+		name  = "programmaticAccess"
+		value = true
+	}
+	properties {
+		name  = "consoleAccess"
+		value = true
+	}
+	properties {
+		name  = "appAccessMethod_static_loginUrl"
+		value = "https://gcp.test.com"
+	}
+	properties {
+		name  = "orgId"
+		value = "gcp1"
+	}
+	properties {
+		name  = "gSuiteAdmin"
+		value = "admin-gcp@test.com"
+	}
+	properties {
+		name  = "projectIdForServiceAccount"
+		value = "gcp-project-1"
+	}
+	properties {
+		name  = "acsUrl"
+		value = "test-gcp.com"
+	}
+	properties {
+		name  = "audience"
+		value = "admin-gcp@test.com"
+	}
+	properties {
+		name  = "enableSso"
+		value = true
+	}
+	properties {
+		name  = "primaryDomain"
+		value = "domain1"
+	}
+	properties {
+		name  = "secondaryDomain"
+		value = "domain2"
+	}
+	properties {
+		name  = "replaceDomain"
+		value = true
+	}
+	properties {
+		name  = "scanUsers"
+		value = true
+	}
+	properties {
+		name  = "scanExternalUsersGroups"
+		value = true
+	}
+	properties {
+		name  = "customerId"
+		value = "Cu51omerId"
+	}
+	properties {
+		name  = "maxSessionDurationForProfiles"
+		value = "1500"
+	}
+	properties {
+		name  = "displayProgrammaticKeys"
+		value = true
+	}
+	properties {
+		name  = "gcpProjectFilter"
+		value = "gcpFilter1"
+	}
+	properties {
+		name  = "gcpProjectFilterInclusion"
+		value = "gcpFilterInclusion1"
+	}
+	sensitive_properties {
+		name  = "serviceAccountCredentials"
+		value = "<Service-Key>"
 	}
 	}
 	`)
