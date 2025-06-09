@@ -366,7 +366,7 @@ func testAccCheckBritiveApplicationConfig() string {
     }
     properties {
       name = "maxSessionDurationForProfiles"
-      value = "1500
+      value = "1500"
     }
     sensitive_properties {
       name = "serviceAccountCredentials"
