@@ -86,7 +86,7 @@ func testAccCheckBritiveApplicationConfig() string {
 	}
 	}
 
-	resource "britive_application" "Snowflake standalone new" {
+	resource "britive_application" "Snowflake_standalone_new" {
     application_type = "Snowflake Standalone"
     version = "1.0"
     user_account_mappings {
@@ -107,7 +107,7 @@ func testAccCheckBritiveApplicationConfig() string {
     }
 	}
 
-	resource "britive_application" "GCP new" {
+	resource "britive_application" "GCP_new" {
 	application_type = "GCP"
 	version = "2.0"
 	user_account_mappings {
