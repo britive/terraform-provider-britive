@@ -86,7 +86,7 @@ func testAccCheckBritiveApplicationConfig() string {
 	}
 	}
 
-	resource "britive_application" "new" {
+	resource "britive_application" "Snowflake standalone new" {
     application_type = "Snowflake Standalone"
     version = "1.0"
     user_account_mappings {
@@ -105,6 +105,107 @@ func testAccCheckBritiveApplicationConfig() string {
       name = "maxSessionDurationForProfiles"
       value = 1500
     }
+	}
+
+	resource "britive_application" "GCP new" {
+	application_type = "GCP"
+	version = "2.0"
+	user_account_mappings {
+		name        = "Mobile"
+		description = "Mobile"
+	}
+	properties {
+		name  = "displayName"
+		value = "AT - GCP App"
+	}
+	properties {
+		name  = "description"
+		value = "AT - Britive GCP App"
+	}
+	properties {
+		name  = "programmaticAccess"
+		value = true
+	}
+	properties {
+		name  = "consoleAccess"
+		value = true
+	}
+	properties {
+		name  = "appAccessMethod_static_loginUrl"
+		value = "https:/console-gcp.com"
+	}
+	properties {
+		name  = "orgId"
+		value = "gcp1"
+	}
+	properties {
+		name  = "gSuiteAdmin"
+		value = "admin@gcp-test.com"
+	}
+	properties {
+		name  = "projectIdForServiceAccount"
+		value = "gcp-project"
+	}
+	properties {
+		name  = "acsUrl"
+		value = "test-gcp.com"
+	}
+	properties {
+		name  = "audience"
+		value = "admin-gcp@test.com"
+	}
+	properties {
+		name  = "enableSso"
+		value = true
+	}
+	properties {
+		name  = "primaryDomain"
+		value = "domain1"
+	}
+	properties {
+		name  = "secondaryDomain"
+		value = "domain2"
+	}
+	properties {
+		name  = "replaceDomain"
+		value = true
+	}
+	properties {
+		name  = "scanUsersGroups"
+		value = true
+	}
+	properties {
+		name  = "scanOrganization"
+		value = true
+	}
+	properties {
+		name  = "scanProjectsOnly"
+		value = true
+	}
+	properties {
+		name  = "scanExternalUsersGroups"
+		value = true
+	}
+	properties {
+		name  = "customerId"
+		value = "Cu5t0merId"
+	}
+	properties {
+		name  = "maxSessionDurationForProfiles"
+		value = "1500"
+	}
+	properties {
+		name  = "gcpProjectFilter"
+		value = "gcpFilter1"
+	}
+	properties {
+		name  = "gcpProjectFilterInclusion"
+		value = "gcpFilterInclusion1"
+	}
+	sensitive_properties {
+		name  = "serviceAccountCredentials"
+		value = "<Service Key>"
+	}
 	}
 	`)
 }
