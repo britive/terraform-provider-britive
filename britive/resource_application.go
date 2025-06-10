@@ -12,6 +12,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -40,14 +41,16 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 		},
 		Schema: map[string]*schema.Schema{
 			"application_type": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone'",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone' and 'Google Workspace'",
+				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "Google Workspace"}, true),
 			},
 			"version": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Computed:    true,
+				ForceNew:    true,
 				Description: "Britive application version",
 			},
 			"catalog_app_id": {

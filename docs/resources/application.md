@@ -2,7 +2,7 @@
 
 This resource allows you to create and manage applications in Britive.
 
--> This resource is only supported for the Snowflake, Snowflake Standalone, GCP, GCP Standalone, Google Workspace applications.
+-> This resource is only supported for the Snowflake, Snowflake Standalone, GCP, GCP Standalone and Google Workspace applications.
 
 ## Example Usage
 
