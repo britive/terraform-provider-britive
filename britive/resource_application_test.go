@@ -17,6 +17,10 @@ func TestBritiveApplication(t *testing.T) {
 				Config: testAccCheckBritiveApplicationConfig(),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveApplicationExists("britive_application.snowflake_new"),
+					testAccCheckBritiveApplicationExists("britive_application.snowflake_standalone_new"),
+					testAccCheckBritiveApplicationExists("britive_application.gcp_new"),
+					testAccCheckBritiveApplicationExists("britive_application.gcp_standlone_new"),
+					testAccCheckBritiveApplicationExists("britive_application.google_workspace_new"),
 				),
 			},
 		},
