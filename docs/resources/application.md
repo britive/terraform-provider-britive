@@ -11,7 +11,6 @@ This resource allows you to create and manage applications in Britive.
 ```hcl
 resource "britive_application" "new" {
   application_type = "Snowflake"
-  version = "1.0"
   user_account_mappings {
     name        = "Mobile"
     description = "Mobile"
@@ -96,7 +95,6 @@ resource "britive_application" "new" {
 ```hcl
 resource "britive_application" "new" {
     application_type = "Snowflake Standalone"
-    version = "1.0"
     user_account_mappings {
       name = "Mobile"
       description = "Mobile"
@@ -127,7 +125,6 @@ resource "britive_application" "new" {
 ```hcl
 resource "britive_application" "new" {
   application_type = "GCP"
-  version = "2.0"
   user_account_mappings {
     name        = "Mobile"
     description = "Mobile"
@@ -262,7 +259,6 @@ resource "britive_application" "new" {
 ```hcl
 resource "britive_application" "new" {
   application_type = "GCP Standalone"
-  version = "1.0"
   user_account_mappings {
     name        = "Mobile"
     description = "Mobile"
@@ -392,7 +388,6 @@ resource "britive_application" "new" {
 ```hcl
 resource "britive_application" "application_google_workspace" {
     application_type = "Google Workspace"
-    version = "1.0"
     user_account_mappings {
       name = "Mobile"
       description = "Mobile"
