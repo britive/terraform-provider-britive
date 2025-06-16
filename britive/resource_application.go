@@ -76,7 +76,7 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 						},
 						"value": {
 							Type:        schema.TypeString,
-							Required:    true,
+							Optional:    true,
 							Description: "Britive application property value.",
 						},
 					},
@@ -98,7 +98,7 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 						},
 						"value": {
 							Type:      schema.TypeString,
-							Required:  true,
+							Optional:  true,
 							Sensitive: true,
 							StateFunc: func(val interface{}) string {
 								return getHash(val.(string))
@@ -408,7 +408,8 @@ func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.Re
 			}
 			propertyType.Value = propertyValue
 		} else {
-			propertyType.Value = property.(map[string]interface{})["value"].(string)
+			propertyValue := property.(map[string]interface{})["value"].(string)
+			propertyType.Value = propertyValue
 		}
 		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
 	}
@@ -482,9 +483,9 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	}
 
 	applicationProperties := application.Properties.PropertyTypes
-	propertiesMap := make(map[string]string)
+	propertiesMap := make(map[string]interface{})
 	for _, property := range applicationProperties {
-		propertiesMap[property.Name] = fmt.Sprintf("%v", property.Value)
+		propertiesMap[property.Name] = property.Value
 	}
 
 	var stateProperties []map[string]interface{}
@@ -494,9 +495,15 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 
 	for _, property := range properties.List() {
 		propertyName := property.(map[string]interface{})["name"].(string)
+		var propertyValue interface{}
+		if propertiesMap[propertyName] == nil || propertiesMap[propertyName] == "" {
+			propertyValue = ""
+		} else {
+			propertyValue = fmt.Sprintf("%v", propertiesMap[propertyName])
+		}
 		stateProperties = append(stateProperties, map[string]interface{}{
 			"name":  propertyName,
-			"value": propertiesMap[propertyName],
+			"value": propertyValue,
 		})
 	}
 	for _, property := range sensitiveProperties.List() {
@@ -566,9 +573,12 @@ func (rrth *ResourceApplicationHelper) importAndMapModelToResource(d *schema.Res
 				"value": fmt.Sprintf("%v", property.Value),
 			})
 		} else {
+			if property.Value != nil {
+				property.Value = fmt.Sprintf("%v", property.Value)
+			}
 			stateProperties = append(stateProperties, map[string]interface{}{
 				"name":  propertyName,
-				"value": fmt.Sprintf("%v", property.Value),
+				"value": property.Value,
 			})
 		}
 	}
