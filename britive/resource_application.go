@@ -496,8 +496,8 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	for _, property := range properties.List() {
 		propertyName := property.(map[string]interface{})["name"].(string)
 		var propertyValue interface{}
-		if propertiesMap[propertyName] == nil || propertiesMap[propertyName] == "" {
-			propertyValue = ""
+		if propertiesMap[propertyName] == nil || propertiesMap[propertyName] == "" || propertyName == "iconUrl" {
+			continue
 		} else {
 			propertyValue = fmt.Sprintf("%v", propertiesMap[propertyName])
 		}
@@ -508,6 +508,9 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	}
 	for _, property := range sensitiveProperties.List() {
 		propertyName := property.(map[string]interface{})["name"].(string)
+		if propertiesMap[propertyName] == nil || propertiesMap[propertyName] == "" {
+			continue
+		}
 		if propertiesMap[propertyName] == "*" {
 			for _, sp := range sensitiveProperties.List() {
 				existing := sp.(map[string]interface{})
@@ -566,22 +569,41 @@ func (rrth *ResourceApplicationHelper) importAndMapModelToResource(d *schema.Res
 	applicationProperties := application.Properties.PropertyTypes
 	for _, property := range applicationProperties {
 		propertyName := property.Name
+		propertyValue := fmt.Sprintf("%v", property.Value)
+
+		// Only valid fields allowed
+		if propertyValue == "" || property.Value == nil {
+			continue
+		}
 
 		if property.Type == "com.britive.pab.api.Secret" || property.Type == "com.britive.pab.api.SecretFile" {
 			stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
 				"name":  propertyName,
-				"value": fmt.Sprintf("%v", property.Value),
+				"value": propertyValue,
 			})
 		} else {
-			if property.Value != nil {
-				property.Value = fmt.Sprintf("%v", property.Value)
-			}
 			stateProperties = append(stateProperties, map[string]interface{}{
 				"name":  propertyName,
-				"value": property.Value,
+				"value": propertyValue,
 			})
 		}
 	}
+
+	// check required properties
+	properties := make(map[string]bool)
+	for _, prop := range stateProperties {
+		propName := prop["name"].(string)
+		properties[propName] = true
+	}
+	for _, prop := range stateSensitiveProperties {
+		propName := prop["name"].(string)
+		properties[propName] = true
+	}
+
+	if err := checkRequiredProps(properties, catalogAppType); err != nil {
+		return err
+	}
+
 	if err := d.Set("properties", stateProperties); err != nil {
 		return err
 	}
@@ -677,17 +699,62 @@ func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *sc
 		}
 	}
 	// Check required properties
-	for name, pt := range allowedProps {
-		if name != "iconUrl" && pt.Required && !userProps[name] {
-			return fmt.Errorf("Required property '%s' must be provided for application type '%s'", name, foundApp.Name), nil
-		}
-	}
-	for name, pt := range allowedSensitive {
-		if pt.Required && !userSensitive[name] {
-			return fmt.Errorf("required sensitive property '%s' must be provided for application type '%s'", name, foundApp.Name), nil
-		}
+	properties := make(map[string]bool)
+	mergePropertySet(properties, props)
+	mergePropertySet(properties, sprops)
+	if err := checkRequiredProps(properties, foundApp.Name); err != nil {
+		return err, nil
 	}
 	return nil, foundApp
+}
+
+func checkRequiredProps(properties map[string]bool, name string) error {
+	appType := strings.ToLower(name)
+
+	requiredProps := map[string][]string{
+		"snowflake": {
+			"displayName", "maxSessionDurationForProfiles", "accountId",
+			"appAccessMethod_static_loginUrl", "username", "role",
+			"publicKey", "privateKey",
+		},
+		"snowflake standalone": {
+			"displayName", "maxSessionDurationForProfiles",
+		},
+		"gcp": {
+			"displayName", "maxSessionDurationForProfiles", "appAccessMethod_static_loginUrl", "orgId",
+			"gSuiteAdmin", "customerId", "serviceAccountCredentials",
+		},
+		"gcp standalone": {
+			"displayName", "maxSessionDurationForProfiles", "appAccessMethod_static_loginUrl",
+			"orgId", "gSuiteAdmin", "customerId", "serviceAccountCredentials",
+		},
+		"google workspace": {
+			"displayName", "appAccessMethod_static_loginUrl", "gSuiteAdmin", "maxSessionDurationForProfiles", "serviceAccountCredentials",
+		},
+	}
+
+	appReqs, ok := requiredProps[appType]
+	if !ok {
+		return fmt.Errorf("invalid appType %q", appType)
+	}
+
+	for _, field := range appReqs {
+		if !properties[field] {
+			return fmt.Errorf("required property '%s' must be provided for application type '%s'", field, appType)
+		}
+	}
+
+	return nil
+}
+
+func mergePropertySet(target map[string]bool, set *schema.Set) {
+	for _, item := range set.List() {
+		if propMap, ok := item.(map[string]interface{}); ok {
+			if name, ok := propMap["name"].(string); ok {
+				target[name] = true
+			}
+		}
+	}
 }
 
 func getLatestVersion(systemApps []britive.SystemApp, appType string) (string, []string) {
