@@ -234,7 +234,7 @@ func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.Res
 	c := m.(*britive.Client)
 
 	// Validate properties and sensitive_properties
-	err, _ := rt.helper.validatePropertiesAgainstSystemApps(d, c)
+	err, foundApp := rt.helper.validatePropertiesAgainstSystemApps(d, c)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -260,6 +260,12 @@ func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.Res
 		log.Printf("[INFO] Received application %#v", application)
 
 		properties := britive.Properties{}
+
+		oldProps, newProps := d.GetChange("properties")
+		oldSprops, newSprops := d.GetChange("sensitive_properties")
+
+		getRemovedProperties(c, foundApp, &properties, oldProps, newProps, oldSprops, newSprops)
+
 		err = rt.helper.mapPropertiesResourceToModel(d, m, &properties, application, false)
 		if err != nil {
 			return diag.FromErr(err)
@@ -314,6 +320,57 @@ func (rt *ResourceApplication) resourceDelete(ctx context.Context, d *schema.Res
 	d.SetId("")
 
 	return diags
+}
+
+func getRemovedProperties(c *britive.Client, application *britive.SystemApp, properties *britive.Properties, oldProps, newProps, oldSprops, newSprops interface{}) {
+	var oldPropertiesList, newPropertiesList, oldSecPropertiesList, newSecPropertiesList []interface{}
+
+	oldPropertiesList = oldProps.(*schema.Set).List()
+	newPropertiesList = newProps.(*schema.Set).List()
+	oldSecPropertiesList = oldSprops.(*schema.Set).List()
+	newSecPropertiesList = newSprops.(*schema.Set).List()
+
+	oldPropertiesList = append(oldPropertiesList, oldSecPropertiesList...)
+	newPropertiesList = append(newPropertiesList, newSecPropertiesList...)
+
+	newPropertyNames := make(map[string]interface{})
+	for _, item := range newPropertiesList {
+		if prop, ok := item.(map[string]interface{}); ok {
+			if name, ok := prop["name"].(string); ok {
+				newPropertyNames[strings.ToLower(name)] = nil
+			}
+		}
+	}
+
+	propertyTypeMap := make(map[string]interface{})
+	for _, foundProp := range application.PropertyTypes {
+		prop := map[string]interface{}{
+			"value": foundProp.Value,
+			"type":  foundProp.Type,
+		}
+		propertyTypeMap[foundProp.Name] = prop
+	}
+
+	for _, propRaw := range oldPropertiesList {
+		prop, _ := propRaw.(map[string]interface{})
+
+		propName := prop["name"].(string)
+
+		if _, found := newPropertyNames[propName]; !found {
+			var property britive.PropertyTypes
+			property.Name = propName
+
+			valueAndType, ok := propertyTypeMap[propName]
+			propType := valueAndType.(map[string]interface{})["type"].(string)
+			propValue := valueAndType.(map[string]interface{})["value"]
+			if ok && propType == "java.lang.Boolean" {
+				property.Value = propValue
+			} else {
+				property.Value = ""
+			}
+			properties.PropertyTypes = append(properties.PropertyTypes, property)
+		}
+	}
 }
 
 func (rt *ResourceApplication) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
@@ -482,47 +539,62 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		return err
 	}
 
+	if err := d.Set("version", application.Properties.Version); err != nil {
+		return err
+	}
+
 	applicationProperties := application.Properties.PropertyTypes
 	propertiesMap := make(map[string]interface{})
 	for _, property := range applicationProperties {
-		propertiesMap[property.Name] = property.Value
+		propertiesMap[property.Name] = map[string]interface{}{
+			"value": property.Value,
+			"type":  property.Type,
+		}
 	}
 
 	var stateProperties []map[string]interface{}
 	var stateSensitiveProperties []map[string]interface{}
 	properties := d.Get("properties").(*schema.Set)
 	sensitiveProperties := d.Get("sensitive_properties").(*schema.Set)
+	userProperties := make(map[string]bool)
 
 	for _, property := range properties.List() {
 		propertyName := property.(map[string]interface{})["name"].(string)
-		var propertyValue interface{}
-		if propertiesMap[propertyName] == nil || propertiesMap[propertyName] == "" || propertyName == "iconUrl" {
+		propertyValType := propertiesMap[propertyName].(map[string]interface{})
+		propertyValue := propertyValType["value"]
+		if propertyValue == nil || propertyValue == "" || propertyName == "iconUrl" {
 			continue
 		} else {
-			propertyValue = fmt.Sprintf("%v", propertiesMap[propertyName])
+			propertyValue = fmt.Sprintf("%v", propertyValue)
 		}
 		stateProperties = append(stateProperties, map[string]interface{}{
 			"name":  propertyName,
 			"value": propertyValue,
 		})
+		userProperties[propertyName] = true
 	}
+	appType := application.CatalogAppName
+	addRequiredProperties(appType, userProperties, propertiesMap, &stateProperties)
+
 	for _, property := range sensitiveProperties.List() {
 		propertyName := property.(map[string]interface{})["name"].(string)
-		if propertiesMap[propertyName] == nil || propertiesMap[propertyName] == "" {
+		propertyValType := propertiesMap[propertyName].(map[string]interface{})
+		propertyValue := propertyValType["value"]
+		if propertyValue == nil || propertyValue == "" {
 			continue
 		}
-		if propertiesMap[propertyName] == "*" {
+		if propertyValue == "*" {
 			for _, sp := range sensitiveProperties.List() {
 				existing := sp.(map[string]interface{})
 				if existing["name"] == propertyName {
-					propertiesMap[propertyName] = existing["value"].(string)
+					propertyValue = existing["value"].(string)
 					break
 				}
 			}
 		}
 		stateSensitiveProperties = append(stateSensitiveProperties, map[string]interface{}{
 			"name":  propertyName,
-			"value": propertiesMap[propertyName],
+			"value": propertyValue,
 		})
 	}
 
@@ -533,6 +605,46 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		return err
 	}
 	return nil
+}
+
+func addRequiredProperties(appType string, userProperties map[string]bool, propertiesMap map[string]interface{}, stateProperties *[]map[string]interface{}) {
+	requiredProps := map[string][]string{
+		"snowflake": {
+			"displayName", "maxSessionDurationForProfiles", "accountId",
+			"appAccessMethod_static_loginUrl", "username", "role",
+			"publicKey", "privateKey",
+		},
+		"snowflake standalone": {
+			"displayName", "maxSessionDurationForProfiles",
+		},
+		"gcp": {
+			"displayName", "maxSessionDurationForProfiles", "appAccessMethod_static_loginUrl", "orgId",
+			"gSuiteAdmin", "customerId", "serviceAccountCredentials",
+		},
+		"gcp standalone": {
+			"displayName", "maxSessionDurationForProfiles", "appAccessMethod_static_loginUrl",
+			"orgId", "gSuiteAdmin", "customerId", "serviceAccountCredentials",
+		},
+		"google workspace": {
+			"displayName", "appAccessMethod_static_loginUrl", "gSuiteAdmin", "maxSessionDurationForProfiles", "serviceAccountCredentials",
+		},
+	}
+
+	appName := strings.ToLower(appType)
+	appReqs, _ := requiredProps[appName]
+
+	for _, field := range appReqs {
+		propertyValType := propertiesMap[field].(map[string]interface{})
+		propertyValue := propertyValType["value"]
+		propertyType := propertyValType["type"].(string)
+		ok := userProperties[field]
+		if !ok && propertyType != "com.britive.pab.api.Secret" && propertyType != "com.britive.pab.api.SecretFile" {
+			*stateProperties = append(*stateProperties, map[string]interface{}{
+				"name":  field,
+				"value": propertyValue,
+			})
+		}
+	}
 }
 
 func (rrth *ResourceApplicationHelper) importAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
@@ -599,7 +711,6 @@ func (rrth *ResourceApplicationHelper) importAndMapModelToResource(d *schema.Res
 		propName := prop["name"].(string)
 		properties[propName] = true
 	}
-
 	if err := checkRequiredProps(properties, catalogAppType); err != nil {
 		return err
 	}
@@ -657,9 +768,6 @@ func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *sc
 		return fmt.Errorf("application_type '%s' with version '%s' not supportted by britive. \nTry %v versions", appType, appVersion, allAppVersions), nil
 	}
 	log.Printf("[Info] Selecting catalog with id %d for application of type %s.", foundApp.CatalogAppId, appTypeRaw)
-
-	var foundAppVersionInterface interface{} = foundApp.Version
-	d.Set("version", foundAppVersionInterface)
 
 	allowedProps := map[string]britive.SystemAppPropertyType{}
 	allowedSensitive := map[string]britive.SystemAppPropertyType{}

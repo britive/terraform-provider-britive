@@ -293,9 +293,10 @@ func (c *Client) GetRootEnvID(applicationID string) (string, error) {
 
 // SystemAppPropertyType represents a property type in the system app catalog
 type SystemAppPropertyType struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Required bool   `json:"required"`
+	Name     string      `json:"name"`
+	Type     string      `json:"type"`
+	Value    interface{} `json:"value"`
+	Required bool        `json:"required"`
 }
 
 // SystemApp represents an app in the system app catalog

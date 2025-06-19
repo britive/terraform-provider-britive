@@ -287,6 +287,7 @@ type ApplicationResponse struct {
 
 type Properties struct {
 	PropertyTypes []PropertyTypes `json:"propertyTypes"`
+	Version       string          `json:"version"`
 }
 
 type PropertyTypes struct {
