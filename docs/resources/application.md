@@ -68,9 +68,7 @@ resource "britive_application" "new" {
     value = "Password"
   }
 }
-```
-
--> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid Snowflake application.  
+```  
 
 ~> This resource does not track changes made to `sensitive_properties` through the Britive console.
 >**Properties:**
@@ -114,7 +112,6 @@ resource "britive_application" "new" {
 }
 ```
 
--> The `properties` in the above Snowflake Standalone example are mandatory for creating a valid Snowflake Standalone application.
 >**Properties:**
 > - `displayName`: Application Name.
 > - `description`: Application Description.
@@ -221,10 +218,7 @@ resource "britive_application" "new" {
     name  = "serviceAccountCredentials"
     value = file("${path.module}/service_key.key")
   }
-}
 ```
-
--> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid GCP application.
 
 ~> This resource does not track changes made to `sensitive_properties` through the Britive console.
 > **Properties:**
@@ -354,8 +348,6 @@ resource "britive_application" "new" {
 }
 ```
 
--> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid GCP Standalone application.
-
 ~> This resource does not track changes made to `sensitive_properties` through the Britive console.
 > **Properties:**
 > - `programmaticAccess`: Programmatic Access.
@@ -455,8 +447,6 @@ resource "britive_application" "application_google_workspace" {
 }
 ```
 
--> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid Google Workspace application.
-
 ~> This resource does not track changes made to `sensitive_properties` through the Britive console.
 > **Properties:**
 > - `displayName`: Application Name.
@@ -517,4 +507,53 @@ Applications can be imported using one of the following formats:
 ```sh
 terraform import britive_application.new apps/{{application_id}}
 terraform import britive_application.new {{application_id}}
+```
+  
+->During the import process, only properties with values explicitly set or different from their default values will be imported. This avoids overwriting default configurations and ensures only customized settings are preserved in the Terraform state.
+
+## Deleting Properties
+
+When a property is deleted from the configuration, its value will revert to the default based on its data type:
+- string: '' (empty string)
+- boolean: False
+
+EXCEPTIONS: Some applications require certain properties to retain specific default values, even when removed from the configuration. These exceptions are outlined below.
+
+```sh
+    'GCP Standalone': 
+    {
+        'consoleAccess': True,
+        'displayName': 'GCP Standalone',
+        'appAccessMethod_static_loginUrl': 'https://console.cloud.google.com',
+        'maxSessionDurationForProfiles': '604800' 
+    },
+    'Google Workspace': 
+    {
+        'displayName': 'Google Workspace',
+        'appAccessMethod_static_loginUrl': 'https://admin.google.com',
+        'maxSessionDurationForProfiles': '604800',
+        'scanRoles': True,
+        'scanGroups': True 
+    },
+    'Snowflake': 
+    {
+        'appAccessMethod_static_loginUrl': 'https://{accountId}.snowflakecomputing.com/',
+        'displayName': 'Snowflake',
+        'maxSessionDurationForProfiles': '604800' 
+    },
+    'GCP': 
+    {
+        'consoleAccess': True,
+        'displayName': 'GCP',
+        'appAccessMethod_static_loginUrl': 'https://console.cloud.google.com',
+        'scanUsersGroups': True,
+        'maxSessionDurationForProfiles': '604800' 
+    },
+    'Snowflake Standalone': 
+    {
+        'displayName': 'Snowflake Standalone',
+        'description': 'Snowflake app for standalone instances',
+        'maxSessionDurationForProfiles': '604800' 
+    }
+
 ```
