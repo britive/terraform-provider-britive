@@ -225,7 +225,7 @@ resource "britive_application" "new" {
 > - `displayName`: Application Name.
 > - `description`: Application Description.
 > - `programmaticAccess`: Programmatic Access.
-> - `consoleAccess`: Console.
+> - `consoleAccess`: Console Access.
 > - `appAccessMethod_static_loginUrl`: Login URL.
 > - `orgId`: The Organizations Unique Identifier.
 > - `gSuiteAdmin`: G Suite Admin Email.
@@ -351,7 +351,7 @@ resource "britive_application" "new" {
 ~> This resource does not track changes made to `sensitive_properties` through the Britive console.
 > **Properties:**
 > - `programmaticAccess`: Programmatic Access.
-> - `consoleAccess`: Console.
+> - `consoleAccess`: Console Access.
 > - `displayName`: Application Name.
 > - `description`: Application Description.
 > - `appAccessMethod_static_loginUrl`: Login URL.
