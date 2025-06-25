@@ -75,7 +75,7 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 						},
 						"value": {
 							Type:        schema.TypeString,
-							Optional:    true,
+							Required:    true,
 							Description: "Britive application property value.",
 						},
 					},
