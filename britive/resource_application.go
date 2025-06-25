@@ -537,6 +537,26 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		return err
 	}
 
+	if application.CatalogAppId == 9 {
+		rootGroupId := ""
+		rootEnvironmentGroups := application.RootEnvironmentGroup
+		if rootEnvironmentGroups != nil {
+			environmentGroups := rootEnvironmentGroups.EnvironmentGroups
+			if environmentGroups != nil {
+				for _, envGroup := range environmentGroups {
+					if envGroup.Name == "root" {
+						rootGroupId = envGroup.ID
+					}
+				}
+			}
+		}
+		if rootGroupId != "" {
+			if err := d.Set("entity_root_environment_group_id", rootGroupId); err != nil {
+				return err
+			}
+		}
+	}
+
 	systemApps, err := c.GetSystemApps()
 	if err != nil {
 		return fmt.Errorf("Failed to fetch system apps: %v", err)
