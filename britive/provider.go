@@ -37,6 +37,7 @@ func Provider(v string) *schema.Provider {
 	resourceApplication := NewResourceApplication(validation, importHelper)
 	resourceEntityGroup := NewResourceEntityGroup(importHelper)
 	resourceEntityEnvironment := NewResourceEntityEnvironment(importHelper)
+	resourceAdvancedSettings := NewResourceAdvancedSettings(validation, importHelper)
 
 	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
 	dataSourceApplication := NewDataSourceApplication()
@@ -79,6 +80,7 @@ func Provider(v string) *schema.Provider {
 			"britive_application":                 resourceApplication.Resource,
 			"britive_entity_group":                resourceEntityGroup.Resource,
 			"britive_entity_environment":          resourceEntityEnvironment.Resource,
+			"britive_advanced_settings":           resourceAdvancedSettings.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider":     dataSourceIdentityProvider.Resource,
