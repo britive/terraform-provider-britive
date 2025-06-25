@@ -97,7 +97,7 @@ func NewResourceApplication(v *Validation, importHelper *ImportHelper) *Resource
 						},
 						"value": {
 							Type:      schema.TypeString,
-							Optional:  true,
+							Required:  true,
 							Sensitive: true,
 							StateFunc: func(val interface{}) string {
 								return getHash(val.(string))
