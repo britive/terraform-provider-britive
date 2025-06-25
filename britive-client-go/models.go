@@ -321,3 +321,22 @@ type ApplicationEntityGroup struct {
 	Description string `json:"description"`
 	ParentID    string `json:"parentId"`
 }
+
+// Advanced Settings - godoc
+type AdvancedSettings struct {
+	Settings []Setting `json:"settings"`
+}
+
+type Setting struct {
+	SettingsType            string `json:"settingsType"`
+	ID                      string `json:"id"`
+	EntityID                string `json:"entityId"`
+	EntityType              string `json:"entityType"`
+	IsInherited             bool   `json:"isInherited"`
+	IsJustificationRequired bool   `json:"isJustificationRequired,omitempty"`
+	JustificationRegex      string `json:"justificationRegex,omitempty"`
+	ConnectionID            string `json:"connectionId,omitempty"`
+	ConnectionType          string `json:"connectionType,omitempty"`
+	IsCommentRequired       bool   `json:"isCommentRequired,omitempty"`
+	IsITSMEnabled           bool   `json:"isITSMEnabled,omitempty"`
+}

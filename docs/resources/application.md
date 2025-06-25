@@ -514,10 +514,10 @@ terraform import britive_application.new {{application_id}}
 ## Deleting Properties
 
 When a property is deleted from the configuration, its value will revert to the default based on its data type:
-- string: '' (empty string)
+- string: "" (empty string)
 - boolean: False
 
-EXCEPTIONS: Some applications require certain properties to retain specific default values, even when removed from the configuration. These exceptions are outlined below.
+**EXCEPTIONS:** Some applications require certain properties to retain specific default values, even when removed from the configuration. These exceptions are outlined below.
 ### GCP
 ```sh
 {
