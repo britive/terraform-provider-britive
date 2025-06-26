@@ -518,42 +518,52 @@ When a property is deleted from the configuration, its value will revert to the 
 - boolean: False
 
 EXCEPTIONS: Some applications require certain properties to retain specific default values, even when removed from the configuration. These exceptions are outlined below.
-
+### GCP
 ```sh
-    'GCP Standalone': 
-    {
-        'consoleAccess': True,
-        'displayName': 'GCP Standalone',
-        'appAccessMethod_static_loginUrl': 'https://console.cloud.google.com',
-        'maxSessionDurationForProfiles': '604800' 
-    },
-    'Google Workspace': 
-    {
-        'displayName': 'Google Workspace',
-        'appAccessMethod_static_loginUrl': 'https://admin.google.com',
-        'maxSessionDurationForProfiles': '604800',
-        'scanRoles': True,
-        'scanGroups': True 
-    },
-    'Snowflake': 
-    {
-        'appAccessMethod_static_loginUrl': 'https://{accountId}.snowflakecomputing.com/',
-        'displayName': 'Snowflake',
-        'maxSessionDurationForProfiles': '604800' 
-    },
-    'GCP': 
-    {
-        'consoleAccess': True,
-        'displayName': 'GCP',
-        'appAccessMethod_static_loginUrl': 'https://console.cloud.google.com',
-        'scanUsersGroups': True,
-        'maxSessionDurationForProfiles': '604800' 
-    },
-    'Snowflake Standalone': 
-    {
-        'displayName': 'Snowflake Standalone',
-        'description': 'Snowflake app for standalone instances',
-        'maxSessionDurationForProfiles': '604800' 
-    }
+{
+    'consoleAccess': True,
+    'displayName': 'GCP',
+    'appAccessMethod_static_loginUrl': 'https://console.cloud.google.com',
+    'scanUsersGroups': True,
+    'maxSessionDurationForProfiles': '604800' 
+}
+```
 
+### GCP Standalone
+```sh
+{
+    'consoleAccess': True,
+    'displayName': 'GCP Standalone',
+    'appAccessMethod_static_loginUrl': 'https://console.cloud.google.com',
+    'maxSessionDurationForProfiles': '604800' 
+}
+```
+
+### Google Workspace
+```sh
+{
+    'displayName': 'Google Workspace',
+    'appAccessMethod_static_loginUrl': 'https://admin.google.com',
+    'maxSessionDurationForProfiles': '604800',
+    'scanRoles': True,
+    'scanGroups': True 
+}
+```
+
+### Snowflake
+``` sh
+{
+    'appAccessMethod_static_loginUrl': 'https://{accountId}.snowflakecomputing.com/',
+    'displayName': 'Snowflake',
+    'maxSessionDurationForProfiles': '604800' 
+}
+```
+
+### Snowflake Standalone
+```sh
+{
+    'displayName': 'Snowflake Standalone',
+    'description': 'Snowflake app for standalone instances',
+    'maxSessionDurationForProfiles': '604800' 
+}
 ```
