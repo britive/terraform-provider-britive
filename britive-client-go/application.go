@@ -290,3 +290,37 @@ func (c *Client) GetRootEnvID(applicationID string) (string, error) {
 	}
 	return "", errors.New("No root Environment Group ia available for application" + applicationID)
 }
+
+// SystemAppPropertyType represents a property type in the system app catalog
+type SystemAppPropertyType struct {
+	Name     string      `json:"name"`
+	Type     string      `json:"type"`
+	Value    interface{} `json:"value"`
+	Required bool        `json:"required"`
+}
+
+// SystemApp represents an app in the system app catalog
+type SystemApp struct {
+	CatalogAppId  int                     `json:"catalogAppId"`
+	Name          string                  `json:"name"`
+	Version       string                  `json:"version"`
+	PropertyTypes []SystemAppPropertyType `json:"propertyTypes"`
+}
+
+// GetSystemApps fetches the list of system apps and their propertyTypes
+func (c *Client) GetSystemApps() ([]SystemApp, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/system/apps", c.APIBaseURL), nil)
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	var apps []SystemApp
+	err = json.Unmarshal(body, &apps)
+	if err != nil {
+		return nil, err
+	}
+	return apps, nil
+}

@@ -277,15 +277,18 @@ type ApplicationRequest struct {
 }
 
 type ApplicationResponse struct {
-	AppContainerId        string        `json:"appContainerId"`
-	CatalogAppId          int           `json:"catalogAppId"`
-	CatalogAppDisplayName string        `json:"catalogAppDisplayName"`
-	UserAccountMappings   []interface{} `json:"userAccountMappings,omitempty"`
-	Properties            Properties    `json:"catalogApplication,omitempty"`
+	AppContainerId        string                           `json:"appContainerId"`
+	CatalogAppId          int                              `json:"catalogAppId"`
+	CatalogAppDisplayName string                           `json:"catalogAppDisplayName"`
+	CatalogAppName        string                           `json:"catalogAppName"`
+	UserAccountMappings   []interface{}                    `json:"userAccountMappings,omitempty"`
+	Properties            Properties                       `json:"catalogApplication,omitempty"`
+	RootEnvironmentGroup  *ApplicationRootEnvironmentGroup `json:"rootEnvironmentGroup,omitempty"`
 }
 
 type Properties struct {
 	PropertyTypes []PropertyTypes `json:"propertyTypes"`
+	Version       string          `json:"version"`
 }
 
 type PropertyTypes struct {
