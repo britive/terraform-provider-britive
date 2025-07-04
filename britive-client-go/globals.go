@@ -5,18 +5,19 @@ import (
 )
 
 const (
-	emptyString         = ""
-	tagLockName         = "tag"
-	profileLockName     = "profile"
-	permissionLockName  = "permissions"
-	roleLockName        = "role"
-	policyLockName      = "policy"
-	accountId           = "accountId"
-	environmentId       = "environmentId"
-	constraintLockName  = "constraint"
-	applicationLockName = "application"
-	environment         = "Environment"
-	environmentGroup    = "EnvironmentGroup"
+	emptyString             = ""
+	tagLockName             = "tag"
+	profileLockName         = "profile"
+	permissionLockName      = "permissions"
+	roleLockName            = "role"
+	policyLockName          = "policy"
+	accountId               = "accountId"
+	environmentId           = "environmentId"
+	constraintLockName      = "constraint"
+	applicationLockName     = "application"
+	advancedSettingLockName = "AdvancedSetting"
+	environment             = "Environment"
+	environmentGroup        = "EnvironmentGroup"
 )
 
 var (
