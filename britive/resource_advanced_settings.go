@@ -71,7 +71,7 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 					},
 				},
 			},
-			"itsm_setting": {
+			"itsm": {
 				Type:        schema.TypeList,
 				Optional:    true,
 				Description: "Resource ITSM Setting",
@@ -329,12 +329,12 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 			},
 		}
 
-		if err := d.Set("itsm_setting", itsmSetting); err != nil {
+		if err := d.Set("itsm", itsmSetting); err != nil {
 			return err
 		}
 
 	} else {
-		if err := d.Set("itsm_setting", nil); err != nil {
+		if err := d.Set("itsm", nil); err != nil {
 			return err
 		}
 	}
@@ -389,7 +389,7 @@ func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d 
 	}
 
 	// Handle ITSM settings
-	if itsmRaw, ok := d.GetOk("itsm_setting"); ok {
+	if itsmRaw, ok := d.GetOk("itsm"); ok {
 		itsmList := itsmRaw.([]interface{})
 		if len(itsmList) != 1 {
 			return fmt.Errorf("Invalid ITSM settings: must contain exactly one element")
