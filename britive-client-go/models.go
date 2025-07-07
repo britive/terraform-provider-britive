@@ -332,13 +332,12 @@ type Setting struct {
 	ID                      string               `json:"id"`
 	EntityID                string               `json:"entityId"`
 	EntityType              string               `json:"entityType"`
-	IsInherited             bool                 `json:"isInherited"`
-	IsJustificationRequired bool                 `json:"isJustificationRequired,omitempty"`
+	IsInherited             *bool                `json:"isInherited"`
+	IsJustificationRequired *bool                `json:"isJustificationRequired,omitempty"`
 	JustificationRegex      string               `json:"justificationRegex,omitempty"`
 	ConnectionID            string               `json:"connectionId,omitempty"`
 	ConnectionType          string               `json:"connectionType,omitempty"`
-	IsCommentRequired       bool                 `json:"isCommentRequired,omitempty"`
-	IsITSMEnabled           bool                 `json:"isITSMEnabled,omitempty"`
+	IsITSMEnabled           *bool                `json:"isITSMEnabled,omitempty"`
 	ItsmFilterCriterias     []ItsmFilterCriteria `json:"itsmFilterCriteria,omitempty"`
 }
 
@@ -354,5 +353,3 @@ type Connection struct {
 	Type     string `json:"type,omitempty"`
 	AuthType string `json:"authType,omitempty"`
 }
-
-
