@@ -125,7 +125,7 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 
 	resource "britive_advanced_settings" "new_profile_policy_advanced_settings" {
 		resource_id   = britive_profile_policy.new_profile_policy.id
-		resource_type = "PROFILE"
+		resource_type = "PROFILE_POLICY"
 
 		justification_settings {
 			is_justification_required = true
