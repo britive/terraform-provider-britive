@@ -321,3 +321,35 @@ type ApplicationEntityGroup struct {
 	Description string `json:"description"`
 	ParentID    string `json:"parentId"`
 }
+
+// Advanced Settings - godoc
+type AdvancedSettings struct {
+	Settings []Setting `json:"settings"`
+}
+
+type Setting struct {
+	SettingsType            string               `json:"settingsType"`
+	ID                      string               `json:"id"`
+	EntityID                string               `json:"entityId"`
+	EntityType              string               `json:"entityType"`
+	IsInherited             *bool                `json:"isInherited"`
+	IsJustificationRequired *bool                `json:"isJustificationRequired,omitempty"`
+	JustificationRegex      string               `json:"justificationRegex,omitempty"`
+	ConnectionID            string               `json:"connectionId,omitempty"`
+	ConnectionType          string               `json:"connectionType,omitempty"`
+	IsITSMEnabled           *bool                `json:"isITSMEnabled,omitempty"`
+	ItsmFilterCriterias     []ItsmFilterCriteria `json:"itsmFilterCriteria,omitempty"`
+}
+
+type ItsmFilterCriteria struct {
+	SupportedTicketType string                 `json:"supportedTicketType,omitempty"`
+	Filter              map[string]interface{} `json:"filter,omitempty"`
+}
+
+//Connections
+type Connection struct {
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Type     string `json:"type,omitempty"`
+	AuthType string `json:"authType,omitempty"`
+}
