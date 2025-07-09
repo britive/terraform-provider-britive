@@ -45,7 +45,7 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 				Type:         schema.TypeString,
 				Required:     true,
 				Description:  "Britive resource type",
-				ValidateFunc: validation.StringInSlice([]string{"APPLICATION", "PROFILE", "PROFILE_POLICY", "RESOURCE_MANAGER_PROFILE", "RESOURCE_MANAGER_PROFILE_POLICY"}, true),
+				ValidateFunc: validation.StringInSlice([]string{"APPLICATION", "PROFILE", "PROFILE_POLICY"}, true),
 			},
 			"justification_settings": {
 				Type:        schema.TypeList,
