@@ -101,7 +101,7 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 	}
 
 	resource "britive_advanced_settings" "new_profile_advanced_settings" {
-		resource_id   = britive_application.new_profile.id
+		resource_id   = britive_profile.new_profile.id
 		resource_type = "PROFILE"
 
 		justification_settings {
@@ -124,7 +124,7 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 	}
 
 	resource "britive_advanced_settings" "new_profile_policy_advanced_settings" {
-		resource_id   = britive_application.new_profile_policy.id
+		resource_id   = britive_profile_policy.new_profile_policy.id
 		resource_type = "PROFILE"
 
 		justification_settings {
