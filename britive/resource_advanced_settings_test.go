@@ -30,7 +30,7 @@ func TestBritiveAdvancedSettings(t *testing.T) {
 }
 
 func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription string) string {
-	return fmt.Sprint(`
+	return fmt.Sprintf(`
 	data "britive_connection" "new_connection"{
 		name = "TF_ACCEPTANCE_TEST_ITSM_DO_NOT_DELETE"
 	}
