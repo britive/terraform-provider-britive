@@ -153,8 +153,13 @@ func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *sche
 
 	log.Printf("[INFO] Adding new advanced settings %#v", advancedSettings)
 
+	advancedSettingsCheck, err := c.GetAdvancedSettings(resourceId, resourceType)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	isUpdate := false
-	if d.Id() != "" {
+	if len(advancedSettingsCheck.Settings) != 0 {
 		isUpdate = true
 	}
 
