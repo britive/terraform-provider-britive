@@ -164,6 +164,10 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 							"britiveprovideracceptancetest1",
 						]
 					}
+					managerApproval = {
+						condition = "All",
+						required = true
+					}
 					notificationMedium = ["Email"]
 					timeToApprove      = 30
 					isValidForInDays   = false
