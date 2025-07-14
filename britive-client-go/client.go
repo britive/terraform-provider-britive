@@ -421,6 +421,19 @@ func ApprovalBlockEqual(old, new string) bool {
 		panic(err)
 	}
 
+	newManagerApprovalReqFalse := false
+
+	if val, ok := newArray["managerApproval"]; ok {
+		managerApproval := val.(map[string]interface{})
+		if reqVal, ok := managerApproval["required"]; (ok && reqVal == false) || !ok {
+			newManagerApprovalReqFalse = true
+		}
+	}
+
+	if _, ok := oldArray["managerApproval"]; !ok && newManagerApprovalReqFalse {
+		oldArray["managerApproval"] = newArray["managerApproval"]
+	}
+
 	if len(oldArray) == len(newArray) {
 		for key, val := range oldArray {
 			memOld, err := json.Marshal(val)
