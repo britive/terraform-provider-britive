@@ -15,13 +15,14 @@ const (
 	environmentId           = "environmentId"
 	constraintLockName      = "constraint"
 	applicationLockName     = "application"
-	advancedSettingLockName = "AdvancedSetting"
-	environment             = "Environment"
-	environmentGroup        = "EnvironmentGroup"
+	advancedSettingLockName = "advancedSetting"
+	environment             = "environment"
+	environmentGroup        = "environmentGroup"
 )
 
 var (
 	//ErrNotFound - godoc
-	ErrNotFound  = errors.New("could not find")
-	ErrNoContent = errors.New("no content")
+	ErrNotFound     = errors.New("could not find")
+	ErrNoContent    = errors.New("no content")
+	ErrNotSupported = errors.New("not supported")
 )

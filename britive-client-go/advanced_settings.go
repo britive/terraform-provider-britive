@@ -10,7 +10,6 @@ import (
 
 // Create Advanced Setting
 func (c *Client) CreateUpdateAdvancedSettings(resourceID, resourceType string, advancedSettings AdvancedSettings, isUpdate bool) error {
-	resourceType = strings.ToUpper(resourceType)
 	profileID := ""
 	resourceIDArr := strings.Split(resourceID, "/")
 	if len(resourceIDArr) > 1 {
@@ -22,45 +21,45 @@ func (c *Client) CreateUpdateAdvancedSettings(resourceID, resourceType string, a
 	advancedSettingURL := ""
 
 	switch resourceType {
-	case "APPLICATION":
+	case "application":
 		advancedSettingURL = fmt.Sprintf("%s/apps/%s/advanced-settings", c.APIBaseURL, resourceID)
 		if isUpdate {
 			apiMethod = "PUT"
 		} else {
 			apiMethod = "POST"
 		}
-	case "PROFILE":
+	case "profile":
 		advancedSettingURL = fmt.Sprintf("%s/paps/%s/advanced-settings", c.APIBaseURL, resourceID)
 		apiMethod = "PUT"
-	case "PROFILE_POLICY":
+	case "profile_policy":
 		if profileID == "" {
-			return fmt.Errorf("unable to fetch profile policy, profileID is empty")
+			return ErrNotFound
 		}
 
 		_, err := c.UpdateProfilePolicyAdvancedSettings(advancedSettings, profileID, resourceID, resourceType)
 		if err != nil {
-			return fmt.Errorf("Error : %v", err)
+			return err
 		}
 		return nil
-	case "RESOURCE_MANAGER_PROFILE":
+	case "resource_manager_profile":
 		advancedSettingURL = fmt.Sprintf("%s/resource-manager/profile/%s/advanced-settings", c.APIBaseURL, resourceID)
 		if isUpdate {
 			apiMethod = "PUT"
 		} else {
 			apiMethod = "POST"
 		}
-	case "RESOURCE_MANAGER_PROFILE_POLICY":
+	case "resource_manager_profile_policy":
 		if profileID == "" {
-			return fmt.Errorf("unable to fetch resource manager profile policy, profileID is empty")
+			return ErrNotFound
 		}
 
 		_, err := c.UpdateProfilePolicyAdvancedSettings(advancedSettings, profileID, resourceID, resourceType)
 		if err != nil {
-			return fmt.Errorf("Error : %v", err)
+			return err
 		}
 		return nil
 	default:
-		return fmt.Errorf("Resource Type '%s' not supported", resourceType)
+		return ErrNotSupported
 	}
 
 	pb, err := json.Marshal(advancedSettings)
@@ -86,7 +85,6 @@ func (c *Client) CreateUpdateAdvancedSettings(resourceID, resourceType string, a
 }
 
 func (c *Client) GetAdvancedSettings(resourceID, resourceType string) (*AdvancedSettings, error) {
-	resourceType = strings.ToUpper(resourceType)
 	profileID := ""
 	resourceIDArr := strings.Split(resourceID, "/")
 	if len(resourceIDArr) > 1 {
@@ -95,38 +93,38 @@ func (c *Client) GetAdvancedSettings(resourceID, resourceType string) (*Advanced
 	}
 	getAppSettingUrl := ""
 	switch resourceType {
-	case "APPLICATION":
+	case "application":
 		getAppSettingUrl = fmt.Sprintf("%s/apps/%s/advanced-settings", c.APIBaseURL, resourceID)
-	case "PROFILE":
+	case "profile":
 		getAppSettingUrl = fmt.Sprintf("%s/paps/%s/advanced-settings", c.APIBaseURL, resourceID)
-	case "PROFILE_POLICY":
+	case "profile_policy":
 		if profileID == "" {
-			return nil, fmt.Errorf("Unable to fetch profile policy, profilrID id empty")
+			return nil, ErrNotFound
 		}
 		profilepolicy, err := c.GetProfilePolicyAdvancedSettings(profileID, resourceID, resourceType)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to get profile policy details : '%v'", err)
+			return nil, err
 		}
 		advancedSettings := AdvancedSettings{
 			Settings: profilepolicy.Settings,
 		}
 		return &advancedSettings, nil
-	case "RESOURCE_MANAGER_PROFILE":
+	case "resource_manager_profile":
 		getAppSettingUrl = fmt.Sprintf("%s/resource-manager/profile/%s/advanced-settings", c.APIBaseURL, resourceID)
-	case "RESOURCE_MANAGER_PROFILE_POLICY":
+	case "resource_manager_profile_policy":
 		if profileID == "" {
-			return nil, fmt.Errorf("Unable to fetch resource manager profile policy, profilrID id empty")
+			return nil, ErrNotFound
 		}
 		profilepolicy, err := c.GetProfilePolicyAdvancedSettings(profileID, resourceID, resourceType)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to get profile policy details : '%v'", err)
+			return nil, err
 		}
 		advancedSettings := AdvancedSettings{
 			Settings: profilepolicy.Settings,
 		}
 		return &advancedSettings, nil
 	default:
-		return nil, fmt.Errorf("ResourceType '%s' is not supported", resourceType)
+		return nil, ErrNotSupported
 	}
 
 	req, err := http.NewRequest("GET", getAppSettingUrl, nil)
@@ -152,7 +150,7 @@ func (c *Client) GetProfilePolicyAdvancedSettings(profileID, policyID, resourceT
 
 	advSettingUrl := ""
 	resourceTypeArr := strings.Split(resourceType, "_")
-	if resourceTypeArr[0] == "RESOURCE" {
+	if strings.EqualFold(resourceTypeArr[0], "resource") {
 		advSettingUrl = fmt.Sprintf("%s/resource-manager/profiles/%s/policies/%s", c.APIBaseURL, profileID, policyID)
 	} else {
 		advSettingUrl = fmt.Sprintf("%s/paps/%s/policies/%s?compactResponse=true", c.APIBaseURL, profileID, policyID)
@@ -191,7 +189,7 @@ func (c *Client) UpdateProfilePolicyAdvancedSettings(profilePolicyAdvancedSettin
 
 	advSettingUrl := ""
 	resourceTypeArr := strings.Split(resourceType, "_")
-	if resourceTypeArr[0] == "RESOURCE" {
+	if strings.EqualFold(resourceTypeArr[0], "resource") {
 		advSettingUrl = fmt.Sprintf("%s/resource-manager/profiles/%s/policies/%s", c.APIBaseURL, profileID, policyID)
 	} else {
 		advSettingUrl = fmt.Sprintf("%s/paps/%s/policies/%s", c.APIBaseURL, profileID, policyID)

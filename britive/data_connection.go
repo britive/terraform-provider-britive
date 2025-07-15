@@ -48,16 +48,14 @@ func (dataSourceConnections *DataSourceConnection) resourceRead(ctx context.Cont
 		return diag.FromErr(NewNotFoundErrorf("connections not found"))
 	}
 
-	connectionNameRaw := d.Get("name")
-	connectionName := strings.ToLower(connectionNameRaw.(string))
+	connectionName := d.Get("name").(string)
 
 	isConnectionFound := false
 	allConnectionNames := make([]string, 0)
 	for _, conn := range allConnections {
-		conName := strings.ToLower(conn.Name)
-		if conName == connectionName {
+		if strings.EqualFold(conn.Name, connectionName) {
 			d.SetId(conn.ID)
-			d.Set("name", connectionNameRaw)
+			d.Set("name", connectionName)
 			d.Set("type", conn.Type)
 			d.Set("auth_type", conn.AuthType)
 			isConnectionFound = true

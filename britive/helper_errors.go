@@ -20,3 +20,8 @@ func NewNotEmptyOrWhiteSpaceError(k string) error {
 func NewInvalidResourceIDError(resource string, ID string) error {
 	return fmt.Errorf("invalid %s id %s, please check the terraform state file", resource, ID)
 }
+
+//NewNotSupportedError - godoc
+func NewNotSupportedError(resource string) error {
+	return fmt.Errorf("%s not supported", resource)
+}

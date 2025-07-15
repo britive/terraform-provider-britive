@@ -70,7 +70,7 @@ Below are configuration examples for each supported resource type. The structure
 
 ```hcl
 resource "britive_advanced_settings" "application" {
-  resource_id   = "{{Application_ID}}"
+  resource_id   = "{{ApplicationID}}"
   resource_type = "APPLICATION"
   # ...advanced settings configuration...
 }
@@ -80,7 +80,7 @@ resource "britive_advanced_settings" "application" {
 
 ```hcl
 resource "britive_advanced_settings" "profile" {
-  resource_id   = "{{Profile_ID}}"
+  resource_id   = "{{ProfileID}}"
   resource_type = "PROFILE"
   # ...advanced settings configuration...
 }
@@ -111,14 +111,14 @@ terraform import britive_advanced_settings.new {{resource_id}}/{{resource_type}}
 - For `APPLICATION` or `PROFILE`:
 
   ```sh
-  terraform import britive_advanced_settings.new 8kjchct9fdxunt1ntjp98gx/APPLICATION
-  terraform import britive_advanced_settings.new 89susd3hdy83dhd8h87euhd8/PROFILE
+  terraform import britive_advanced_settings.new 8kjchct9fdxunt1ntjp98gx/application
+  terraform import britive_advanced_settings.new 89susd3hdy83dhd8h87euhd8/profile
   ```
 
 - For `PROFILE_POLICY`:
 
   ```sh
-  terraform import britive_advanced_settings.new paps/9asduahsd83h3e8/policies/89sus-d3hdy-83dhd8-h87euhd8/PROFILE_POLICY
+  terraform import britive_advanced_settings.new paps/9asduahsd83h3e8/policies/89sus-d3hdy-83dhd8-h87euhd8/profile_policy
   ```
 
 -> During the import process, only advanced settings that are not inherited will be imported.

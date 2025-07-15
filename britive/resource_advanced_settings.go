@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -49,6 +50,7 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 			},
 			"justification_settings": {
 				Type:        schema.TypeList,
+				MaxItems:    1,
 				Optional:    true,
 				Description: "Resource's Justification Settings",
 				Elem: &schema.Resource{
@@ -73,6 +75,7 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 			},
 			"itsm": {
 				Type:        schema.TypeList,
+				MaxItems:    1,
 				Optional:    true,
 				Description: "Resource ITSM Setting",
 				Elem: &schema.Resource{
@@ -116,7 +119,7 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 											str := i.(string)
 											var js interface{}
 											if err := json.Unmarshal([]byte(str), &js); err != nil {
-												errs = append(errs, fmt.Errorf("%q contains invalid JSON: %s", s, err))
+												errs = append(errs, err)
 											}
 											return
 										},
@@ -139,10 +142,13 @@ func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *sche
 
 	resourceId := d.Get("resource_id").(string)
 	resourceType := d.Get("resource_type").(string)
-	resourceType = strings.ToUpper(resourceType)
+	resourceType = strings.ToLower(resourceType)
 
-	if resourceId == "" || resourceType == "" {
-		return diag.FromErr(fmt.Errorf("ResourceID or ResourceType Cannot be empty."))
+	if resourceId == "" {
+		return diag.FromErr(NewNotFoundErrorf("resource_id"))
+	}
+	if resourceType == "" {
+		return diag.FromErr(NewNotFoundErrorf("resource_type"))
 	}
 
 	advancedSettings := britive.AdvancedSettings{}
@@ -154,6 +160,11 @@ func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *sche
 	log.Printf("[INFO] Adding new advanced settings %#v", advancedSettings)
 
 	advancedSettingsCheck, err := c.GetAdvancedSettings(resourceId, resourceType)
+	if errors.Is(err, britive.ErrNotFound) {
+		err = NewNotFoundErrorf("advanced settings of %s", resourceId)
+	} else if errors.Is(err, britive.ErrNotSupported) {
+		err = NewNotSupportedError(resourceType)
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -163,7 +174,13 @@ func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *sche
 		isUpdate = true
 	}
 
-	if err := c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, isUpdate); err != nil {
+	err = c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, isUpdate)
+	if errors.Is(err, britive.ErrNotFound) {
+		err = NewNotFoundErrorf("advanced settings of %s", resourceId)
+	} else if errors.Is(err, britive.ErrNotSupported) {
+		err = NewNotSupportedError(resourceType)
+	}
+	if err != nil {
 		return diag.FromErr(err)
 	}
 
@@ -196,24 +213,26 @@ func (rst *ResourceAdvancedSettings) resourceUpdate(ctx context.Context, d *sche
 
 	resourceId := d.Get("resource_id").(string)
 	resourceType := d.Get("resource_type").(string)
-	resourceType = strings.ToUpper(resourceType)
+	resourceType = strings.ToLower(resourceType)
 
-	if resourceId == "" || resourceType == "" {
-		return diag.FromErr(fmt.Errorf("ResourceID or ResourceType Cannot be empty."))
+	if resourceId == "" {
+		return diag.FromErr(NewNotFoundErrorf("resource_id"))
 	}
-
-	isUpdate := false
-	if d.Id() != "" {
-		isUpdate = true
+	if resourceType == "" {
+		return diag.FromErr(NewNotFoundErrorf("resource_type"))
 	}
 
 	log.Printf("[INFO] Updating advanced settings: %#v", advancedSettings)
 
-	if err := c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, isUpdate); err != nil {
+	err = c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, true)
+	if errors.Is(err, britive.ErrNotFound) {
+		err = NewNotFoundErrorf("advanced settings of %s", resourceId)
+	} else if errors.Is(err, britive.ErrNotSupported) {
+		err = NewNotSupportedError(resourceType)
+	}
+	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	log.Printf("[INFO] Updated advanced settings: %#v", advancedSettings)
 
 	rst.resourceRead(ctx, d, m)
 
@@ -225,7 +244,9 @@ func (rst *ResourceAdvancedSettings) resourceRead(ctx context.Context, d *schema
 	var diags diag.Diagnostics
 
 	err := rst.helper.getAndMapModelToResource(d, m)
-
+	if errors.Is(err, britive.ErrNotFound) {
+		err = NewNotFoundErrorf("advanced settings")
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -240,20 +261,24 @@ func (rst *ResourceAdvancedSettings) resourceDelete(ctx context.Context, d *sche
 
 	resourceId := d.Get("resource_id").(string)
 	resourceType := d.Get("resource_type").(string)
-	resourceType = strings.ToUpper(resourceType)
+	resourceType = strings.ToLower(resourceType)
 
-	if resourceId == "" || resourceType == "" {
-		return diag.FromErr(fmt.Errorf("ResourceID or ResourceType Cannot be empty."))
+	if resourceId == "" {
+		return diag.FromErr(NewNotFoundErrorf("resource_id"))
 	}
-
-	isUpdate := false
-	if d.Id() != "" {
-		isUpdate = true
+	if resourceType == "" {
+		return diag.FromErr(NewNotFoundErrorf("resource_type"))
 	}
 
 	log.Printf("[INFO] Deleting advanced settings of %s", resourceId)
 
-	if err := c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, isUpdate); err != nil {
+	err := c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, true)
+	if errors.Is(err, britive.ErrNotFound) {
+		err = NewNotFoundErrorf("advanced settings of %s", resourceId)
+	} else if errors.Is(err, britive.ErrNotSupported) {
+		err = NewNotSupportedError(resourceType)
+	}
+	if err != nil {
 		return diag.FromErr(err)
 	}
 	d.SetId("")
@@ -267,7 +292,6 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 
 	resourceID, resourceType := rrst.parseUniqueID(d.Id())
 	log.Printf("[INFO] Reading advanced settings %s", resourceID)
-	resourceType = strings.ToUpper(resourceType)
 
 	rawResourceID := d.Get("resource_id")
 	resourceID = rawResourceID.(string)
@@ -283,9 +307,9 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 	var rawItsmSetting britive.Setting
 
 	for _, rawSetting := range advancedSettings.Settings {
-		if rawSetting.SettingsType == "JUSTIFICATION" {
+		if strings.EqualFold(rawSetting.SettingsType, "JUSTIFICATION") {
 			rawJustificationSetting = rawSetting
-		} else if rawSetting.SettingsType == "ITSM" {
+		} else if strings.EqualFold(rawSetting.SettingsType, "ITSM") {
 			rawItsmSetting = rawSetting
 		}
 	}
@@ -314,7 +338,7 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 			if criteria.Filter != nil {
 				bytes, err := json.Marshal(criteria.Filter)
 				if err != nil {
-					return fmt.Errorf("fInvalid ITSM filter criteria filter: %w. Filter should be json decodable.", err)
+					return err
 				}
 				filterStr = string(bytes)
 			}
@@ -350,7 +374,6 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 }
 
 func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d *schema.ResourceData, m interface{}, advancedSettings *britive.AdvancedSettings) error {
-	// c := m.(*britive.Client)
 	isInherited := false
 	resourceId := d.Get("resource_id").(string)
 	resourceType := d.Get("resource_type").(string)
@@ -367,7 +390,7 @@ func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d 
 	if justificationRaw, ok := d.GetOk("justification_settings"); ok {
 		justificationList := justificationRaw.([]interface{})
 		if len(justificationList) != 1 {
-			return fmt.Errorf("Invalid justification settings: must contain exactly one element")
+			return fmt.Errorf("Invalid: must contain exactly one justification setting")
 		}
 
 		userJustificationSetting := justificationList[0].(map[string]interface{})
@@ -397,7 +420,7 @@ func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d 
 	if itsmRaw, ok := d.GetOk("itsm"); ok {
 		itsmList := itsmRaw.([]interface{})
 		if len(itsmList) != 1 {
-			return fmt.Errorf("Invalid ITSM settings: must contain exactly one element")
+			return fmt.Errorf("Invalid: must contain exactly one ITSM setting")
 		}
 
 		userItsmSetting := itsmList[0].(map[string]interface{})
@@ -429,7 +452,7 @@ func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d 
 
 				var js map[string]interface{}
 				if err := json.Unmarshal([]byte(val["filter"].(string)), &js); err != nil {
-					return fmt.Errorf("Invalid JSON format in itsm_filter_criteria 'filter': %v", err)
+					return err
 				}
 
 				itsmFilter := britive.ItsmFilterCriteria{
@@ -458,7 +481,6 @@ func NewResourceAdvancedSettingsHelper() *ResourceAdvancedSettingsHelper {
 }
 
 func (rrst *ResourceAdvancedSettingsHelper) generateUniqueID(resourceID, resourceType string) string {
-	resourceType = strings.ToUpper(resourceType)
 	resourceArr := strings.Split(resourceID, "/")
 	if len(resourceArr) > 1 {
 		return resourceType + "/" + resourceArr[len(resourceArr)-1] + "/advanced-settings"
@@ -474,7 +496,6 @@ func (rrst *ResourceAdvancedSettingsHelper) parseUniqueID(ID string) (string, st
 	arr := strings.Split(ID, "/")
 	resourceId := arr[1]
 	resourceType := arr[0]
-	resourceType = strings.ToUpper(resourceType)
 	return resourceId, resourceType
 }
 
@@ -485,7 +506,11 @@ func (rst *ResourceAdvancedSettings) resourceStateImporter(d *schema.ResourceDat
 
 	importArr := strings.Split(importID, "/")
 	resourceType := importArr[len(importArr)-1]
-	resourceType = strings.ToUpper(resourceType)
+	resourceType = strings.ToLower(resourceType)
+
+	if !strings.EqualFold("application", resourceType) && !strings.EqualFold("profile", resourceType) && !strings.EqualFold("profile_policy", resourceType) {
+		return nil, NewNotSupportedError(resourceType)
+	}
 
 	importArr = importArr[:len(importArr)-1]
 	resourceID := strings.Join(importArr, "/")
