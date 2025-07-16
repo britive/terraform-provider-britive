@@ -16,8 +16,8 @@ const (
 	constraintLockName      = "constraint"
 	applicationLockName     = "application"
 	advancedSettingLockName = "advancedSetting"
-	environment             = "environment"
-	environmentGroup        = "environmentGroup"
+	environment             = "Environment"
+	environmentGroup        = "EnvironmentGroup"
 )
 
 var (
