@@ -41,7 +41,7 @@ resource "britive_advanced_settings" "example" {
 }
 ```
 
--> The format of `resource_id` and `resource_type` must correspond to the specific Britive resource you are configuring. Ensure that the `resource_id` and `resource_type` are associated with the same Britive resource.
+-> The format of `resource_id` must correspond to the specific `resource_type` you are configuring. Ensure that the `resource_id` and `resource_type` are associated with the same Britive resource.
 
 ## Argument Reference
 
@@ -99,26 +99,22 @@ resource "britive_advanced_settings" "profile_policy" {
 -> Replace the `resource_id` and `resource_type` values according to the resource for which you are managing advanced settings. The rest of the configuration remains the same.
 
 ## Import
-
+ 
 Advanced settings can be imported using one of the following formats:
-
-```sh
-terraform import britive_advanced_settings.new {{resource_id}}/{{resource_type}}
-```
-
-### Import Examples
-
+ 
 - For `APPLICATION` or `PROFILE`:
-
-  ```sh
-  terraform import britive_advanced_settings.new 8kjchct9fdxunt1ntjp98gx/application
-  terraform import britive_advanced_settings.new 89susd3hdy83dhd8h87euhd8/profile
-  ```
-
+ 
+```SH
+terraform import britive_advanced_settings.new {{resource_id}}/{{resource_type}}
+terraform import britive_advanced_settings.new 8kjchct9fdxunt1ntjp98gx/application
+terraform import britive_advanced_settings.new 89susd3hdy83dhd8h87euhd8/profile
+```
+ 
 - For `PROFILE_POLICY`:
-
-  ```sh
-  terraform import britive_advanced_settings.new paps/9asduahsd83h3e8/policies/89sus-d3hdy-83dhd8-h87euhd8/profile_policy
-  ```
+ 
+```SH
+terraform import britive_advanced_settings.new paps/{{profileId}}/policies/{{policyId}}/profile_policy
+terraform import britive_advanced_settings.new paps/9asduahsd83h3e8/policies/89sus-d3hdy-83dhd8-h87euhd8/profile_policy
+```
 
 -> During the import process, only advanced settings that are not inherited will be imported.
