@@ -37,10 +37,13 @@ func Provider(v string) *schema.Provider {
 	resourceApplication := NewResourceApplication(validation, importHelper)
 	resourceEntityGroup := NewResourceEntityGroup(importHelper)
 	resourceEntityEnvironment := NewResourceEntityEnvironment(importHelper)
+	resourceAdvancedSettings := NewResourceAdvancedSettings(validation, importHelper)
 
 	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
 	dataSourceApplication := NewDataSourceApplication()
 	dataSourceConstraints := NewDataSourceConstraints()
+	dataSourceConnections := NewDataSourceConnection()
+	dataSourceAllConnections := NewDataSourceAllConnections()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -79,11 +82,14 @@ func Provider(v string) *schema.Provider {
 			"britive_application":                 resourceApplication.Resource,
 			"britive_entity_group":                resourceEntityGroup.Resource,
 			"britive_entity_environment":          resourceEntityEnvironment.Resource,
+			"britive_advanced_settings":           resourceAdvancedSettings.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider":     dataSourceIdentityProvider.Resource,
 			"britive_application":           dataSourceApplication.Resource,
 			"britive_supported_constraints": dataSourceConstraints.Resource,
+			"britive_connection":            dataSourceConnections.Resource,
+			"britive_all_connections":       dataSourceAllConnections.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
