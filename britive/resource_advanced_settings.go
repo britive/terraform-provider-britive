@@ -45,6 +45,7 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 			"resource_type": {
 				Type:         schema.TypeString,
 				Required:     true,
+				ForceNew:     true,
 				Description:  "Britive resource type",
 				ValidateFunc: validation.StringInSlice([]string{"APPLICATION", "PROFILE", "PROFILE_POLICY"}, true),
 			},
@@ -67,8 +68,9 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 						},
 						"justification_regex": {
 							Type:        schema.TypeString,
-							Required:    true,
+							Optional:    true,
 							Description: "Resource justification Regular Expression",
+							Default:     "",
 						},
 					},
 				},
@@ -300,8 +302,6 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 	if err != nil {
 		return err
 	}
-
-	log.Printf("[INFO] Reading application %#v", advancedSettings)
 
 	var rawJustificationSetting britive.Setting
 	var rawItsmSetting britive.Setting
