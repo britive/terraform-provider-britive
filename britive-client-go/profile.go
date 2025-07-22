@@ -62,7 +62,7 @@ func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile,
 
 // GetProfile - Returns a specifc profile
 func (c *Client) GetProfile(profileID string) (*Profile, error) {
-	requestURL := fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profileID)
+	requestURL := fmt.Sprintf("%s/paps/%s?skipIntegrityChecks=true", c.APIBaseURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, err
