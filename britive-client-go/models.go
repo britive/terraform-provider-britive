@@ -339,6 +339,7 @@ type Setting struct {
 	ConnectionType          string               `json:"connectionType,omitempty"`
 	IsITSMEnabled           *bool                `json:"isITSMEnabled,omitempty"`
 	ItsmFilterCriterias     []ItsmFilterCriteria `json:"itsmFilterCriteria,omitempty"`
+	EscalationPolicies      []string             `json:"escalationPolicies,omitempty"`
 }
 
 type ItsmFilterCriteria struct {
