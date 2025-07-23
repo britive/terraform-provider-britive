@@ -10,6 +10,11 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/datasources"
+	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive/resources"
+	"github.com/britive/terraform-provider-britive/britive/resources/resourcemanager"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/mitchellh/go-homedir"
@@ -20,30 +25,35 @@ var version string
 // Provider - Britive Provider
 func Provider(v string) *schema.Provider {
 	version = v
-	validation := NewValidation()
-	importHelper := NewImportHelper()
+	validation := validate.NewValidation()
+	importHelper := imports.NewImportHelper()
 
-	resourceTag := NewResourceTag(importHelper)
-	resourceTagMember := NewResourceTagMember(importHelper)
-	resourceProfile := NewResourceProfile(validation, importHelper)
-	resourceProfilePermission := NewResourceProfilePermission(importHelper)
-	resourceProfileSessionAttribute := NewResourceProfileSessionAttribute(importHelper)
-	resourcePermission := NewResourcePermission(validation, importHelper)
-	resourceRole := NewResourceRole(validation, importHelper)
-	resourcePolicy := NewResourcePolicy(importHelper)
-	resourceProfilePolicy := NewResourceProfilePolicy(importHelper)
-	resourceConstraint := NewResourceConstraint(importHelper)
-	resourceProfileAdditionalSettings := NewResourceProfileAdditionalSettings(importHelper)
-	resourceApplication := NewResourceApplication(validation, importHelper)
-	resourceEntityGroup := NewResourceEntityGroup(importHelper)
-	resourceEntityEnvironment := NewResourceEntityEnvironment(importHelper)
-	resourceAdvancedSettings := NewResourceAdvancedSettings(validation, importHelper)
+	resourceTag := resources.NewResourceTag(importHelper)
+	resourceTagMember := resources.NewResourceTagMember(importHelper)
+	resourceProfile := resources.NewResourceProfile(validation, importHelper)
+	resourceProfilePermission := resources.NewResourceProfilePermission(importHelper)
+	resourceProfileSessionAttribute := resources.NewResourceProfileSessionAttribute(importHelper)
+	resourcePermission := resources.NewResourcePermission(validation, importHelper)
+	resourceRole := resources.NewResourceRole(validation, importHelper)
+	resourcePolicy := resources.NewResourcePolicy(importHelper)
+	resourceProfilePolicy := resources.NewResourceProfilePolicy(importHelper)
+	resourceConstraint := resources.NewResourceConstraint(importHelper)
+	resourceProfileAdditionalSettings := resources.NewResourceProfileAdditionalSettings(importHelper)
+	resourceApplication := resources.NewResourceApplication(validation, importHelper)
+	resourceEntityGroup := resources.NewResourceEntityGroup(importHelper)
+	resourceEntityEnvironment := resources.NewResourceEntityEnvironment(importHelper)
+	resourceAdvancedSettings := resources.NewResourceAdvancedSettings(validation, importHelper)
+	resourceResourceType := resourcemanager.NewResourceResourceType(validation, importHelper)
+	resourceResourceTypePermissions := resourcemanager.NewResourceResourceTypePermissions(importHelper)
+	resourceResponseTemplate := resourcemanager.NewResourceResponseTemplate(importHelper)
+	resourceServerAccess := resources.NewResourceServerAccess(validation, importHelper)
+	resourceBrokerPools := resources.NewResourceBrokerPools(validation, importHelper)
 
-	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
-	dataSourceApplication := NewDataSourceApplication()
-	dataSourceConstraints := NewDataSourceConstraints()
-	dataSourceConnections := NewDataSourceConnection()
-	dataSourceAllConnections := NewDataSourceAllConnections()
+	dataSourceIdentityProvider := datasources.NewDataSourceIdentityProvider()
+	dataSourceApplication := datasources.NewDataSourceApplication()
+	dataSourceConstraints := datasources.NewDataSourceConstraints()
+	dataSourceConnections := datasources.NewDataSourceConnection()
+	dataSourceAllConnections := datasources.NewDataSourceAllConnections()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -83,6 +93,11 @@ func Provider(v string) *schema.Provider {
 			"britive_entity_group":                resourceEntityGroup.Resource,
 			"britive_entity_environment":          resourceEntityEnvironment.Resource,
 			"britive_advanced_settings":           resourceAdvancedSettings.Resource,
+			"britive_resource_type":               resourceResourceType.Resource,
+			"britive_resource_type_permission":    resourceResourceTypePermissions.Resource,
+			"britive_response_template":           resourceResponseTemplate.Resource,
+			"britive_resource":                    resourceServerAccess.Resource,
+			"britive_resource_broker_pools":       resourceBrokerPools.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider":     dataSourceIdentityProvider.Resource,
