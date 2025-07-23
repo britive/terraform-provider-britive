@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_application Resource - britive"
+description: |-
+  Manages applications for the Britive provider.
+---
+
 # britive_application Resource
 
 This resource allows you to create and manage applications in Britive.

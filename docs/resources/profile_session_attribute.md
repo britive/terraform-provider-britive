@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_profile_session_attribute Resource - britive"
+description: |-
+  Manages profile session attributes for the Britive provider.
+---
+
 # britive_profile_session_attribute Resource
 
 This resource allows you to add or remove session attributes from a Britive profile.

@@ -339,6 +339,8 @@ type Setting struct {
 	ConnectionType          string               `json:"connectionType,omitempty"`
 	IsITSMEnabled           *bool                `json:"isITSMEnabled,omitempty"`
 	ItsmFilterCriterias     []ItsmFilterCriteria `json:"itsmFilterCriteria,omitempty"`
+	IsAutoApprovalEnabled   *bool                `json:"isAutoApprovalEnabled,omitempty"`
+	EscalationPolicies      []string             `json:"escalationPolicies,omitempty"`
 }
 
 type ItsmFilterCriteria struct {
@@ -352,4 +354,169 @@ type Connection struct {
 	Name     string `json:"name,omitempty"`
 	Type     string `json:"type,omitempty"`
 	AuthType string `json:"authType,omitempty"`
+}
+
+//EscalationPolicies
+type EscalationPolicies struct {
+	Policies []map[string]string `json:"escalationPolicies,omitempty"`
+	Count    int                 `json:"count,omitempty"`
+	Page     int                 `json:"page,omitempty"`
+	Size     int                 `json:"size,omitempty"`
+	More     bool                `json:"more,omitempty"`
+}
+
+// ResourceType - godoc
+type ResourceType struct {
+	ResourceTypeID string      `json:"resourceTypeId,omitempty"`
+	Name           string      `json:"name"`
+	Description    string      `json:"description,omitempty"`
+	Parameters     []Parameter `json:"parameters,omitempty"`
+}
+
+type Parameter struct {
+	ParamName   string `json:"name"`
+	ParamType   string `json:"paramType"`
+	IsMandatory bool   `json:"isMandatory"`
+}
+
+type ResponseTemplate struct {
+	TemplateID             string `json:"templateId,omitempty"`
+	Name                   string `json:"name"`
+	Description            string `json:"description,omitempty"`
+	IsConsoleAccessEnabled bool   `json:"isConsoleAccessEnabled"`
+	ShowOnUI               bool   `json:"show_on_ui"`
+	TemplateData           string `json:"template_data"`
+}
+
+type AllResponseTemplates struct {
+	Count             int                `json:"count,omitempty"`
+	ResponseTemplates []ResponseTemplate `json:"data,omitempty"`
+}
+
+// ResourceTypePermission - Model for resource type permissions
+type ResourceTypePermission struct {
+	PermissionID      string        `json:"permissionId,omitempty"`
+	Name              string        `json:"name"`
+	Description       string        `json:"description,omitempty"`
+	ResourceTypeID    string        `json:"resourceTypeId"`
+	ResourceTypeName  string        `json:"resourceTypeName,omitempty"`
+	IsDraft           bool          `json:"isDraft"`
+	Version           string        `json:"version,omitempty"`
+	CheckinTimeLimit  int           `json:"checkinTimeLimit,omitempty"`
+	CheckoutTimeLimit int           `json:"checkoutTimeLimit,omitempty"`
+	ShowOrigCreds     bool          `json:"showOrigCreds,omitempty"`
+	InlineFileExists  bool          `json:"inlineFileExists,omitempty"`
+	ResponseTemplates []interface{} `json:"responseTemplates,omitempty"`
+	CheckinFileName   string        `json:"checkinFileName,omitempty"`
+	CheckoutFileName  string        `json:"checkoutFileName,omitempty"`
+	Variables         []interface{} `json:"variables,omitempty"`
+}
+
+type ResourceTypePermissiosUploadUrls struct {
+	CheckInUrl  string `json:"checkinURL,omitempty"`
+	CheckOutUrl string `json:"checkoutURL,omitempty"`
+}
+
+// Resource Label Resource - godoc
+type ResourceLabel struct {
+	LabelId     string               `json:"keyId,omitempty"`
+	Name        string               `json:"keyName,omitempty"`
+	Description string               `json:"description,omitempty"`
+	Internal    bool                 `json:"internal,omitempty"`
+	LabelColor  string               `json:"labelColor,omitempty"`
+	Values      []ResourceLabelValue `json:"values,omitempty"`
+}
+
+type ResourceLabelValue struct {
+	ValueId     string `json:"valueId,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	CreatedBy   int    `json:"createdBy,omiempty"`
+	UpdatedBy   int    `json:"updatedBy,omitempty"`
+	CreatedOn   string `json:"createdOn,omitempty"`
+	UpdatedOn   string `json:"updatedOn,omitempty"`
+}
+
+// ResourceManagerProfile - godoc
+type ResourceManagerProfile struct {
+	ProfileId             string              `json:"profileId,omitempty"`
+	Name                  string              `json:"name,omitempty"`
+	Description           string              `json:"description,omitempty"`
+	ExpirationDuration    int                 `json:"expirationDuration,omitempty"`
+	Status                string              `json:"status,omitempty"`
+	Associations          map[string][]string `json:"associations,omitempty"`
+	ResourceLabelColorMap map[string]string   `json:"resourceLabelColorMap,omitempty"`
+}
+
+// ResourceManagerProfilePolicy - godoc
+type ResourceManagerProfilePolicy struct {
+	ProfileID      string              `json:"profileId,omitempty"`
+	PolicyID       string              `json:"id,omitempty"`
+	Name           string              `json:"name,omitempty"`
+	Description    string              `json:"description"`
+	Condition      string              `json:"condition"`
+	Members        interface{}         `json:"members"`
+	Consumer       string              `json:"consumer"`
+	AccessType     string              `json:"accessType"`
+	IsActive       bool                `json:"isActive"`
+	IsDraft        bool                `json:"isDraft"`
+	IsReadOnly     bool                `json:"isReadOnly"`
+	ResourceLabels map[string][]string `json:"resourceLabels"`
+}
+
+// Resource Manager Profile Permission - godoc
+type ResourceManagerProfilePermission struct {
+	ProfilID         string                   `json:"profileID,omitempty"`
+	PermissionID     string                   `json:"permissionId,omitempty"`
+	PermissionName   string                   `json:"permissionName,omitempty"`
+	Description      string                   `json:"description,omitempty"`
+	Version          string                   `json:"version,omitempty"`
+	ResourceTypeId   string                   `json:"resourceTypeId,omitempty"`
+	ResourceTypeName string                   `json:"resourceTypeName,omitempty"`
+	Variables        []map[string]interface{} `json:"variables,omitempty"`
+}
+
+// Resource Manager Permissions - godoc
+type ResourceManagerPermissions struct {
+	Permissions []map[string]interface{} `json:"data"`
+}
+
+// Server Access Resource - godoc
+type ServerAccessResource struct {
+	ResourceID                  string                   `json:"resourceId,omitempty"`
+	Name                        string                   `json:"name"`
+	Description                 string                   `json:"description"`
+	ResourceType                ServerAccessResourceType `json:"resourceType"`
+	ResourceTypeParameterValues map[string]string        `json:"paramValues"`
+	ResourceLabels              map[string][]string      `json:"resourceLabels"`
+}
+
+// Server Access Resource Type - godoc
+type ServerAccessResourceType struct {
+	ResourceTypeID string `json:"id"`
+	Name           string `json:"name"`
+}
+
+// Broker Pool - godoc
+type BrokerPool struct {
+	BrokerPoolID string `json:"brokerPoolId,omitempty"`
+	Name         string `json:"brokerPoolName"`
+	Description  string `json:"brokerPoolDesc,omitempty"`
+	Count        int    `json:"brokerCount,omitempty"`
+}
+
+// Resource Manager Resource-Policy - godoc
+type ResourceManagerResourcePolicy struct {
+	PolicyID       string              `json:"id,omitempty"`
+	Name           string              `json:"name,omitempty"`
+	Description    string              `json:"description"`
+	Condition      string              `json:"condition"`
+	Members        interface{}         `json:"members"`
+	Consumer       string              `json:"consumer"`
+	AccessType     string              `json:"accessType"`
+	AccessLevel    string              `json:"accessLevel"`
+	IsActive       bool                `json:"isActive"`
+	IsDraft        bool                `json:"isDraft"`
+	IsReadOnly     bool                `json:"isReadOnly"`
+	ResourceLabels map[string][]string `json:"resourceLabels"`
 }

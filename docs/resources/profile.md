@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_profile Resource - britive"
+description: |-
+  Manages profiles for the Britive provider.
+---
+
 # britive_profile Resource
 
 This resource allows you to create and configure a Britive Profile.

@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_application Data Source - britive"
+description: |-
+  Retrieves information of application.
+---
+
 # britive_application Data Source
 
 Use this data source to retrieve information about the application.

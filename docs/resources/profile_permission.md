@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_profile_permission Resource - britive"
+description: |-
+  Manages profile permission for the Britive provider.
+---
+
 # britive_profile_permission Resource
 
 This resource allows you to add or remove permissions from a Britive profile.

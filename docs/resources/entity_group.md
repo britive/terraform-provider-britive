@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_entity_group Resource - britive"
+description: |-
+  Manages entity group for the Britive provider.
+---
+
 # britive_entity_group Resource
 
 This resource allows you to create and configure an application entity of the type "Environment Group".

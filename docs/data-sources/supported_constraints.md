@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_supported_constraints Data Source - britive"
+description: |-
+  Retrieves information of supported constraints.
+---
+
 # britive_supported_constraints Data Source
 
 Use this data source to retrieve the supported constraint types for a profile permission.

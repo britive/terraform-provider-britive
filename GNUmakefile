@@ -1,12 +1,12 @@
 # PROVIDER_DIR is used instead of PWD since docker volume commands can be dangerous to run in $HOME.
 # This ensures docker volumes are mounted from within provider directory instead.
 PROVIDER_DIR := $(abspath $(lastword $(dir $(MAKEFILE_LIST))))
-TEST         := "$(PROVIDER_DIR)/britive"
+TEST         := "$(PROVIDER_DIR)/britive/tests"
 HOSTNAME	 := github.com
 NAMESPACE	 := britive
 NAME 		 := britive
 BINARY		 := terraform-provider-${NAME}
-VERSION      := 2.1
+VERSION      := 2.2
 OS_ARCH      := $(shell go env GOOS)_$(shell go env GOARCH)
 
 default: build

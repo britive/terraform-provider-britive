@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_constraint Resource - britive"
+description: |-
+  Manages constraints for the Britive provider.
+---
+
 # britive_constraint Resource
 
 This resource allows you to create and configure a constraint on the permission associated to a profile.

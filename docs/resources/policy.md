@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_policy Resource - britive"
+description: |-
+  Manages policies for the Britive provider.
+---
+
 # britive_policy Resource
 
 -> When using this version for the first time, you may encounter noisy diffs caused by the reordering of resource argument values. 

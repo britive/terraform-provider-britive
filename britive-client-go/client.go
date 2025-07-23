@@ -906,3 +906,40 @@ func TeamsAppChannelsMapEqual(oldMap, newMap map[string]interface{}) bool {
 
 	return true
 }
+
+func DiffSuppressCommaSeparatedStrings(old, new string) bool {
+	oldSlice := strings.Split(strings.TrimSpace(old), ",")
+	newSlice := strings.Split(strings.TrimSpace(new), ",")
+
+	for i := range oldSlice {
+		oldSlice[i] = strings.TrimSpace(oldSlice[i])
+	}
+	for j := range newSlice {
+		newSlice[j] = strings.TrimSpace(newSlice[j])
+	}
+
+	return SliceIgnoreOrderEqual(oldSlice, newSlice)
+}
+
+func ResourceLabelsMapEqual(oldMap, newMap map[string]interface{}) bool {
+	equalCount := 0
+
+	if len(oldMap) == len(newMap) {
+		for oldKey, oldVal := range oldMap {
+			for newKey, newVal := range newMap {
+				if strings.EqualFold(oldKey, newKey) {
+					if DiffSuppressCommaSeparatedStrings(oldVal.(string), newVal.(string)) {
+						equalCount++
+					}
+				}
+			}
+		}
+		if equalCount != len(newMap) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}

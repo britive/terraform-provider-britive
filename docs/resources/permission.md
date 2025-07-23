@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_permission Resource - britive"
+description: |-
+  Manages permissions for the Britive provider.
+---
+
 # britive_permission Resource
 
 This resource allows you to create and configure a permission.
