@@ -132,6 +132,39 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 					},
 				},
 			},
+			"im": {
+				Type:        schema.TypeList,
+				Optional:    true,
+				Description: "Resource IM Setting",
+				MaxItems:    1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"im_id": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "IM Setting ID",
+						},
+						"connection_id": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Description: "IM Connection id",
+						},
+						"connection_type": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Description: "IM Connection type",
+						},
+						"escalation_policies": {
+							Type:        schema.TypeSet,
+							Required:    true,
+							Description: "IM Escalation Policies",
+							Elem: &schema.Schema{
+								Type: schema.TypeString,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	return rst
@@ -305,12 +338,15 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 
 	var rawJustificationSetting britive.Setting
 	var rawItsmSetting britive.Setting
+	var rawImSetting britive.Setting
 
 	for _, rawSetting := range advancedSettings.Settings {
 		if strings.EqualFold(rawSetting.SettingsType, "JUSTIFICATION") {
 			rawJustificationSetting = rawSetting
 		} else if strings.EqualFold(rawSetting.SettingsType, "ITSM") {
 			rawItsmSetting = rawSetting
+		} else if strings.EqualFold(rawSetting.SettingsType, "IM") {
+			rawImSetting = rawSetting
 		}
 	}
 
@@ -364,6 +400,25 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 
 	} else {
 		if err := d.Set("itsm", nil); err != nil {
+			return err
+		}
+	}
+
+	// Mapping IM Settings
+	if rawImSetting.ID != "" && !(rawImSetting.IsInherited != nil && *rawImSetting.IsInherited == true) {
+		imSetting := []map[string]interface{}{
+			{
+				"connection_id":       rawImSetting.ConnectionID,
+				"connection_type":     rawImSetting.ConnectionType,
+				"escalation_policies": rawImSetting.EscalationPolicies,
+				"im_id":               rawImSetting.ID,
+			},
+		}
+		if err := d.Set("im", imSetting); err != nil {
+			return err
+		}
+	} else {
+		if err := d.Set("im", nil); err != nil {
 			return err
 		}
 	}
@@ -468,6 +523,45 @@ func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d 
 		}
 
 		advancedSettings.Settings = append(advancedSettings.Settings, itsmSetting)
+	}
+
+	// Handle IM settings
+	if imRaw, ok := d.GetOk("im"); ok {
+		imList := imRaw.([]interface{})
+		if len(imList) != 1 {
+			return fmt.Errorf("Invalid: must contain exactly one IM setting")
+		}
+
+		userImSetting := imList[0].(map[string]interface{})
+		imSetting := britive.Setting{
+			SettingsType: "IM",
+			EntityID:     resourceId,
+			EntityType:   resourceType,
+			IsInherited:  &isInherited,
+		}
+
+		if val, ok := userImSetting["im_id"].(string); ok {
+			imSetting.ID = val
+		}
+
+		if val, ok := userImSetting["connection_id"].(string); ok {
+			imSetting.ConnectionID = val
+		}
+		if val, ok := userImSetting["connection_type"].(string); ok {
+			imSetting.ConnectionType = val
+		}
+
+		if rawSet, ok := userImSetting["escalation_policies"].(*schema.Set); ok {
+			var policies []string
+			for _, v := range rawSet.List() {
+				if str, ok := v.(string); ok {
+					policies = append(policies, str)
+				}
+			}
+			imSetting.EscalationPolicies = policies
+		}
+
+		advancedSettings.Settings = append(advancedSettings.Settings, imSetting)
 	}
 
 	return nil
