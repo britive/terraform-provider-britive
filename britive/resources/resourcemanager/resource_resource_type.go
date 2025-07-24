@@ -13,7 +13,6 @@ import (
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 // ResourceResourceType - Terraform Resource for Resource Type
@@ -43,8 +42,9 @@ func NewResourceResourceType(v *validate.Validation, importHelper *imports.Impor
 			"name": {
 				Type:         schema.TypeString,
 				Required:     true,
+				ForceNew:     true,
 				Description:  "The name of Britive resource type",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
+				ValidateFunc: rt.validation.StringWithNoSpecialChar,
 			},
 			"description": {
 				Type:        schema.TypeString,
@@ -60,19 +60,15 @@ func NewResourceResourceType(v *validate.Validation, importHelper *imports.Impor
 						"param_name": {
 							Type:         schema.TypeString,
 							Required:     true,
-							ValidateFunc: validation.StringIsNotWhiteSpace,
+							ValidateFunc: rt.validation.StringWithNoSpecialChar,
 						},
 						"param_type": {
 							Type:     schema.TypeString,
 							Required: true,
 							ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
-								v := strings.ToLower(val.(string))
-								switch v {
-								case "string", "password":
-									//valid
-									return
-								default:
-									errs = append(errs, fmt.Errorf("%q must be one of string or password (case-insensitive), got: %s", key, val))
+								paramType := val.(string)
+								if !strings.EqualFold(paramType, "string") && !strings.EqualFold(paramType, "password") {
+									errs = append(errs, fmt.Errorf("paramater type '%s' is not supported, try with 'string' or 'password'", val))
 								}
 								return
 							},
@@ -231,13 +227,16 @@ func (rrth *ResourceResourceTypeHelper) mapResourceToModel(d *schema.ResourceDat
 	resourceType.Description = d.Get("description").(string)
 	parameters := d.Get("parameters").(*schema.Set)
 
-	for i := 0; i < len(parameters.List()); i++ {
-		parameter := parameters.List()[i]
+	for _, param := range parameters.List() {
+		parameter := param.(map[string]interface{})
+		paramName := parameter["param_name"].(string)
+		paramType := parameter["param_type"].(string)
+
 		resourceType.Parameters = append(resourceType.Parameters,
 			britive.Parameter{
-				ParamName:   parameter.(map[string]interface{})["param_name"].(string),
-				ParamType:   strings.ToLower(parameter.(map[string]interface{})["param_type"].(string)),
-				IsMandatory: parameter.(map[string]interface{})["is_mandatory"].(bool),
+				ParamName:   paramName,
+				ParamType:   strings.ToLower(paramType),
+				IsMandatory: parameter["is_mandatory"].(bool),
 			})
 	}
 	return nil
