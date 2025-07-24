@@ -421,6 +421,19 @@ func ApprovalBlockEqual(old, new string) bool {
 		panic(err)
 	}
 
+	newManagerApprovalReqFalse := false
+
+	if val, ok := newArray["managerApproval"]; ok {
+		managerApproval := val.(map[string]interface{})
+		if reqVal, ok := managerApproval["required"]; (ok && reqVal == false) || !ok {
+			newManagerApprovalReqFalse = true
+		}
+	}
+
+	if _, ok := oldArray["managerApproval"]; !ok && newManagerApprovalReqFalse {
+		oldArray["managerApproval"] = newArray["managerApproval"]
+	}
+
 	if len(oldArray) == len(newArray) {
 		for key, val := range oldArray {
 			memOld, err := json.Marshal(val)
@@ -434,6 +447,10 @@ func ApprovalBlockEqual(old, new string) bool {
 			switch key {
 			case "approvers":
 				if ApproversBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "managerApproval":
+				if ManagerApprovalBlockEqual(string(memOld), string(memNew)) {
 					equalCount++
 				}
 			case "isValidForInDays":
@@ -522,6 +539,54 @@ func ApproversBlockEqual(old, new string) bool {
 				}
 			case "teamsAppChannels":
 				if TeamsAppChannelsBlockEqual(val, newArray[key]) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func ManagerApprovalBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	oldArray := make(map[string]interface{})
+
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := make(map[string]interface{})
+
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			switch key {
+			case "condition":
+				if val == newArray[key] {
+					equalCount++
+				}
+			case "required":
+				if val == newArray[key] {
 					equalCount++
 				}
 			default:
@@ -833,6 +898,43 @@ func TeamsAppChannelsMapEqual(oldMap, newMap map[string]interface{}) bool {
 			}
 		}
 		if equalCount != count {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func DiffSuppressCommaSeparatedStrings(old, new string) bool {
+	oldSlice := strings.Split(strings.TrimSpace(old), ",")
+	newSlice := strings.Split(strings.TrimSpace(new), ",")
+
+	for i := range oldSlice {
+		oldSlice[i] = strings.TrimSpace(oldSlice[i])
+	}
+	for j := range newSlice {
+		newSlice[j] = strings.TrimSpace(newSlice[j])
+	}
+
+	return SliceIgnoreOrderEqual(oldSlice, newSlice)
+}
+
+func ResourceLabelsMapEqual(oldMap, newMap map[string]interface{}) bool {
+	equalCount := 0
+
+	if len(oldMap) == len(newMap) {
+		for oldKey, oldVal := range oldMap {
+			for newKey, newVal := range newMap {
+				if strings.EqualFold(oldKey, newKey) {
+					if DiffSuppressCommaSeparatedStrings(oldVal.(string), newVal.(string)) {
+						equalCount++
+					}
+				}
+			}
+		}
+		if equalCount != len(newMap) {
 			return false
 		}
 	} else {
