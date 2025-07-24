@@ -45,7 +45,7 @@ func Provider(v string) *schema.Provider {
 	resourceAdvancedSettings := resources.NewResourceAdvancedSettings(validation, importHelper)
 	resourceResourceType := resourcemanager.NewResourceResourceType(validation, importHelper)
 	resourceResourceTypePermissions := resourcemanager.NewResourceResourceTypePermissions(importHelper)
-	resourceResponseTemplate := resourcemanager.NewResourceResponseTemplate(importHelper)
+	resourceResponseTemplate := resourcemanager.NewResourceResponseTemplate(validation, importHelper)
 	resourceServerAccess := resources.NewResourceServerAccess(validation, importHelper)
 	resourceBrokerPools := resources.NewResourceBrokerPools(validation, importHelper)
 

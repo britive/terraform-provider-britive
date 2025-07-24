@@ -35,5 +35,6 @@ In addition to the arguments above, the following attributes are exported:
 Response templates can be imported using their `template_id`:
 
 ```sh
-terraform import britive_response_template.example {{template_id}}
+terraform import britive_response_template.example resource-manager/resource-templates/{{template_id}}
+terraform import britive_response_template.example resource-manager/response-templates/nqxzufjs976w87eywqwln63wac
 ```

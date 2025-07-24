@@ -10,6 +10,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -18,14 +19,16 @@ import (
 type ResourceResponseTemplate struct {
 	Resource     *schema.Resource
 	helper       *ResourceResponseTemplateHelper
+	validation   *validate.Validation
 	importHelper *imports.ImportHelper
 }
 
 // NewResourceResponseTemplate - Initialization of new response template resource
-func NewResourceResponseTemplate(importHelper *imports.ImportHelper) *ResourceResponseTemplate {
+func NewResourceResponseTemplate(v *validate.Validation, importHelper *imports.ImportHelper) *ResourceResponseTemplate {
 	rrt := &ResourceResponseTemplate{
 		helper:       NewResourceResponseTemplateHelper(),
 		importHelper: importHelper,
+		validation:   v,
 	}
 	rrt.Resource = &schema.Resource{
 		CreateContext: rrt.resourceCreate,
@@ -37,9 +40,10 @@ func NewResourceResponseTemplate(importHelper *imports.ImportHelper) *ResourceRe
 		},
 		Schema: map[string]*schema.Schema{
 			"name": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The name of the response template.",
+				Type:         schema.TypeString,
+				Required:     true,
+				Description:  "The name of the response template.",
+				ValidateFunc: rrt.validation.StringWithNoSpecialChar,
 			},
 			"description": {
 				Type:        schema.TypeString,
@@ -80,49 +84,6 @@ func NewResourceResponseTemplate(importHelper *imports.ImportHelper) *ResourceRe
 		},
 	}
 	return rrt
-}
-
-// ResourceResponseTemplateHelper - Helper for Response Template Resource
-type ResourceResponseTemplateHelper struct{}
-
-func NewResourceResponseTemplateHelper() *ResourceResponseTemplateHelper {
-	return &ResourceResponseTemplateHelper{}
-}
-
-func (helper *ResourceResponseTemplateHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, template *britive.ResponseTemplate, isUpdate bool) {
-	template.Name = d.Get("name").(string)
-	template.Description = d.Get("description").(string)
-	template.IsConsoleAccessEnabled = d.Get("is_console_access_enabled").(bool)
-	if template.IsConsoleAccessEnabled {
-		template.ShowOnUI = false
-	} else {
-		template.ShowOnUI = d.Get("show_on_ui").(bool)
-	}
-	template.TemplateData = d.Get("template_data").(string)
-}
-
-func (helper *ResourceResponseTemplateHelper) getAndMapModelToResource(d *schema.ResourceData, template *britive.ResponseTemplate) {
-	d.Set("name", template.Name)
-	d.Set("description", template.Description)
-	d.Set("is_console_access_enabled", template.IsConsoleAccessEnabled)
-	d.Set("show_on_ui", template.ShowOnUI)
-	d.Set("template_data", template.TemplateData)
-}
-
-func (helper *ResourceResponseTemplateHelper) generateUniqueID(templateID string) string {
-	return fmt.Sprintf("resource-manager/response-templates/%s", templateID)
-}
-
-func (helper *ResourceResponseTemplateHelper) parseUniqueID(ID string) (responseTemplateID string, err error) {
-	responseTemplatesParts := strings.Split(ID, "/")
-
-	if len(responseTemplatesParts) < 3 {
-		err = errs.NewInvalidResourceIDError("responseTemplates", ID)
-		return
-	}
-
-	responseTemplateID = responseTemplatesParts[2]
-	return
 }
 
 func (rrt *ResourceResponseTemplate) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -217,6 +178,49 @@ func (rrt *ResourceResponseTemplate) resourceDelete(ctx context.Context, d *sche
 	log.Printf("[INFO] Resource template %s deleted", templateID)
 	d.SetId("")
 	return diags
+}
+
+// ResourceResponseTemplateHelper - Helper for Response Template Resource
+type ResourceResponseTemplateHelper struct{}
+
+func NewResourceResponseTemplateHelper() *ResourceResponseTemplateHelper {
+	return &ResourceResponseTemplateHelper{}
+}
+
+func (helper *ResourceResponseTemplateHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, template *britive.ResponseTemplate, isUpdate bool) {
+	template.Name = d.Get("name").(string)
+	template.Description = d.Get("description").(string)
+	template.IsConsoleAccessEnabled = d.Get("is_console_access_enabled").(bool)
+	if template.IsConsoleAccessEnabled {
+		template.ShowOnUI = false
+	} else {
+		template.ShowOnUI = d.Get("show_on_ui").(bool)
+	}
+	template.TemplateData = d.Get("template_data").(string)
+}
+
+func (helper *ResourceResponseTemplateHelper) getAndMapModelToResource(d *schema.ResourceData, template *britive.ResponseTemplate) {
+	d.Set("name", template.Name)
+	d.Set("description", template.Description)
+	d.Set("is_console_access_enabled", template.IsConsoleAccessEnabled)
+	d.Set("show_on_ui", template.ShowOnUI)
+	d.Set("template_data", template.TemplateData)
+}
+
+func (helper *ResourceResponseTemplateHelper) generateUniqueID(templateID string) string {
+	return fmt.Sprintf("resource-manager/response-templates/%s", templateID)
+}
+
+func (helper *ResourceResponseTemplateHelper) parseUniqueID(ID string) (responseTemplateID string, err error) {
+	responseTemplatesParts := strings.Split(ID, "/")
+
+	if len(responseTemplatesParts) < 3 {
+		err = errs.NewInvalidResourceIDError("responseTemplates", ID)
+		return
+	}
+
+	responseTemplateID = responseTemplatesParts[2]
+	return
 }
 
 func (rrt *ResourceResponseTemplate) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {

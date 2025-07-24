@@ -26,7 +26,7 @@ resource "britive_resource_type" "example" {
 
 ## Argument Reference
 
-* `name` - (Required) The name of the Britive resource type.
+* `name` - (Required, ForceNew) The name of the Britive resource type.
 
 * `description` - (Optional) The description of the Britive resource type.
 
