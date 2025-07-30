@@ -421,16 +421,16 @@ func ApprovalBlockEqual(old, new string) bool {
 		panic(err)
 	}
 
-	newManagerApprovalReqFalse := false
+	isNewManagerApprovalReq := false
 
 	if val, ok := newArray["managerApproval"]; ok {
 		managerApproval := val.(map[string]interface{})
 		if reqVal, ok := managerApproval["required"]; (ok && reqVal == false) || !ok {
-			newManagerApprovalReqFalse = true
+			isNewManagerApprovalReq = true
 		}
 	}
 
-	if _, ok := oldArray["managerApproval"]; !ok && newManagerApprovalReqFalse {
+	if _, ok := oldArray["managerApproval"]; !ok && isNewManagerApprovalReq {
 		oldArray["managerApproval"] = newArray["managerApproval"]
 	}
 
