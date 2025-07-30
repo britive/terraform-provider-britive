@@ -1,4 +1,4 @@
-## 2.1.7
+## 2.1.8
 
 ENHANCEMENTS:
 *  `britive_profile_policy`: Support for managerApproval config.(PAB-20426)
