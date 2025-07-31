@@ -137,14 +137,14 @@ The following arguments are supported:
 
 * `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string.  
   * The `condition` block can include:
-    * `approvers` - Includes the username for `tags` and `userIds` under `approvers`.
     * `approval` - Contains:
-      * `notificationMedium` - List of strings.
-      * `timeToApprove` - Provided in minutes.
-      * `validFor` - Can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively.
-    * The `managerApproval` block, which contains:
-      * `condition` - Specifies the approval condition. Supported values are `All`, `Any"`, and `Manager` (case sensitive).
-      * `required` - Boolean indicating if manager approval is required.
+        * `approvers` - Includes the username for `tags` and `userIds` under `approvers`.
+        * `notificationMedium` - List of strings.
+        * `timeToApprove` - Provided in minutes.
+        * `validFor` - Can be provided in days or minutes, depending on `isValidForInDays` boolean value being set to true or false respectively.
+        * The `managerApproval` block, which contains:
+            * `condition` - Specifies the approval condition. Supported values are `All`, `Any"`, and `Manager` (case sensitive).
+            * `required` - Boolean indicating if manager approval is required.
     * `ipAddress` - Comma separated IP addresses in CIDR, dotted decimal format or `null`.
     * `timeOfAccess` - Can be scheduled based on date, days, both or `null`.
       * `dateSchedule` - Should contain `fromDate`, `toDate` in format "YYYY-MM-DD HH:MM:SS" and `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not required, set to `null`.
