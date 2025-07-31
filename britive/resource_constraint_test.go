@@ -11,8 +11,8 @@ import (
 
 func TestBritiveConstraint(t *testing.T) {
 	applicationName := "DO NOT DELETE - GCP TF Plugin"
-	profileName := "AT - New Britive Constraint Test"
-	profileDescription := "AT - New Britive Constraint Test Description"
+	profileName := "AT - New Britive Constraint Tests"
+	profileDescription := "AT - New Britive Constraint Tests Description"
 	associationValue := "britive-gdev-cis.net"
 	permissionName := "BigQuery Data Owner"
 	permissionType := "role"

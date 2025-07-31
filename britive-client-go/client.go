@@ -421,6 +421,19 @@ func ApprovalBlockEqual(old, new string) bool {
 		panic(err)
 	}
 
+	isNewManagerApprovalReq := false
+
+	if val, ok := newArray["managerApproval"]; ok {
+		managerApproval := val.(map[string]interface{})
+		if reqVal, ok := managerApproval["required"]; (ok && reqVal == false) || !ok {
+			isNewManagerApprovalReq = true
+		}
+	}
+
+	if _, ok := oldArray["managerApproval"]; !ok && isNewManagerApprovalReq {
+		oldArray["managerApproval"] = newArray["managerApproval"]
+	}
+
 	if len(oldArray) == len(newArray) {
 		for key, val := range oldArray {
 			memOld, err := json.Marshal(val)
@@ -434,6 +447,10 @@ func ApprovalBlockEqual(old, new string) bool {
 			switch key {
 			case "approvers":
 				if ApproversBlockEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
+			case "managerApproval":
+				if ManagerApprovalBlockEqual(string(memOld), string(memNew)) {
 					equalCount++
 				}
 			case "isValidForInDays":
@@ -522,6 +539,54 @@ func ApproversBlockEqual(old, new string) bool {
 				}
 			case "teamsAppChannels":
 				if TeamsAppChannelsBlockEqual(val, newArray[key]) {
+					equalCount++
+				}
+			default:
+				return false
+			}
+		}
+		if equalCount != len(newArray) {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+func ManagerApprovalBlockEqual(old, new string) bool {
+	equalCount := 0
+
+	if old == emptyString {
+		old = "{}"
+	}
+
+	if new == emptyString {
+		new = "{}"
+	}
+
+	oldArray := make(map[string]interface{})
+
+	if err := json.Unmarshal([]byte(old), &oldArray); err != nil {
+		panic(err)
+	}
+
+	newArray := make(map[string]interface{})
+
+	if err := json.Unmarshal([]byte(new), &newArray); err != nil {
+		panic(err)
+	}
+
+	if len(oldArray) == len(newArray) {
+		for key, val := range oldArray {
+			switch key {
+			case "condition":
+				if val == newArray[key] {
+					equalCount++
+				}
+			case "required":
+				if val == newArray[key] {
 					equalCount++
 				}
 			default:

@@ -4,7 +4,7 @@ Manages advanced settings for Britive resources.
 
 ## Overview
 
-The `britive_advanced_settings` resource allows you to configure and manage advanced settings for supported Britive resources. This includes settings such as justification requirements and ITSM (IT Service Management) integration. Use this resource to enforce additional controls and workflows on your Britive-managed entities.
+The `britive_advanced_settings` resource allows you to configure and manage advanced settings for supported Britive resources. This includes settings such as justification requirements and ITSM (IT Service Management) integration.
 
 ## Supported Resource Types
 
@@ -47,12 +47,12 @@ resource "britive_advanced_settings" "example" {
 
 The following arguments are supported:
 
-- `resource_id` (Required) – The unique identifier of the resource for which advanced settings are being managed.
-- `resource_type` (Required) – The type of resource. Must be one of: `APPLICATION`, `PROFILE`, or `PROFILE_POLICY`.
+- `resource_id` (Required, ForceNew) – The unique identifier of the resource for which advanced settings are being managed.
+- `resource_type` (Required, ForceNew) – The type of resource. Must be one of: `APPLICATION`, `PROFILE`, or `PROFILE_POLICY`.
 - `justification_settings` (Optional):
   - `justification_id` (Computed) – The ID of the justification setting.
   - `is_justification_required` (Required) – Whether justification is required for actions on the resource.
-  - `justification_regex` (Required) – A regular expression to validate justification input.
+  - `justification_regex` (Optional) – A regular expression to validate justification input.
 - `itsm` (Optional):
   - `itsm_id` (Computed) – The ID of the ITSM setting.
   - `connection_id` (Required) – The ID of the ITSM connection.
