@@ -154,6 +154,11 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 							Optional:    true,
 							Description: "IM Connection type",
 						},
+						"is_auto_approval_enabled": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Description: "IM auto approval toggle",
+						},
 						"escalation_policies": {
 							Type:        schema.TypeSet,
 							Required:    true,
@@ -408,10 +413,11 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 	if rawImSetting.ID != "" && !(rawImSetting.IsInherited != nil && *rawImSetting.IsInherited == true) {
 		imSetting := []map[string]interface{}{
 			{
-				"connection_id":       rawImSetting.ConnectionID,
-				"connection_type":     rawImSetting.ConnectionType,
-				"escalation_policies": rawImSetting.EscalationPolicies,
-				"im_id":               rawImSetting.ID,
+				"connection_id":            rawImSetting.ConnectionID,
+				"connection_type":          rawImSetting.ConnectionType,
+				"escalation_policies":      rawImSetting.EscalationPolicies,
+				"is_auto_approval_enabled": rawImSetting.IsAutoApprovalEnabled,
+				"im_id":                    rawImSetting.ID,
 			},
 		}
 		if err := d.Set("im", imSetting); err != nil {
@@ -549,6 +555,10 @@ func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d 
 		}
 		if val, ok := userImSetting["connection_type"].(string); ok {
 			imSetting.ConnectionType = val
+		}
+
+		if val, ok := userImSetting["is_auto_approval_enabled"].(bool); ok {
+			imSetting.IsAutoApprovalEnabled = &val
 		}
 
 		if rawSet, ok := userImSetting["escalation_policies"].(*schema.Set); ok {
