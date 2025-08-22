@@ -25,6 +25,12 @@ func NewDataSourceConnection() *DataSourceConnection {
 				Required:    true,
 				Description: "Name of connection",
 			},
+			"setting_type": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "ITSM",
+				Description: "Advanced Setting Type",
+			},
 			"type": {
 				Type:        schema.TypeString,
 				Computed:    true,
@@ -43,22 +49,33 @@ func NewDataSourceConnection() *DataSourceConnection {
 func (dataSourceConnections *DataSourceConnection) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	allConnections, err := c.GetAllConnections()
+	settingType := d.Get("setting_type").(string)
+
+	allConnections, err := c.GetAllConnections(settingType)
 	if errors.Is(err, britive.ErrNotFound) {
 		return diag.FromErr(NewNotFoundErrorf("connections not found"))
+	} else if errors.Is(err, britive.ErrNotSupported) {
+		return diag.FromErr(NewNotSupportedError(fmt.Sprintf("%s setting type is ", settingType)))
+	}
+	if err != nil {
+		return diag.FromErr(err)
 	}
 
 	connectionName := d.Get("name").(string)
 
 	isConnectionFound := false
 	allConnectionNames := make([]string, 0)
-	for _, conn := range allConnections {
+	for i, conn := range allConnections {
 		if strings.EqualFold(conn.Name, connectionName) {
 			d.SetId(conn.ID)
 			d.Set("name", connectionName)
 			d.Set("type", conn.Type)
 			d.Set("auth_type", conn.AuthType)
+			d.Set("setting_type", settingType)
 			isConnectionFound = true
+		}
+		if i != len(allConnections)-1 {
+			conn.Name = conn.Name + ","
 		}
 		allConnectionNames = append(allConnectionNames, conn.Name)
 	}

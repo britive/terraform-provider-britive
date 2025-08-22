@@ -209,8 +209,15 @@ func (c *Client) UpdateProfilePolicyAdvancedSettings(profilePolicyAdvancedSettin
 }
 
 // Get all Connections
-func (c *Client) GetAllConnections() ([]Connection, error) {
-	connectionsURL := fmt.Sprintf("%s/itsm-manager/connections", c.APIBaseURL)
+func (c *Client) GetAllConnections(settingType string) ([]Connection, error) {
+	var connectionsURL string
+	if strings.EqualFold(settingType, "ITSM") {
+		connectionsURL = fmt.Sprintf("%s/itsm-manager/connections", c.APIBaseURL)
+	} else if strings.EqualFold(settingType, "IM") {
+		connectionsURL = fmt.Sprintf("%s/im-manager/connections", c.APIBaseURL)
+	} else {
+		return nil, ErrNotSupported
+	}
 
 	req, err := http.NewRequest("GET", connectionsURL, nil)
 	if err != nil {

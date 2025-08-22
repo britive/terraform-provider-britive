@@ -146,17 +146,17 @@ func NewResourceAdvancedSettings(v *Validation, importHelper *ImportHelper) *Res
 						},
 						"connection_id": {
 							Type:        schema.TypeString,
-							Optional:    true,
+							Required:    true,
 							Description: "IM Connection id",
 						},
 						"connection_type": {
 							Type:        schema.TypeString,
-							Optional:    true,
+							Required:    true,
 							Description: "IM Connection type",
 						},
 						"is_auto_approval_enabled": {
 							Type:        schema.TypeBool,
-							Optional:    true,
+							Required:    true,
 							Description: "IM auto approval toggle",
 						},
 						"escalation_policies": {

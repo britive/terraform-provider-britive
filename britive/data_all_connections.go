@@ -3,6 +3,7 @@ package britive
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -18,6 +19,12 @@ func NewDataSourceAllConnections() *DataSourceAllConnections {
 	dataSourceAllConnections.Resource = &schema.Resource{
 		ReadContext: dataSourceAllConnections.resourceRead,
 		Schema: map[string]*schema.Schema{
+			"setting_type": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "ITSM",
+				Description: "Advanced Setting Type",
+			},
 			"connections": {
 				Type:        schema.TypeList,
 				Computed:    true,
@@ -55,9 +62,16 @@ func NewDataSourceAllConnections() *DataSourceAllConnections {
 func (dataSourceAllConnections *DataSourceAllConnections) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	allConnections, err := c.GetAllConnections()
+	settingType := d.Get("setting_type").(string)
+
+	allConnections, err := c.GetAllConnections(settingType)
 	if errors.Is(err, britive.ErrNotFound) {
 		return diag.FromErr(NewNotFoundErrorf("connections not found"))
+	} else if errors.Is(err, britive.ErrNotSupported) {
+		return diag.FromErr(NewNotSupportedError(fmt.Sprintf("%s setting type is ", settingType)))
+	}
+	if err != nil {
+		return diag.FromErr(err)
 	}
 
 	var results []map[string]interface{}
@@ -68,6 +82,10 @@ func (dataSourceAllConnections *DataSourceAllConnections) resourceRead(ctx conte
 			"type":      conn.Type,
 			"auth_type": conn.AuthType,
 		})
+	}
+
+	if err := d.Set("setting_type", settingType); err != nil {
+		return diag.FromErr(err)
 	}
 
 	if err := d.Set("connections", results); err != nil {

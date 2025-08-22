@@ -7,6 +7,7 @@ This data source allows you to retrieve information about a specific connection 
 ```hcl
 data "britive_connection" "my_conn" {
   name = "BD-Jira-0601-1"
+  setting_type = "ITSM"
 }
 
 output "connection_id" {
@@ -31,6 +32,7 @@ output "connection_auth_type" {
 The following argument is supported:
 
 - `name` (Required) – The name of the connection to retrieve.
+- `setting_type` (Optional) – Type of advanced setting, eg.("ITSM","IM").
 
 ## Attribute Reference
 

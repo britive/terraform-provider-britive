@@ -38,6 +38,13 @@ resource "britive_advanced_settings" "example" {
       })
     }
   }
+
+  im {
+    connection_id       = "aa97s6-s7df66ew-sids7f6we-w87er"
+    connection_type     = "pagerDuty"
+    is_auto_approval_enabled = false
+    escalation_policies = ["e1", "e2"]
+  }
 }
 ```
 
@@ -61,6 +68,11 @@ The following arguments are supported:
   - `itsm_filter_criteria` (Required):
       - `filter` (Required) – The filter definition (e.g., JQL for Jira).
       - `supported_ticket_type` (Required) – The supported ticket type for the filter criteria. Example: `"issue"`, `"request"`.
+- `im` (Optional):
+  - `connection_id` (Required) – The ID of the IM connection.
+  - `connection_type` (Required) – The type of IM connection (e.g., PagerDuty).
+  - `is_auto_approval_enabled` (Required) – Whether IM settings auto approval enabled.
+  - `escalation_policies` (Required) – Escalation policies of incident management setting.
 
 ## Resource Type Examples
 
