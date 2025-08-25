@@ -6,7 +6,7 @@ This data source allows you to retrieve information about a specific connection 
 
 ```hcl
 data "britive_connection" "my_conn" {
-  name = "BD-Jira-0601-1"
+  name = "Jira-connection-example"
   setting_type = "ITSM"
 }
 
