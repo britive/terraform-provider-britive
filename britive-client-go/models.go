@@ -355,3 +355,12 @@ type Connection struct {
 	Type     string `json:"type,omitempty"`
 	AuthType string `json:"authType,omitempty"`
 }
+
+//EscalationPolicies
+type EscalationPolicies struct {
+	Policies []map[string]string `json:"escalationPolicies,omitempty"`
+	Count    int                 `json:"count,omitempty"`
+	Page     int                 `json:"page,omitempty"`
+	Size     int                 `json:"size,omitempty"`
+	More     bool                `json:"more,omitempty"`
+}

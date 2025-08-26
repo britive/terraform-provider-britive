@@ -224,7 +224,7 @@ func (c *Client) GetAllConnections(settingType string) ([]Connection, error) {
 		return nil, err
 	}
 
-	body, err := c.DoWithLock(req, applicationLockName)
+	body, err := c.DoWithLock(req, advancedSettingLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -235,4 +235,25 @@ func (c *Client) GetAllConnections(settingType string) ([]Connection, error) {
 		return nil, err
 	}
 	return connectionsResponse, nil
+}
+
+func (c *Client) GetEscalationPolicies(page int, imConnectionId, policyName string) (*EscalationPolicies, error) {
+	url := fmt.Sprintf("%s/im-integration/%s/escalation-policies/search?page=%d&size=20&searchText=%s", c.APIBaseURL, imConnectionId, page, policyName)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, advancedSettingLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies EscalationPolicies
+	err = json.Unmarshal(body, &policies)
+	if err != nil {
+		return nil, err
+	}
+	return &policies, nil
 }

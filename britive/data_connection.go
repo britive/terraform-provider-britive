@@ -65,7 +65,7 @@ func (dataSourceConnections *DataSourceConnection) resourceRead(ctx context.Cont
 
 	isConnectionFound := false
 	allConnectionNames := make([]string, 0)
-	for i, conn := range allConnections {
+	for _, conn := range allConnections {
 		if strings.EqualFold(conn.Name, connectionName) {
 			d.SetId(conn.ID)
 			d.Set("name", connectionName)
@@ -74,13 +74,12 @@ func (dataSourceConnections *DataSourceConnection) resourceRead(ctx context.Cont
 			d.Set("setting_type", settingType)
 			isConnectionFound = true
 		}
-		if i != len(allConnections)-1 {
-			conn.Name = conn.Name + ","
-		}
-		allConnectionNames = append(allConnectionNames, conn.Name)
+		allConnectionNames = append(allConnectionNames, conn.Name+",")
 	}
 
 	if !isConnectionFound {
+		totalConnections := len(allConnectionNames) - 1
+		allConnectionNames[totalConnections] = allConnectionNames[totalConnections][:len(allConnectionNames[totalConnections])-1]
 		return diag.FromErr(fmt.Errorf("Invalid connection name.\nTry with %v", allConnectionNames))
 	}
 

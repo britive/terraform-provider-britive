@@ -44,6 +44,7 @@ func Provider(v string) *schema.Provider {
 	dataSourceConstraints := NewDataSourceConstraints()
 	dataSourceConnections := NewDataSourceConnection()
 	dataSourceAllConnections := NewDataSourceAllConnections()
+	dataSourceEscalationPolicy := NewDataSourceEscalationPolicy()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -90,6 +91,7 @@ func Provider(v string) *schema.Provider {
 			"britive_supported_constraints": dataSourceConstraints.Resource,
 			"britive_connection":            dataSourceConnections.Resource,
 			"britive_all_connections":       dataSourceAllConnections.Resource,
+			"britive_escalation_policy":     dataSourceEscalationPolicy.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

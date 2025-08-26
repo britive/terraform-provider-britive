@@ -36,8 +36,13 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 	}
 
 	data "britive_connection" "new_im_connection"{
-		name = "TF_ACCEPTANCE_TEST_ITSM_DO_NOT_DELETE"
+		name = "TF_ACCEPTANCE_TEST_IM_DO_NOT_DELETE"
 		setting_type = "IM"
+	}
+
+	data "britive_escalation_policy" "new_esc_policy"{
+		name = "TF_ACCEPTANCE_TEST_ESCALATION_POLICY_DO_NOT_DELETE"
+		im_connection_id = data.britive_connection.new_im_connection.id
 	}
 
 	data "britive_application" "new_app" {
@@ -108,7 +113,7 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			connection_id       = data.britive_connection.new_im_connection.id
 			connection_type     = data.britive_connection.new_im_connection.type
 			is_auto_approval_enabled = false
-    		escalation_policies = ["e1", "e2"]
+    		escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
 		}
 	}
 
@@ -138,7 +143,7 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			connection_id       = data.britive_connection.new_im_connection.id
 			connection_type     = data.britive_connection.new_im_connection.type
 			is_auto_approval_enabled = false
-    		escalation_policies = ["e1", "e2"]
+    		escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
 		}
 	}
 
@@ -168,7 +173,7 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			connection_id       = data.britive_connection.new_im_connection.id
 			connection_type     = data.britive_connection.new_im_connection.type
 			is_auto_approval_enabled = false
-    		escalation_policies = ["e1", "e2"]
+    		escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
 		}
 	}
 
