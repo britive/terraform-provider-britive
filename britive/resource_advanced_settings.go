@@ -411,10 +411,24 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 
 	// Mapping IM Settings
 	if rawImSetting.ID != "" && !(rawImSetting.IsInherited != nil && *rawImSetting.IsInherited == true) {
+		var userConnType, connType string
+		if imRaw, ok := d.GetOk("im"); ok {
+			imList := imRaw.([]interface{})
+			if len(imList) == 1 {
+				im := imList[0].(map[string]interface{})
+				userConnType = im["connection_type"].(string)
+			}
+		}
+		if strings.EqualFold(rawImSetting.ConnectionType, userConnType) {
+			connType = userConnType
+		} else {
+			connType = rawImSetting.ConnectionType
+		}
+
 		imSetting := []map[string]interface{}{
 			{
 				"connection_id":            rawImSetting.ConnectionID,
-				"connection_type":          rawImSetting.ConnectionType,
+				"connection_type":          connType,
 				"escalation_policies":      rawImSetting.EscalationPolicies,
 				"is_auto_approval_enabled": rawImSetting.IsAutoApprovalEnabled,
 				"im_id":                    rawImSetting.ID,
