@@ -355,6 +355,7 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 		}
 	}
 
+	// Mapping Justification setting
 	if rawJustificationSetting.ID != "" && !(rawJustificationSetting.IsInherited != nil && *rawJustificationSetting.IsInherited == true) {
 		justificationSetting := []map[string]interface{}{
 			{
@@ -372,6 +373,7 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 		}
 	}
 
+	// Mapping ITSM setting
 	if rawItsmSetting.ID != "" && !(rawItsmSetting.IsInherited != nil && *rawItsmSetting.IsInherited == true) {
 		itsmFilterCriteria := []map[string]interface{}{}
 		for _, criteria := range rawItsmSetting.ItsmFilterCriterias {
@@ -389,10 +391,24 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 			})
 		}
 
+		var userConnType, connType string
+		if itsmRaw, ok := d.GetOk("itsm"); ok {
+			itsmList := itsmRaw.([]interface{})
+			if len(itsmList) == 1 {
+				itsm := itsmList[0].(map[string]interface{})
+				userConnType = itsm["connection_type"].(string)
+			}
+		}
+		if strings.EqualFold(rawItsmSetting.ConnectionType, userConnType) {
+			connType = userConnType
+		} else {
+			connType = rawItsmSetting.ConnectionType
+		}
+
 		itsmSetting := []map[string]interface{}{
 			{
 				"connection_id":        rawItsmSetting.ConnectionID,
-				"connection_type":      rawItsmSetting.ConnectionType,
+				"connection_type":      connType,
 				"is_itsm_enabled":      rawItsmSetting.IsITSMEnabled,
 				"itsm_filter_criteria": itsmFilterCriteria,
 				"itsm_id":              rawItsmSetting.ID,
