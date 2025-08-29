@@ -6,7 +6,7 @@ This data source allows you to retrieve information about a specific escalation 
 
 ```hcl
 data "britive_escalation_policy" "new_policy" {
-  name = "TF_IM_Connection"
+  name = "IM_Escalation_Policy"
   im_connection_id = "yastd87awd-8q6wtd-as86dt-aw8we7khhd"
 }
 

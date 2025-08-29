@@ -17,7 +17,7 @@ output "all_connections" {
 
 The following argument is supported:
 
-- `setting_type` (Optional) – Type of advanced setting, eg.("ITSM","IM"). Default value is "ITSM"
+- `setting_type` (Optional) – The type of advanced setting. Defaults to "ITSM" if not specified, eg.("ITSM","IM").
 
 ## Attribute Reference
 

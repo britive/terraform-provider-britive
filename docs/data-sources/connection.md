@@ -32,7 +32,7 @@ output "connection_auth_type" {
 The following argument is supported:
 
 - `name` (Required) – The name of the connection to retrieve.
-- `setting_type` (Optional) – Type of advanced setting, eg.("ITSM","IM").
+- `setting_type` (Optional) – Specifies the type of advanced setting. Defaults to "ITSM" if not specified, eg.("ITSM","IM").
 
 ## Attribute Reference
 
