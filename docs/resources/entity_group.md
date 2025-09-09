@@ -1,5 +1,5 @@
 ---
-subcategory: ""
+subcategory: "Application and Access Profile Management"
 layout: "britive"
 page_title: "britive_entity_group Resource - britive"
 description: |-

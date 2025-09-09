@@ -1,5 +1,5 @@
 ---
-subcategory: "resource_manager"
+subcategory: "Resource Manager"
 layout: "britive"
 page_title: "britive_resource_manager_resource_policy Resource - britive"
 description: |-
