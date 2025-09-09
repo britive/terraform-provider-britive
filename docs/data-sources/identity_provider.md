@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_identity_provider Data Source - britive"
+description: |-
+  Retrieves information of identity.
+---
+
 # britive_identity_provider Data Source 
 
 Use this data source to retrieve the identity provider information.

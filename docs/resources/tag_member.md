@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_tag_member Resource - britive"
+description: |-
+  Manages tag members for the Britive provider.
+---
+
 # britive_tag_member Resource
 
 This resource allows you to add or remove a member to the Britive tag.

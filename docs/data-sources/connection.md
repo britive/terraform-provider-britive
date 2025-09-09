@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_connection Data Source - britive"
+description: |-
+  Retrieves information of connection.
+---
+
 # britive_connection Data Source
 
 This data source allows you to retrieve information about a specific connection required for configuring advanced settings in Britive.
@@ -7,6 +15,7 @@ This data source allows you to retrieve information about a specific connection 
 ```hcl
 data "britive_connection" "my_conn" {
   name = "BD-Jira-0601-1"
+  setting_type = "ITSM"
 }
 
 output "connection_id" {
@@ -31,6 +40,7 @@ output "connection_auth_type" {
 The following argument is supported:
 
 - `name` (Required) – The name of the connection to retrieve.
+- `setting_type` (Optional) – The type of advanced setting. Defaults to 'ITSM' if not specified. Supported types are ITSM and IM.
 
 ## Attribute Reference
 

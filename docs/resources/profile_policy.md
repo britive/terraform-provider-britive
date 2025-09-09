@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_profile_policy Resource - britive"
+description: |-
+  Manages profile policies for the Britive provider.
+---
+
 # britive_profile_policy Resource
 
 -> When using this version for the first time, you may encounter noisy diffs caused by the reordering of resource argument values. 
@@ -149,7 +157,6 @@ The following arguments are supported:
     * `timeOfAccess` - Can be scheduled based on date, days, both or `null`.
       * `dateSchedule` - Should contain `fromDate`, `toDate` in format "YYYY-MM-DD HH:MM:SS" and `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not required, set to `null`.
       * `daysSchedule` - Should contain `fromTime`, `toTime` in format "HH:MM:SS", `timezone` as a string from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones and `days` as a list of strings. If not required, set to `null`.
-
 * `access_type` - (Optional) Type of access the policy provides. This can have two values "Allow"/"Deny". Default: `"Allow"`.
 
 * `consumer` - (Optional) A component/entity that will use the policy engine for access decisions. Default: `"papservice"`. Do not provide any other value.

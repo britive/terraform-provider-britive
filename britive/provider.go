@@ -10,6 +10,11 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/datasources"
+	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive/resources"
+	"github.com/britive/terraform-provider-britive/britive/resources/resourcemanager"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/mitchellh/go-homedir"
@@ -20,30 +25,42 @@ var version string
 // Provider - Britive Provider
 func Provider(v string) *schema.Provider {
 	version = v
-	validation := NewValidation()
-	importHelper := NewImportHelper()
+	validation := validate.NewValidation()
+	importHelper := imports.NewImportHelper()
 
-	resourceTag := NewResourceTag(importHelper)
-	resourceTagMember := NewResourceTagMember(importHelper)
-	resourceProfile := NewResourceProfile(validation, importHelper)
-	resourceProfilePermission := NewResourceProfilePermission(importHelper)
-	resourceProfileSessionAttribute := NewResourceProfileSessionAttribute(importHelper)
-	resourcePermission := NewResourcePermission(validation, importHelper)
-	resourceRole := NewResourceRole(validation, importHelper)
-	resourcePolicy := NewResourcePolicy(importHelper)
-	resourceProfilePolicy := NewResourceProfilePolicy(importHelper)
-	resourceConstraint := NewResourceConstraint(importHelper)
-	resourceProfileAdditionalSettings := NewResourceProfileAdditionalSettings(importHelper)
-	resourceApplication := NewResourceApplication(validation, importHelper)
-	resourceEntityGroup := NewResourceEntityGroup(importHelper)
-	resourceEntityEnvironment := NewResourceEntityEnvironment(importHelper)
-	resourceAdvancedSettings := NewResourceAdvancedSettings(validation, importHelper)
+	resourceTag := resources.NewResourceTag(importHelper)
+	resourceTagMember := resources.NewResourceTagMember(importHelper)
+	resourceProfile := resources.NewResourceProfile(validation, importHelper)
+	resourceProfilePermission := resources.NewResourceProfilePermission(importHelper)
+	resourceProfileSessionAttribute := resources.NewResourceProfileSessionAttribute(importHelper)
+	resourcePermission := resources.NewResourcePermission(validation, importHelper)
+	resourceRole := resources.NewResourceRole(validation, importHelper)
+	resourcePolicy := resources.NewResourcePolicy(importHelper)
+	resourceProfilePolicy := resources.NewResourceProfilePolicy(importHelper)
+	resourceConstraint := resources.NewResourceConstraint(importHelper)
+	resourceProfileAdditionalSettings := resources.NewResourceProfileAdditionalSettings(importHelper)
+	resourceApplication := resources.NewResourceApplication(validation, importHelper)
+	resourceEntityGroup := resources.NewResourceEntityGroup(importHelper)
+	resourceEntityEnvironment := resources.NewResourceEntityEnvironment(importHelper)
+	resourceAdvancedSettings := resources.NewResourceAdvancedSettings(validation, importHelper)
+	resourceResourceType := resourcemanager.NewResourceResourceType(validation, importHelper)
+	resourceResourceTypePermissions := resourcemanager.NewResourceResourceTypePermissions(importHelper)
+	resourceResponseTemplate := resourcemanager.NewResourceResponseTemplate(validation, importHelper)
+	resourceResourceLabel := resourcemanager.NewResourceResourceLabel(validation, importHelper)
+	resourceResourceManagerProfile := resourcemanager.NewResourceResourceManagerProfile(validation, importHelper)
+	resourceResourceManagerProfilePolicy := resourcemanager.NewResourceResourceManagerProfilePolicy(validation, importHelper)
+	resourceResourceManagerProfilePermission := resourcemanager.NewResourceResourceManagerProfilePermission(validation, importHelper)
+	resourceServerAccess := resourcemanager.NewResourceServerAccess(validation, importHelper)
+	resourceBrokerPools := resourcemanager.NewResourceBrokerPools(validation, importHelper)
+	resourceResourceManagerResourcePolicy := resourcemanager.NewResourceResourcePolicy(validation, importHelper)
 
-	dataSourceIdentityProvider := NewDataSourceIdentityProvider()
-	dataSourceApplication := NewDataSourceApplication()
-	dataSourceConstraints := NewDataSourceConstraints()
-	dataSourceConnections := NewDataSourceConnection()
-	dataSourceAllConnections := NewDataSourceAllConnections()
+	dataSourceIdentityProvider := datasources.NewDataSourceIdentityProvider()
+	dataSourceApplication := datasources.NewDataSourceApplication()
+	dataSourceConstraints := datasources.NewDataSourceConstraints()
+	dataSourceConnections := datasources.NewDataSourceConnection()
+	dataSourceAllConnections := datasources.NewDataSourceAllConnections()
+	dataSourceEscalationPolicy := datasources.NewDataSourceEscalationPolicy()
+	dataSourceResourceManagerProfilePermissions := datasources.NewDataSourceResourceManagerProfilePermissions()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -68,28 +85,40 @@ func Provider(v string) *schema.Provider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"britive_tag":                         resourceTag.Resource,
-			"britive_tag_member":                  resourceTagMember.Resource,
-			"britive_profile":                     resourceProfile.Resource,
-			"britive_profile_permission":          resourceProfilePermission.Resource,
-			"britive_profile_session_attribute":   resourceProfileSessionAttribute.Resource,
-			"britive_permission":                  resourcePermission.Resource,
-			"britive_role":                        resourceRole.Resource,
-			"britive_policy":                      resourcePolicy.Resource,
-			"britive_profile_policy":              resourceProfilePolicy.Resource,
-			"britive_constraint":                  resourceConstraint.Resource,
-			"britive_profile_additional_settings": resourceProfileAdditionalSettings.Resource,
-			"britive_application":                 resourceApplication.Resource,
-			"britive_entity_group":                resourceEntityGroup.Resource,
-			"britive_entity_environment":          resourceEntityEnvironment.Resource,
-			"britive_advanced_settings":           resourceAdvancedSettings.Resource,
+			"britive_tag":                                       resourceTag.Resource,
+			"britive_tag_member":                                resourceTagMember.Resource,
+			"britive_profile":                                   resourceProfile.Resource,
+			"britive_profile_permission":                        resourceProfilePermission.Resource,
+			"britive_profile_session_attribute":                 resourceProfileSessionAttribute.Resource,
+			"britive_permission":                                resourcePermission.Resource,
+			"britive_role":                                      resourceRole.Resource,
+			"britive_policy":                                    resourcePolicy.Resource,
+			"britive_profile_policy":                            resourceProfilePolicy.Resource,
+			"britive_constraint":                                resourceConstraint.Resource,
+			"britive_profile_additional_settings":               resourceProfileAdditionalSettings.Resource,
+			"britive_application":                               resourceApplication.Resource,
+			"britive_entity_group":                              resourceEntityGroup.Resource,
+			"britive_entity_environment":                        resourceEntityEnvironment.Resource,
+			"britive_advanced_settings":                         resourceAdvancedSettings.Resource,
+			"britive_resource_manager_resource_type":            resourceResourceType.Resource,
+			"britive_resource_manager_resource_type_permission": resourceResourceTypePermissions.Resource,
+			"britive_resource_manager_response_template":        resourceResponseTemplate.Resource,
+			"britive_resource_manager_resource_label":           resourceResourceLabel.Resource,
+			"britive_resource_manager_profile":                  resourceResourceManagerProfile.Resource,
+			"britive_resource_manager_profile_policy":           resourceResourceManagerProfilePolicy.Resource,
+			"britive_resource_manager_profile_permission":       resourceResourceManagerProfilePermission.Resource,
+			"britive_resource_manager_resource":                 resourceServerAccess.Resource,
+			"britive_resource_manager_resource_broker_pools":    resourceBrokerPools.Resource,
+			"britive_resource_manager_resource_policy":          resourceResourceManagerResourcePolicy.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
-			"britive_identity_provider":     dataSourceIdentityProvider.Resource,
-			"britive_application":           dataSourceApplication.Resource,
-			"britive_supported_constraints": dataSourceConstraints.Resource,
-			"britive_connection":            dataSourceConnections.Resource,
-			"britive_all_connections":       dataSourceAllConnections.Resource,
+			"britive_identity_provider":                    dataSourceIdentityProvider.Resource,
+			"britive_application":                          dataSourceApplication.Resource,
+			"britive_supported_constraints":                dataSourceConstraints.Resource,
+			"britive_connection":                           dataSourceConnections.Resource,
+			"britive_all_connections":                      dataSourceAllConnections.Resource,
+			"britive_escalation_policy":                    dataSourceEscalationPolicy.Resource,
+			"britive_resource_manager_profile_permissions": dataSourceResourceManagerProfilePermissions.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_additional_settings Resource - britive"
+description: |-
+  Manages additional settings for the Britive provider.
+---
+
 # britive_profile_additional_settings Resource
 
 This resource allows you to create and configure the additional settings associated to a profile.

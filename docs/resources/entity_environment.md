@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_entity_environment Resource - britive"
+description: |-
+  Manages entity environment for the Britive provider.
+---
+
 # britive_entity_environment Resource
 
 This resource allows you to create and configure an application entity of the type "Environment".

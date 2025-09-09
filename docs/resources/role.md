@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_role Resource - britive"
+description: |-
+  Manages roles for the Britive provider.
+---
+
 # britive_role Resource
 
 -> When using this version for the first time, you may encounter noisy diffs caused by the reordering of resource argument values. 

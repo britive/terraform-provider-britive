@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_tag Resource - britive"
+description: |-
+  Manages tags for the Britive provider.
+---
+
 # britive_tag Resource
 
 This resource allows you to create and configure a Britive tag.

@@ -1,3 +1,11 @@
+---
+subcategory: ""
+layout: "britive"
+page_title: "britive_advanced_settings Resource - britive"
+description: |-
+  Manages advanced settings for the Britive provider.
+---
+
 # britive_advanced_settings Resource
 
 Manages advanced settings for Britive resources.
@@ -13,13 +21,15 @@ This resource supports advanced settings for the following resource types:
 - `APPLICATION` – Britive application resource
 - `PROFILE` – Britive application profile resource
 - `PROFILE_POLICY` – Britive application profile policy resource
+- `RESOURCE_MANAGER_PROFILE` – Britive resource manager profile resource
+- `RESOURCE_MANAGER_PROFILE_POLICY` – Britive resource manager profile policy resource
 
 ## Example Usage
 
 ```hcl
 resource "britive_advanced_settings" "example" {
   resource_id   = "8s7fw93frt09gng8sy98r3sjdw83"
-  resource_type = "APPLICATION" # (PROFILE or PROFILE_POLICY)
+  resource_type = "APPLICATION" # (PROFILE, PROFILE_POLICY, RESOURCE_MANAGER_PROFILE or RESOURCE_MANAGER_PROFILE_POLICY)
 
   justification_settings {
     is_justification_required = true
@@ -38,6 +48,13 @@ resource "britive_advanced_settings" "example" {
       })
     }
   }
+
+  im {
+    connection_id       = "aa97s6-s7df66ew-sids7f6we-w87er"
+    connection_type     = "pagerDuty"
+    is_auto_approval_enabled = false
+    escalation_policies = ["e1", "e2"]
+  }
 }
 ```
 
@@ -48,7 +65,7 @@ resource "britive_advanced_settings" "example" {
 The following arguments are supported:
 
 - `resource_id` (Required, ForceNew) – The unique identifier of the resource for which advanced settings are being managed.
-- `resource_type` (Required, ForceNew) – The type of resource. Must be one of: `APPLICATION`, `PROFILE`, or `PROFILE_POLICY`.
+- `resource_type` (Required, ForceNew) – The type of resource. Must be one of: `APPLICATION`, `PROFILE`, `PROFILE_POLICY`, `RESOURCE_MANAGER_PROFILE` or `RESOURCE_MANAGER_PROFILE_POLICY`.
 - `justification_settings` (Optional):
   - `justification_id` (Computed) – The ID of the justification setting.
   - `is_justification_required` (Required) – Whether justification is required for actions on the resource.
@@ -61,6 +78,11 @@ The following arguments are supported:
   - `itsm_filter_criteria` (Required):
       - `filter` (Required) – The filter definition (e.g., JQL for Jira).
       - `supported_ticket_type` (Required) – The supported ticket type for the filter criteria. Example: `"issue"`, `"request"`.
+- `im` (Optional):
+  - `connection_id` (Required) – The ID of the IM connection.
+  - `connection_type` (Required) – The type of IM connection (e.g., PagerDuty).
+  - `is_auto_approval_enabled` (Required) – Whether IM settings auto approval enabled.
+  - `escalation_policies` (Required) – Escalation policies of incident management setting.
 
 ## Resource Type Examples
 
@@ -96,6 +118,26 @@ resource "britive_advanced_settings" "profile_policy" {
 }
 ```
 
+### RESOURCE_MANAGER_PROFILE
+
+```hcl
+resource "britive_advanced_settings" "resource_manager_profile" {
+  resource_id   = "resource-manager/profile/{{ProfileID}}" # or {{ProfileID}}
+  resource_type = "RESOURCE_MANAGER_PROFILE"
+  # ...advanced settings configuration...
+}
+```
+
+### RESOURCE_MANAGER_PROFILE_POLICY
+
+```hcl
+resource "britive_advanced_settings" "resource_manager_profile_policy" {
+  resource_id   = "resource-manager/profile/{{ProfileID}}/policies/{{PolicyID}}"
+  resource_type = "RESOURCE_MANAGER_PROFILE_POLICY"
+  # ...advanced settings configuration...
+}
+```
+
 -> Replace the `resource_id` and `resource_type` values according to the resource for which you are managing advanced settings. The rest of the configuration remains the same.
 
 ## Import
@@ -116,5 +158,24 @@ terraform import britive_advanced_settings.new 89susd3hdy83dhd8h87euhd8/profile
 terraform import britive_advanced_settings.new paps/{{profileId}}/policies/{{policyId}}/profile_policy
 terraform import britive_advanced_settings.new paps/9asduahsd83h3e8/policies/89sus-d3hdy-83dhd8-h87euhd8/profile_policy
 ```
+
+- For `RESOURCE_MANAGER_PROFILE`:
+
+```SH
+terraform import britive_advanced_settings.new resource-manager/profile/{{profileId}}/resource_manager_profile
+# OR
+terraform import britive_advanced_settings.new {{profileId}}/resource_manager_profile
+terraform import britive_advanced_settings.new resource-manager/profile/89susd3hdy83dhd8h87euhd8/resource_manager_profile
+# OR
+terraform import britive_advanced_settings.new 89susd3hdy83dhd8h87euhd8/resource_manager_profile
+```
+
+- For `RESOURCE_MANAGER_PROFILE_POLICY`:
+
+```SH
+terraform import britive_advanced_settings.new resource-manager/profile/{{profileId}}/policies/{{PolicyID}}/resource_manager_profile_policy
+terraform import britive_advanced_settings.new resource-manager/profile/89susd3hdy83dhd8h87euhd8/policies/89sus-d3hdy-83dhd8-h87euhd8/resource_manager_profile_policy
+```
+
 
 -> During the import process, only advanced settings that are not inherited will be imported.

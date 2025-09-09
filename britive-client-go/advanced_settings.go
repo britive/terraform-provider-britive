@@ -12,10 +12,17 @@ import (
 func (c *Client) CreateUpdateAdvancedSettings(resourceID, resourceType string, advancedSettings AdvancedSettings, isUpdate bool) error {
 	profileID := ""
 	resourceIDArr := strings.Split(resourceID, "/")
-	if len(resourceIDArr) > 1 {
-		profileID = resourceIDArr[1]
-		resourceID = resourceIDArr[3]
+	resIdArrLen := len(resourceIDArr)
+	if (resIdArrLen > 1) && (strings.EqualFold(resourceIDArr[resIdArrLen-2], "policy") || strings.EqualFold(resourceIDArr[resIdArrLen-2], "policies")) {
+		profileID = resourceIDArr[resIdArrLen-3]
+		resourceID = resourceIDArr[resIdArrLen-1]
+	} else {
+		resourceID = resourceIDArr[resIdArrLen-1]
 	}
+	// if len(resourceIDArr) > 1 {
+	// 	profileID = resourceIDArr[1]
+	// 	resourceID = resourceIDArr[3]
+	// }
 
 	apiMethod := ""
 	advancedSettingURL := ""
@@ -87,10 +94,17 @@ func (c *Client) CreateUpdateAdvancedSettings(resourceID, resourceType string, a
 func (c *Client) GetAdvancedSettings(resourceID, resourceType string) (*AdvancedSettings, error) {
 	profileID := ""
 	resourceIDArr := strings.Split(resourceID, "/")
-	if len(resourceIDArr) > 1 {
-		profileID = resourceIDArr[1]
-		resourceID = resourceIDArr[3]
+	resIdArrLen := len(resourceIDArr)
+	if (resIdArrLen > 1) && (strings.EqualFold(resourceIDArr[resIdArrLen-2], "policy") || strings.EqualFold(resourceIDArr[resIdArrLen-2], "policies")) {
+		profileID = resourceIDArr[resIdArrLen-3]
+		resourceID = resourceIDArr[resIdArrLen-1]
+	} else {
+		resourceID = resourceIDArr[resIdArrLen-1]
 	}
+	// if len(resourceIDArr) > 1 {
+	// 	profileID = resourceIDArr[1]
+	// 	resourceID = resourceIDArr[3]
+	// }
 	getAppSettingUrl := ""
 	switch resourceType {
 	case "application":
@@ -209,15 +223,22 @@ func (c *Client) UpdateProfilePolicyAdvancedSettings(profilePolicyAdvancedSettin
 }
 
 // Get all Connections
-func (c *Client) GetAllConnections() ([]Connection, error) {
-	connectionsURL := fmt.Sprintf("%s/itsm-manager/connections", c.APIBaseURL)
+func (c *Client) GetAllConnections(settingType string) ([]Connection, error) {
+	var connectionsURL string
+	if strings.EqualFold(settingType, "ITSM") {
+		connectionsURL = fmt.Sprintf("%s/itsm-manager/connections", c.APIBaseURL)
+	} else if strings.EqualFold(settingType, "IM") {
+		connectionsURL = fmt.Sprintf("%s/im-manager/connections", c.APIBaseURL)
+	} else {
+		return nil, ErrNotSupported
+	}
 
 	req, err := http.NewRequest("GET", connectionsURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	body, err := c.DoWithLock(req, applicationLockName)
+	body, err := c.DoWithLock(req, advancedSettingLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -228,4 +249,25 @@ func (c *Client) GetAllConnections() ([]Connection, error) {
 		return nil, err
 	}
 	return connectionsResponse, nil
+}
+
+func (c *Client) GetEscalationPolicies(page int, imConnectionId, policyName string) (*EscalationPolicies, error) {
+	url := fmt.Sprintf("%s/im-integration/%s/escalation-policies/search?page=%d&size=20&searchText=%s", c.APIBaseURL, imConnectionId, page, policyName)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, advancedSettingLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies EscalationPolicies
+	err = json.Unmarshal(body, &policies)
+	if err != nil {
+		return nil, err
+	}
+	return &policies, nil
 }
