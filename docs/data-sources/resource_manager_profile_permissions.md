@@ -1,5 +1,5 @@
 ---
-subcategory: "resource_manager"
+subcategory: "Resource Manager"
 layout: "britive"
 page_title: "britive_resource_manager_profile_permissions Data Source - britive"
 description: |-
