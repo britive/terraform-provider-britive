@@ -378,6 +378,206 @@ func testAccCheckBritiveApplicationConfig() string {
       value = "<Service-key>"
     }
 	}
+
+	resource "britive_application" "aws_1" {
+    application_type = "AWS"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - AWS APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - AWS APP DESC"
+    }
+    properties {
+      name = "showAwsAccountNumber"
+      value = true
+    }
+    properties {
+      name = "sessionDuration"
+      value = 2
+    }
+    properties {
+      name = "identityProvider"
+      value = "BritiveProvider"
+    }
+    properties {
+      name = "roleName"
+      value = "britive-integration-role"
+    }
+    properties {
+      name = "accountId"
+      value = "<AccountID>"
+    }
+    properties {
+      name = "region"
+      value = "us-east-1"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+    properties {
+      name = "supportsInvalidationGlobal"
+      value = true
+    }
+    properties {
+      name = "allowCopyingConsoleUrl"
+      value = false
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = false
+    }
+	}
+
+	resource "britive_application" "aws_standalone_1" {
+    application_type = "aws standalone"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - AWS STANDALONE APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - AWS STANDALONE APP DESC"
+    }
+    properties {
+      name = "showAwsAccountNumber"
+      value = false
+    }
+    properties {
+      name = "allowCopyingConsoleUrl"
+      value = false
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = false
+    }
+    properties {
+      name = "identityProvider"
+      value = "BritiveProvider"
+    }
+    properties {
+      name = "sessionDuration"
+      value = 1000
+    }
+    properties {
+      name = "region"
+      value = "us-east-1"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+	}
+
+	resource "britive_application" "azure_1" {
+    application_type = "azure"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - AZURE APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - AZURE APP DESC"
+    }
+    properties {
+      name = "programmaticAccess"
+      value = true
+    }
+    properties {
+      name = "consoleAccess"
+      value = true
+    }
+    properties {
+      name = "appAccessMethod_static_loginUrl"
+      value = "https://azure.test.com"
+    }
+    properties {
+      name = "tenantId"
+      value = "<Tenant-Id>"
+    }
+    properties {
+      name = "clientId"
+      value = "<Client-Id>"
+    }
+    sensitive_properties {
+      name = "clientSecret"
+      value = "<Client-Secret>"
+    }
+    properties {
+      name = "userFilter"
+      value = ""
+    }
+    properties {
+      name = "groupFilter"
+      value = ""
+    }
+    properties {
+      name = "scanMethod"
+      value = "collectUsersGroups"
+    }
+    properties {
+      name = "scanMgmtGroupsAndSubscriptions"
+      value = false
+    }
+    properties {
+      name = "scanSubscriptionsOnly"
+      value = false
+    }
+    properties {
+      name = "scanResources"
+      value = false
+    }
+    properties {
+      name = "scanGroupsMemberships"
+      value = false
+    }
+    properties {
+      name = "scanServicePrincipals"
+      value = false
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = false
+    }
+	}
+
+	resource "britive_application" "okta_1" {
+    application_type = "okta"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - OKTA APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - OKTA APP DESC"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+	}
 	`)
 }
 
