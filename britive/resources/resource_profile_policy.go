@@ -130,7 +130,8 @@ func NewResourceProfilePolicy(importHelper *imports.ImportHelper) *ResourceProfi
 //region Profile Policy Resource Context Operations
 
 func (rpp *ResourceProfilePolicy) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var diags diag.Diagnostics
 
 	profilePolicy := britive.ProfilePolicy{}
@@ -167,7 +168,8 @@ func (rpp *ResourceProfilePolicy) resourceRead(ctx context.Context, d *schema.Re
 }
 
 func (rpp *ResourceProfilePolicy) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var hasChanges bool
 	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("members") || d.HasChange("condition") || d.HasChange("associations") {
@@ -211,7 +213,8 @@ func (rpp *ResourceProfilePolicy) resourceUpdate(ctx context.Context, d *schema.
 }
 
 func (rpp *ResourceProfilePolicy) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -232,7 +235,8 @@ func (rpp *ResourceProfilePolicy) resourceDelete(ctx context.Context, d *schema.
 }
 
 func (rpp *ResourceProfilePolicy) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	if err := rpp.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/policies/(?P<policy_name>[^/]+)", "(?P<profile_id>[^/]+)/(?P<policy_name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
@@ -301,7 +305,8 @@ func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceDa
 }
 
 func (rpph *ResourceProfilePolicyHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	profileID, policyID, err := rpph.parseUniqueID(d.Id())
 	if err != nil {
@@ -415,7 +420,8 @@ func (rpph *ResourceProfilePolicyHelper) appendProfilePolicyAssociations(associa
 }
 
 func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID string, d *schema.ResourceData, m interface{}) ([]britive.ProfilePolicyAssociation, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	associationScopes := make([]britive.ProfilePolicyAssociation, 0)
 	as := d.Get("associations").(*schema.Set)
 	if as == nil {
@@ -427,7 +433,7 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID 
 		return associationScopes, err
 	}
 
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId, m)
 	if err != nil {
 		return associationScopes, err
 	}
@@ -482,7 +488,8 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID 
 }
 
 func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToResource(profileID string, associations []britive.ProfilePolicyAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	profilePolicyAssociations := make([]interface{}, 0)
 	inputAssociations := d.Get("associations").(*schema.Set)
 	if inputAssociations == nil {
@@ -494,7 +501,7 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 		return profilePolicyAssociations, err
 	}
 
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId, m)
 	if err != nil {
 		return profilePolicyAssociations, err
 	}

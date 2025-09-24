@@ -136,7 +136,8 @@ func NewResourceResourceManagerProfilePolicy(v *validate.Validation, importHelpe
 }
 
 func (rrmpp *ResourceResourceManagerProfilePolicy) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	resourceManagerProfilePolicy := &britive.ResourceManagerProfilePolicy{}
 
@@ -158,7 +159,8 @@ func (rrmpp *ResourceResourceManagerProfilePolicy) resourceCreate(ctx context.Co
 }
 
 func (rrmpp *ResourceResourceManagerProfilePolicy) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -185,7 +187,8 @@ func (rrmpp *ResourceResourceManagerProfilePolicy) resourceRead(ctx context.Cont
 }
 
 func (rrmpp *ResourceResourceManagerProfilePolicy) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("members") || d.HasChange("condition") || d.HasChange("resource_labels") {
 		profileID, policyID := rrmpp.helper.parseUniqueID(d.Id())
@@ -221,7 +224,9 @@ func (rrmpp *ResourceResourceManagerProfilePolicy) resourceUpdate(ctx context.Co
 }
 
 func (rrmpp *ResourceResourceManagerProfilePolicy) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	profileID, policyID := rrmpp.helper.parseUniqueID(d.Id())
@@ -240,7 +245,9 @@ func (rrmpp *ResourceResourceManagerProfilePolicy) resourceDelete(ctx context.Co
 }
 
 func (rrmpp *ResourceResourceManagerProfilePolicy) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	if err := rrmpp.importHelper.ParseImportID([]string{"resource-manager/profiles/(?P<profile_id>[^/]+)/policies/(?P<policy_name>[^/]+)", "(?P<profile_id>[^/]+)/(?P<policy_name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}

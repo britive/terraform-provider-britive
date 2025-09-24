@@ -107,7 +107,8 @@ func NewResourceConstraint(importHelper *imports.ImportHelper) *ResourceConstrai
 //region Constraint Resource Context Operations
 
 func (rc *ResourceConstraint) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var diags diag.Diagnostics
 
 	profileID := d.Get("profile_id").(string)
@@ -165,7 +166,8 @@ func (rpc *ResourceConstraint) resourceRead(ctx context.Context, d *schema.Resou
 }
 
 func (rc *ResourceConstraint) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -186,7 +188,8 @@ func (rc *ResourceConstraint) resourceDelete(ctx context.Context, d *schema.Reso
 }
 
 func (rc *ResourceConstraint) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	importConstraintType, err := rc.importHelper.FetchImportFieldValue([]string{"paps/(?P<profile_id>[^/]+)/permissions/(?P<permission_name>[^/]+)/(?P<permission_type>[^/]+)/constraints/(?P<constraint_type>[^/]+)/(?P<name>[^/]+)", "(?P<profile_id>[^/]+)/(?P<permission_name>[^/]+)/(?P<permission_type>[^/]+)/(?P<constraint_type>[^/]+)/(?P<name>[^/]+)"}, d, "constraint_type")
 	if err != nil {
 		return nil, err
@@ -319,7 +322,8 @@ func (rch *ResourceConstraintHelper) mapConditionResourceToModel(d *schema.Resou
 }
 
 func (rch *ResourceConstraintHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	profileID, permissionName, permissionType, constraintType, constraintName, err := rch.parseUniqueID(d.Id())
 	if err != nil {

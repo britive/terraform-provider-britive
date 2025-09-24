@@ -3,6 +3,7 @@ package britive
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -90,6 +91,7 @@ func (c *Client) SaveProfileAssociationResourceScopes(profileID string, associat
 
 // Get the application type for a given application ID
 func (c *Client) GetApplicationType(appContainerID string) (*ApplicationType, error) {
+	log.Printf("=========== Get applicationtype: %v", appContainerID)
 	resourceURL := fmt.Sprintf("%s/apps/%s", c.APIBaseURL, appContainerID)
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {

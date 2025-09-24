@@ -72,7 +72,8 @@ func NewResourceProfileAdditionalSettings(importHelper *imports.ImportHelper) *R
 //region Profile Additional Settings Resource Context Operations
 
 func (rpas *ResourceProfileAdditionalSettings) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var diags diag.Diagnostics
 
 	profileAdditionalSettings := britive.ProfileAdditionalSettings{}
@@ -97,7 +98,8 @@ func (rpas *ResourceProfileAdditionalSettings) resourceCreate(ctx context.Contex
 
 func (rpas *ResourceProfileAdditionalSettings) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	profileID, err := rpas.helper.parseUniqueID(d.Id())
 	if err != nil {
@@ -124,7 +126,8 @@ func (rpas *ResourceProfileAdditionalSettings) resourceRead(ctx context.Context,
 }
 
 func (rpas *ResourceProfileAdditionalSettings) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var hasChanges bool
 	if d.HasChange("profile_id") || d.HasChange("use_app_credential_type") || d.HasChange("console_access") || d.HasChange("programmatic_access") || d.HasChange("project_id_for_service_account") {
@@ -158,7 +161,8 @@ func (rpas *ResourceProfileAdditionalSettings) resourceUpdate(ctx context.Contex
 }
 
 func (rpas *ResourceProfileAdditionalSettings) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -190,7 +194,8 @@ func (rpas *ResourceProfileAdditionalSettings) resourceDelete(ctx context.Contex
 }
 
 func (rpas *ResourceProfileAdditionalSettings) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	if err := rpas.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/additional-settings"}, d); err != nil {
 		return nil, err
 	}

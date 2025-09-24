@@ -19,10 +19,6 @@ func (c *Client) CreateUpdateAdvancedSettings(resourceID, resourceType string, a
 	} else {
 		resourceID = resourceIDArr[resIdArrLen-1]
 	}
-	// if len(resourceIDArr) > 1 {
-	// 	profileID = resourceIDArr[1]
-	// 	resourceID = resourceIDArr[3]
-	// }
 
 	apiMethod := ""
 	advancedSettingURL := ""

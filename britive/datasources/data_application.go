@@ -92,7 +92,8 @@ func NewDataSourceApplication() *DataSourceApplication {
 }
 
 func (dataSourceApplication *DataSourceApplication) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	applicationName := d.Get("name").(string)
 

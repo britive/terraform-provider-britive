@@ -63,7 +63,8 @@ func NewResourceBrokerPools(v *validate.Validation, importHelper *imports.Import
 //region Resource Broker Pools Context Operations
 
 func (rbp *ResourceBrokerPools) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -106,7 +107,8 @@ func (rbp *ResourceBrokerPools) resourceRead(ctx context.Context, d *schema.Reso
 }
 
 func (rbp *ResourceBrokerPools) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -164,7 +166,8 @@ func NewResourceBrokerPoolsHelper() *ResourceBrokerPoolsHelper {
 //region Resource Broker Pools helper functions
 
 func (rbph *ResourceBrokerPoolsHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	serverAccessResourceID, err := rbph.parseUniqueID(d.Id())
 	if err != nil {
@@ -210,7 +213,9 @@ func (resourceBrokerPoolsHelper *ResourceBrokerPoolsHelper) parseUniqueID(ID str
 }
 
 func (resourceBrokerPoolsHelper *ResourceBrokerPoolsHelper) getBrokerPoolNames(serverAccessResourceName string, m interface{}) (brokerPoolNames []string, err error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	brokerPools, err := c.GetBrokerPoolsResource(serverAccessResourceName)
 	if errors.Is(err, britive.ErrNotFound) {
 		return nil, errs.NewNotFoundErrorf("broker pools for resource %s", serverAccessResourceName)

@@ -111,7 +111,8 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 }
 
 func (rrmp *ResourceResourceManagerProfile) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -138,11 +139,9 @@ func (rrmp *ResourceResourceManagerProfile) resourceCreate(ctx context.Context, 
 	log.Printf("[INFO] Adding associations to resource_manager_profile")
 	_, err = c.CreateUpdateResourceManagerProfileAssociations(*resourceManagerProfile)
 	if errors.Is(err, britive.ErrNotFound) {
-		// return diag.FromErr(errs.NewNotFoundErrorf("Resource manager profile"))
 		diags = append(diags, diag.FromErr(errs.NewNotFoundErrorf("Resource manager profile"))...)
 	}
 	if err != nil {
-		// return diag.FromErr(err)
 		diags = append(diags, diag.FromErr(err)...)
 	}
 
@@ -165,7 +164,8 @@ func (rrmp *ResourceResourceManagerProfile) resourceCreate(ctx context.Context, 
 }
 
 func (rrmp *ResourceResourceManagerProfile) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -207,7 +207,8 @@ func (rrmp *ResourceResourceManagerProfile) resourceRead(ctx context.Context, d 
 }
 
 func (rrmp *ResourceResourceManagerProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") {
 		resourceManagerProfile := &britive.ResourceManagerProfile{}
@@ -249,7 +250,8 @@ func (rrmp *ResourceResourceManagerProfile) resourceUpdate(ctx context.Context, 
 }
 
 func (rrmp *ResourceResourceManagerProfile) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -276,7 +278,8 @@ func (rrmp *ResourceResourceManagerProfile) resourceDelete(ctx context.Context, 
 }
 
 func (rrmp *ResourceResourceManagerProfile) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if err := rrmp.importHelper.ParseImportID([]string{"resource-manager/profile/(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err

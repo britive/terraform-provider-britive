@@ -88,7 +88,8 @@ func NewResourceResponseTemplate(v *validate.Validation, importHelper *imports.I
 }
 
 func (rrt *ResourceResponseTemplate) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	template := &britive.ResponseTemplate{}
 	rrt.helper.mapResourceToModel(d, m, template, false)
@@ -106,7 +107,9 @@ func (rrt *ResourceResponseTemplate) resourceCreate(ctx context.Context, d *sche
 }
 
 func (rrt *ResourceResponseTemplate) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	templateID, err := rrt.helper.parseUniqueID(d.Id())
@@ -130,7 +133,9 @@ func (rrt *ResourceResponseTemplate) resourceRead(ctx context.Context, d *schema
 }
 
 func (rrt *ResourceResponseTemplate) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	templateID, err := rrt.helper.parseUniqueID(d.Id())
@@ -162,7 +167,9 @@ func (rrt *ResourceResponseTemplate) resourceUpdate(ctx context.Context, d *sche
 }
 
 func (rrt *ResourceResponseTemplate) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	templateID, err := rrt.helper.parseUniqueID(d.Id())
@@ -225,7 +232,8 @@ func (helper *ResourceResponseTemplateHelper) parseUniqueID(ID string) (response
 }
 
 func (rrt *ResourceResponseTemplate) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if err := rrt.importHelper.ParseImportID([]string{"resource-manager/response-templates/(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err

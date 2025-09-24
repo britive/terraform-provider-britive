@@ -65,7 +65,8 @@ func NewResourceRole(v *validate.Validation, importHelper *imports.ImportHelper)
 //region Role Resource Context Operations
 
 func (rr *ResourceRole) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -105,7 +106,8 @@ func (rr *ResourceRole) resourceRead(ctx context.Context, d *schema.ResourceData
 }
 
 func (rr *ResourceRole) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	roleID, err := rr.helper.parseUniqueID(d.Id())
 	if err != nil {
@@ -142,7 +144,8 @@ func (rr *ResourceRole) resourceUpdate(ctx context.Context, d *schema.ResourceDa
 }
 
 func (rr *ResourceRole) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -163,7 +166,8 @@ func (rr *ResourceRole) resourceDelete(ctx context.Context, d *schema.ResourceDa
 }
 
 func (rr *ResourceRole) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	if err := rr.importHelper.ParseImportID([]string{"roles/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
@@ -214,7 +218,8 @@ func (rrh *ResourceRoleHelper) mapResourceToModel(d *schema.ResourceData, m inte
 }
 
 func (rrh *ResourceRoleHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	roleID, err := rrh.parseUniqueID(d.Id())
 	if err != nil {
