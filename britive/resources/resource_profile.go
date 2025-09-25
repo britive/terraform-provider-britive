@@ -331,57 +331,6 @@ func (rph *ResourceProfileHelper) appendProfileAssociations(associations []briti
 	return associations
 }
 
-// func (rph *ResourceProfileHelper) cachedRootEnvironmentGroup(appContainerID string, m interface{}) (*britive.ApplicationRootEnvironmentGroup, error) {
-// 	providerMeta := m.(*britive.ProviderMeta)
-// 	c := providerMeta.Client
-// 	appCache := providerMeta.AppCache
-
-// 	mutex := providerMeta.Mutex
-// 	isLocked := false
-
-// 	var appRootEnvironmentGroup *britive.ApplicationRootEnvironmentGroup
-// 	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", appContainerID)
-
-// 	if _, ok := appCache[cacheKey]; !ok {
-// 		mutex.Lock()
-// 		isLocked = true
-// 		log.Printf("=========== Cache miss appRootEnvironmentGroup")
-// 	}
-// 	if cacheData, ok := appCache[cacheKey]; ok {
-// 		if isLocked {
-// 			mutex.Unlock()
-// 			isLocked = false
-// 		}
-// 		defer func() {
-// 			if isLocked {
-// 				mutex.Unlock()
-// 				isLocked = false
-// 			}
-// 		}()
-// 		appRootEnvironmentGroup = cacheData.Cache.(*britive.ApplicationRootEnvironmentGroup)
-// 		log.Printf("=========== Cache hit appRootEnvironmentGroup: %v", appRootEnvironmentGroup)
-// 	} else {
-// 		response, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		appRootEnvironmentGroup = response
-
-// 		newCache := &britive.AppData{
-// 			Cache: appRootEnvironmentGroup,
-// 		}
-// 		appCache[cacheKey] = newCache
-
-// 		log.Printf("=========== Cached appRootEnvironmentGroup: %v", appCache)
-// 	}
-// 	if isLocked {
-// 		mutex.Unlock()
-// 		isLocked = false
-// 	}
-
-// 	return appRootEnvironmentGroup, nil
-// }
-
 func (rph *ResourceProfileHelper) cachedApplicationType(appContainerID string, m interface{}) (*britive.ApplicationType, error) {
 	providerMeta := m.(*britive.ProviderMeta)
 	c := providerMeta.Client
@@ -398,9 +347,9 @@ func (rph *ResourceProfileHelper) cachedApplicationType(appContainerID string, m
 		defer func() {
 			if isLocked {
 				mutex.Unlock()
+				isLocked = false
 			}
 		}()
-		log.Printf("=========== Cache miss applicationtype")
 	}
 	if cachedData, ok := appCache[cacheKey]; ok {
 		if isLocked {
@@ -408,7 +357,6 @@ func (rph *ResourceProfileHelper) cachedApplicationType(appContainerID string, m
 			isLocked = false
 		}
 		applicationType = cachedData.Cache.(*britive.ApplicationType)
-		log.Printf("=========== Cache hit applicationtype: %v", applicationType)
 	} else {
 		response, err := c.GetApplicationType(appContainerID)
 		if err != nil {
@@ -419,7 +367,6 @@ func (rph *ResourceProfileHelper) cachedApplicationType(appContainerID string, m
 			Cache: applicationType,
 		}
 		appCache[cacheKey] = newCache
-		log.Printf("=========== Cached applicationtype: %v", appCache)
 	}
 
 	if isLocked {
@@ -433,7 +380,6 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 	providerMeta := m.(*britive.ProviderMeta)
 	c := providerMeta.Client
 
-	// ================ appRootEnvironmentGroup, err := rph.cachedRootEnvironmentGroup(appContainerID, m)
 	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID, m)
 	if err != nil {
 		return err

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -249,7 +248,6 @@ func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId i
 	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
 	if _, ok := appCache[cacheKey]; ok {
 		delete(appCache, cacheKey)
-		log.Printf("=========== Cache removed appRootEnvironmentGroup from application")
 	}
 	return nil
 }

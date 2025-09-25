@@ -3,7 +3,6 @@ package britive
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 )
 
@@ -21,23 +20,20 @@ func (c *Client) GetApplicationRootEnvironmentGroup(appContainerID string, m int
 	if _, ok := appCache[cacheKey]; !ok {
 		mutex.Lock()
 		isLocked = true
-		log.Printf("=========== Cache miss appRootEnvironmentGroup")
-	}
-	if cacheData, ok := appCache[cacheKey]; ok {
-		if isLocked {
-			mutex.Unlock()
-			isLocked = false
-		}
 		defer func() {
 			if isLocked {
 				mutex.Unlock()
 				isLocked = false
 			}
 		}()
+	}
+	if cacheData, ok := appCache[cacheKey]; ok {
+		if isLocked {
+			mutex.Unlock()
+			isLocked = false
+		}
 		appRootEnvironmentGroup = cacheData.Cache.(*ApplicationRootEnvironmentGroup)
-		log.Printf("=========== Cache hit appRootEnvironmentGroup: %v", appRootEnvironmentGroup)
 	} else {
-		log.Printf("=========== Get GetApplicationRootEnvironmentGroup: %v", appContainerID)
 		//TODO: Warning Recursion - Get by Filter
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s/apps/%s/root-environment-group", c.APIBaseURL, appContainerID), nil)
 		if err != nil {
@@ -60,7 +56,6 @@ func (c *Client) GetApplicationRootEnvironmentGroup(appContainerID string, m int
 		}
 		appCache[cacheKey] = newCache
 
-		log.Printf("=========== Cached appRootEnvironmentGroup: %+v", newCache.Cache)
 	}
 	if isLocked {
 		mutex.Unlock()

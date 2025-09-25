@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 )
@@ -40,7 +39,6 @@ func (c *Client) CreateEntityEnvironment(applicationEntity ApplicationEntityEnvi
 	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
 	if _, ok := appCache[cacheKey]; ok {
 		delete(appCache, cacheKey)
-		log.Printf("=========== Cache removed appRootEnvironmentGroup environment")
 	}
 
 	return ae, nil
@@ -64,7 +62,6 @@ func (c *Client) DeleteEntityEnvironment(applicationID, entityID string, m inter
 	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
 	if _, ok := appCache[cacheKey]; ok {
 		delete(appCache, cacheKey)
-		log.Printf("=========== Cache removed appRootEnvironmentGroup from environment")
 	}
 
 	return err
@@ -121,7 +118,6 @@ func (c *Client) PatchApplicationEnvPropertyTypes(applicationID string, entityID
 	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
 	if _, ok := appCache[cacheKey]; ok {
 		delete(appCache, cacheKey)
-		log.Printf("=========== Cache removed appRootEnvironmentGroup environment")
 	}
 
 	return &applicationEnvResponse, nil

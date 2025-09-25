@@ -403,8 +403,6 @@ func (helper *ResourceResourceTypePermissionsHelper) mapResourceToModel(d *schem
 	permission.IsDraft = d.Get("is_draft").(bool)
 	permission.CheckinTimeLimit = d.Get("checkin_time_limit").(int)
 	permission.CheckoutTimeLimit = d.Get("checkout_time_limit").(int)
-	// responseTemplates := d.Get("response_templates").(*schema.Set)
-	// permission.ResponseTemplates = append(permission.ResponseTemplates, responseTemplates.List()...)
 	variables := d.Get("variables").(*schema.Set)
 	permission.Variables = append(permission.Variables, variables.List()...)
 	permission.ShowOrigCreds = d.Get("show_orig_creds").(bool)
