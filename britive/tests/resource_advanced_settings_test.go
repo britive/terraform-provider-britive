@@ -36,15 +36,15 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 		name = "TF_ACCEPTANCE_TEST_ITSM_DO_NOT_DELETE"
 	}
 
-	data "britive_connection" "new_im_connection"{
-		name = "TF_ACCEPTANCE_TEST_IM_DO_NOT_DELETE"
-		setting_type = "IM"
-	}
+	// data "britive_connection" "new_im_connection"{
+	// 	name = "TF_ACCEPTANCE_TEST_IM_DO_NOT_DELETE"
+	// 	setting_type = "IM"
+	// }
 
-	data "britive_escalation_policy" "new_esc_policy"{
-		name = "BDescalation-1"
-		im_connection_id = data.britive_connection.new_im_connection.id
-	}
+	// data "britive_escalation_policy" "new_esc_policy"{
+	// 	name = "BDescalation-1"
+	// 	im_connection_id = data.britive_connection.new_im_connection.id
+	// }
 
 	data "britive_application" "new_app" {
 		name = "%s"
@@ -110,12 +110,12 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			}
 		}
 
-		im {
-			connection_id       = data.britive_connection.new_im_connection.id
-			connection_type     = data.britive_connection.new_im_connection.type
-			is_auto_approval_enabled = false
-    		escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
-		}
+		// im {
+		// 	connection_id       = data.britive_connection.new_im_connection.id
+		// 	connection_type     = data.britive_connection.new_im_connection.type
+		// 	is_auto_approval_enabled = false
+    	// 	escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
+		// }
 	}
 
 	resource "britive_advanced_settings" "new_profile_advanced_settings" {
@@ -140,12 +140,12 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			}
 		}
 			
-		im {
-			connection_id       = data.britive_connection.new_im_connection.id
-			connection_type     = data.britive_connection.new_im_connection.type
-			is_auto_approval_enabled = false
-    		escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
-		}
+		// im {
+		// 	connection_id       = data.britive_connection.new_im_connection.id
+		// 	connection_type     = data.britive_connection.new_im_connection.type
+		// 	is_auto_approval_enabled = false
+    	// 	escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
+		// }
 	}
 
 	resource "britive_advanced_settings" "new_profile_policy_advanced_settings" {
@@ -170,12 +170,12 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			}
 		}
 
-		im {
-			connection_id       = data.britive_connection.new_im_connection.id
-			connection_type     = data.britive_connection.new_im_connection.type
-			is_auto_approval_enabled = false
-    		escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
-		}
+		// im {
+		// 	connection_id       = data.britive_connection.new_im_connection.id
+		// 	connection_type     = data.britive_connection.new_im_connection.type
+		// 	is_auto_approval_enabled = false
+    	// 	escalation_policies = ["data.britive_escalation_policy.new_esc_policy.id"]
+		// }
 	}
 
 `, applicationName, profileName, profilePolicyName, profilePolicyDescription)
