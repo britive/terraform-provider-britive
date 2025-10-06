@@ -59,7 +59,7 @@ func testAccCheckBritivePolicyPriorityConfig(applicationName, profileName, profi
 	resource "britive_profile_policy" "new" {
 		policy_name  = "%s"
 		description  = "%s"
-		profile_id   = britive_profile.new.id
+		profile_id   = britive_profile.new_profile.id
 		access_type  = "Allow"
 		condition    = jsonencode(
 			{
