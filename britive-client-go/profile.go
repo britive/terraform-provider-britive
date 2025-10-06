@@ -177,3 +177,93 @@ func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
 
 	return nil
 }
+
+// EnablePolicyOrdering - Enable Policy Order
+func (c *Client) EnablePolicyOrdering(resourcePolicyPriority ProfilePolicyPriority) (*ProfilePolicyPriority, error) {
+	policyOrder, err := json.Marshal(resourcePolicyPriority)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, resourcePolicyPriority.ProfileId), strings.NewReader(string(policyOrder)))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.DoWithLock(req, profileLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(resp, &resourcePolicyPriority)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resourcePolicyPriority, nil
+}
+
+// PrioritizePolicies - Order Policy
+func (c *Client) PrioritizePolicies(resourcePolicyPriority ProfilePolicyPriority) (*ProfilePolicyPriority, error) {
+	policyOrder, err := json.Marshal(resourcePolicyPriority.PolicyOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/policies/order", c.APIBaseURL, resourcePolicyPriority.ProfileId), strings.NewReader(string(policyOrder)))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, profileLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	var profilePolicyPriority ProfilePolicyPriority
+	err = json.Unmarshal(body, &profilePolicyPriority.PolicyOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	return &profilePolicyPriority, nil
+}
+
+func (c *Client) GetProfilePolicies(profileId string) ([]ProfilePolicy, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/policies", c.APIBaseURL, profileId), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, profileLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies []ProfilePolicy
+	err = json.Unmarshal(body, &policies)
+	if err != nil {
+		return nil, err
+	}
+
+	return policies, nil
+}
+
+func (c *Client) DeletePolicyOrder(resourcePolicyPriority ProfilePolicyPriority) error {
+	policyOrder, err := json.Marshal(resourcePolicyPriority)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, resourcePolicyPriority.ProfileId), strings.NewReader(string(policyOrder)))
+	if err != nil {
+		return err
+	}
+
+	_, err = c.DoWithLock(req, profileLockName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
