@@ -96,14 +96,21 @@ func (rpo *ResourcePolicyPriority) resourceCreate(ctx context.Context, d *schema
 		return diag.FromErr(err)
 	}
 
-	log.Printf("[INFO] Enabeling policy prioritization")
-	resourcePolicyPriority, err = c.EnablePolicyOrdering(*resourcePolicyPriority)
+	profileSummary, err := c.GetProfileSummary(resourcePolicyPriority.ProfileId)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	resourcePolicyPriority.ProfileId = resourcePolicyPriority.PapId
-	profileId := resourcePolicyPriority.PapId
+	profileSummary.PolicyOrderingEnabled = resourcePolicyPriority.PolicyOrderingEnabled
+	profileSummary.AppContainerID = resourcePolicyPriority.ProfileId
+
+	log.Printf("[INFO] Enabeling policy prioritization")
+	profileSummary, err = c.EnablePolicyOrdering(*profileSummary)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	profileId := resourcePolicyPriority.ProfileId
 
 	if resourcePolicyPriority.PolicyOrderingEnabled {
 		log.Printf("[INFO] Prioritizing policies:%v", resourcePolicyPriority.PolicyOrder)
@@ -160,14 +167,21 @@ func (rpo *ResourcePolicyPriority) resourceUpdate(ctx context.Context, d *schema
 			return diag.FromErr(err)
 		}
 
-		log.Printf("[INFO] Enabeling policy prioritization")
-		resourcePolicyPriority, err = c.EnablePolicyOrdering(*resourcePolicyPriority)
+		profileSummary, err := c.GetProfileSummary(resourcePolicyPriority.ProfileId)
 		if err != nil {
 			return diag.FromErr(err)
 		}
 
-		resourcePolicyPriority.ProfileId = resourcePolicyPriority.PapId
-		profileId := resourcePolicyPriority.PapId
+		profileSummary.PolicyOrderingEnabled = resourcePolicyPriority.PolicyOrderingEnabled
+		profileSummary.AppContainerID = resourcePolicyPriority.ProfileId
+
+		log.Printf("[INFO] Enabeling policy prioritization")
+		profileSummary, err = c.EnablePolicyOrdering(*profileSummary)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		profileId := resourcePolicyPriority.ProfileId
 
 		if resourcePolicyPriority.PolicyOrderingEnabled {
 			log.Printf("[INFO] Prioritizing policies:%v", resourcePolicyPriority.PolicyOrder)
