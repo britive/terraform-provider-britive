@@ -15,13 +15,11 @@ This resource allows you to enable policy prioritization policies for a Britive 
 ```hcl
 resource "britive_policy_priority" "order_1" {
   profile_id                = "abc123xyz"
-  policy_ordering_enabled   = true
-
-  policy_priority = {
+  policy_priority {
     id       = "policy-001"
     priority = 0
   }
-  policy_priority = {
+  policy_priority {
       id       = "policy-002"
       priority = 1
   }
@@ -33,7 +31,6 @@ resource "britive_policy_priority" "order_1" {
 The following arguments are supported:
 
 * `profile_id` - (Required) The identity of britive application profile.
-* `policy_ordering_enabled` - (Optional) A boolean flag indicating whether policy ordering is enabled. Defaults to true.
 * `policy_priority` - (Optional) The policy priority
     * `id` - (Required) The identity of britive profile policy.
     * `priority` - (Required) The priority order (integer), where 0 is the highest priority.
