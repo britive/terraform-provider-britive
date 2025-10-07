@@ -89,6 +89,34 @@ func (c *Client) GetProfile(profileID string) (*Profile, error) {
 	return profile, nil
 }
 
+func (c *Client) GetProfileSummary(profileID string) (*ProfileSummary, error) {
+	requestURL := fmt.Sprintf("%s/paps/%s?view=summary", c.APIBaseURL, profileID)
+	req, err := http.NewRequest("GET", requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, profileLockName)
+	if err != nil {
+		return nil, err
+	}
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
+	profileSummary := &ProfileSummary{}
+	err = json.Unmarshal(body, profileSummary)
+	if err != nil {
+		return nil, err
+	}
+
+	if profileSummary == nil {
+		return nil, ErrNotFound
+	}
+
+	return profileSummary, nil
+}
+
 // CreateProfile - Create new profile
 func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile, error) {
 	utb, err := json.Marshal(profile)
@@ -114,6 +142,7 @@ func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile
 
 // UpdateProfile - Updates profile
 func (c *Client) UpdateProfile(appContainerID string, profileID string, profile Profile) (*Profile, error) {
+
 	profileBody, err := json.Marshal(profile)
 	if err != nil {
 		return nil, err
@@ -179,13 +208,13 @@ func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
 }
 
 // EnablePolicyOrdering - Enable Policy Order
-func (c *Client) EnablePolicyOrdering(resourcePolicyPriority ProfilePolicyPriority) (*ProfilePolicyPriority, error) {
-	policyOrder, err := json.Marshal(resourcePolicyPriority)
+func (c *Client) EnablePolicyOrdering(profile ProfileSummary) (*ProfileSummary, error) {
+	policyOrder, err := json.Marshal(profile)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, resourcePolicyPriority.ProfileId), strings.NewReader(string(policyOrder)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profile.PapId), strings.NewReader(string(policyOrder)))
 	if err != nil {
 		return nil, err
 	}
@@ -195,12 +224,14 @@ func (c *Client) EnablePolicyOrdering(resourcePolicyPriority ProfilePolicyPriori
 		return nil, err
 	}
 
-	err = json.Unmarshal(resp, &resourcePolicyPriority)
+	var profileSummary ProfileSummary
+
+	err = json.Unmarshal(resp, &profileSummary)
 	if err != nil {
 		return nil, err
 	}
 
-	return &resourcePolicyPriority, nil
+	return &profileSummary, nil
 }
 
 // PrioritizePolicies - Order Policy
