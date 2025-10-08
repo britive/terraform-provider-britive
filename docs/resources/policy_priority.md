@@ -8,13 +8,13 @@ description: |-
 
 # britive_policy_priority Resource
 
-This resource allows you to enable policy prioritization policies for a Britive profile.
+This resource allows you to manage policy prioritization of policies for a Britive profile.
 
 ## Example Usage
 
 ```hcl
-resource "britive_policy_priority" "order_1" {
-  profile_id                = "abc123xyz"
+resource "britive_policy_priority" "new_priority" {
+  profile_id = "abc123xyz"
   policy_priority {
     id       = "policy-001"
     priority = 0
@@ -41,9 +41,7 @@ In addition to the above arguments, the following attribute is exported.
 
 * `id` - The identity of the Britive policy priority.
 
--> - If `policy_ordering_enabled = true` but `policy_priority` omits some policies in the profile, the remaining policies will be **automatically included in the order**, assigned **lower priorities** after those explicitly defined.
-
--> - When this resource is deleted or all `policy_priority` removed, Terraform will automatically **disable `policy_ordering_enabled`** for the associated profile.
+-> When this resource is created, Terraform will automatically **enable policy prioritization** for the associated profile and prioritize policies accordingly. Conversely, when the resource is deleted, Terraform will **disable policy prioritization** for that profile.
 
 ## Import
 
