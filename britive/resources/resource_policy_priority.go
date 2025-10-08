@@ -56,7 +56,7 @@ func NewResourcePolicyPriority(v *validate.Validation, importHelper *imports.Imp
 				Description: "Enable policy ordering",
 				ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
 					if val.(bool) != true {
-						errs = append(errs, fmt.Errorf("%s must always be true", key))
+						errs = append(errs, fmt.Errorf("Invalid Param."))
 					}
 					return
 				},
