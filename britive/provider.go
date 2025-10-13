@@ -111,7 +111,7 @@ func Provider(v string) *schema.Provider {
 			"britive_resource_manager_resource":                 resourceServerAccess.Resource,
 			"britive_resource_manager_resource_broker_pools":    resourceBrokerPools.Resource,
 			"britive_resource_manager_resource_policy":          resourceResourceManagerResourcePolicy.Resource,
-			"britive_policy_priority":                           resourceProfilePolicyPriority.Resource,
+			"britive_profile_policy_prioritization":             resourceProfilePolicyPriority.Resource,
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"britive_identity_provider":                    dataSourceIdentityProvider.Resource,

@@ -1,4 +1,4 @@
-## 2.2.2
+## 2.2.3
 
-ENHANCEMENTS:
-* Documentation restructure (PAB-21583)
+FEATURES:
+* **New Resource:**  `britive_profile_policy_prioritization`: Create, update, and manage profile policy prioritization.

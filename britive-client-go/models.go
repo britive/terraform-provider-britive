@@ -217,8 +217,7 @@ type ProfileSummary struct {
 }
 
 type ProfilePolicyPriority struct {
-	ProfileId             string `json:"appContainerId"`
-	PapId                 string `json:"papId"`
+	ProfileID             string `json:"papId"`
 	PolicyOrderingEnabled bool   `json:"policyOrderingEnabled"`
 	Extendable            bool   `json:"extendable"`
 	PolicyOrder           []PolicyOrder
