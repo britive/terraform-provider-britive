@@ -11,9 +11,9 @@ import (
 
 func TestBritiveProfilePolicyPrioritization(t *testing.T) {
 	applicationName := "DO NOT DELETE - AWS TF Plugin"
-	profileName := "AT - New Britive Profile Policy Test"
-	profilePolicyName := "AT - New Britive Profile Policy Test"
-	profilePolicyDescription := "AT - New Britive Profile Policy Test Description"
+	profileName := "AT - New Britive Profile Policy for Prioritization Test"
+	profilePolicyName := "AT - New Britive Profile Policy for Prioritization Test"
+	profilePolicyDescription := "AT - New Britive Profile Policy for Prioritization Test Description"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,
