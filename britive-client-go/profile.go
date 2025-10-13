@@ -279,22 +279,3 @@ func (c *Client) GetProfilePolicies(profileId string) ([]ProfilePolicy, error) {
 
 	return policies, nil
 }
-
-func (c *Client) DeletePolicyOrder(resourcePolicyPriority ProfilePolicyPriority) error {
-	policyOrder, err := json.Marshal(resourcePolicyPriority)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, resourcePolicyPriority.ProfileID), strings.NewReader(string(policyOrder)))
-	if err != nil {
-		return err
-	}
-
-	_, err = c.DoWithLock(req, profileLockName)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
