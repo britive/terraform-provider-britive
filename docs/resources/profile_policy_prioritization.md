@@ -1,19 +1,19 @@
 ---
 subcategory: "Application and Access Profile Management"
 layout: "britive"
-page_title: "britive_policy_priority Resource - britive"
+page_title: "britive_profile_policy_prioritization Resource - britive"
 description: |-
   Manages policy priority configuration for a Britive profile.
 ---
 
-# britive_policy_priority Resource
+# britive_profile_policy_prioritization Resource
 
 This resource allows you to manage policy prioritization of policies for a Britive profile.
 
 ## Example Usage
 
 ```hcl
-resource "britive_policy_priority" "new_priority" {
+resource "britive_profile_policy_prioritization" "new_priority" {
   profile_id = "abc123xyz"
   policy_priority {
     id       = "policy-001"
@@ -48,8 +48,8 @@ In addition to the above arguments, the following attribute is exported.
 You can import a profile using any of these accepted formats:
 
 ```sh
-terraform import britive_policy_priority.new paps/{{profile_id}}/policies/priority
-terraform import britive_policy_priority.new {{profile_id}}
+terraform import britive_profile_policy_prioritization.new paps/{{profile_id}}/policies/priority
+terraform import britive_profile_policy_prioritization.new {{profile_id}}
 ```
 
 -> - During import, all current policies and their priorities are **read and synced** into the Terraform state.

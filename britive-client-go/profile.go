@@ -208,7 +208,7 @@ func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
 }
 
 // EnablePolicyOrdering - Enable Policy Order
-func (c *Client) EnablePolicyOrdering(profile ProfileSummary) (*ProfileSummary, error) {
+func (c *Client) EnableDisablePolicyPrioritization(profile ProfileSummary) (*ProfileSummary, error) {
 	policyOrder, err := json.Marshal(profile)
 	if err != nil {
 		return nil, err
@@ -241,7 +241,7 @@ func (c *Client) PrioritizePolicies(resourcePolicyPriority ProfilePolicyPriority
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/policies/order", c.APIBaseURL, resourcePolicyPriority.ProfileId), strings.NewReader(string(policyOrder)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/policies/order", c.APIBaseURL, resourcePolicyPriority.ProfileID), strings.NewReader(string(policyOrder)))
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (c *Client) DeletePolicyOrder(resourcePolicyPriority ProfilePolicyPriority)
 		return err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, resourcePolicyPriority.ProfileId), strings.NewReader(string(policyOrder)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, resourcePolicyPriority.ProfileID), strings.NewReader(string(policyOrder)))
 	if err != nil {
 		return err
 	}
