@@ -45,7 +45,7 @@ func (c *Client) GetApplicationRootEnvironmentGroup(appContainerID string, m int
 			return nil, err
 		}
 
-		appRootEnvironmentGroup := &ApplicationRootEnvironmentGroup{}
+		appRootEnvironmentGroup = &ApplicationRootEnvironmentGroup{}
 		err = json.Unmarshal(body, appRootEnvironmentGroup)
 		if err != nil {
 			return nil, err
