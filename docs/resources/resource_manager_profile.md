@@ -17,6 +17,7 @@ resource "britive_resource_manager_profile" "example" {
     name                 = "example_profile"
     description          = "Profile for managing production resources"
     expiration_duration  = 3600000
+    delegation_enabled   = true
 
     associations {
         label_key   = "environment"
@@ -36,6 +37,7 @@ The following arguments are supported:
 * `name` - (Required) The name of the britive resource manager profile.
 * `description` - (Optional) Description of britive resource manager profile.
 * `expiration_duration` - (Required) Expiration duration of resource manager profile (in minutes).
+* `delegation_enabled` - (Optional) Allow impersonatio for perofile.
 * `associations` - (Optional) List of resource label associations. Each association block supports:
   * `label_key` - (Required) Resource label name for association.
   * `values` - (Required) List of values for the associated resource label. Must contain at least one value.

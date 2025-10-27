@@ -326,6 +326,10 @@ func MembersEqual(old, new string) bool {
 				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
 					equalCount++
 				}
+			case "aiIdentities":
+				if ArrayOfMapsEqual(string(memOld), string(memNew)) {
+					equalCount++
+				}
 			default:
 				return false
 			}

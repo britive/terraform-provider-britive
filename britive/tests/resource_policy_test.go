@@ -130,6 +130,11 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 						name = "britiveprovideracceptancetest1"
 					},
 				]
+				aiIdentities      = [
+        			{
+          				name : "DO_NOT_DELETE_AI_IDENTITY"
+        			},
+      			]
 			}
 		)
 		permissions  = jsonencode(
