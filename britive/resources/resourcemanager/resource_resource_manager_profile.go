@@ -65,6 +65,11 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 				Computed:    true,
 				Description: "Status of resource manager profile",
 			},
+			"delegation_enabled": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Enable or disable delegation",
+			},
 			"associations": {
 				Type:        schema.TypeSet,
 				Optional:    true,
@@ -138,11 +143,9 @@ func (rrmp *ResourceResourceManagerProfile) resourceCreate(ctx context.Context, 
 	log.Printf("[INFO] Adding associations to resource_manager_profile")
 	_, err = c.CreateUpdateResourceManagerProfileAssociations(*resourceManagerProfile)
 	if errors.Is(err, britive.ErrNotFound) {
-		// return diag.FromErr(errs.NewNotFoundErrorf("Resource manager profile"))
 		diags = append(diags, diag.FromErr(errs.NewNotFoundErrorf("Resource manager profile"))...)
 	}
 	if err != nil {
-		// return diag.FromErr(err)
 		diags = append(diags, diag.FromErr(err)...)
 	}
 
@@ -209,7 +212,7 @@ func (rrmp *ResourceResourceManagerProfile) resourceRead(ctx context.Context, d 
 func (rrmp *ResourceResourceManagerProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") {
+	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") || d.HasChange("delegation_enabled") {
 		resourceManagerProfile := &britive.ResourceManagerProfile{}
 		err := rrmp.helper.mapResourceToModel(d, resourceManagerProfile)
 		if err != nil {
@@ -299,6 +302,9 @@ func (helper *ResourceResourceManagerProfileHelper) mapResourceToModel(d *schema
 	if v, ok := d.GetOk("description"); ok {
 		resourceManagerProfile.Description = v.(string)
 	}
+	if delegationEnabled, ok := d.GetOk("delegation_enabled"); ok {
+		resourceManagerProfile.DelegationEnabled = delegationEnabled.(bool)
+	}
 	resourceManagerProfile.ExpirationDuration = d.Get("expiration_duration").(int)
 
 	rawAssociations := d.Get("associations").(*schema.Set)
@@ -323,6 +329,9 @@ func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *
 	d.Set("description", resourceManagerProfile.Description)
 	d.Set("expiration_duration", resourceManagerProfile.ExpirationDuration)
 	d.Set("status", resourceManagerProfile.Status)
+	if err := d.Set("delegation_enabled", resourceManagerProfile.DelegationEnabled); err != nil {
+		return err
+	}
 
 	var associationMapList []map[string]interface{}
 	for name, values := range resourceManagerProfile.Associations {

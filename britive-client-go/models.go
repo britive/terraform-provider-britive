@@ -77,6 +77,7 @@ type Profile struct {
 	ExtensionLimit                interface{}          `json:"extensionLimit,omitempty"`
 	DestinationUrl                string               `json:"destinationUrl,omitempty"`
 	PolicyOrderingEnabled         bool                 `json:"policyOrderingEnabled,omitempty"`
+	DelegationEnabled             bool                 `json:"delegationEnabled,omitempty"`
 }
 
 // Application - godoc
@@ -475,6 +476,7 @@ type ResourceManagerProfile struct {
 	Status                string              `json:"status,omitempty"`
 	Associations          map[string][]string `json:"associations,omitempty"`
 	ResourceLabelColorMap map[string]string   `json:"resourceLabelColorMap,omitempty"`
+	DelegationEnabled     bool                `json:"delegationEnabled,omitempty"`
 }
 
 // ResourceManagerProfilePolicy - godoc
