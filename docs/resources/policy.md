@@ -53,6 +53,11 @@ resource "britive_policy" "new" {
                     name = "skyle"
                 },
             ]
+            aiIdentities      = [
+                {
+                    name = "AI_Identity"
+                },
+            ]
         }
     )
     permissions  = jsonencode(
@@ -131,7 +136,7 @@ The following arguments are supported:
 
 * `access_type` - (Optional) Type of access the policy provides. This can have two values "Allow"/"Deny". Default:`"Allow"`.
 
-* `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags`, `tokens` and `users`
+* `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags`, `tokens`, `aiIdentities` and `users`
 
 * `permissions` - (Optional) Permissions associated to the policy. Either a role/permission is to be assigned to a policy.
 

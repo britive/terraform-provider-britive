@@ -3,6 +3,7 @@ package britive
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -86,6 +87,8 @@ func (c *Client) GetProfile(profileID string) (*Profile, error) {
 		return nil, ErrNotFound
 	}
 
+	log.Printf("======== get : %s", string(body))
+
 	return profile, nil
 }
 
@@ -123,6 +126,7 @@ func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("====== req POST := %s", string(utb))
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps", c.APIBaseURL, appContainerID), strings.NewReader(string(utb)))
 	if err != nil {
 		return nil, err
@@ -147,6 +151,8 @@ func (c *Client) UpdateProfile(appContainerID string, profileID string, profile 
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("====== req PATCH := %s", string(profileBody))
 
 	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/apps/%s/paps/%s", c.APIBaseURL, appContainerID, profileID), strings.NewReader(string(profileBody)))
 	if err != nil {

@@ -51,6 +51,7 @@ func testAccCheckBritiveProfileConfig(name string, description string, applicati
 		name = "%s"
 		description = "%s"
 		expiration_duration = "25m0s"
+		delegation_enabled  = true
 		associations {
 			type  = "Environment"
 			value = "Subscription 1"
