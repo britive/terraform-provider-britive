@@ -45,7 +45,7 @@ resource "britive_resource_manager_profile_policy" "example" {
             ]
             aiIdentities      = [
                 {
-                    name = "AI_Identity"
+                    name = "DO_NOT_DELETE_AI_Identity"
                 },
             ]
         }

@@ -47,7 +47,7 @@ resource "britive_profile_policy" "new" {
             ]
             aiIdentities      = [
                 {
-                    name = "AI_Identity"
+                    name = "DO_NOT_DELETE_AI_Identity"
                 },
             ]
         }
