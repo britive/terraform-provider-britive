@@ -344,29 +344,25 @@ func (helper *ResourceResourceManagerProfilePolicyHelper) getAndMapModelToResour
 		return err
 	}
 
-	log.Printf("=========== okay profile_id : %s", resourceManagerProfilePolicy.ProfileID)
-
-	apiCon := ""
+	normalizedCondition := ""
 	if resourceManagerProfilePolicy.Condition != "" {
 		var condMap interface{}
 		if err := json.Unmarshal([]byte(resourceManagerProfilePolicy.Condition), &condMap); err != nil {
-			log.Printf("====== unmarshal error : %s", resourceManagerProfilePolicy.Condition)
 			return err
 		}
-		normalizedCondition, err := json.Marshal(condMap)
+		apiCon, err := json.Marshal(condMap)
 		if err != nil {
-			log.Printf("======= marshal error : %v", condMap)
 			return err
 		}
-		apiCon = string(normalizedCondition)
+		normalizedCondition = string(apiCon)
 	}
 
 	newCon := d.Get("condition")
-	if britive.ConditionEqual(apiCon, newCon.(string)) {
+	if britive.ConditionEqual(normalizedCondition, newCon.(string)) {
 		if err := d.Set("condition", newCon.(string)); err != nil {
 			return err
 		}
-	} else if err := d.Set("condition", apiCon); err != nil {
+	} else if err := d.Set("condition", normalizedCondition); err != nil {
 		return err
 	}
 
@@ -375,18 +371,14 @@ func (helper *ResourceResourceManagerProfilePolicyHelper) getAndMapModelToResour
 		return err
 	}
 
-	log.Printf("======== okay condition")
-
 	newMem := d.Get("members")
 	if britive.MembersEqual(string(mem), newMem.(string)) {
 		if err := d.Set("members", newMem.(string)); err != nil {
 			return err
 		}
-		log.Printf("========= okay members : %s", newMem.(string))
 	} else if err := d.Set("members", string(mem)); err != nil {
 		return err
 	}
-	log.Printf("========= okay members : %s", string(mem))
 
 	var resourceLabelsList []map[string]interface{}
 	for name, values := range resourceManagerProfilePolicy.ResourceLabels {
@@ -396,8 +388,6 @@ func (helper *ResourceResourceManagerProfilePolicyHelper) getAndMapModelToResour
 		}
 		resourceLabelsList = append(resourceLabelsList, resourceLabelMap)
 	}
-
-	log.Printf("==== all okay")
 
 	return nil
 }
