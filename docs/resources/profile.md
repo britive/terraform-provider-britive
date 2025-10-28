@@ -61,7 +61,7 @@ The following arguments are supported, except for AWS profiles:
 
 * `extension_duration` - (Optional) The Britive profile expiry extension duration as a time value. For example: `12m30s`
 
-* `delegation_enabled` - (Optional) Allow impersonatio for perofile.
+* `delegation_enabled` - (Optional) Allow impersonation for profile.
 
 * `extension_limit` - (Optional) The Britive profile expiry extension limit. For example: `2`
 
