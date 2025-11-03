@@ -10,7 +10,7 @@ description: |-
 
 This resource allows you to create and manage applications in Britive.
 
--> This resource is only supported for the Snowflake, Snowflake Standalone, GCP, GCP Standalone and Google Workspace applications.
+-> This resource is only supported for the Snowflake, Snowflake Standalone, GCP, GCP Standalone, Google Workspace, AWS, AWS Standalone, Azure and Okta applications.
 
 ## Example Usage
 
@@ -235,7 +235,7 @@ resource "britive_application" "new" {
 > - `programmaticAccess`: Programmatic Access.
 > - `consoleAccess`: Console Access.
 > - `appAccessMethod_static_loginUrl`: Login URL.
-> - `orgId`: The Organizations Unique Identifier.
+> - `orgId`: The Organization's Unique Identifier.
 > - `gSuiteAdmin`: G Suite Admin Email.
 > - `projectIdForServiceAccount`: Project ID for creating Service Accounts.
 > - `acsUrl`: ACS URL.
@@ -394,11 +394,11 @@ resource "britive_application" "application_google_workspace" {
     }
     properties {
       name = "displayName"
-      value = "YS TF Google Workspace"
+      value = "TF Google Workspace"
     }
     properties {
       name = "description"
-      value = "YS TF Google Workspace Description"
+      value = "TF Google Workspace Description"
     }
     properties {
       name = "appAccessMethod_static_loginUrl"
@@ -446,7 +446,7 @@ resource "britive_application" "application_google_workspace" {
     }
     properties {
       name = "maxSessionDurationForProfiles"
-      value = "12345
+      value = "12345"
     }
     sensitive_properties {
       name = "serviceAccountCredentials"
@@ -475,11 +475,281 @@ resource "britive_application" "application_google_workspace" {
 >**Sensitive Properties:**
 > - `serviceAccountCredentials`: The Service Account Credentials - Content of Private Key File as JSON String.
 
+### AWS Application
+
+```hcl
+resource "britive_application" "aws_1" {
+    application_type = "AWS"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AWS Application App"
+    }
+    properties {
+      name = "description"
+      value = "AWS Application App Desc"
+    }
+    properties {
+      name = "showAwsAccountNumber"
+      value = true
+    }
+    properties {
+      name = "sessionDuration"
+      value = 2
+    }
+    properties {
+      name = "identityProvider"
+      value = "Provider"
+    }
+    properties {
+      name = "roleName"
+      value = "roleName"
+    }
+    properties {
+      name = "accountId"
+      value = "321xxxx"
+    }
+    properties {
+      name = "region"
+      value = "us-east-1"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+    properties {
+      name = "supportsInvalidationGlobal"
+      value = true
+    }
+    properties {
+      name = "allowCopyingConsoleUrl"
+      value = false
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = false
+    }
+}
+```
+
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `showAwsAccountNumber`: Show AWS Account Number.
+> - `sessionDuration`: Duration of the backend AWS connection (in hours).
+> - `identityProvider`: Identity Provider Name.
+> - `roleName`: Integration Role Name.
+> - `accountId`: Management Account ID.
+> - `region`: Region.
+> - `supportsInvalidationGlobal`: Enable AWS Session Invalidation for all Environments.
+> - `allowCopyingConsoleUrl`: Allow copy link for console URL.
+> - `displayProgrammaticKeys`: Display programmatic access keys.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+
+### AWS Standalone Application
+
+```hcl
+resource "britive_application" "aws_standalone_1" {
+    application_type = "AWS Standalone"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AWS Standalone App"
+    }
+    properties {
+      name = "description"
+      value = "AWS Standalone App Description"
+    }
+    properties {
+      name = "showAwsAccountNumber"
+      value = false
+    }
+    properties {
+      name = "allowCopyingConsoleUrl"
+      value = false
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = false
+    }
+    properties {
+      name = "identityProvider"
+      value = "Provider"
+    }
+    properties {
+      name = "sessionDuration"
+      value = 1000
+    }
+    properties {
+      name = "region"
+      value = "us-east-1"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+}
+```
+
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `showAwsAccountNumber`: Show AWS Account Number.
+> - `sessionDuration`: Duration of the backend AWS connection (in hours).
+> - `identityProvider`: Identity Provider Name.
+> - `region`: Region.
+> - `allowCopyingConsoleUrl`: Allow copy link for console URL.
+> - `displayProgrammaticKeys`: Display programmatic access keys.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+
+### Azure Application
+
+```hcl
+resource "britive_application" "azure_1" {
+    application_type = "Azure"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "Azure App"
+    }
+    properties {
+      name = "description"
+      value = "Azure App Desc"
+    }
+    properties {
+      name = "programmaticAccess"
+      value = true
+    }
+    properties {
+      name = "consoleAccess"
+      value = true
+    }
+    properties {
+      name = "appAccessMethod_static_loginUrl"
+      value = "https://azure.test.com"
+    }
+    properties {
+      name = "tenantId"
+      value = "<Tenant-Id>"
+    }
+    properties {
+      name = "clientId"
+      value = "<Client-Id>"
+    }
+    properties {
+      name = "userFilter"
+      value = "user"
+    }
+    properties {
+      name = "groupFilter"
+      value = "group"
+    }
+    properties {
+      name = "scanMethod"
+      value = "collectUsersGroups"
+    }
+    properties {
+      name = "scanMgmtGroupsAndSubscriptions"
+      value = false
+    }
+    properties {
+      name = "scanSubscriptionsOnly"
+      value = false
+    }
+    properties {
+      name = "scanResources"
+      value = false
+    }
+    properties {
+      name = "scanGroupsMemberships"
+      value = false
+    }
+    properties {
+      name = "scanServicePrincipals"
+      value = false
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = false
+    }
+    sensitive_properties {
+      name = "clientSecret"
+      value = "<Client-Secret>"
+    }
+}
+```
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `programmaticAccess`: Programmatic Access.
+> - `consoleAccess`: Console.
+> - `appAccessMethod_static_loginUrl`: Login URL.
+> - `tenantId`: Tenant ID.
+> - `clientId`: Client ID.
+> - `clientSecret`: Client Secret (Sensitive Property)
+> - `userFilter`: Filter for users.
+> - `groupFilter`: Filter for groups.
+> - `scanMethod`: Scan Method.
+> - `scanMgmtGroupsAndSubscriptions`: Scan Management Groups and Subscriptions.
+> - `scanSubscriptionsOnly`: Scan Subscriptions Only.
+> - `scanResources`: Scan Azure Resource Groups and Resources.
+> - `scanGroupsMemberships`: Scan Azure Group Membership.
+> - `scanServicePrincipals`: Scan Azure Service Principals.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+> - `displayProgrammaticKeys`: Display programmatic access keys.
+
+>**Sensitive Properties:**
+> - `clientSecret`: Client secret.
+
+### Okta Application
+
+```hcl
+resource "britive_application" "okta_1" {
+    application_type = "Okta"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "Okta App"
+    }
+    properties {
+      name = "description"
+      value = "Okta App Desc"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+}
+```
+
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+
 ## Argument Reference
 
 The following arguments are supported:
 
-* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone` and `Google Workspace`.
+* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone`, `Google Workspace`, `AWS`, `AWS Standalone`, `Azure` and `Okta`.
 
 * `version` - (Optional) The version of the application resource.  
   If specified, it must match a supported version for the selected `application_type`.  
@@ -573,5 +843,56 @@ When a property is deleted from the configuration, its value will revert to the 
     'displayName': 'Snowflake Standalone',
     'description': 'Snowflake app for standalone instances',
     'maxSessionDurationForProfiles': '604800' 
+}
+```
+
+### AWS
+```sh
+{
+    'displayName': 'AWS',
+    'identityProvider': 'Britive',
+    'roleName': 'roleName',
+    'sessionDuration': '1',
+    'appAccessMethod': 'appAccessMethod',
+    'maxSessionDurationForProfiles`: '43200',
+    'allowCopyingConsoleUrl`: 'true',
+    'displayProgrammaticKeys`: 'true'
+}
+```
+
+### AWS Standalone
+```sh
+{
+    'displayName': 'AWS Standalone',
+    'appAccessMethod': 'appAccessMethod',
+    'url': 'https://aws.test.com',
+    'roleName': 'britive-integration-role',
+    'sessionDuration': '1',
+    'identityProvider': 'Provider',
+    'maxSessionDurationForProfiles': '43200',
+    'allowCopyingConsoleUrl': 'true',
+    'displayProgrammaticKeys': 'true'
+}
+```
+
+### Azure
+```sh
+{
+    'displayName': 'Azure',
+    'consoleAccess': 'true',
+    'appAccessMethod_static_loginUrl': 'https://azure.test.com',
+    'clientId': '<Client-ID>',
+    'clientSecret': '<Client-Secret>',
+    'scanMethod': 'scanMethod',
+    'scanGroupsMemberships': 'true',
+    'maxSessionDurationForProfiles': '604800'
+}
+```
+
+### Okta
+```sh
+{
+    `displayName`: 'Okta',
+    `maxSessionDurationForProfiles`: '604800'
 }
 ```
