@@ -1,7 +1,7 @@
 ---
 subcategory: "Application and Access Profile Management"
 layout: "britive"
-page_title: "britive_application Resource - britive"
+page_title: "britive_application Resource - Britive"
 description: |-
   Manages applications for the Britive provider.
 ---
@@ -446,7 +446,7 @@ resource "britive_application" "application_google_workspace" {
     }
     properties {
       name = "maxSessionDurationForProfiles"
-      value = "12345
+      value = "12345"
     }
     sensitive_properties {
       name = "serviceAccountCredentials"
@@ -543,7 +543,7 @@ resource "britive_application" "aws_1" {
 > - `identityProvider`: Identity Provider.
 > - `roleName`: Role name.
 > - `accountId`: Management Account ID.
-> - `region`: region.
+> - `region`: Region.
 > - `supportsInvalidationGlobal`: Support invalidation global.
 > - `allowCopyingConsoleUrl`: Allow copying console url.
 > - `displayProgrammaticKeys`: Display pragmatic keys.
@@ -564,7 +564,7 @@ resource "britive_application" "aws_standalone_1" {
     }
     properties {
       name = "description"
-      value = "AWS Standalone App DESC"
+      value = "AWS Standalone App Desc"
     }
     properties {
       name = "showAwsAccountNumber"
@@ -605,7 +605,7 @@ resource "britive_application" "aws_standalone_1" {
 > - `identityProvider`: Identity Provider.
 > - `region`: Region.
 > - `allowCopyingConsoleUrl`: Allow copying console url.
-> - `displayProgrammaticKeys`: Display pragmatic keys.
+> - `displayProgrammaticKeys`: Display programmatic keys.
 > - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 
 ### Azure Application
@@ -705,7 +705,7 @@ resource "britive_application" "azure_1" {
 > - `groupFilter`: Group filter.
 > - `scanMethod`: Scan method.
 > - `scanMgmtGroupsAndSubscriptions`: Scan management group and subscription.
-> - `scanSubscriptionsOnly`: Scan subscription Only.
+> - `scanSubscriptionsOnly`: Scan Subscription Only.
 > - `scanResources`: Scan resources.
 > - `scanGroupsMemberships`: Scan group membership.
 > - `scanServicePrincipals`: Scan service principals.
@@ -786,7 +786,7 @@ terraform import britive_application.new apps/{{application_id}}
 terraform import britive_application.new {{application_id}}
 ```
   
-->During the import process, only properties with values explicitly set or different from their default values will be imported. This avoids overwriting default configurations and ensures only customized settings are preserved in the Terraform state.
+-> During the import process, only properties with values explicitly set or different from their default values will be imported. This avoids overwriting default configurations and ensures only customized settings are preserved in the Terraform state.
 
 ## Deleting Properties
 
@@ -848,50 +848,50 @@ When a property is deleted from the configuration, its value will revert to the 
 ### AWS
 ```sh
 {
-    `displayName`: 'AWS',
-    `identityProvider`: 'Britive',
-    `roleName`: 'roleName',
-    `sessionDuration`: '1',
-    `appAccessMethod`: 'appAccessMethod',
-    `maxSessionDurationForProfiles`: '43200',
-    `allowCopyingConsoleUrl`: 'true',
-    `displayProgrammaticKeys`: 'true'
+    'displayName': 'AWS',
+    'identityProvider': 'Britive',
+    'roleName': 'roleName',
+    'sessionDuration': '1',
+    'appAccessMethod': 'appAccessMethod',
+    'maxSessionDurationForProfiles': '43200',
+    'allowCopyingConsoleUrl': 'true',
+    'displayProgrammaticKeys': 'true'
 }
 ```
 
-### AWS STandalone
+### AWS Standalone
 ```sh
 {
-    `displayName`: 'AWS Standalone',
-    `appAccessMethod`: 'appAccessMethod',
-    `url`: 'https://aws.test.com',
-    `roleName`: 'britive-integration-role',
-    `sessionDuration`: '1',
-    `identityProvider`: 'Provider',
-    `maxSessionDurationForProfiles`: '43200',
-    `allowCopyingConsoleUrl`: 'true',
-    `displayProgrammaticKeys`: 'true'
+    'displayName': 'AWS Standalone',
+    'appAccessMethod': 'appAccessMethod',
+    'url': 'https://aws.test.com',
+    'roleName': 'britive-integration-role',
+    'sessionDuration': '1',
+    'identityProvider': 'Provider',
+    'maxSessionDurationForProfiles': '43200',
+    'allowCopyingConsoleUrl': 'true',
+    'displayProgrammaticKeys': 'true'
 }
 ```
 
 ### Azure
 ```sh
 {
-    `displayName`: 'Azure',
-    `consoleAccess`: 'true',
-    `appAccessMethod_static_loginUrl`: 'https://azure.test.com',
-    `clientId`: '<Client-ID>',
-    `clientSecret`: '<Client-Secret>',
-    `scanMethod`: 'scanMethod',
-    `scanGroupsMemberships`: 'true',
-    `maxSessionDurationForProfiles`: '604800'
+    'displayName': 'Azure',
+    'consoleAccess': 'true',
+    'appAccessMethod_static_loginUrl': 'https://azure.test.com',
+    'clientId': '<Client-ID>',
+    'clientSecret': '<Client-Secret>',
+    'scanMethod': 'scanMethod',
+    'scanGroupsMemberships': 'true',
+    'maxSessionDurationForProfiles': '604800'
 }
 ```
 
 ### Okta
 ```sh
 {
-    `displayName`: 'Okta',
-    `maxSessionDurationForProfiles`: '604800'
+   'displayName': 'Okta',
+   'maxSessionDurationForProfiles': '604800'
 }
 ```
