@@ -10,13 +10,14 @@ description: |-
 
 This resource allows you to create and configure an application entity of the type "Environment".
 
--> This resource is only supported for Snowflake Standalone applications.
+-> This resource is only supported for Snowflake Standalone, AWS Standalone and Okta applications.
 
 -> For applications created from the Britive console, the first entity must be created through the console so that this resource has a parent under which it can be created. This step is not needed for applications created via the Britive Terraform provider plugin.
 
 ## Example Usage
 
 ```hcl
+# Example: Snowflake Standalone Environment
 resource "britive_application" "new_snowflake_standalone" {
     application_type = "Snowflake Standalone"
     user_account_mappings {
@@ -87,6 +88,68 @@ resource "britive_entity_environment" "new" {
     value = file("${path.module}/snowflake_pr.key")
   }
 }
+
+# In the same way, entity environments can be created for AWS Standalone and Okta applications, as shown in the following example.
+
+# Example: AWS Standalone Environment
+resource "britive_entity_environment" "aws_env_1" {
+  application_id = "jhaidy8q7ywqSyxxxxxx"
+  parent_group_id = "aksd67euhexxxx7we98exx"
+  properties {
+    name = "displayName"
+    value = "My AWS Environment"
+  }
+  properties {
+    name = "description"
+    value = "My AWS Environment Description"
+  }
+  properties {
+    name = "showAwsAccountNumber"
+    value = true
+  }
+  properties {
+    name = "accountId"
+    value = "897xxxx5476xxxx"
+  }
+  properties {
+    name = "supportsInvalidation"
+    value = false
+  }
+}
+
+# Example: Okta Environment
+resource "britive_entity_environment" "okta_env_1" {
+  application_id = "aydhsadjxxxdw8dhxxxx"
+  parent_group_id = "auysgxxxxxuaysux"
+  properties {
+    name = "displayName"
+    value = "My Okta Environment"
+  }
+  properties {
+    name = "description"
+    value = "My Okta Environment Description"
+  }
+  properties {
+    name = "appAccessMethod_static_loginUrl"
+    value = "https://test.okta.com/"
+  }
+  properties {
+    name = "userFilter"
+    value = "user@test.com"
+  }
+  properties {
+    name = "groupFilter"
+    value = "testGroup"
+  }
+  properties {
+    name = "scanRoles"
+    value = true
+  }
+  sensitive_properties {
+    name = "apiToken"
+    value = "kjhduyad76xxxxoadiye7eyiahsxxxioad9qwe98xxxx"
+  }
+}
 ```
 -> The `properties` and `sensitive_properties` in the above example are mandatory for creating a valid entity of type environment.  
 
@@ -94,6 +157,8 @@ resource "britive_entity_environment" "new" {
 >**Properties:**
 > - `displayName`- Environment Name.
 > - `description`- Environment Description.
+
+>**Properties (Snowflake):**
 > - `appAccessMethod_static_loginUrl`: Login URL.
 > - `username`: Username of the User in Snowflake.
 > - `accountId`: Account ID.
@@ -101,10 +166,20 @@ resource "britive_entity_environment" "new" {
 > - `loginNameForAccountMapping`: Use login name for account mapping.
 > - `snowflakeSchemaScanFilter`: Skip collecting schema level privileges.
 
->**Sensitive Properties:**
+>**Sensitive Properties (Snowflake):**
 > - `privateKeyPassword`: Password of the Private Key.
 > - `publicKey`: Public Key configured for the user.
 > - `privateKey`: Private Key configured for the user.
+
+>**Properties (AWS):**
+> - `showAwsAccountNumber`: Display AWS account number.
+> - `accountId`: Account ID.
+> - `supportsInvalidation`: Indicates if invalidation is supported.
+
+>**Properties (Okta):**
+> - `userFilter`: Filter for specific users.
+> - `groupFilter`: Filter for specific groups.
+> - `scanRoles`: Enable scanning of roles.
 
 ## Argument Reference
 

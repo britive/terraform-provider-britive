@@ -10,13 +10,14 @@ description: |-
 
 This resource allows you to create and configure an application entity of the type "Environment Group".
 
--> This resource is only supported for Snowflake Standalone applications.
+-> This resource is only supported for Snowflake Standalone, AWS Standalone and Okta applications.
 
 -> For applications created from the Britive console, the first entity must be created through the console so that this resource has a parent under which it can be created. This step is not needed for applications created via the Britive Terraform provider plugin.
 
 ## Example Usage
 
 ```hcl
+# Example: Snowflake Standalone EnvironmentGroup
 resource "britive_application" "new_snowflake_standalone" {
     application_type = "Snowflake Standalone"
     user_account_mappings {
@@ -39,27 +40,32 @@ resource "britive_application" "new_snowflake_standalone" {
 
 resource "britive_entity_group" "new" {
     application_id     = britive_application.new_snowflake_standalone.id
-    entity_name        = "My Entity Group"
-    entity_description = "My Entity Group Description"
+    entity_name        = "My Snowflake Entity Group"
+    entity_description = "My Snowflake Entity Group Description"
     parent_id          = britive_application.new_snowflake_standalone.entity_root_environment_group_id
 }
 
-resource "britive_entity_group" "new1" {
-    application_id     = britive_application.new_snowflake_standalone.id
-    entity_name        = "My Group"
-    entity_description = "My Group Description"
-    parent_id          = britive_entity_group.new.entity_id
+# In the same way, entity group can be created for AWS Standalone and Okta applications, as shown in the following example.
+
+# Example: AWS Standalone EnvironmentGroup
+resource "britive_entity_group" "AWS_Env_Group" {
+    application_id     = "hsgfuysxxausdiuasd"
+    entity_name        = "My AWS Entity Group"
+    entity_description = "My AWS Entity Group Description"
+    parent_id          = "jiashdsdkjxxahdaud"
 }
 
-resource "britive_entity_group" "new2" {
-    application_id     = "h59ih6p1537xxxxxxxxx"
-    entity_name        = "My New Group"
-    entity_description = "My New Group Description"
-    parent_id          = "qawerxxxx1efr43xxx"
+# Example: Okta EnvironmentGroup
+resource "britive_entity_group" "AWS_Env_Group" {
+    application_id     = "ahgduasdxxaudiau"
+    entity_name        = "My Okta Entity Group"
+    entity_description = "My Okta Entity Group Description"
+    parent_id          = "asjdhuhxxdccudhd"
 }
+
 ```
 
-## Argument Reference
+## Argument Reference (Snowflake Sandalone, AWS Standalone and Okta)
 
 The following arguments are supported:
 
