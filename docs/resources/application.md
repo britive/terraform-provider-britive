@@ -10,16 +10,7 @@ description: |-
 
 This resource allows you to create and manage applications in Britive.
 
-**Note: This resource is only supported for the following applications**  
-- Snowflake  
-- Snowflake Standalone  
-- GCP  
-- GCP Standalone  
-- Google Workspace 
-- AWS
-- AWS Standalone
-- Azure
-- Okta 
+-> This resource is supported only on Snowflake, Snowflake Standalone, GCP, GCP Standalone, Google Workspace, AWS, AWS Standalone, Azure, and Okta applications.
 
 ## Example Usage
 

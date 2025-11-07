@@ -65,16 +65,12 @@ resource "britive_entity_group" "AWS_Env_Group" {
 
 ```
 
-## Argument Reference (Snowflake Sandalone, AWS Standalone and Okta)
+## Argument Reference
 
-The following arguments are supported:
-
+The following arguments are supported for Snowflake Standalone, AWS Standalone and Okta applications:
 * `application_id` - (Required, ForceNew) The identity of the Britive application.
-
 * `entity_name` - (Required) The name of the environment group entity to be created.
-
 * `entity_description` - (Required) Description of the environment group entity.
-
 * `parent_id` - (Required, ForceNew)  The identity of the parent under which the environment group entity will be created.
 
 -> Refer to the `environment_group_ids_names` attribute of the `britive_application` data source to get the set of group IDs and names for an application.
@@ -84,7 +80,6 @@ The following arguments are supported:
 In addition to the above arguments, the following attributes are exported.
 
 * `entity_id` - An identifier of the environment group entity.
-
 * `id` - An identifier of the resource with format `apps/{{application_id}}/root-environment-group/groups/{{entity_id}}`
 
 ## Import
