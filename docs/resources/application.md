@@ -10,7 +10,16 @@ description: |-
 
 This resource allows you to create and manage applications in Britive.
 
--> This resource is only supported for the Snowflake, Snowflake Standalone, GCP, GCP Standalone and Google Workspace applications.
+**Note: This resource is only supported for the following applications**  
+- Snowflake  
+- Snowflake Standalone  
+- GCP  
+- GCP Standalone  
+- Google Workspace 
+- AWS
+- AWS Standalone
+- Azure
+- Okta 
 
 ## Example Usage
 
@@ -546,7 +555,7 @@ resource "britive_application" "aws_1" {
 > - `region`: Region.
 > - `supportsInvalidationGlobal`: Support invalidation global.
 > - `allowCopyingConsoleUrl`: Allow copying console url.
-> - `displayProgrammaticKeys`: Display pragmatic keys.
+> - `displayProgrammaticKeys`: Display progragmmatic keys.
 > - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 
 ### AWS Standalone Application
@@ -705,7 +714,7 @@ resource "britive_application" "azure_1" {
 > - `groupFilter`: Group filter.
 > - `scanMethod`: Scan method.
 > - `scanMgmtGroupsAndSubscriptions`: Scan management group and subscription.
-> - `scanSubscriptionsOnly`: Scan Subscription Only.
+> - `scanSubscriptionsOnly`: Scan subscription Only.
 > - `scanResources`: Scan resources.
 > - `scanGroupsMemberships`: Scan group membership.
 > - `scanServicePrincipals`: Scan service principals.
