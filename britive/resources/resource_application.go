@@ -47,7 +47,7 @@ func NewResourceApplication(v *validate.Validation, importHelper *imports.Import
 				Type:         schema.TypeString,
 				Required:     true,
 				Description:  "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone' and 'Google Workspace'",
-				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "Google Workspace"}, true),
+				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta"}, true),
 			},
 			"version": {
 				Type:        schema.TypeString,
@@ -198,7 +198,12 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 	log.Printf("[INFO] Updated user mappings: %#v", userMappings)
 
 	//The root environment group creation can be skipped when PAB-20648 is fixed
-	if application.CatalogAppId == 9 {
+	allowedEnvGroupApps := map[int]string{
+		2: "AWS Standalone",
+		8: "Okta",
+		9: "Snowflake Standalone",
+	}
+	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		log.Printf("[INFO] Creating root environment group")
 		err = c.CreateRootEnvironmentGroup(appResponse.AppContainerId, application.CatalogAppId)
 		if err != nil {
@@ -540,7 +545,12 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		return err
 	}
 
-	if application.CatalogAppId == 9 {
+	allowedEnvGroupApps := map[int]string{
+		2: "AWS Standalone",
+		8: "Okta",
+		9: "Snowflake Standalone",
+	}
+	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupId := ""
 		rootEnvironmentGroups := application.RootEnvironmentGroup
 		if rootEnvironmentGroups != nil {

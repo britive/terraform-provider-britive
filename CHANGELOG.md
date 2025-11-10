@@ -1,4 +1,5 @@
-## 2.2.3
+## 2.2.4
 
-FEATURES:
-* **New Resource:**  `britive_profile_policy_prioritization`: Create, update, and manage profile policy prioritization.
+ENHANCEMENTS:
+
+* `britive_application`: Support extended to create and manage applications of type AWS, AWS Standalone, Azure and Okta.
