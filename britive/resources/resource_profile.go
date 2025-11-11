@@ -134,6 +134,7 @@ func NewResourceProfile(v *validate.Validation, importHelper *imports.ImportHelp
 			"delegation_enabled": {
 				Type:        schema.TypeBool,
 				Optional:    true,
+				Default:     false,
 				Description: "Enable or disable delegation",
 			},
 		},

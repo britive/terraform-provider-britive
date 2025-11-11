@@ -68,6 +68,7 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 			"delegation_enabled": {
 				Type:        schema.TypeBool,
 				Optional:    true,
+				Default:     false,
 				Description: "Enable or disable delegation",
 			},
 			"associations": {
