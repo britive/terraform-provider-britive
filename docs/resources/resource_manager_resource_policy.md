@@ -42,6 +42,11 @@ resource "britive_resource_manager_resource_policy" "example" {
                     name = "jgordon"
                 },
             ]
+            aiIdentities      = [
+                {
+                    name = "DO_NOT_DELETE_AI_Identity"
+                },
+            ]
         }
     )
     condition    = jsonencode(

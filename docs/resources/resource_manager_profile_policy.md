@@ -43,6 +43,11 @@ resource "britive_resource_manager_profile_policy" "example" {
                     name = "jgordon"
                 },
             ]
+            aiIdentities      = [
+                {
+                    name = "DO_NOT_DELETE_AI_Identity"
+                },
+            ]
         }
     )
     condition    = jsonencode(
@@ -100,7 +105,7 @@ The following arguments are supported:
 * `profile_id` - (Required) The identifier of the profile.
 * `policy_name` - (Required) The name of the profile policy.
 * `description` - (Optional) A description of the profile policy.
-* `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags`, and `users`.
+* `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags`, `aiIdentities` and `users`.
 * `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string.  
   * The `condition` block can include:
     * `approval` - Contains:

@@ -72,6 +72,7 @@ func testAccCheckBritiveResourceManagerProfilePolicyConfig(resourceLabelName1, r
 		name                 = "%s"
 		description          = "%s"
 		expiration_duration  = 3600000
+		allow_impersonation  = true
 
 		associations {
 			label_key   = britive_resource_manager_resource_label.resource_label_1.name
@@ -113,6 +114,11 @@ func testAccCheckBritiveResourceManagerProfilePolicyConfig(resourceLabelName1, r
 						name = "britiveprovideracceptancetest1"
 					},
 				]
+				aiIdentities      = [
+        			{
+          				name : "DO_NOT_DELETE_AI_IDENTITY"
+        			},
+      			]
 			}
 		)
 		condition    = jsonencode(

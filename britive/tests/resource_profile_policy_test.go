@@ -41,6 +41,7 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 		app_container_id = data.britive_application.app.id
 		name = "%s"
 		expiration_duration = "25m0s"
+		allow_impersonation  = true
 		associations {
 			type  = "EnvironmentGroup"
 			value = "Development"
@@ -132,6 +133,11 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 						name = "britiveprovideracceptancetest1"
 					},
 				]
+				aiIdentities      = [
+        			{
+          				name : "DO_NOT_DELETE_AI_IDENTITY"
+        			},
+      			]
 			}
 		)
 		associations {
