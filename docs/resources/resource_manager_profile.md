@@ -37,7 +37,7 @@ The following arguments are supported:
 * `name` - (Required) The name of the britive resource manager profile.
 * `description` - (Optional) Description of britive resource manager profile.
 * `expiration_duration` - (Required) Expiration duration of resource manager profile (in minutes).
-* `allow_impersonation` - (Optional) Allow impersonation for profile.
+* `allow_impersonation` - (Optional) Allow AI Identities to impersonate Users and Service Identities.
 * `associations` - (Optional) List of resource label associations. Each association block supports:
   * `label_key` - (Required) Resource label name for association.
   * `values` - (Required) List of values for the associated resource label. Must contain at least one value.
