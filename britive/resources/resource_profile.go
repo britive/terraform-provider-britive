@@ -131,7 +131,7 @@ func NewResourceProfile(v *validate.Validation, importHelper *imports.ImportHelp
 				Optional:    true,
 				Description: "The destination url to redirect user after checkout",
 			},
-			"delegation_enabled": {
+			"allow_impersonation": {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
@@ -205,7 +205,7 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 		d.HasChange("extension_duration") ||
 		d.HasChange("extension_limit") ||
 		d.HasChange("destination_url") ||
-		d.HasChange("delegation_enabled") {
+		d.HasChange("allow_impersonation") {
 
 		hasChanges = true
 
@@ -426,7 +426,7 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, profile *britive.Profile, isUpdate bool) error {
 	profile.AppContainerID = d.Get("app_container_id").(string)
 	profile.Name = d.Get("name").(string)
-	if delegationEnabled, ok := d.GetOk("delegation_enabled"); ok {
+	if delegationEnabled, ok := d.GetOk("allow_impersonation"); ok {
 		profile.DelegationEnabled = delegationEnabled.(bool)
 	}
 	profile.Description = d.Get("description").(string)
@@ -508,7 +508,7 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	if err := d.Set("extendable", profile.Extendable); err != nil {
 		return err
 	}
-	if err := d.Set("delegation_enabled", profile.DelegationEnabled); err != nil {
+	if err := d.Set("allow_impersonation", profile.DelegationEnabled); err != nil {
 		return err
 	}
 	if profile.Extendable {

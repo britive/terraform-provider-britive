@@ -65,7 +65,7 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 				Computed:    true,
 				Description: "Status of resource manager profile",
 			},
-			"delegation_enabled": {
+			"allow_impersonation": {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
@@ -213,7 +213,7 @@ func (rrmp *ResourceResourceManagerProfile) resourceRead(ctx context.Context, d 
 func (rrmp *ResourceResourceManagerProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") || d.HasChange("delegation_enabled") {
+	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") || d.HasChange("allow_impersonation") {
 		resourceManagerProfile := &britive.ResourceManagerProfile{}
 		err := rrmp.helper.mapResourceToModel(d, resourceManagerProfile)
 		if err != nil {
@@ -303,7 +303,7 @@ func (helper *ResourceResourceManagerProfileHelper) mapResourceToModel(d *schema
 	if v, ok := d.GetOk("description"); ok {
 		resourceManagerProfile.Description = v.(string)
 	}
-	if delegationEnabled, ok := d.GetOk("delegation_enabled"); ok {
+	if delegationEnabled, ok := d.GetOk("allow_impersonation"); ok {
 		resourceManagerProfile.DelegationEnabled = delegationEnabled.(bool)
 	}
 	resourceManagerProfile.ExpirationDuration = d.Get("expiration_duration").(int)
@@ -330,7 +330,7 @@ func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *
 	d.Set("description", resourceManagerProfile.Description)
 	d.Set("expiration_duration", resourceManagerProfile.ExpirationDuration)
 	d.Set("status", resourceManagerProfile.Status)
-	if err := d.Set("delegation_enabled", resourceManagerProfile.DelegationEnabled); err != nil {
+	if err := d.Set("allow_impersonation", resourceManagerProfile.DelegationEnabled); err != nil {
 		return err
 	}
 

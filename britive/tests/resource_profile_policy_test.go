@@ -41,7 +41,7 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 		app_container_id = data.britive_application.app.id
 		name = "%s"
 		expiration_duration = "25m0s"
-		delegation_enabled  = true
+		allow_impersonation  = true
 		associations {
 			type  = "EnvironmentGroup"
 			value = "Development"
