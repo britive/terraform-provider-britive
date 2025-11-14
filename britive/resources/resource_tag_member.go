@@ -64,7 +64,8 @@ func NewResourceTagMember(importHelper *imports.ImportHelper) *ResourceTagMember
 //region Tag member Resource Context Operations
 
 func (rtm *ResourceTagMember) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	tagID := d.Get("tag_id").(string)
 	username := d.Get("username").(string)
@@ -102,7 +103,8 @@ func (rtm *ResourceTagMember) resourceRead(ctx context.Context, d *schema.Resour
 }
 
 func (rtm *ResourceTagMember) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -125,7 +127,8 @@ func (rtm *ResourceTagMember) resourceDelete(ctx context.Context, d *schema.Reso
 }
 
 func (rtm *ResourceTagMember) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if err := rtm.importHelper.ParseImportID([]string{"tags/(?P<tag_name>[^/]+)/users/(?P<username>[^/]+)", "(?P<tag_name>[^/]+)/(?P<username>[^/]+)"}, d); err != nil {
 		return nil, err
@@ -201,7 +204,8 @@ func (resourceTagMemberHelper *ResourceTagMemberHelper) parseUniqueID(ID string)
 }
 
 func (resourceTagMemberHelper *ResourceTagMemberHelper) getAndMapModelToResource(tagID string, userID string, d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	log.Printf("[INFO] Reading tag member %s/%s", tagID, userID)
 	u, err := c.GetTagMember(tagID, userID)

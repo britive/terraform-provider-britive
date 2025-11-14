@@ -222,7 +222,8 @@ func NewResourceResourceTypePermissions(importHelper *imports.ImportHelper) *Res
 }
 
 func (rtp *ResourceResourceTypePermissions) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	permission := &britive.ResourceTypePermission{}
 	err := rtp.helper.mapResourceToModel(d, permission, m)
@@ -277,7 +278,8 @@ func (rtp *ResourceResourceTypePermissions) resourceCreate(ctx context.Context, 
 }
 
 func (rtp *ResourceResourceTypePermissions) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	permissionID, err := rtp.helper.parseUniqueID(d.Id())
 	if err != nil {
@@ -301,7 +303,8 @@ func (rtp *ResourceResourceTypePermissions) resourceRead(ctx context.Context, d 
 }
 
 func (rtp *ResourceResourceTypePermissions) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	permissionID, err := rtp.helper.parseUniqueID(d.Id())
 	if err != nil {
@@ -352,7 +355,8 @@ func (rtp *ResourceResourceTypePermissions) resourceUpdate(ctx context.Context, 
 }
 
 func (rtp *ResourceResourceTypePermissions) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 	permissionID, err := rtp.helper.parseUniqueID(d.Id())
@@ -373,7 +377,8 @@ func (rtp *ResourceResourceTypePermissions) resourceDelete(ctx context.Context, 
 }
 
 func (helper *ResourceResourceTypePermissionsHelper) mapResourceToModel(d *schema.ResourceData, permission *britive.ResourceTypePermission, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	allResponseTemplates, err := c.GetAllResponseTemplate()
 	if err != nil {
@@ -398,8 +403,6 @@ func (helper *ResourceResourceTypePermissionsHelper) mapResourceToModel(d *schem
 	permission.IsDraft = d.Get("is_draft").(bool)
 	permission.CheckinTimeLimit = d.Get("checkin_time_limit").(int)
 	permission.CheckoutTimeLimit = d.Get("checkout_time_limit").(int)
-	// responseTemplates := d.Get("response_templates").(*schema.Set)
-	// permission.ResponseTemplates = append(permission.ResponseTemplates, responseTemplates.List()...)
 	variables := d.Get("variables").(*schema.Set)
 	permission.Variables = append(permission.Variables, variables.List()...)
 	permission.ShowOrigCreds = d.Get("show_orig_creds").(bool)
@@ -451,7 +454,8 @@ func (helper *ResourceResourceTypePermissionsHelper) parseUniqueID(ID string) (s
 }
 
 func (rtp *ResourceResourceTypePermissions) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if err := rtp.importHelper.ParseImportID([]string{"resource-manager/permissions/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err

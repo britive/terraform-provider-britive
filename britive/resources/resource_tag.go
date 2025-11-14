@@ -74,7 +74,8 @@ func NewResourceTag(importHelper *imports.ImportHelper) *ResourceTag {
 //region Tag Resource Context Operations
 
 func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	err := rt.helper.validateForExternalTag(d, m)
 	if err != nil {
@@ -110,7 +111,8 @@ func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceDat
 }
 
 func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -141,7 +143,8 @@ func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData,
 }
 
 func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	err := rt.helper.validateForExternalTag(d, m)
 	if err != nil {
@@ -185,7 +188,8 @@ func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceDat
 }
 
 func (rt *ResourceTag) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -208,7 +212,8 @@ func (rt *ResourceTag) resourceDelete(ctx context.Context, d *schema.ResourceDat
 }
 
 func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if err := rt.importHelper.ParseImportID([]string{"tags/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
@@ -286,7 +291,8 @@ func (rth *ResourceTagHelper) validateForExternalTag(d *schema.ResourceData, m i
 		return nil
 	}
 
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	identityProvider, err := c.GetIdentityProvider(identityProviderID)
 	if err != nil {

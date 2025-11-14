@@ -209,7 +209,7 @@ func (c *Client) ConfigureUserMappings(applicationID string, userMappings UserMa
 }
 
 // Create root environment group
-func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId int) error {
+func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId int, m interface{}) error {
 	appEnvGroups, err := c.GetAppEnvs(applicationID, "environmentGroups")
 	if err != nil {
 		return err
@@ -241,7 +241,13 @@ func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId i
 		if err != nil {
 			return err
 		}
+	}
 
+	providerMeta := m.(*ProviderMeta)
+	appCache := providerMeta.AppCache
+	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
+	if _, ok := appCache[cacheKey]; ok {
+		delete(appCache, cacheKey)
 	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/datasources"
@@ -199,5 +200,11 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		return nil, diags
 	}
 
-	return c, diags
+	meta := &britive.ProviderMeta{
+		Client:   c,
+		AppCache: make(map[string]*britive.AppData),
+		Mutex:    &sync.Mutex{},
+	}
+
+	return meta, diags
 }

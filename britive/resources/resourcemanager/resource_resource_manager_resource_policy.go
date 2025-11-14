@@ -133,7 +133,8 @@ func NewResourceResourcePolicy(v *validate.Validation, importHelper *imports.Imp
 }
 
 func (rrp *ResourceResourcePolicy) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	resourcePolicy := &britive.ResourceManagerResourcePolicy{}
 	err := rrp.helper.mapResourceToModel(d, resourcePolicy)
@@ -154,7 +155,8 @@ func (rrp *ResourceResourcePolicy) resourceCreate(ctx context.Context, d *schema
 }
 
 func (rrp *ResourceResourcePolicy) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -180,7 +182,8 @@ func (rrp *ResourceResourcePolicy) resourceRead(ctx context.Context, d *schema.R
 }
 
 func (rrp *ResourceResourcePolicy) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("access_level") || d.HasChange("members") || d.HasChange("condition") || d.HasChange("resource_labels") {
 		policyID := rrp.helper.parseUniqueID(d.Id())
@@ -215,7 +218,9 @@ func (rrp *ResourceResourcePolicy) resourceUpdate(ctx context.Context, d *schema
 }
 
 func (rrp *ResourceResourcePolicy) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	policyID := rrp.helper.parseUniqueID(d.Id())
@@ -234,7 +239,9 @@ func (rrp *ResourceResourcePolicy) resourceDelete(ctx context.Context, d *schema
 }
 
 func (rrp *ResourceResourcePolicy) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	if err := rrp.importHelper.ParseImportID([]string{"resource-manager/policies/(?P<policy_name>[^/]+)", "(?P<policy_name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}

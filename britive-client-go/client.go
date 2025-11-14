@@ -28,6 +28,18 @@ type Client struct {
 	SyncMap    *sync.Map
 }
 
+//ProviderMeta - Britive Provider Cache
+type ProviderMeta struct {
+	Client   *Client
+	AppCache map[string]*AppData
+	Mutex    *sync.Mutex
+}
+
+//AppData - Britive App Data
+type AppData struct {
+	Cache interface{}
+}
+
 // NewClient - Initializes new Britive API client
 func NewClient(apiBaseURL, token, version string) (*Client, error) {
 	syncOnce.Do(func() {

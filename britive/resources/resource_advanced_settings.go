@@ -179,7 +179,8 @@ func NewResourceAdvancedSettings(v *validate.Validation, importHelper *imports.I
 }
 
 func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -241,7 +242,8 @@ func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *sche
 }
 
 func (rst *ResourceAdvancedSettings) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -298,7 +300,8 @@ func (rst *ResourceAdvancedSettings) resourceRead(ctx context.Context, d *schema
 }
 
 func (rst *ResourceAdvancedSettings) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var diags diag.Diagnostics
 	advancedSettings := britive.AdvancedSettings{}
 
@@ -331,7 +334,8 @@ func (rst *ResourceAdvancedSettings) resourceDelete(ctx context.Context, d *sche
 }
 
 func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	resourceID, resourceType := rrst.parseUniqueID(d.Id())
 	log.Printf("[INFO] Reading advanced settings %s", resourceID)
@@ -637,7 +641,8 @@ func (rrst *ResourceAdvancedSettingsHelper) parseUniqueID(ID string) (string, st
 }
 
 func (rst *ResourceAdvancedSettings) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	importID := d.Id()
 

@@ -60,7 +60,8 @@ func NewDataSourceResourceManagerProfilePermissions() *DataSourceResourceManager
 }
 
 func (dsrmpp *DataSourceResourceManagerProfilePermissions) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	profileIDArr := strings.Split(d.Get("profile_id").(string), "/")
 	profileID := profileIDArr[len(profileIDArr)-1]

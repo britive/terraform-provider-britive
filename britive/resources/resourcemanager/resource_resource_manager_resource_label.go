@@ -119,7 +119,8 @@ func NewResourceResourceLabel(v *validate.Validation, importHelper *imports.Impo
 }
 
 func (rl *ResourceResourceLabel) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	log.Printf("[INFO] Mapping Resource Label Resource to Model")
 
@@ -145,7 +146,9 @@ func (rl *ResourceResourceLabel) resourceCreate(ctx context.Context, d *schema.R
 }
 
 func (rl *ResourceResourceLabel) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	labelId, err := rl.helper.parseUniqueID(d.Id())
@@ -169,7 +172,8 @@ func (rl *ResourceResourceLabel) resourceRead(ctx context.Context, d *schema.Res
 }
 
 func (rl *ResourceResourceLabel) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	labelId, err := rl.helper.parseUniqueID(d.Id())
 	if err != nil {
@@ -198,7 +202,9 @@ func (rl *ResourceResourceLabel) resourceUpdate(ctx context.Context, d *schema.R
 }
 
 func (rl *ResourceResourceLabel) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	labelId, err := rl.helper.parseUniqueID(d.Id())
@@ -219,7 +225,8 @@ func (rl *ResourceResourceLabel) resourceDelete(ctx context.Context, d *schema.R
 }
 
 func (rl *ResourceResourceLabel) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if err := rl.importHelper.ParseImportID([]string{"resource-manager/resource-labels/(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err

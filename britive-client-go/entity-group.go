@@ -9,7 +9,7 @@ import (
 )
 
 // CreateEntityGroup - Create entity group for an application
-func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntityGroup, applicationID string) (*ApplicationEntityGroup, error) {
+func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntityGroup, applicationID string, m interface{}) (*ApplicationEntityGroup, error) {
 
 	applicationEntityBody, err := json.Marshal(applicationEntity)
 	if err != nil {
@@ -34,11 +34,18 @@ func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntityGroup, app
 		return nil, err
 	}
 
+	providerMeta := m.(*ProviderMeta)
+	appCache := providerMeta.AppCache
+	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
+	if _, ok := appCache[cacheKey]; ok {
+		delete(appCache, cacheKey)
+	}
+
 	return ae, nil
 }
 
 // UpdateEntityGroup - Update the entity group for an application
-func (c *Client) UpdateEntityGroup(applicationEntity ApplicationEntityGroup, applicationID string) (*ApplicationEntityGroup, error) {
+func (c *Client) UpdateEntityGroup(applicationEntity ApplicationEntityGroup, applicationID string, m interface{}) (*ApplicationEntityGroup, error) {
 
 	applicationEntityBody, err := json.Marshal(applicationEntity)
 	if err != nil {
@@ -63,11 +70,18 @@ func (c *Client) UpdateEntityGroup(applicationEntity ApplicationEntityGroup, app
 		return nil, err
 	}
 
+	providerMeta := m.(*ProviderMeta)
+	appCache := providerMeta.AppCache
+	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
+	if _, ok := appCache[cacheKey]; ok {
+		delete(appCache, cacheKey)
+	}
+
 	return ae, nil
 }
 
 // DeleteEntityGroup - Delete entity group from the application
-func (c *Client) DeleteEntityGroup(applicationID, entityID string) error {
+func (c *Client) DeleteEntityGroup(applicationID, entityID string, m interface{}) error {
 
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/environment-groups/%s", c.APIBaseURL, applicationID, entityID), nil)
 	if err != nil {
@@ -77,6 +91,13 @@ func (c *Client) DeleteEntityGroup(applicationID, entityID string) error {
 	_, err = c.DoWithLock(req, applicationID)
 	if errors.Is(err, ErrNoContent) || err == nil {
 		return nil
+	}
+
+	providerMeta := m.(*ProviderMeta)
+	appCache := providerMeta.AppCache
+	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
+	if _, ok := appCache[cacheKey]; ok {
+		delete(appCache, cacheKey)
 	}
 
 	return err

@@ -112,7 +112,8 @@ func NewResourceEntityEnvironment(importHelper *imports.ImportHelper) *ResourceE
 //region Application Entity Resource Context Operations
 
 func (ree *ResourceEntityEnvironment) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var diags diag.Diagnostics
 
 	applicationEntity := britive.ApplicationEntityEnvironment{}
@@ -126,7 +127,7 @@ func (ree *ResourceEntityEnvironment) resourceCreate(ctx context.Context, d *sch
 
 	applicationID := d.Get("application_id").(string)
 
-	ae, err := c.CreateEntityEnvironment(applicationEntity, applicationID)
+	ae, err := c.CreateEntityEnvironment(applicationEntity, applicationID, m)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -148,7 +149,7 @@ func (ree *ResourceEntityEnvironment) resourceCreate(ctx context.Context, d *sch
 	}
 
 	log.Printf("[INFO] Updating application environment properties")
-	_, err = c.PatchApplicationEnvPropertyTypes(applicationID, ae.EntityID, properties)
+	_, err = c.PatchApplicationEnvPropertyTypes(applicationID, ae.EntityID, properties, m)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -177,7 +178,8 @@ func (ree *ResourceEntityEnvironment) resourceRead(ctx context.Context, d *schem
 }
 
 func (ree *ResourceEntityEnvironment) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var hasChanges bool
 	if d.HasChange("properties") || d.HasChange("sensitive_properties") {
@@ -201,7 +203,7 @@ func (ree *ResourceEntityEnvironment) resourceUpdate(ctx context.Context, d *sch
 		}
 
 		log.Printf("[INFO] Updating application entity environment properties")
-		_, err = c.PatchApplicationEnvPropertyTypes(applicationID, entityID, properties)
+		_, err = c.PatchApplicationEnvPropertyTypes(applicationID, entityID, properties, m)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -214,7 +216,8 @@ func (ree *ResourceEntityEnvironment) resourceUpdate(ctx context.Context, d *sch
 }
 
 func (ree *ResourceEntityEnvironment) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -224,7 +227,7 @@ func (ree *ResourceEntityEnvironment) resourceDelete(ctx context.Context, d *sch
 	}
 
 	log.Printf("[INFO] Deleting entity %s of type environment for application %s", entityID, applicationID)
-	err = c.DeleteEntityEnvironment(applicationID, entityID)
+	err = c.DeleteEntityEnvironment(applicationID, entityID, m)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -235,7 +238,8 @@ func (ree *ResourceEntityEnvironment) resourceDelete(ctx context.Context, d *sch
 }
 
 func (ree *ResourceEntityEnvironment) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var err error
 	if err := ree.importHelper.ParseImportID([]string{"apps/(?P<application_id>[^/]+)/root-environment-group/environments/(?P<entity_id>[^/]+)", "(?P<application_id>[^/]+)/environments/(?P<entity_id>[^/]+)"}, d); err != nil {
 		return nil, err
@@ -378,7 +382,8 @@ func (reeh *ResourceEntityEnvironmentHelper) mapPropertiesResourceToModel(d *sch
 }
 
 func (reeh *ResourceEntityEnvironmentHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	applicationID, entityID, err := reeh.parseUniqueID(d.Id())
 	if err != nil {
@@ -387,7 +392,7 @@ func (reeh *ResourceEntityEnvironmentHelper) getAndMapModelToResource(d *schema.
 
 	log.Printf("[INFO] Reading entity environment %s for application %s", entityID, applicationID)
 
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(applicationID)
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(applicationID, m)
 	if err != nil || appRootEnvironmentGroup == nil {
 		return err
 	}
@@ -408,7 +413,8 @@ func (reeh *ResourceEntityEnvironmentHelper) getAndMapModelToResource(d *schema.
 }
 
 func (reeh *ResourceEntityEnvironmentHelper) getAndMapPropertiesModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	applicationID, entityID, err := reeh.parseUniqueID(d.Id())
 	if err != nil {
@@ -480,7 +486,8 @@ func (resourceEntityEnvironmentHelper *ResourceEntityEnvironmentHelper) parseUni
 }
 
 func (rrth *ResourceEntityEnvironmentHelper) importAndMapPropertiesToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	applicationID, entityID, err := rrth.parseUniqueID(d.Id())
 	if err != nil {

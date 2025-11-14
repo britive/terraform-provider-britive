@@ -40,7 +40,8 @@ func NewDataSourceIdentityProvider() *DataSourceIdentityProvider {
 }
 
 func (dataSourceIdentityProvider *DataSourceIdentityProvider) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	identityProviderName := d.Get("name").(string)
 

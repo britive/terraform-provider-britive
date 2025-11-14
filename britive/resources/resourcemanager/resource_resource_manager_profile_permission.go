@@ -117,7 +117,8 @@ func NewResourceResourceManagerProfilePermission(v *validate.Validation, importH
 }
 
 func (rrmppr *ResourceResourceManagerProfilePermission) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	resourceManagerProfilePermission := &britive.ResourceManagerProfilePermission{}
 
@@ -142,7 +143,9 @@ func (rrmppr *ResourceResourceManagerProfilePermission) resourceCreate(ctx conte
 }
 
 func (rrmppr *ResourceResourceManagerProfilePermission) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	var diags diag.Diagnostics
 
 	profileID, permissionID := rrmppr.helper.parseUniqueID(d.Id())
@@ -165,7 +168,8 @@ func (rrmppr *ResourceResourceManagerProfilePermission) resourceRead(ctx context
 }
 
 func (rrmppr *ResourceResourceManagerProfilePermission) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if d.HasChange("version") {
 		oldVer, newVer := d.GetChange("version")
@@ -202,7 +206,8 @@ func (rrmppr *ResourceResourceManagerProfilePermission) resourceUpdate(ctx conte
 }
 
 func (rrmppr *ResourceResourceManagerProfilePermission) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -223,7 +228,9 @@ func (rrmppr *ResourceResourceManagerProfilePermission) resourceDelete(ctx conte
 }
 
 func (rrmppr *ResourceResourceManagerProfilePermission) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	if err := rrmppr.importHelper.ParseImportID([]string{"resource-manager/profile/(?P<profile_id>[^/]+)/permission/(?P<permission_id>[^/]+)", "(?P<profile_id>[^/]+)/(?P<permission_id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}

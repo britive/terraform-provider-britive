@@ -67,7 +67,8 @@ func NewDataSourceConstraints() *DataSourceConstraints {
 }
 
 func (dataSourceConstraints *DataSourceConstraints) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	profileId := d.Get("profile_id").(string)
 	permissionName := d.Get("permission_name").(string)

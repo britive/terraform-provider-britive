@@ -78,7 +78,8 @@ func NewResourcePermission(v *validate.Validation, importHelper *imports.ImportH
 //region Permission Resource Context Operations
 
 func (rp *ResourcePermission) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -118,7 +119,8 @@ func (rp *ResourcePermission) resourceRead(ctx context.Context, d *schema.Resour
 }
 
 func (rp *ResourcePermission) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	permissionID, err := rp.helper.parseUniqueID(d.Id())
 	if err != nil {
@@ -150,7 +152,8 @@ func (rp *ResourcePermission) resourceUpdate(ctx context.Context, d *schema.Reso
 }
 
 func (rp *ResourcePermission) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -171,7 +174,8 @@ func (rp *ResourcePermission) resourceDelete(ctx context.Context, d *schema.Reso
 }
 
 func (rp *ResourcePermission) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	if err := rp.importHelper.ParseImportID([]string{"permissions/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
@@ -229,7 +233,8 @@ func (rph *ResourcePermissionHelper) mapResourceToModel(d *schema.ResourceData, 
 }
 
 func (rph *ResourcePermissionHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	permissionID, err := rph.parseUniqueID(d.Id())
 	if err != nil {

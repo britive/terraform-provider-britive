@@ -136,7 +136,8 @@ func NewResourceApplication(v *validate.Validation, importHelper *imports.Import
 }
 
 func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -205,7 +206,7 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		log.Printf("[INFO] Creating root environment group")
-		err = c.CreateRootEnvironmentGroup(appResponse.AppContainerId, application.CatalogAppId)
+		err = c.CreateRootEnvironmentGroup(appResponse.AppContainerId, application.CatalogAppId, m)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -237,7 +238,8 @@ func (rt *ResourceApplication) resourceRead(ctx context.Context, d *schema.Resou
 }
 
 func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	// Validate properties and sensitive_properties
 	err, foundApp := rt.helper.validatePropertiesAgainstSystemApps(d, c)
@@ -307,7 +309,8 @@ func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.Res
 }
 
 func (rt *ResourceApplication) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -374,7 +377,9 @@ func getRemovedProperties(c *britive.Client, application *britive.SystemApp, pro
 }
 
 func (rt *ResourceApplication) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	if err := rt.importHelper.ParseImportID([]string{"apps/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
@@ -508,7 +513,8 @@ func (rrth *ResourceApplicationHelper) mapUserMappingsResourceToModel(d *schema.
 }
 
 func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	applicationID, err := rrth.parseUniqueID(d.Id())
 	if err != nil {
