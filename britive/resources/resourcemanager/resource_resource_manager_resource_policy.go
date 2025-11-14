@@ -376,6 +376,10 @@ func (helper *ResourceResourcePolicyHelper) getAndMapModelToResource(d *schema.R
 		resourceLabelsList = append(resourceLabelsList, resourceLabelMap)
 	}
 
+	if err := d.Set("resource_labels", resourceLabelsList); err != nil {
+		return err
+	}
+
 	return nil
 }
 
