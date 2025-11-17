@@ -344,21 +344,25 @@ func (helper *ResourceResourceManagerProfilePolicyHelper) getAndMapModelToResour
 		return err
 	}
 
-	var condMap interface{}
-	if err := json.Unmarshal([]byte(resourceManagerProfilePolicy.Condition), &condMap); err != nil {
-		return err
-	}
-	normalizedCondition, err := json.Marshal(condMap)
-	if err != nil {
-		return err
+	normalizedCondition := ""
+	if resourceManagerProfilePolicy.Condition != "" {
+		var condMap interface{}
+		if err := json.Unmarshal([]byte(resourceManagerProfilePolicy.Condition), &condMap); err != nil {
+			return err
+		}
+		apiCon, err := json.Marshal(condMap)
+		if err != nil {
+			return err
+		}
+		normalizedCondition = string(apiCon)
 	}
 
 	newCon := d.Get("condition")
-	if britive.ConditionEqual(string(normalizedCondition), newCon.(string)) {
+	if britive.ConditionEqual(normalizedCondition, newCon.(string)) {
 		if err := d.Set("condition", newCon.(string)); err != nil {
 			return err
 		}
-	} else if err := d.Set("condition", string(normalizedCondition)); err != nil {
+	} else if err := d.Set("condition", normalizedCondition); err != nil {
 		return err
 	}
 

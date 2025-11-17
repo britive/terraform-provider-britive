@@ -26,6 +26,7 @@ resource "britive_profile" "new" {
     notification_prior_to_expiration = "10m0s"
     extension_duration               = "12m30s"
     extension_limit                  = 2
+    allow_impersonation               = true
     associations {
       type  = "Environment"
       value = "QA Subscription"
@@ -59,6 +60,8 @@ The following arguments are supported, except for AWS profiles:
 * `notification_prior_to_expiration` - (Optional) The Britive profile expiry notification as a time value. For example, `10m0s`
 
 * `extension_duration` - (Optional) The Britive profile expiry extension duration as a time value. For example: `12m30s`
+
+* `allow_impersonation` - (Optional) Allow AI Identities to impersonate Users and Service Identities.
 
 * `extension_limit` - (Optional) The Britive profile expiry extension limit. For example: `2`
 
