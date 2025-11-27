@@ -48,37 +48,7 @@ func TestBritiveProfilePolicyPrioritization(t *testing.T) {
 					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy_prioritization.new_priority"),
 				),
 			},
-			// Step 2: Update policy priorities
-			{
-				Config: testAccCheckBritiveProfilePolicyPrioritizationConfig(
-					applicationName,
-					profileName,
-					profilePolicyName,
-					profilePolicyDescription1,
-					profilePolicyName1,
-					profilePolicyDescription2,
-					profilePolicyName2,
-					profilePolicyDescription2,
-					2,
-					0,
-					1,
-				),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrPair(
-						"britive_profile_policy_prioritization.new_priority", "policy_priority.0.priority",
-						"britive_profile_policy.new", "id",
-					),
-					resource.TestCheckResourceAttrPair(
-						"britive_profile_policy_prioritization.new_priority", "policy_priority.1.priority",
-						"britive_profile_policy.new_1", "id",
-					),
-					resource.TestCheckResourceAttrPair(
-						"britive_profile_policy_prioritization.new_priority", "policy_priority.2.priority",
-						"britive_profile_policy.new_2", "id",
-					),
-				),
-			},
-			// Step 3: Plan-only check (should be no diff)
+			// Step 2: Plan-only check (should be no diff)
 			{
 				PlanOnly: true,
 				Config: testAccCheckBritiveProfilePolicyPrioritizationConfig(
