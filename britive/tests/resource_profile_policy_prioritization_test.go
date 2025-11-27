@@ -136,13 +136,21 @@ data "britive_application" "app" {
 }
 
 resource "britive_profile" "new_profile" {
-  app_container_id = data.britive_application.app.id
-  name             = "%s"
-  expiration_duration = "25m0s"
-
-  associations { type = "EnvironmentGroup", value = "Development" }
-  associations { type = "EnvironmentGroup", value = "Stage" }
-  associations { type = "Environment", value = "Sigma Corporate" }
+	app_container_id = data.britive_application.app.id
+	name = "%s"
+	expiration_duration = "25m0s"
+	associations {
+		type  = "EnvironmentGroup"
+		value = "Development"
+	}
+	associations {
+		type  = "EnvironmentGroup"
+		value = "Stage"
+	}
+	associations {
+		type  = "Environment"
+		value = "Sigma Corporate"
+	}
 }
 
 resource "britive_profile_policy" "new" {
