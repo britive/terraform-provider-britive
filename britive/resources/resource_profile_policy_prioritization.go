@@ -133,7 +133,7 @@ func (rpo *ResourcePolicyPriority) resourceRead(ctx context.Context, d *schema.R
 
 	profileId := rpo.helper.parseUniqueID(d.Id())
 
-	log.Printf("[INFO] Getting profile polcies")
+	log.Printf("[INFO] Getting profile policies")
 	policies, err := c.GetProfilePolicies(profileId)
 	if err != nil {
 		return diag.FromErr(err)
@@ -250,20 +250,18 @@ func (helper *ResourcePolicyPriorityHelper) getAndMapModelToResource(d *schema.R
 		return nil
 	}
 
-	userOrder := make(map[string]int)
-	stateOrder := make(map[int]string)
+	userOrder := make(map[string]string)
 	for _, ord := range order {
 		mapOrder := ord.(map[string]interface{})
 		idArr := strings.Split(mapOrder["id"].(string), "/")
 		pId := idArr[len(idArr)-1]
-		userOrder[pId] = mapOrder["priority"].(int)
-		stateOrder[mapOrder["priority"].(int)] = mapOrder["id"].(string)
+		userOrder[pId] = mapOrder["id"].(string)
 	}
 
 	for _, policy := range policies {
 		if _, ok := userOrder[policy.PolicyID]; ok {
 			pOrder := map[string]interface{}{
-				"id":       stateOrder[policy.Order],
+				"id":       userOrder[policy.PolicyID],
 				"priority": policy.Order,
 			}
 			policyOrder = append(policyOrder, pOrder)

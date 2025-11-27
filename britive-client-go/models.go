@@ -194,7 +194,7 @@ type ProfilePolicy struct {
 	IsDraft      bool                       `json:"isDraft"`
 	IsReadOnly   bool                       `json:"isReadOnly"`
 	Associations []ProfilePolicyAssociation `json:"scopes"`
-	Order        int                        `json:"order"`
+	Order        int                        `json:"order,omitempty"`
 }
 
 type ProfilePolicyAssociation struct {
@@ -378,7 +378,7 @@ type ItsmFilterCriteria struct {
 	Filter              map[string]interface{} `json:"filter,omitempty"`
 }
 
-//Connections
+// Connections
 type Connection struct {
 	ID       string `json:"id,omitempty"`
 	Name     string `json:"name,omitempty"`
@@ -386,7 +386,7 @@ type Connection struct {
 	AuthType string `json:"authType,omitempty"`
 }
 
-//EscalationPolicies
+// EscalationPolicies
 type EscalationPolicies struct {
 	Policies []map[string]string `json:"escalationPolicies,omitempty"`
 	Count    int                 `json:"count,omitempty"`
