@@ -14,22 +14,44 @@ func TestBritiveProfilePolicyPrioritization(t *testing.T) {
 	profileName := "AT - New Britive Profile Policy for Prioritization Test"
 	profilePolicyName := "AT - New Britive Profile Policy for Prioritization Test"
 	profilePolicyDescription := "AT - New Britive Profile Policy for Prioritization Test Description"
+	profilePolicyNamePriority := 0
+	profilePolicyName1 := "AT - New Britive Profile Policy for Prioritization Test 1"
+	profilePolicyDescription1 := "AT - New Britive Profile Policy for Prioritization Test 1 Description"
+	profilePolicyName1Priority := 1
+	profilePolicyName2 := "AT - New Britive Profile Policy for Prioritization Test 2"
+	profilePolicyDescription2 := "AT - New Britive Profile Policy for Prioritization Test 2 Description"
+	profilePolicyName2Priority := 2
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription),
+				Config: testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy.new"),
+					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy.new_1"),
+					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy.new_2"),
 					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy_prioritization.new_priority"),
+				),
+			},
+			{
+				PlanOnly:           true,
+				Config:             testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority),
+				ExpectNonEmptyPlan: false,
+			},
+			{
+				Config: testAccProfilePolicyPrioritizationConfig(
+					applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, 2,0,1
+				),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("britive_profile_policy_prioritization.new_priority", "policy_priority.0.priority", "1"),
 				),
 			},
 		},
 	})
 }
 
-func testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription string) string {
+func testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2 string, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority int) string {
 	return fmt.Sprintf(`
 	data "britive_application" "app" {
 		name = "%s"
@@ -76,14 +98,68 @@ func testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profi
 		)
 	}
 
+	resource "britive_profile_policy" "new_1" {
+		policy_name  = "%s"
+		description  = "%s"
+		profile_id   = britive_profile.new_profile.id
+		access_type  = "Allow"
+		consumer     = "papservice"
+		is_active    = true
+		is_draft     = false
+		is_read_only = false
+		members      = jsonencode(
+			{
+				users             = [
+					{
+						name = "britiveprovideracceptancetest"
+					},
+					{
+						name = "britiveprovideracceptancetest1"
+					},
+				]
+			}
+		)
+	}
+
+	resource "britive_profile_policy" "new_2" {
+		policy_name  = "%s"
+		description  = "%s"
+		profile_id   = britive_profile.new_profile.id
+		access_type  = "Allow"
+		consumer     = "papservice"
+		is_active    = true
+		is_draft     = false
+		is_read_only = false
+		members      = jsonencode(
+			{
+				users             = [
+					{
+						name = "britiveprovideracceptancetest"
+					},
+					{
+						name = "britiveprovideracceptancetest1"
+					},
+				]
+			}
+		)
+	}
+
 	resource "britive_profile_policy_prioritization" "new_priority" {
     	profile_id = britive_profile.new_profile.id
 		policy_priority {
       		id = britive_profile_policy.new.id
-      		priority =0
+      		priority =%d
+    	}
+		policy_priority {
+      		id = britive_profile_policy.new_1.id
+      		priority =%d
+    	}
+		policy_priority {
+      		id = britive_profile_policy.new_2.id
+      		priority =%d
     	}
 	}
-		`, applicationName, profileName, profilePolicyName, profilePolicyDescription)
+		`, applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority)
 
 }
 

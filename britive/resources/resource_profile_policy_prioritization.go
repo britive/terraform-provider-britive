@@ -133,7 +133,7 @@ func (rpo *ResourcePolicyPriority) resourceRead(ctx context.Context, d *schema.R
 
 	profileId := rpo.helper.parseUniqueID(d.Id())
 
-	log.Printf("[INFO] Getting profile polcies")
+	log.Printf("[INFO] Getting profile policies")
 	policies, err := c.GetProfilePolicies(profileId)
 	if err != nil {
 		return diag.FromErr(err)
@@ -251,19 +251,18 @@ func (helper *ResourcePolicyPriorityHelper) getAndMapModelToResource(d *schema.R
 	}
 
 	userOrder := make(map[string]int)
-	stateOrder := make(map[int]string)
 	for _, ord := range order {
 		mapOrder := ord.(map[string]interface{})
 		idArr := strings.Split(mapOrder["id"].(string), "/")
 		pId := idArr[len(idArr)-1]
 		userOrder[pId] = mapOrder["priority"].(int)
-		stateOrder[mapOrder["priority"].(int)] = mapOrder["id"].(string)
 	}
 
 	for _, policy := range policies {
 		if _, ok := userOrder[policy.PolicyID]; ok {
+			pID := helper.generateUniquePolicyID(profileId, policy.PolicyID)
 			pOrder := map[string]interface{}{
-				"id":       stateOrder[policy.Order],
+				"id":       pID,
 				"priority": policy.Order,
 			}
 			policyOrder = append(policyOrder, pOrder)
@@ -275,6 +274,10 @@ func (helper *ResourcePolicyPriorityHelper) getAndMapModelToResource(d *schema.R
 	}
 
 	return nil
+}
+
+func (helper *ResourcePolicyPriorityHelper) generateUniquePolicyID(profileID string, policyID string) string {
+	return fmt.Sprintf("paps/%s/policies/%s", profileID, policyID)
 }
 
 func (helper *ResourcePolicyPriorityHelper) mapResourceToModel(c *britive.Client, d *schema.ResourceData, resourcePolicyPriority *britive.ProfilePolicyPriority) (*britive.ProfilePolicyPriority, error) {
