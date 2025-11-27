@@ -34,18 +34,20 @@ func TestBritiveProfilePolicyPrioritization(t *testing.T) {
 					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy_prioritization.new_priority"),
 				),
 			},
-			{
-				PlanOnly:           true,
-				Config:             testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority),
-				ExpectNonEmptyPlan: false,
-			},
+			// Updates policy and policy priority
 			{
 				Config: testAccProfilePolicyPrioritizationConfig(
-					applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, 2,0,1
+					applicationName, profileName, profilePolicyName, profilePolicyDescription1, profilePolicyName1, profilePolicyDescription2, profilePolicyName2, profilePolicyDescription2, 2,0,1
 				),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("britive_profile_policy_prioritization.new_priority", "policy_priority.0.priority", "1"),
 				),
+			},
+			// PLAN SHOULD BE EMPTY (NO DIFF)
+			{
+				PlanOnly:           true,
+				Config:             testAccCheckBritiveProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority),
+				ExpectNonEmptyPlan: false,
 			},
 		},
 	})
