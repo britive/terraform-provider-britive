@@ -9,121 +9,155 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/crypto/argon2"
 )
 
-// ResourceApplication - Terraform Resource for Application
+var (
+	_ resource.Resource              = &ResourceApplication{}
+	_ resource.ResourceWithConfigure = &ResourceApplication{}
+	// _ resource.ResourceWithImportState = &ResourceApplication{}
+)
+
 type ResourceApplication struct {
-	Resource     *schema.Resource
-	helper       *ResourceApplicationHelper
-	validation   *validate.Validation
-	importHelper *imports.ImportHelper
+	client *britive_client.Client
+	helper *ResourceApplicationHelper
+	// importHelper *imports.ImportHelper
 }
 
-// NewResourceApplication - Initializes new application resource
-func NewResourceApplication(v *validate.Validation, importHelper *imports.ImportHelper) *ResourceApplication {
-	rt := &ResourceApplication{
-		helper:       NewResourceApplicationHelper(),
-		validation:   v,
-		importHelper: importHelper,
+type ResourceApplicationHelper struct{}
+
+func NewResourceApplication() resource.Resource {
+	return &ResourceApplication{}
+}
+
+func NewResourceApplicationHelper() *ResourceApplicationHelper {
+	return &ResourceApplicationHelper{}
+}
+
+func (ra *ResourceApplication) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_application"
+}
+
+func (ra *ResourceApplication) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Application resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rt.Resource = &schema.Resource{
-		CreateContext: rt.resourceCreate,
-		ReadContext:   rt.resourceRead,
-		UpdateContext: rt.resourceUpdate,
-		DeleteContext: rt.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rt.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"application_type": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone' and 'Google Workspace'",
-				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta"}, true),
+
+	ra.client = req.ProviderData.(*britive_client.Client)
+	if ra.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for ResourceApplication")
+	ra.helper = NewResourceApplicationHelper()
+}
+
+func (ra *ResourceApplication) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for Britive Application resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
 			},
-			"version": {
-				Type:        schema.TypeString,
+			"application_type": schema.StringAttribute{
+				Required:    true,
+				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta'.",
+				Validators: []validator.String{
+					validate.CaseInsensitiveOneOfValidator(
+						"Snowflake",
+						"Snowflake Standalone",
+						"GCP",
+						"GCP Standalone",
+						"Google Workspace",
+						"AWS",
+						"AWS Standalone",
+						"Azure",
+						"Okta",
+					),
+				},
+			},
+			"version": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Britive application version",
 			},
-			"catalog_app_id": {
-				Type:        schema.TypeInt,
+			"catalog_app_id": schema.Int64Attribute{
 				Computed:    true,
-				Description: "Britive application base catalog id.",
+				Description: "Britive application base catalog ID",
 			},
-			"entity_root_environment_group_id": {
-				Type:        schema.TypeString,
+			"entity_root_environment_group_id": schema.StringAttribute{
 				Computed:    true,
-				Description: "Britive application root environment ID for Snowflake Standalone applications.",
+				Description: "Britive application root environment ID for Snowflake Standalone applications",
 			},
-			"properties": {
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Description: "Britive application overwrite properties.",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"name": {
-							Type:        schema.TypeString,
+		},
+		Blocks: map[string]schema.Block{
+			"properties": schema.SetNestedBlock{
+				Description: "Britive application override properties",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Britive application property name.",
+							Description: "Property name",
 						},
-						"value": {
-							Type:        schema.TypeString,
+						"value": schema.StringAttribute{
 							Required:    true,
-							Description: "Britive application property value.",
+							Description: "Property value",
 						},
 					},
 				},
 			},
-			"sensitive_properties": {
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Description: "Britive application overwrite sensitive properties.",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"name": {
-							Type:     schema.TypeString,
-							Required: true,
-							StateFunc: func(val interface{}) string {
-								return val.(string)
-							},
-							Description: "Britive application property name.",
+
+			"sensitive_properties": schema.SetNestedBlock{
+				Description: "Britive application override sensitive properties",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Required:    true,
+							Description: "Property name",
 						},
-						"value": {
-							Type:      schema.TypeString,
-							Required:  true,
-							Sensitive: true,
-							StateFunc: func(val interface{}) string {
-								return getHash(val.(string))
-							},
-							Description: "Britive application property value.",
+						"value": schema.StringAttribute{
+							Required:    true,
+							Sensitive:   true,
+							Description: "Property value",
 						},
 					},
 				},
 			},
-			"user_account_mappings": {
-				Type:        schema.TypeSet,
-				Optional:    true,
+
+			"user_account_mappings": schema.SetNestedBlock{
+				Validators: []validator.Set{
+					setvalidator.SizeAtMost(1),
+				},
 				Description: "Application user account",
-				MaxItems:    1,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"name": {
-							Type:        schema.TypeString,
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
 							Required:    true,
 							Description: "Application user account name",
 						},
-						"description": {
-							Type:        schema.TypeString,
+						"description": schema.StringAttribute{
 							Required:    true,
 							Description: "Application user account description",
 						},
@@ -132,219 +166,446 @@ func NewResourceApplication(v *validate.Validation, importHelper *imports.Import
 			},
 		},
 	}
-	return rt
 }
 
-func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (ra *ResourceApplication) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_application")
 
-	var diags diag.Diagnostics
-
-	// Validate properties and sensitive_properties
-	err, appCatalogDetails := rt.helper.validatePropertiesAgainstSystemApps(d, c)
-	if err != nil {
-		return diag.FromErr(err)
+	var plan britive_client.ApplicationPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during application creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	applicationName, err := rt.helper.getApplicationName(d)
+	appCatalogDetails, err := ra.helper.validatePropertiesAgainstSystemApps(ctx, plan, ra.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to validate application",
+			fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+		)
+		tflog.Error(ctx, "Failed to validate application", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	application := britive.ApplicationRequest{}
-	err = rt.helper.mapApplicationResourceToModel(d, m, &application, applicationName, appCatalogDetails, false)
+	applicationName, err := ra.helper.getApplicationName(plan)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Missing `displayName` property",
+			fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+		)
+		tflog.Error(ctx, "Missing `displayName` property", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	log.Printf("[INFO] Adding new application")
+	application := britive_client.ApplicationRequest{}
+	ra.helper.mapApplicationResourceToModel(&application, applicationName, appCatalogDetails)
 
-	appResponse, err := c.CreateApplication(application)
+	tflog.Info(ctx, "Creating new application")
+
+	appResponse, err := ra.client.CreateApplication(ctx, application)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to create application",
+			fmt.Sprintf("CreateApplication API call failed: %v", err),
+		)
+		tflog.Error(ctx, "CreateApplication API call failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
-	log.Printf("[INFO] Submitted new application: %#v", appResponse)
+	tflog.Info(ctx, "Application creation success")
 
-	d.SetId(rt.helper.generateUniqueID(appResponse.AppContainerId))
-
-	log.Printf("[INFO] Updated state after application submission: %#v", appResponse)
+	plan.ID = types.StringValue(ra.helper.generateUniqueID(appResponse.AppContainerId))
 
 	// Patch properties
-	properties := britive.Properties{}
-	err = rt.helper.mapPropertiesResourceToModel(d, m, &properties, appResponse, false)
+	properties := britive_client.Properties{}
+	err = ra.helper.mapPropertiesResourceToModel(plan, &properties, appResponse)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Unabe to map properties",
+			fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+		)
+		tflog.Error(ctx, "Unabe to map properties", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	log.Printf("[INFO] Updating application properties")
-	_, err = c.PatchApplicationPropertyTypes(appResponse.AppContainerId, properties)
+	tflog.Info(ctx, "Updating application properties")
+
+	_, err = ra.client.PatchApplicationPropertyTypes(ctx, appResponse.AppContainerId, properties)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Unabe to update properties",
+			fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+		)
+		tflog.Error(ctx, "Unabe to update properties", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
-	log.Printf("[INFO] Updated application properties")
+	tflog.Info(ctx, "Updated application properties")
 
 	// configer user account mappings
-	userMappings := britive.UserMappings{}
-	err = rt.helper.mapUserMappingsResourceToModel(d, m, &userMappings, false)
+	userMappings := britive_client.UserMappings{}
+	err = ra.helper.mapUserMappingsResourceToModel(plan, &userMappings)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Unabe to map user_mappings",
+			fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+		)
+		tflog.Error(ctx, "Unabe to map user_mappings", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	log.Printf("[INFO] Updating user mappings: %#v", userMappings)
-	err = c.ConfigureUserMappings(appResponse.AppContainerId, userMappings)
+	tflog.Info(ctx, "Updating user mapping", map[string]interface{}{
+		"userMapping": userMappings,
+	})
+	err = ra.client.ConfigureUserMappings(ctx, appResponse.AppContainerId, userMappings)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Unabe to configure user_mappings",
+			fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+		)
+		tflog.Error(ctx, "Unabe to configure user_mappings", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
-	log.Printf("[INFO] Updated user mappings: %#v", userMappings)
+	tflog.Info(ctx, "User Mappings configured successfully")
 
 	//The root environment group creation can be skipped when PAB-20648 is fixed
-	allowedEnvGroupApps := map[int]string{
+	allowedEnvGroupApps := map[int64]string{
 		2: "AWS Standalone",
 		8: "Okta",
 		9: "Snowflake Standalone",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
-		log.Printf("[INFO] Creating root environment group")
-		err = c.CreateRootEnvironmentGroup(appResponse.AppContainerId, application.CatalogAppId)
+		tflog.Info(ctx, "Creating root environment group")
+		err = ra.client.CreateRootEnvironmentGroup(ctx, appResponse.AppContainerId, application.CatalogAppId)
 		if err != nil {
-			return diag.FromErr(err)
+
 		}
-		log.Printf("[INFO] Created root environment group")
-		rootEnvID, err := c.GetRootEnvID(appResponse.AppContainerId)
+		tflog.Info(ctx, "Created root environment group")
+		rootEnvID, err := ra.client.GetRootEnvID(ctx, appResponse.AppContainerId)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError(
+				"Unabe to get root environment id",
+				fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+			)
+			tflog.Error(ctx, "Unabe to get root environment id", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
 		}
-		if err = d.Set("entity_root_environment_group_id", rootEnvID); err != nil {
-			return diag.FromErr(err)
-		}
+		plan.EntityRootEnvironmentGroupID = types.StringValue(rootEnvID)
 	}
 
-	rt.resourceRead(ctx, d, m)
+	planPtr, err := ra.helper.getAndMapModelToPlan(ctx, plan, *ra.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get application",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map application model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
 
-	return diags
+	log.Printf("===== out of getandmap:%v", planPtr)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"application": planPtr,
+	})
 }
 
-func (rt *ResourceApplication) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
+func (ra *ResourceApplication) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_application")
 
-	err := rt.helper.getAndMapModelToResource(d, m)
-
-	if err != nil {
-		return diag.FromErr(err)
+	if ra.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
 	}
 
-	return diags
+	var state britive_client.ApplicationPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get application state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	applicationID := state.ID.ValueString()
+	if applicationID == "" {
+		resp.Diagnostics.AddError(
+			"Failed to get application",
+			"application Id not found",
+		)
+		tflog.Error(ctx, "Read failed: missing application ID in state")
+		return
+	}
+
+	newPlan, err := ra.helper.getAndMapModelToPlan(ctx, state, *ra.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get application",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "get and map application model to plan failed in Read", map[string]interface{}{
+			"error":          err.Error(),
+			"application_id": applicationID,
+		})
+		return
+	}
+
+	diags = resp.State.Set(ctx, newPlan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state in Read", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Read completed for britive_application", map[string]interface{}{
+		"application_id": applicationID,
+	})
 }
 
-func (rt *ResourceApplication) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (ra *ResourceApplication) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_application")
 
-	// Validate properties and sensitive_properties
-	err, foundApp := rt.helper.validatePropertiesAgainstSystemApps(d, c)
-	if err != nil {
-		return diag.FromErr(err)
+	var plan, state britive_client.ApplicationPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	applicationID, err := rt.helper.parseUniqueID(d.Id())
+	foundApp, err := ra.helper.validatePropertiesAgainstSystemApps(ctx, plan, ra.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to validate application",
+			fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+		)
+		tflog.Error(ctx, "Failed to validate application", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	applicationID, err := ra.helper.parseUniqueID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"ApplicationID if invalid",
+			fmt.Sprintf("Error: %v.", err),
+		)
+		tflog.Error(ctx, "Failed to parse applicationID", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
 	var hasChanges bool
-	if d.HasChange("properties") || d.HasChange("sensitive_properties") {
+	if !plan.Properties.Equal(state.Properties) || plan.SensitiveProperties.Equal(state.SensitiveProperties) {
 		hasChanges = true
 
-		log.Printf("[INFO] Reading application %s", applicationID)
-		application, err := c.GetApplication(applicationID)
-		if errors.Is(err, britive.ErrNotFound) {
-			return diag.FromErr(errs.NewNotFoundErrorf("application %s", applicationID))
-		}
+		tflog.Info(ctx, "Reading application", map[string]interface{}{
+			"applicationID": applicationID,
+		})
+		application, err := ra.client.GetApplication(ctx, applicationID)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError(
+				"Failed to fetch applicationID",
+				fmt.Sprintf("Error: %v.", err),
+			)
+			tflog.Error(ctx, "Failed to fetch applicationID", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
 		}
 
-		log.Printf("[INFO] Received application %#v", application)
+		tflog.Info(ctx, "Received application", map[string]interface{}{
+			"application": application,
+		})
 
-		properties := britive.Properties{}
+		properties := britive_client.Properties{}
 
-		oldProps, newProps := d.GetChange("properties")
-		oldSprops, newSprops := d.GetChange("sensitive_properties")
-
-		getRemovedProperties(c, foundApp, &properties, oldProps, newProps, oldSprops, newSprops)
-		err = rt.helper.mapPropertiesResourceToModel(d, m, &properties, application, false)
+		oldProps, err := ra.helper.mapSetToPropertyPlan(state.Properties)
 		if err != nil {
-			return diag.FromErr(err)
+			tflog.Error(ctx, "Unable to map properties set to plan")
 		}
-
-		log.Printf("[INFO] Updating application properties")
-		_, err = c.PatchApplicationPropertyTypes(applicationID, properties)
+		newProps, err := ra.helper.mapSetToPropertyPlan(plan.Properties)
 		if err != nil {
-			return diag.FromErr(err)
+			tflog.Error(ctx, "Unable to map properties set to plan")
 		}
-		log.Printf("[INFO] Updated application properties")
 
+		oldSprops, err := ra.helper.mapSetToSensitivePropertyPlan(state.SensitiveProperties)
+		if err != nil {
+			tflog.Error(ctx, "Unable to map sensitive properties set to plan")
+		}
+		newSprops, err := ra.helper.mapSetToSensitivePropertyPlan(plan.SensitiveProperties)
+		if err != nil {
+			tflog.Error(ctx, "Unable to map sensitive properties set to plan")
+		}
+
+		getRemovedProperties(foundApp, &properties, oldProps, newProps, oldSprops, newSprops)
+		err = ra.helper.mapPropertiesResourceToModel(plan, &properties, application)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unabe to map properties",
+				fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+			)
+			tflog.Error(ctx, "Unabe to map properties", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		tflog.Info(ctx, "Updating application properties")
+		_, err = ra.client.PatchApplicationPropertyTypes(ctx, applicationID, properties)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unabe to update properties",
+				fmt.Sprintf("Error: %v. Please check the input values and try again.", err),
+			)
+			tflog.Error(ctx, "Unabe to update properties", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+		tflog.Info(ctx, "Updated application properties")
 	}
-	if d.HasChange("user_account_mappings") {
+	if !plan.UserAccountMappings.Equal(state.UserAccountMappings) {
 		hasChanges = true
-		userMappings := britive.UserMappings{}
-		err = rt.helper.mapUserMappingsResourceToModel(d, m, &userMappings, false)
+		userMappings := britive_client.UserMappings{}
+		err = ra.helper.mapUserMappingsResourceToModel(plan, &userMappings)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError(
+				"Unable to map user-account-mappings",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Unable to map user-account-mappings", map[string]interface{}{
+				"Error": err,
+			})
+			return
 		}
 
-		log.Printf("[INFO] Updating user mappings: %#v", userMappings)
-		err = c.ConfigureUserMappings(applicationID, userMappings)
+		tflog.Info(ctx, fmt.Sprintf("Updating user mappings: %#v", userMappings))
+		err = ra.client.ConfigureUserMappings(ctx, applicationID, userMappings)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError(
+				"Failed to update user_account_mappings",
+				fmt.Sprintf("Error:%v", err),
+			)
+			tflog.Error(ctx, fmt.Sprintf("Failed to update user_account_mappings, Error:%v", err))
+			return
 		}
-		log.Printf("[INFO] Updated user mappings: %#v", userMappings)
+		tflog.Info(ctx, fmt.Sprintf("Updated user mappings: %#v", userMappings))
 	}
+
+	plan.ID = types.StringValue(ra.helper.generateUniqueID(applicationID))
 
 	if hasChanges {
-		return rt.resourceRead(ctx, d, m)
-	}
-	return nil
-}
-
-func (rt *ResourceApplication) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-
-	applicationID, err := rt.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	log.Printf("[INFO] Deleting application %s", applicationID)
-	err = c.DeleteApplication(applicationID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	log.Printf("[INFO] Application %s deleted", applicationID)
-	d.SetId("")
-
-	return diags
-}
-
-func getRemovedProperties(c *britive.Client, application *britive.SystemApp, properties *britive.Properties, oldProps, newProps, oldSprops, newSprops interface{}) {
-	var oldPropertiesList, newPropertiesList, oldSecPropertiesList, newSecPropertiesList []interface{}
-
-	oldPropertiesList = oldProps.(*schema.Set).List()
-	newPropertiesList = newProps.(*schema.Set).List()
-	oldSecPropertiesList = oldSprops.(*schema.Set).List()
-	newSecPropertiesList = newSprops.(*schema.Set).List()
-
-	oldPropertiesList = append(oldPropertiesList, oldSecPropertiesList...)
-	newPropertiesList = append(newPropertiesList, newSecPropertiesList...)
-
-	newPropertyNames := make(map[string]interface{})
-	for _, item := range newPropertiesList {
-		if prop, ok := item.(map[string]interface{}); ok {
-			if name, ok := prop["name"].(string); ok {
-				newPropertyNames[name] = nil
-			}
+		planPtr, err := ra.helper.getAndMapModelToPlan(ctx, plan, *ra.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to get application",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map application model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
 		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+		tflog.Info(ctx, "Update completed and state set", map[string]interface{}{
+			"application": planPtr,
+		})
+	}
+
+}
+
+func (ra *ResourceApplication) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_application")
+
+	var state britive_client.ApplicationPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	applicationID, err := ra.helper.parseUniqueID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to fetch applicationID",
+			fmt.Sprintf("applicationID: %s", applicationID),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Failed to fetch applicationID: %s", applicationID))
+		return
+	}
+
+	tflog.Info(ctx, "Deleting application", map[string]interface{}{
+		"applicationID": applicationID,
+	})
+
+	err = ra.client.DeleteApplication(ctx, applicationID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting application",
+			"Reason: "+err.Error(),
+		)
+		tflog.Error(ctx, "Delete Application API call failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Delete Application API call succeeded", map[string]interface{}{
+		"applicationID": applicationID,
+	})
+	resp.State.RemoveResource(ctx)
+}
+
+func getRemovedProperties(application *britive_client.SystemApp, properties *britive_client.Properties, oldProps, newProps []britive_client.PropertyPlan, oldSprops, newSprops []britive_client.SensitivePropertyPlan) {
+	newPropertyNames := make(map[string]interface{})
+	for _, item := range newProps {
+		newPropertyNames[item.Name.ValueString()] = nil
+	}
+	for _, item := range newSprops {
+		newPropertyNames[item.Name.ValueString()] = nil
 	}
 
 	propertyTypeMap := make(map[string]interface{})
@@ -356,16 +617,29 @@ func getRemovedProperties(c *britive.Client, application *britive.SystemApp, pro
 		propertyTypeMap[foundProp.Name] = prop
 	}
 
+	var oldPropertiesList []interface{}
+	for _, prop := range oldProps {
+		oldPropertiesList = append(oldPropertiesList, map[string]interface{}{
+			"name":  prop.Name.ValueString(),
+			"value": prop.Value.ValueString(),
+		})
+	}
+	for _, prop := range oldSprops {
+		oldPropertiesList = append(oldPropertiesList, map[string]interface{}{
+			"name":  prop.Name.ValueString(),
+			"value": prop.Value.ValueString(),
+		})
+	}
 	for _, propRaw := range oldPropertiesList {
 		prop, _ := propRaw.(map[string]interface{})
 
 		propName := prop["name"].(string)
 
 		if _, found := newPropertyNames[propName]; !found {
-			var property britive.PropertyTypes
+			var property britive_client.PropertyTypes
 			property.Name = propName
 
-			valueAndType, _ := propertyTypeMap[propName]
+			valueAndType := propertyTypeMap[propName]
 			propValue := valueAndType.(map[string]interface{})["value"]
 			property.Value = propValue
 			properties.PropertyTypes = append(properties.PropertyTypes, property)
@@ -373,179 +647,50 @@ func getRemovedProperties(c *britive.Client, application *britive.SystemApp, pro
 	}
 }
 
-func (rt *ResourceApplication) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-	if err := rt.importHelper.ParseImportID([]string{"apps/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, d); err != nil {
+func (rrth *ResourceApplicationHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ApplicationPlan, c britive_client.Client) (*britive_client.ApplicationPlan, error) {
+
+	applicationID, err := rrth.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
 		return nil, err
 	}
 
-	applicationID := d.Id()
-	if strings.TrimSpace(applicationID) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("id")
-	}
+	tflog.Info(ctx, "Reading apllication", map[string]interface{}{
+		"applicationId": applicationID,
+	})
 
-	log.Printf("[INFO] Importing resource type: %s", applicationID)
-
-	application, err := c.GetApplication(applicationID)
-	if errors.Is(err, britive.ErrNotFound) {
+	application, err := c.GetApplication(ctx, applicationID)
+	if errors.Is(err, britive_client.ErrNotFound) {
 		return nil, errs.NewNotFoundErrorf("application %s", applicationID)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	d.SetId(rt.helper.generateUniqueID(application.AppContainerId))
+	tflog.Info(ctx, "Received application", map[string]interface{}{
+		"applicationId": applicationID,
+	})
 
-	log.Printf("[INFO] Imported application: %s", applicationID)
-	return []*schema.ResourceData{d}, nil
-}
-
-// ResourceApplicationHelper - Resource Resource Type helper functions
-type ResourceApplicationHelper struct {
-}
-
-// NewResourceApplicationHelper - Initializes new resource type resource helper
-func NewResourceApplicationHelper() *ResourceApplicationHelper {
-	return &ResourceApplicationHelper{}
-}
-
-func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(d *schema.ResourceData, m interface{}, application *britive.ApplicationRequest, applicationName string, appCatalogDetails *britive.SystemApp, isUpdate bool) error {
-	application.CatalogAppId = appCatalogDetails.CatalogAppId
-	application.CatalogAppDisplayName = applicationName
-	return nil
-}
-
-func (rrth *ResourceApplicationHelper) getApplicationName(d *schema.ResourceData) (string, error) {
-	propertyTypes := d.Get("properties").(*schema.Set)
-	for _, property := range propertyTypes.List() {
-		propertyName := property.(map[string]interface{})["name"].(string)
-		propertyValue := property.(map[string]interface{})["value"].(string)
-		if propertyName == "displayName" {
-			return propertyValue, nil
-		}
+	if plan.ApplicationType.IsNull() || plan.ApplicationType.ValueString() == britive_client.EmptyString {
+		plan.ApplicationType = types.StringValue(application.CatalogAppName)
 	}
-	return "", errors.New("Missing mandatory property displayName")
-}
+	plan.CatalogAppID = types.Int64Value(application.CatalogAppId)
 
-func getHash(val string) string {
-	hash := argon2.IDKey([]byte(val), []byte{}, 1, 64*1024, 4, 32)
-	return base64.RawStdEncoding.EncodeToString(hash)
-}
-
-func isHashValue(val string, hash string) bool {
-	return hash == getHash(val)
-}
-
-func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(d *schema.ResourceData, m interface{}, properties *britive.Properties, appResponse *britive.ApplicationResponse, isUpdate bool) error {
-	propertyTypes := d.Get("properties").(*schema.Set)
-	sensitiveProperties := d.Get("sensitive_properties").(*schema.Set)
-
-	applicationProperties := appResponse.Properties.PropertyTypes
-	propertiesMap := make(map[string]string)
-	for _, property := range applicationProperties {
-		propertiesMap[property.Name] = fmt.Sprintf("%v", property.Type)
+	var planUserAccountMappings []britive_client.UserAccountMappingPlan
+	for _, userAccMapRaw := range application.UserAccountMappings {
+		userAccMap := userAccMapRaw.(map[string]interface{})
+		var userAccMapPlan britive_client.UserAccountMappingPlan
+		userAccMapPlan.Name = types.StringValue(userAccMap["name"].(string))
+		userAccMapPlan.Description = types.StringValue(userAccMap["description"].(string))
+		planUserAccountMappings = append(planUserAccountMappings, userAccMapPlan)
 	}
-
-	for _, property := range propertyTypes.List() {
-		propertyType := britive.PropertyTypes{}
-		propertyType.Name = property.(map[string]interface{})["name"].(string)
-
-		if propertyType.Name == "iconUrl" {
-			continue
-		}
-
-		if propertiesMap[propertyType.Name] == "java.lang.Boolean" {
-			propertyValue, err := strconv.ParseBool(property.(map[string]interface{})["value"].(string))
-			if err != nil {
-				return err
-			}
-			propertyType.Value = propertyValue
-		} else {
-			propertyValue := property.(map[string]interface{})["value"].(string)
-			propertyType.Value = propertyValue
-		}
-		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
-	}
-
-	sensitivePropertiesMap := make(map[string]string)
-
-	for _, property := range sensitiveProperties.List() {
-		propertyName := property.(map[string]interface{})["name"].(string)
-		propertyValue := property.(map[string]interface{})["value"].(string)
-		if prePropertyValue, ok := sensitivePropertiesMap[propertyName]; ok {
-			if isHashValue(prePropertyValue, propertyValue) {
-				continue
-			} else if isHashValue(propertyValue, prePropertyValue) {
-				sensitivePropertiesMap[propertyName] = propertyValue
-				continue
-			} else {
-				return errors.New("Something wrong with sensitive properties")
-			}
-		} else {
-			sensitivePropertiesMap[propertyName] = propertyValue
-		}
-	}
-
-	for sensitivePropertyName, sensitivePropertyValue := range sensitivePropertiesMap {
-		propertyType := britive.PropertyTypes{}
-		propertyType.Name = sensitivePropertyName
-		propertyType.Value = sensitivePropertyValue
-		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
-	}
-
-	return nil
-}
-
-func (rrth *ResourceApplicationHelper) mapUserMappingsResourceToModel(d *schema.ResourceData, m interface{}, userMappings *britive.UserMappings, isUpdate bool) error {
-	inputUserMappings := d.Get("user_account_mappings").(*schema.Set)
-	for _, user := range inputUserMappings.List() {
-		userMapping := britive.UserMapping{}
-		userMapping.Name = user.(map[string]interface{})["name"].(string)
-		userMapping.Description = user.(map[string]interface{})["description"].(string)
-		userMappings.UserAccountMappings = append(userMappings.UserAccountMappings, userMapping)
-	}
-	return nil
-}
-
-func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
-
-	applicationID, err := rrth.parseUniqueID(d.Id())
+	plan.UserAccountMappings, err = rrth.mapUserAccountMappingPlanToSet(planUserAccountMappings)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	log.Printf("[INFO] Reading application %s", applicationID)
+	plan.Version = types.StringValue(application.Properties.Version)
 
-	application, err := c.GetApplication(applicationID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("application %s", applicationID)
-	}
-	if err != nil {
-		return err
-	}
-
-	log.Printf("[INFO] Received application %#v", application)
-
-	if _, ok := d.GetOk("application_type"); !ok {
-		if err := d.Set("application_type", application.CatalogAppName); err != nil {
-			return err
-		}
-	}
-
-	if err := d.Set("catalog_app_id", application.CatalogAppId); err != nil {
-		return err
-	}
-
-	if err := d.Set("user_account_mappings", application.UserAccountMappings); err != nil {
-		return err
-	}
-
-	if err := d.Set("version", application.Properties.Version); err != nil {
-		return err
-	}
-
-	allowedEnvGroupApps := map[int]string{
+	allowedEnvGroupApps := map[int64]string{
 		2: "AWS Standalone",
 		8: "Okta",
 		9: "Snowflake Standalone",
@@ -555,27 +700,27 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		rootEnvironmentGroups := application.RootEnvironmentGroup
 		if rootEnvironmentGroups != nil {
 			environmentGroups := rootEnvironmentGroups.EnvironmentGroups
-			if environmentGroups != nil {
-				for _, envGroup := range environmentGroups {
-					if envGroup.Name == "root" {
-						rootGroupId = envGroup.ID
-					}
+			for _, envGroup := range environmentGroups {
+				if envGroup.Name == "root" {
+					rootGroupId = envGroup.ID
 				}
 			}
 		}
 		if rootGroupId != "" {
-			if err := d.Set("entity_root_environment_group_id", rootGroupId); err != nil {
-				return err
-			}
+			plan.EntityRootEnvironmentGroupID = types.StringValue(rootGroupId)
+		} else {
+			plan.EntityRootEnvironmentGroupID = types.StringNull()
 		}
+	} else {
+		plan.EntityRootEnvironmentGroupID = types.StringNull()
 	}
 
-	systemApps, err := c.GetSystemApps()
+	systemApps, err := c.GetSystemApps(ctx)
 	if err != nil {
-		return fmt.Errorf("Failed to fetch system apps: %v", err)
+		return nil, fmt.Errorf("failed to fetch system apps: %v", err)
 	}
 
-	var foundApp *britive.SystemApp
+	var foundApp *britive_client.SystemApp
 	for _, app := range systemApps {
 		if app.CatalogAppId == application.CatalogAppId {
 			foundApp = &app
@@ -583,7 +728,7 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		}
 	}
 	if foundApp == nil {
-		return fmt.Errorf("Failed to found the system app with catalog ID: %v", application.CatalogAppId)
+		return nil, fmt.Errorf("failed to found the system app with catalog ID: %v", application.CatalogAppId)
 	}
 	systemPropertyTypeMap := make(map[string]map[string]interface{})
 	for _, foundProp := range foundApp.PropertyTypes {
@@ -598,12 +743,19 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 
 	var stateProperties []map[string]interface{}
 	var stateSensitiveProperties []map[string]interface{}
-	sensitiveProperties := d.Get("sensitive_properties").(*schema.Set)
-	properties := d.Get("properties").(*schema.Set)
+
 	userProperties := make(map[string]interface{})
-	for _, prop := range properties.List() {
-		propName := prop.(map[string]interface{})["name"].(string)
-		propValue := prop.(map[string]interface{})["value"]
+	planProperties, err := rrth.mapSetToPropertyPlan(plan.Properties)
+	if err != nil {
+		return nil, err
+	}
+	planSensitiveProperties, err := rrth.mapSetToSensitivePropertyPlan(plan.SensitiveProperties)
+	if err != nil {
+		return nil, err
+	}
+	for _, prop := range planProperties {
+		propName := prop.Name.ValueString()
+		propValue := prop.Value.ValueString()
 		userProperties[propName] = propValue
 	}
 
@@ -624,10 +776,10 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 		}
 		if propertyValType == "com.britive.pab.api.Secret" || propertyValType == "com.britive.pab.api.SecretFile" {
 			if propertyValue == "*" {
-				for _, sp := range sensitiveProperties.List() {
-					existing := sp.(map[string]interface{})
-					if existing["name"] == propertyName {
-						propertyValue = existing["value"].(string)
+
+				for _, sp := range planSensitiveProperties {
+					if sp.Name.ValueString() == propertyName {
+						propertyValue = sp.Value.ValueString()
 						break
 					}
 				}
@@ -652,16 +804,121 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 			}
 		}
 	}
-	if err := d.Set("properties", stateProperties); err != nil {
+	planProperties = nil
+	for _, prop := range stateProperties {
+		var propertyPlan britive_client.PropertyPlan
+		propertyPlan.Name = types.StringValue(prop["name"].(string))
+		propertyPlan.Value = types.StringValue(prop["value"].(string))
+		planProperties = append(planProperties, propertyPlan)
+	}
+	plan.Properties, err = rrth.mapPropertyPlanToSet(planProperties)
+	if err != nil {
+		return nil, err
+	}
+	planSensitiveProperties = nil
+	for _, prop := range stateSensitiveProperties {
+		var sensPropertyPlan britive_client.SensitivePropertyPlan
+		sensPropertyPlan.Name = types.StringValue(prop["name"].(string))
+		sensPropertyPlan.Value = types.StringValue(prop["value"].(string))
+		planSensitiveProperties = append(planSensitiveProperties, sensPropertyPlan)
+	}
+	plan.SensitiveProperties, err = rrth.mapSensitivePropertyPlanToSet(planSensitiveProperties)
+	if err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+func (rrth *ResourceApplicationHelper) mapUserMappingsResourceToModel(plan britive_client.ApplicationPlan, userMappings *britive_client.UserMappings) error {
+	planUserAccountMappings, err := rrth.mapSetToUserAccountMappingPlan(plan.UserAccountMappings)
+	if err != nil {
 		return err
 	}
-	if err := d.Set("sensitive_properties", stateSensitiveProperties); err != nil {
-		return err
+	for _, user := range planUserAccountMappings {
+		userMapping := britive_client.UserMapping{}
+		userMapping.Name = user.Name.ValueString()
+		userMapping.Description = user.Description.ValueString()
+		userMappings.UserAccountMappings = append(userMappings.UserAccountMappings, userMapping)
 	}
 	return nil
 }
 
-func (resourceApplicationHelper *ResourceApplicationHelper) generateUniqueID(applicationID string) string {
+func (rrth *ResourceApplicationHelper) mapPropertiesResourceToModel(plan britive_client.ApplicationPlan, properties *britive_client.Properties, appResponse *britive_client.ApplicationResponse) error {
+
+	applicationProperties := appResponse.Properties.PropertyTypes
+	propertiesMap := make(map[string]string)
+	for _, property := range applicationProperties {
+		propertiesMap[property.Name] = fmt.Sprintf("%v", property.Type)
+	}
+
+	planProperties, err := rrth.mapSetToPropertyPlan(plan.Properties)
+	if err != nil {
+		return err
+	}
+	for _, property := range planProperties {
+		propertyType := britive_client.PropertyTypes{}
+		propertyType.Name = property.Name.ValueString()
+
+		if propertyType.Name == "iconUrl" {
+			continue
+		}
+
+		if propertiesMap[propertyType.Name] == "java.lang.Boolean" {
+			propertyValue, err := strconv.ParseBool(property.Value.ValueString())
+			if err != nil {
+				return err
+			}
+			propertyType.Value = propertyValue
+		} else {
+			propertyValue := property.Value.ValueString()
+			propertyType.Value = propertyValue
+		}
+		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
+	}
+
+	sensitivePropertiesMap := make(map[string]string)
+
+	planSensitiveProperties, err := rrth.mapSetToSensitivePropertyPlan(plan.SensitiveProperties)
+	if err != nil {
+		return err
+	}
+	for _, property := range planSensitiveProperties {
+		propertyName := property.Name.ValueString()
+		propertyValue := property.Value.ValueString()
+		if prePropertyValue, ok := sensitivePropertiesMap[propertyName]; ok {
+			if rrth.isHashValue(prePropertyValue, propertyValue) {
+				continue
+			} else if rrth.isHashValue(propertyValue, prePropertyValue) {
+				sensitivePropertiesMap[propertyName] = propertyValue
+				continue
+			} else {
+				return errors.New("an error has occurred related to the sensitive properties")
+			}
+		} else {
+			sensitivePropertiesMap[propertyName] = propertyValue
+		}
+	}
+
+	for sensitivePropertyName, sensitivePropertyValue := range sensitivePropertiesMap {
+		propertyType := britive_client.PropertyTypes{}
+		propertyType.Name = sensitivePropertyName
+		propertyType.Value = sensitivePropertyValue
+		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
+	}
+
+	return nil
+}
+
+func (rrth *ResourceApplicationHelper) getHash(val string) string {
+	hash := argon2.IDKey([]byte(val), []byte{}, 1, 64*1024, 4, 32)
+	return base64.RawStdEncoding.EncodeToString(hash)
+}
+
+func (rrth *ResourceApplicationHelper) isHashValue(val string, hash string) bool {
+	return hash == rrth.getHash(val)
+}
+
+func (rrth *ResourceApplicationHelper) generateUniqueID(applicationID string) string {
 	return applicationID
 }
 
@@ -669,45 +926,57 @@ func (resourceApplicationHelper *ResourceApplicationHelper) parseUniqueID(ID str
 	return ID, nil
 }
 
-// validatePropertiesAgainstSystemApps validates properties and sensitive_properties against system apps
-func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *schema.ResourceData, c *britive.Client) (error, *britive.SystemApp) {
-	appTypeRaw, ok := d.GetOk("application_type")
-	if !ok {
-		// Return error
-		return fmt.Errorf("Required application_type is not provided"), nil
-	}
-	appType := strings.ToLower(appTypeRaw.(string))
+func (rrth *ResourceApplicationHelper) mapApplicationResourceToModel(application *britive_client.ApplicationRequest, applicationName string, appCatalogDetails *britive_client.SystemApp) {
+	application.CatalogAppId = appCatalogDetails.CatalogAppId
+	application.CatalogAppDisplayName = applicationName
+}
 
-	systemApps, err := c.GetSystemApps()
+func (rrth *ResourceApplicationHelper) getApplicationName(plan britive_client.ApplicationPlan) (string, error) {
+	planProperties, err := rrth.mapSetToPropertyPlan(plan.Properties)
 	if err != nil {
-		return fmt.Errorf("Failed to fetch system apps: %v", err), nil
+		return "", err
+	}
+	for _, property := range planProperties {
+		propertyName := property.Name.ValueString()
+		propertyValue := property.Value.ValueString()
+		if propertyName == "displayName" {
+			return propertyValue, nil
+		}
+	}
+	return "", errors.New("missing mandatory property displayName")
+}
+
+func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(ctx context.Context, plan britive_client.ApplicationPlan, c *britive_client.Client) (*britive_client.SystemApp, error) {
+	appType := strings.ToLower(plan.ApplicationType.ValueString())
+
+	systemApps, err := c.GetSystemApps(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch system apps: %v", err)
 	}
 
-	latestVersion, allAppVersions := getLatestVersion(systemApps, appType)
+	latestVersion, allAppVersions := rrth.getLatestVersion(systemApps, appType)
 
-	var appVersion string
-	appVersionRaw, ok := d.GetOk("version")
-	if ok {
-		appVersion = appVersionRaw.(string)
-	} else {
-		log.Printf("Selected latest version %s for application with type %s", latestVersion, appTypeRaw)
-		appVersion = latestVersion
+	if plan.Version.IsNull() || plan.Version.ValueString() == britive_client.EmptyString {
+		tflog.Info(ctx, "Selected latest version", map[string]interface{}{
+			"Latest version": latestVersion,
+		})
+		plan.Version = types.StringValue(latestVersion)
 	}
 
-	var foundApp *britive.SystemApp
+	var foundApp *britive_client.SystemApp
 	for _, app := range systemApps {
-		if strings.ToLower(app.Name) == appType && app.Version == appVersion {
+		if strings.ToLower(app.Name) == appType && app.Version == plan.Version.ValueString() {
 			foundApp = &app
 			break
 		}
 	}
 	if foundApp == nil {
-		return fmt.Errorf("application_type '%s' with version '%s' not supportted by britive. \nTry %v versions", appType, appVersion, allAppVersions), nil
+		return nil, fmt.Errorf("application_type '%s' with version '%s' not supportted by britive. \nTry %v versions", appType, plan.Version.ValueString(), allAppVersions)
 	}
-	log.Printf("[Info] Selecting catalog with id %d for application of type %s.", foundApp.CatalogAppId, appTypeRaw)
+	tflog.Info(ctx, fmt.Sprintf("Selecting catalog with id %d for application of type %s.", foundApp.CatalogAppId, plan.ApplicationType.ValueString()))
 
-	allowedProps := map[string]britive.SystemAppPropertyType{}
-	allowedSensitive := map[string]britive.SystemAppPropertyType{}
+	allowedProps := map[string]britive_client.SystemAppPropertyType{}
+	allowedSensitive := map[string]britive_client.SystemAppPropertyType{}
 	for _, pt := range foundApp.PropertyTypes {
 		if pt.Type == "com.britive.pab.api.Secret" || pt.Type == "com.britive.pab.api.SecretFile" {
 			allowedSensitive[pt.Name] = pt
@@ -715,45 +984,70 @@ func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(d *sc
 			allowedProps[pt.Name] = pt
 		}
 	}
-	// Validate properties
-	props := d.Get("properties").(*schema.Set)
+	// Validate properti
 	userProps := map[string]bool{}
-	for _, prop := range props.List() {
-		propMap := prop.(map[string]interface{})
-		name := propMap["name"].(string)
-		val := propMap["value"].(string)
+	planProperties, err := rrth.mapSetToPropertyPlan(plan.Properties)
+	if err != nil {
+		return nil, err
+	}
+	for _, prop := range planProperties {
+		name := prop.Name.ValueString()
+		val := prop.Value.ValueString()
 		userProps[name] = true
 		pt, ok := allowedProps[name]
 		if !ok {
-			return fmt.Errorf("Property '%s' is not supported for application type '%s'", name, foundApp.Name), nil
+			return nil, fmt.Errorf("property '%s' is not supported for application type '%s'", name, foundApp.Name)
 		}
 		// Type validation for non-sensitive properties
-		if err := validatePropertyValueType(val, pt.Type, name); err != nil {
-			return err, nil
+		if err := rrth.validatePropertyValueType(val, pt.Type, name); err != nil {
+			return nil, err
 		}
 	}
 	// Validate sensitive_properties
-	sprops := d.Get("sensitive_properties").(*schema.Set)
 	userSensitive := map[string]bool{}
-	for _, prop := range sprops.List() {
-		propMap := prop.(map[string]interface{})
-		name := propMap["name"].(string)
+	planSensitiveProperties, err := rrth.mapSetToSensitivePropertyPlan(plan.SensitiveProperties)
+	if err != nil {
+		return nil, err
+	}
+	for _, prop := range planSensitiveProperties {
+		name := prop.Name.ValueString()
 		userSensitive[name] = true
 		if _, ok := allowedSensitive[name]; !ok {
-			return fmt.Errorf("sensitive property '%s' is not supported for application type '%s'", name, foundApp.Name), nil
+			return nil, fmt.Errorf("sensitive property '%s' is not supported for application type '%s'", name, foundApp.Name)
 		}
 	}
-	return nil, foundApp
+	return foundApp, nil
 }
 
-func getLatestVersion(systemApps []britive.SystemApp, appType string) (string, []string) {
-	var foundApps []britive.SystemApp
+func (rrth *ResourceApplicationHelper) validatePropertyValueType(val string, typ string, name string) error {
+	switch typ {
+	case "java.lang.Boolean":
+		if _, err := strconv.ParseBool(val); err != nil {
+			return fmt.Errorf("property '%s' value '%s' is not a valid boolean", name, val)
+		}
+	case "java.lang.Integer", "java.lang.Long", "java.time.Duration":
+		if _, err := strconv.ParseInt(val, 10, 64); err != nil {
+			return fmt.Errorf("property '%s' value '%s' is not a valid integer", name, val)
+		}
+	case "java.lang.Float", "java.lang.Double":
+		if _, err := strconv.ParseFloat(val, 64); err != nil {
+			return fmt.Errorf("property '%s' value '%s' is not a valid float", name, val)
+		}
+	// For secrets, files, and strings, accept any string
+	case "java.lang.String":
+		// no-op
+	default:
+		// Unknown type, skip validation
+	}
+	return nil
+}
+
+func (rrth *ResourceApplicationHelper) getLatestVersion(systemApps []britive_client.SystemApp, appType string) (string, []string) {
 	latestVersionParts := []string{"0", "0", "0", "0", "0"}
 	var latestVersion string
 	var allAppVersions []string
 	for _, app := range systemApps {
 		if strings.ToLower(app.Name) == appType {
-			foundApps = append(foundApps, app)
 			appVersionStr := strings.TrimPrefix(app.Version, "Custom-")
 			appVersionParts := strings.Split(appVersionStr, ".")
 
@@ -776,25 +1070,164 @@ func getLatestVersion(systemApps []britive.SystemApp, appType string) (string, [
 	return latestVersion, allAppVersions
 }
 
-func validatePropertyValueType(val string, typ string, name string) error {
-	switch typ {
-	case "java.lang.Boolean":
-		if _, err := strconv.ParseBool(val); err != nil {
-			return fmt.Errorf("property '%s' value '%s' is not a valid boolean", name, val)
+func (rrth *ResourceApplicationHelper) mapPropertyPlanToSet(plans []britive_client.PropertyPlan) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(plans))
+
+	for _, p := range plans {
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"name":  types.StringType,
+				"value": types.StringType,
+			},
+			map[string]attr.Value{
+				"name":  p.Name,
+				"value": p.Value,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create object for property: %v", diags)
 		}
-	case "java.lang.Integer", "java.lang.Long", "java.time.Duration":
-		if _, err := strconv.ParseInt(val, 10, 64); err != nil {
-			return fmt.Errorf("property '%s' value '%s' is not a valid integer", name, val)
-		}
-	case "java.lang.Float", "java.lang.Double":
-		if _, err := strconv.ParseFloat(val, 64); err != nil {
-			return fmt.Errorf("property '%s' value '%s' is not a valid float", name, val)
-		}
-	// For secrets, files, and strings, accept any string
-	case "java.lang.String":
-		// no-op
-	default:
-		// Unknown type, skip validation
+		objs = append(objs, obj)
 	}
-	return nil
+
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"name":  types.StringType,
+				"value": types.StringType,
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create properties set: %v", diags)
+	}
+
+	return set, nil
+}
+
+func (rrth *ResourceApplicationHelper) mapSetToPropertyPlan(set types.Set) ([]britive_client.PropertyPlan, error) {
+	var result []britive_client.PropertyPlan
+	objs := set.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, fmt.Errorf("expected Object, got %T", e)
+		}
+		var p britive_client.PropertyPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to convert object to PropertyPlan: %v", diags)
+		}
+		result = append(result, p)
+	}
+	return result, nil
+}
+
+func (rrt *ResourceApplicationHelper) mapSensitivePropertyPlanToSet(plans []britive_client.SensitivePropertyPlan) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(plans))
+
+	for _, p := range plans {
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"name":  types.StringType,
+				"value": types.StringType,
+			},
+			map[string]attr.Value{
+				"name":  p.Name,
+				"value": p.Value,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create object for sensitive property: %v", diags)
+		}
+		objs = append(objs, obj)
+	}
+
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"name":  types.StringType,
+				"value": types.StringType,
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create sensitive properties set: %v", diags)
+	}
+
+	return set, nil
+}
+
+func (rrth *ResourceApplicationHelper) mapSetToSensitivePropertyPlan(set types.Set) ([]britive_client.SensitivePropertyPlan, error) {
+	var result []britive_client.SensitivePropertyPlan
+	objs := set.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, fmt.Errorf("expected Object, got %T", e)
+		}
+		var p britive_client.SensitivePropertyPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to convert object to SensitivePropertyPlan: %v", diags)
+		}
+		result = append(result, p)
+	}
+	return result, nil
+}
+
+func (rrth *ResourceApplicationHelper) mapUserAccountMappingPlanToSet(plans []britive_client.UserAccountMappingPlan) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(plans))
+
+	for _, p := range plans {
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"name":        types.StringType,
+				"description": types.StringType,
+			},
+			map[string]attr.Value{
+				"name":        p.Name,
+				"description": p.Description,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create object for user account mapping: %v", diags)
+		}
+		objs = append(objs, obj)
+	}
+
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"name":        types.StringType,
+				"description": types.StringType,
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create user account mapping set: %v", diags)
+	}
+
+	return set, nil
+}
+
+func (rrth *ResourceApplicationHelper) mapSetToUserAccountMappingPlan(set types.Set) ([]britive_client.UserAccountMappingPlan, error) {
+	var result []britive_client.UserAccountMappingPlan
+	objs := set.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, fmt.Errorf("expected Object, got %T", e)
+		}
+		var p britive_client.UserAccountMappingPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to convert object to UserAccountMappingPlan: %v", diags)
+		}
+		result = append(result, p)
+	}
+	return result, nil
 }
