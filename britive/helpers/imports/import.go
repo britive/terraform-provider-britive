@@ -3,10 +3,6 @@ package imports
 import (
 	"fmt"
 	"regexp"
-	"strconv"
-	"strings"
-
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 // ImportHelper - Helper functions for terraform imports
@@ -18,63 +14,51 @@ func NewImportHelper() *ImportHelper {
 	return &ImportHelper{}
 }
 
-// ParseImportID - Helper function to parse Import ID
-func (ih *ImportHelper) ParseImportID(idRegexes []string, d *schema.ResourceData) error {
+type ImportHelperData struct {
+	ID     string
+	Fields map[string]string
+}
+
+func (ih *ImportHelper) ParseImportID(idRegexes []string, data *ImportHelperData) error {
 	for _, idFormat := range idRegexes {
 		re, err := regexp.Compile(idFormat)
 		if err != nil {
-			return fmt.Errorf("invalid import format. %s", err)
+			return err
 		}
-
-		if fieldValues := re.FindStringSubmatch(d.Id()); fieldValues != nil {
-			for i := 1; i < len(fieldValues); i++ {
-				fieldName := re.SubexpNames()[i]
-				fieldValue := fieldValues[i]
-				val, _ := d.GetOk(fieldName)
-				if _, ok := val.(string); val == nil || ok {
-					if fieldName == "id" {
-						d.SetId(fieldValue)
-					} else if err = d.Set(fieldName, fieldValue); err != nil {
-						return err
-					}
-				} else if _, ok := val.(int); ok {
-					if intVal, atoiErr := strconv.Atoi(fieldValue); atoiErr == nil {
-						if err = d.Set(fieldName, intVal); err != nil {
-							return err
-						}
-					} else {
-						return fmt.Errorf("%s appears to be an integer, but %v cannot be parsed as an int", fieldName, fieldValue)
-					}
-				} else {
-					return fmt.Errorf("cannot handle %s, which currently has value %v, and should be set to %#v, during import", fieldName, val, fieldValue)
+		if matches := re.FindStringSubmatch(data.ID); matches != nil {
+			if data.Fields == nil {
+				data.Fields = make(map[string]string)
+			}
+			for i, name := range re.SubexpNames() {
+				if i != 0 && name != "" {
+					data.Fields[name] = matches[i]
 				}
 			}
-
 			return nil
 		}
 	}
-	return fmt.Errorf("import value %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
+	return fmt.Errorf("import ID %q does not match expected formats", data.ID)
 }
 
-// FetchImportFieldValue - Helper function to parse Import ID, and return the value for a given field
-func (ih *ImportHelper) FetchImportFieldValue(idRegexes []string, d *schema.ResourceData, field string) (string, error) {
-	for _, idFormat := range idRegexes {
-		re, err := regexp.Compile(idFormat)
-		if err != nil {
-			return "", fmt.Errorf("invalid import format. %s", err)
-		}
+// // FetchImportFieldValue - Helper function to parse Import ID, and return the value for a given field
+// func (ih *ImportHelper) FetchImportFieldValue(idRegexes []string, d *schema.ResourceData, field string) (string, error) {
+// 	for _, idFormat := range idRegexes {
+// 		re, err := regexp.Compile(idFormat)
+// 		if err != nil {
+// 			return "", fmt.Errorf("invalid import format. %s", err)
+// 		}
 
-		if fieldValues := re.FindStringSubmatch(d.Id()); fieldValues != nil {
-			for i := 1; i < len(fieldValues); i++ {
-				fieldName := re.SubexpNames()[i]
-				fieldValue := fieldValues[i]
-				if strings.EqualFold(fieldName, field) {
-					return fieldValue, nil
-				}
-			}
+// 		if fieldValues := re.FindStringSubmatch(d.Id()); fieldValues != nil {
+// 			for i := 1; i < len(fieldValues); i++ {
+// 				fieldName := re.SubexpNames()[i]
+// 				fieldValue := fieldValues[i]
+// 				if strings.EqualFold(fieldName, field) {
+// 					return fieldValue, nil
+// 				}
+// 			}
 
-			return "", fmt.Errorf("Value not found for field %s", field)
-		}
-	}
-	return "", fmt.Errorf("import value %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
-}
+// 			return "", fmt.Errorf("Value not found for field %s", field)
+// 		}
+// 	}
+// 	return "", fmt.Errorf("import value %q doesn't match any of the accepted formats: %v", d.Id(), idRegexes)
+// }

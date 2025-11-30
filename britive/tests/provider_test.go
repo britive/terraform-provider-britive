@@ -2,43 +2,104 @@ package tests
 
 import (
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/mitchellh/go-homedir"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-var testAccProviders map[string]*schema.Provider
-var testAccProvider *schema.Provider
-var testVersion = "1.0.0"
-
-func init() {
-	testAccProvider = britive.Provider(testVersion)
-	testAccProviders = map[string]*schema.Provider{
-		"britive": testAccProvider,
+var (
+	testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
+		"britive": providerserver.NewProtocol6WithError(britive.New()),
 	}
-}
-
-func TestProvider(t *testing.T) {
-	if err := britive.Provider(testVersion).InternalValidate(); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-}
-
-func TestProvider_impl(t *testing.T) {
-	var _ *schema.Provider = britive.Provider(testVersion)
-}
+)
 
 func testAccPreCheck(t *testing.T) {
-	configPath, _ := homedir.Expand("~/.britive/tf.config")
-	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
-		return
-	}
-	if err := os.Getenv("BRITIVE_TENANT"); err == "" {
+	if os.Getenv("BRITIVE_TENANT") == "" {
 		t.Fatal("BRITIVE_TENANT must be set for acceptance tests")
 	}
-	if err := os.Getenv("BRITIVE_TOKEN"); err == "" {
+	if os.Getenv("BRITIVE_TOKEN") == "" {
 		t.Fatal("BRITIVE_TOKEN must be set for acceptance tests")
 	}
+}
+
+func TestProvider_Startup(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				// Minimal working config
+				Config: `
+					provider "britive" {
+						tenant = "https://example.com"
+						token  = "dummy"
+					}
+				`,
+			},
+		},
+	})
+}
+
+func TestAccProvider_InvalidTenant(t *testing.T) {
+
+	config := `
+	provider "britive" {
+		tenant = "notaurl"
+		token  = "dummy"
+	}
+	`
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile("Invalid Tenant URL"),
+			},
+		},
+	})
+}
+
+func TestAccProvider_MissingToken(t *testing.T) {
+
+	config := `
+	provider "britive" {
+		tenant = "https://example.com"
+	}
+	`
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile("Missing API Token"),
+			},
+		},
+	})
+}
+
+// Example connectivity test once backend client is contacted
+func TestAccProvider_Connectivity(t *testing.T) {
+
+	config := `
+	provider "britive" {
+		tenant = "https://unknown-host.xyz"
+		token  = "dummy"
+	}
+	`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile("Unable to create Britive client"),
+			},
+		},
+	})
 }
