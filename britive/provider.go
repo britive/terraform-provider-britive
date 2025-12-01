@@ -82,12 +82,12 @@ func (p *britiveProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 	currentValue := config.Tenant.ValueString()
-	_, err := url.ParseRequestURI(currentValue)
-	if err != nil {
+	u, err := url.Parse(currentValue)
+	if err != nil || u.Scheme == "" || u.Host == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("tenant"),
 			"Invalid Tenant URL",
-			fmt.Sprintf("The provided tenant URL '%s' is not valid or cannot be parsed.", currentValue),
+			fmt.Sprintf("The provided tenant URL %q is not valid. A full URL with scheme is required, e.g. https://example.britive.com.", currentValue),
 		)
 		return
 	}
@@ -95,7 +95,7 @@ func (p *britiveProvider) Configure(ctx context.Context, req provider.ConfigureR
 	p.baseURL = fmt.Sprintf("%s/api", currentValue)
 
 	// Set token
-	if config.Token.IsNull() || config.Tenant.ValueString() == britive_client.EmptyString {
+	if config.Token.IsNull() || config.Token.ValueString() == britive_client.EmptyString {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("token"),
 			"Missing API Token",
