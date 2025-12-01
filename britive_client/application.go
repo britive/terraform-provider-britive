@@ -224,3 +224,22 @@ func (c *Client) DeleteApplication(ctx context.Context, applicationID string) er
 	}
 	return err
 }
+
+func (c *Client) GetEnvDetails(appEnvs []ApplicationEnvironment, field string) ([]string, error) {
+	var envList []string
+	var envValue string
+
+	for _, appEnv := range appEnvs {
+		switch field {
+		case "id":
+			envValue = appEnv.EnvironmentID
+		case "name":
+			envValue = appEnv.EnvironmentName
+		default:
+			return nil, ErrNotFound
+		}
+		envList = append(envList, envValue)
+	}
+
+	return envList, nil
+}

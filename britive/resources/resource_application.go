@@ -543,7 +543,7 @@ func (ra *ResourceApplication) Update(ctx context.Context, req resource.UpdateRe
 		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &planPtr)...)
 		if resp.Diagnostics.HasError() {
-			tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
 				"diagnostics": resp.Diagnostics,
 			})
 			return
