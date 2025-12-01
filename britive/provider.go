@@ -4,200 +4,205 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
-	"strings"
+	"regexp"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/datasources"
-	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
-	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/britive/terraform-provider-britive/britive/resources"
-	"github.com/britive/terraform-provider-britive/britive/resources/resourcemanager"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/mitchellh/go-homedir"
 )
 
-var version string
+// FileConfig represents the structure of the config file
+type FileConfig struct {
+	Tenant string `json:"tenant"`
+	Token  string `json:"token"`
+}
 
-// Provider - Britive Provider
-func Provider(v string) *schema.Provider {
-	version = v
-	validation := validate.NewValidation()
-	importHelper := imports.NewImportHelper()
+type britiveProvider struct {
+	version string
+	baseURL string
+	token   string
+	client  *britive_client.Client
+}
 
-	resourceTag := resources.NewResourceTag(importHelper)
-	resourceTagMember := resources.NewResourceTagMember(importHelper)
-	resourceProfile := resources.NewResourceProfile(validation, importHelper)
-	resourceProfilePermission := resources.NewResourceProfilePermission(importHelper)
-	resourceProfileSessionAttribute := resources.NewResourceProfileSessionAttribute(importHelper)
-	resourcePermission := resources.NewResourcePermission(validation, importHelper)
-	resourceRole := resources.NewResourceRole(validation, importHelper)
-	resourcePolicy := resources.NewResourcePolicy(importHelper)
-	resourceProfilePolicy := resources.NewResourceProfilePolicy(importHelper)
-	resourceConstraint := resources.NewResourceConstraint(importHelper)
-	resourceProfileAdditionalSettings := resources.NewResourceProfileAdditionalSettings(importHelper)
-	resourceApplication := resources.NewResourceApplication(validation, importHelper)
-	resourceEntityGroup := resources.NewResourceEntityGroup(importHelper)
-	resourceEntityEnvironment := resources.NewResourceEntityEnvironment(importHelper)
-	resourceAdvancedSettings := resources.NewResourceAdvancedSettings(validation, importHelper)
-	resourceResourceType := resourcemanager.NewResourceResourceType(validation, importHelper)
-	resourceResourceTypePermissions := resourcemanager.NewResourceResourceTypePermissions(importHelper)
-	resourceResponseTemplate := resourcemanager.NewResourceResponseTemplate(validation, importHelper)
-	resourceResourceLabel := resourcemanager.NewResourceResourceLabel(validation, importHelper)
-	resourceResourceManagerProfile := resourcemanager.NewResourceResourceManagerProfile(validation, importHelper)
-	resourceResourceManagerProfilePolicy := resourcemanager.NewResourceResourceManagerProfilePolicy(validation, importHelper)
-	resourceResourceManagerProfilePermission := resourcemanager.NewResourceResourceManagerProfilePermission(validation, importHelper)
-	resourceServerAccess := resourcemanager.NewResourceServerAccess(validation, importHelper)
-	resourceBrokerPools := resourcemanager.NewResourceBrokerPools(validation, importHelper)
-	resourceResourceManagerResourcePolicy := resourcemanager.NewResourceResourcePolicy(validation, importHelper)
-	resourceProfilePolicyPriority := resources.NewResourcePolicyPriority(validation, importHelper)
+var _ provider.Provider = &britiveProvider{}
+var tag string
 
-	dataSourceIdentityProvider := datasources.NewDataSourceIdentityProvider()
-	dataSourceApplication := datasources.NewDataSourceApplication()
-	dataSourceConstraints := datasources.NewDataSourceConstraints()
-	dataSourceConnections := datasources.NewDataSourceConnection()
-	dataSourceAllConnections := datasources.NewDataSourceAllConnections()
-	dataSourceEscalationPolicy := datasources.NewDataSourceEscalationPolicy()
-	dataSourceResourceManagerProfilePermissions := datasources.NewDataSourceResourceManagerProfilePermissions()
+func New() provider.Provider {
+	const defaultVersion = "1.0"
+	return &britiveProvider{
+		version: func() string {
+			if tag == "" {
+				return defaultVersion
+			}
+			return tag
+		}(),
+	}
+}
 
-	return &schema.Provider{
-		Schema: map[string]*schema.Schema{
-			"tenant": {
-				Type:        schema.TypeString,
+func (p *britiveProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "britive"
+	resp.Version = p.version
+}
+
+func (p *britiveProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "The Britive Provider enables Terraform to interact with the Britive REST API.",
+		Attributes: map[string]schema.Attribute{
+			"tenant": schema.StringAttribute{
+				Description: "The tenant URL or domain of your Britive instance.",
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_TENANT", nil),
-				Description: "This is the Britive Tenant URL",
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must not be empty or whitespace"),
+				},
 			},
-			"token": {
-				Type:        schema.TypeString,
+			"token": schema.StringAttribute{
+				Description: "The authentication token used to connect to the Britive API.",
 				Optional:    true,
 				Sensitive:   true,
-				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_TOKEN", nil),
-				Description: "This is the API Token to interact with your Britive API",
 			},
-			"config_path": {
-				Type:        schema.TypeString,
+			"config_path": schema.StringAttribute{
+				Description: "The file path for Britive provider configuration. Default is ~/.britive/tf.config",
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_CONFIG", "~/.britive/tf.config"),
-				Description: "This is the file path for Britive provider configuration. The default configuration path is ~/.britive/tf.config",
 			},
 		},
-		ResourcesMap: map[string]*schema.Resource{
-			"britive_tag":                                       resourceTag.Resource,
-			"britive_tag_member":                                resourceTagMember.Resource,
-			"britive_profile":                                   resourceProfile.Resource,
-			"britive_profile_permission":                        resourceProfilePermission.Resource,
-			"britive_profile_session_attribute":                 resourceProfileSessionAttribute.Resource,
-			"britive_permission":                                resourcePermission.Resource,
-			"britive_role":                                      resourceRole.Resource,
-			"britive_policy":                                    resourcePolicy.Resource,
-			"britive_profile_policy":                            resourceProfilePolicy.Resource,
-			"britive_constraint":                                resourceConstraint.Resource,
-			"britive_profile_additional_settings":               resourceProfileAdditionalSettings.Resource,
-			"britive_application":                               resourceApplication.Resource,
-			"britive_entity_group":                              resourceEntityGroup.Resource,
-			"britive_entity_environment":                        resourceEntityEnvironment.Resource,
-			"britive_advanced_settings":                         resourceAdvancedSettings.Resource,
-			"britive_resource_manager_resource_type":            resourceResourceType.Resource,
-			"britive_resource_manager_resource_type_permission": resourceResourceTypePermissions.Resource,
-			"britive_resource_manager_response_template":        resourceResponseTemplate.Resource,
-			"britive_resource_manager_resource_label":           resourceResourceLabel.Resource,
-			"britive_resource_manager_profile":                  resourceResourceManagerProfile.Resource,
-			"britive_resource_manager_profile_policy":           resourceResourceManagerProfilePolicy.Resource,
-			"britive_resource_manager_profile_permission":       resourceResourceManagerProfilePermission.Resource,
-			"britive_resource_manager_resource":                 resourceServerAccess.Resource,
-			"britive_resource_manager_resource_broker_pools":    resourceBrokerPools.Resource,
-			"britive_resource_manager_resource_policy":          resourceResourceManagerResourcePolicy.Resource,
-			"britive_profile_policy_prioritization":             resourceProfilePolicyPriority.Resource,
-		},
-		DataSourcesMap: map[string]*schema.Resource{
-			"britive_identity_provider":                    dataSourceIdentityProvider.Resource,
-			"britive_application":                          dataSourceApplication.Resource,
-			"britive_supported_constraints":                dataSourceConstraints.Resource,
-			"britive_connection":                           dataSourceConnections.Resource,
-			"britive_all_connections":                      dataSourceAllConnections.Resource,
-			"britive_escalation_policy":                    dataSourceEscalationPolicy.Resource,
-			"britive_resource_manager_profile_permissions": dataSourceResourceManagerProfilePermissions.Resource,
-		},
-		ConfigureContextFunc: providerConfigure,
 	}
 }
 
-func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, error) {
-	log.Print("[DEBUG] Trying to load configuration from file")
-	if configPath, ok := d.GetOk("config_path"); ok && configPath.(string) != "" {
-		path, err := homedir.Expand(configPath.(string))
-		if err != nil {
-			log.Printf("[DEBUG] Failed to expand config file path %s, error %s", configPath, err)
-			return "", "", nil
-		}
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Printf("[DEBUG] Terraform config file %s does not exist, error %s", path, err)
-			return "", "", nil
-		}
-		log.Printf("[DEBUG] Terraform configuration file is: %s", path)
-		configFile, err := os.Open(path)
-		if err != nil {
-			log.Printf("[DEBUG] Unable to open Terraform configuration file %s", path)
-			return "", "", fmt.Errorf("unable to open terraform configuration file. error %v", err)
-		}
-		defer configFile.Close()
-
-		configBytes, _ := ioutil.ReadAll(configFile)
-		var config britive.Config
-		err = json.Unmarshal(configBytes, &config)
-		if err != nil {
-			log.Printf("[DEBUG] Failed to parse config file %s", path)
-			return "", "", fmt.Errorf("invalid terraform configuration file format. error %v", err)
-		}
-		return config.Tenant, config.Token, nil
-	}
-	return "", "", nil
-}
-
-func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	var err error
-
-	token := d.Get("token").(string)
-	tenant := d.Get("tenant").(string)
-
-	if tenant == "" && token == "" {
-		tenant, token, err = getProviderConfigurationFromFile(d)
-		if err != nil {
-			return nil, diag.FromErr(err)
-		}
-	}
-	if tenant == "" {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  "Initializing provider, tenant parameter is missing",
-		})
-	}
-	if token == "" {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  "Initializing provider, token parameter is missing",
-		})
-	}
-	if diags != nil && len(diags) > 0 {
-		return nil, diags
+// loadConfigFromFile reads the config file and returns tenant and token
+func loadConfigFromFile(configPath string) (string, string, error) {
+	if configPath == "" {
+		return "", "", nil
 	}
 
-	apiBaseURL := fmt.Sprintf("%s/api", strings.TrimSuffix(tenant, "/"))
-	c, err := britive.NewClient(apiBaseURL, token, version)
+	expandedPath, err := homedir.Expand(configPath)
 	if err != nil {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  "Unable to create Britive client",
-			Detail:   "Unable to authenticate user for Britive client",
-		})
-
-		return nil, diags
+		log.Printf("[DEBUG] Failed to expand config file path %s: %v", configPath, err)
+		return "", "", err
 	}
 
-	return c, diags
+	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+		log.Printf("[DEBUG] Config file does not exist at path: %s", expandedPath)
+		return "", "", nil
+	}
+
+	configBytes, err := os.ReadFile(expandedPath)
+	if err != nil {
+		log.Printf("[DEBUG] Unable to read config file %s: %v", expandedPath, err)
+		return "", "", err
+	}
+
+	var fileConfig FileConfig
+	if err := json.Unmarshal(configBytes, &fileConfig); err != nil {
+		log.Printf("[DEBUG] Failed to parse config file %s: %v", expandedPath, err)
+		return "", "", err
+	}
+
+	return fileConfig.Tenant, fileConfig.Token, nil
+}
+
+func (p *britiveProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	tflog.Info(ctx, "Configuring the Britive provider")
+
+	var config britive_client.BritiveProviderModel
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !config.ConfigPath.IsNull() && config.ConfigPath.ValueString() != "" {
+		fileTenant, fileToken, err := loadConfigFromFile(config.ConfigPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Unable to load configuration file",
+				fmt.Sprintf("Failed to load configuration file %q: %v", config.ConfigPath.ValueString(), err),
+			)
+			return
+		}
+
+		if config.Tenant.IsNull() && fileTenant != "" {
+			config.Tenant = types.StringValue(fileTenant)
+		}
+		if config.Token.IsNull() && fileToken != "" {
+			config.Token = types.StringValue(fileToken)
+		}
+	}
+
+	if config.Tenant.IsNull() || config.Tenant.ValueString() == "" {
+		config.Tenant = types.StringValue(os.Getenv("BRITIVE_TENANT"))
+	}
+	if config.Token.IsNull() || config.Token.ValueString() == "" {
+		config.Token = types.StringValue(os.Getenv("BRITIVE_TOKEN"))
+	}
+
+	if config.Tenant.IsNull() || config.Tenant.ValueString() == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("tenant"),
+			"Missing Tenant",
+			"You must specify the tenant URL for your Britive instance.",
+		)
+		return
+	}
+
+	u, err := url.Parse(config.Tenant.ValueString())
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("tenant"),
+			"Invalid Tenant URL",
+			fmt.Sprintf("The provided tenant URL %q is not valid.", config.Tenant.ValueString()),
+		)
+		return
+	}
+	p.baseURL = fmt.Sprintf("%s/api", config.Tenant.ValueString())
+
+	if config.Token.IsNull() || config.Token.ValueString() == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("token"),
+			"Missing API Token",
+			"You must provide an authentication token to connect to the Britive API.",
+		)
+		return
+	}
+	p.token = config.Token.ValueString()
+
+	// Create API client
+	client, err := britive_client.NewClient(p.baseURL, p.token, p.version)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Unable to create Britive client",
+			"Failed to authenticate or initialize the Britive API client: "+err.Error(),
+		)
+		return
+	}
+	p.client = client
+
+	// Pass provider configuration to resources and data sources
+	resp.ResourceData = client
+	resp.DataSourceData = client
+}
+
+func (p *britiveProvider) DataSources(_ context.Context) []func() datasource.DataSource {
+	return []func() datasource.DataSource{
+		datasources.NewDataSourceApplication,
+	}
+}
+
+func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resource {
+	return []func() resource.Resource{
+		resources.NewResourceApplication,
+		resources.NewResourceProfile,
+	}
 }

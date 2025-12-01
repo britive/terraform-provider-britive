@@ -2,147 +2,280 @@ package datasources
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"regexp"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// DataSourceApplication - Terraform Application DataSource
+var (
+	_ datasource.DataSource              = &DataSourceApplication{}
+	_ datasource.DataSourceWithConfigure = &DataSourceApplication{}
+)
+
 type DataSourceApplication struct {
-	Resource *schema.Resource
+	client *britive_client.Client
 }
 
-// NewDataSourceApplication - Initializes new DataSourceApplication
-func NewDataSourceApplication() *DataSourceApplication {
-	dataSourceApplication := &DataSourceApplication{}
-	dataSourceApplication.Resource = &schema.Resource{
-		ReadContext: dataSourceApplication.resourceRead,
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The name of the application",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"environment_ids": {
-				Type:        schema.TypeSet,
-				Optional:    true,
+func NewDataSourceApplication() datasource.DataSource {
+	return &DataSourceApplication{}
+}
+
+func (da *DataSourceApplication) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = "britive_application"
+}
+
+func (da *DataSourceApplication) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*britive_client.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	da.client = client
+	tflog.Info(ctx, "Configured DataSourceApplication with Britive client")
+}
+
+func (da *DataSourceApplication) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Datasource for retrieving Britive application metadata.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
 				Computed:    true,
+				Description: "The unique identifier of application",
+			},
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: "The name of the application",
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`\S`),
+						"must not be empty or whitespace",
+					),
+				},
+			},
+			"environment_ids": schema.SetAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
 				Description: "A set of environment ids for the application",
-				Elem:        &schema.Schema{Type: schema.TypeString},
 			},
-			"environment_group_ids": {
-				Type:        schema.TypeSet,
-				Optional:    true,
+			"environment_group_ids": schema.SetAttribute{
 				Computed:    true,
+				ElementType: types.StringType,
 				Description: "A set of environment group ids for the application",
-				Elem:        &schema.Schema{Type: schema.TypeString},
 			},
-			"environment_ids_names": {
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Computed:    true,
-				Description: "A set of map of environment ids and names for the application",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:         schema.TypeString,
-							Required:     true,
-							Description:  "The environment id",
-							ValidateFunc: validation.StringIsNotWhiteSpace,
+		},
+		Blocks: map[string]schema.Block{
+			"environment_ids_names": schema.SetNestedBlock{
+				Description: "A set of environment IDs and names for the application",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Required:    true,
+							Description: "The environment id",
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(
+									regexp.MustCompile(`\S`),
+									"must not be empty or whitespace",
+								),
+							},
 						},
-						"name": {
-							Type:         schema.TypeString,
-							Required:     true,
-							Description:  "The environment name",
-							ValidateFunc: validation.StringIsNotWhiteSpace,
+						"name": schema.StringAttribute{
+							Required:    true,
+							Description: "The environment name",
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(
+									regexp.MustCompile(`\S`),
+									"must not be empty or whitespace",
+								),
+							},
 						},
 					},
 				},
 			},
-			"environment_group_ids_names": {
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Computed:    true,
-				Description: "A set of map of environment group ids and names for the application",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:         schema.TypeString,
-							Required:     true,
-							Description:  "The environment group id",
-							ValidateFunc: validation.StringIsNotWhiteSpace,
+			"environment_group_ids_names": schema.SetNestedBlock{
+				Description: "A set of environment group IDs and names for the application",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Required:    true,
+							Description: "The environment group id",
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(
+									regexp.MustCompile(`\S`),
+									"must not be empty or whitespace",
+								),
+							},
 						},
-						"name": {
-							Type:         schema.TypeString,
-							Required:     true,
-							Description:  "The environment group name",
-							ValidateFunc: validation.StringIsNotWhiteSpace,
+						"name": schema.StringAttribute{
+							Required:    true,
+							Description: "The environment group name",
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(
+									regexp.MustCompile(`\S`),
+									"must not be empty or whitespace",
+								),
+							},
 						},
 					},
 				},
 			},
 		},
 	}
-	return dataSourceApplication
 }
 
-func (dataSourceApplication *DataSourceApplication) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (da *DataSourceApplication) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_application datasource")
 
-	applicationName := d.Get("name").(string)
-
-	application, err := c.GetApplicationByName(applicationName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("application %s", applicationName))
+	var plan britive_client.DataSourceApplicationPlan
+	diags := req.Config.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during fetching application", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
+
+	application, err := da.client.GetApplicationByName(ctx, plan.Name.ValueString())
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get application",
+			fmt.Sprintf("Error: %v, Check applicatio name: %s", err, plan.Name.ValueString()),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Error: %v, Failed to get application of name: %s", err, plan.Name.ValueString()))
+		return
 	}
 
-	d.SetId(application.AppContainerID)
+	plan.ID = types.StringValue(application.AppContainerID)
 
-	if err := d.Set("name", application.CatalogAppDisplayName); err != nil {
-		return diag.FromErr(err)
-	}
-
-	appEnvs, err := c.GetAppEnvs(d.Id(), "environments")
+	appEnvs, err := da.client.GetAppEnvs(ctx, plan.ID.ValueString(), "environments")
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get app environments",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Error: %v, Failed to get app environments", err))
+		return
 	}
 
-	appEnvGroups, err := c.GetAppEnvs(d.Id(), "environmentGroups")
+	appEnvGroups, err := da.client.GetAppEnvs(ctx, plan.ID.ValueString(), "environmentGroups")
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get app environment groups.",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Error: %v, Failed to get app environment groups.", err))
+		return
 	}
 
-	envIdList, err := c.GetEnvDetails(appEnvs, "id")
+	envIdList, err := da.client.GetEnvDetails(appEnvs, "id")
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get environment details",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Error: %v, Failed to get environment details", err))
+		return
 	}
-	d.Set("environment_ids", envIdList)
+	var envIdListElem []attr.Value
+	for _, elem := range envIdList {
+		envIdListElem = append(envIdListElem, types.StringValue(elem))
+	}
 
-	envGrpIdList, err := c.GetEnvDetails(appEnvGroups, "id")
+	envIdSet, diag := types.SetValue(types.StringType, envIdListElem)
+	if diag.HasError() {
+		tflog.Error(ctx, "Failed to map environment id's to set")
+		return
+	}
+
+	plan.EnvironmentIDs = envIdSet
+
+	envGrpIdList, err := da.client.GetEnvDetails(appEnvGroups, "id")
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get environment group details",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Error: %v, Failed to get environment group details", err))
+		return
 	}
-	d.Set("environment_group_ids", envGrpIdList)
 
-	envIdNameList, err := c.GetEnvFullDetails(appEnvs)
+	var envGrpIdListElem []attr.Value
+	for _, elem := range envGrpIdList {
+		envGrpIdListElem = append(envGrpIdListElem, types.StringValue(elem))
+	}
+
+	envGrpIdSet, diag := types.SetValue(types.StringType, envGrpIdListElem)
+	if diag.HasError() {
+		tflog.Error(ctx, "Failed to map environment groups to set")
+		return
+	}
+	plan.EnvironmentGroupIDs = envGrpIdSet
+
+	envIdNameList, err := da.client.GetEnvFullDetails(appEnvs)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get full details of environtments",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Error: %v, Failed to get full details of environments", err))
+		return
 	}
-	d.Set("environment_ids_names", envIdNameList)
 
-	envGrpIdNameList, err := c.GetEnvFullDetails(appEnvGroups)
+	plan.EnvironmentIDsNames = nil
+	for _, elem := range envIdNameList {
+		var elemEnvIdNameData britive_client.DataSourceEnvironmentIDNamePlan
+		elemEnvIdNameData.ID = types.StringValue(elem["id"])
+		elemEnvIdNameData.Name = types.StringValue(elem["name"])
+		plan.EnvironmentIDsNames = append(plan.EnvironmentIDsNames, elemEnvIdNameData)
+	}
+
+	envGrpIdNameList, err := da.client.GetEnvFullDetails(appEnvGroups)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get full details of environtment groups",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, fmt.Sprintf("Error: %v, Failed to get full details of environment groups", err))
+		return
 	}
-	d.Set("environment_group_ids_names", envGrpIdNameList)
 
-	return nil
+	plan.EnvironmentGroupIDsNames = nil
+	for _, elem := range envGrpIdNameList {
+		var elemEnvGrpNameData britive_client.DataSourceEnvironmentGroupIDNamePlan
+		elemEnvGrpNameData.ID = types.StringValue(elem["id"])
+		elemEnvGrpNameData.Name = types.StringValue(elem["name"])
+		plan.EnvironmentGroupIDsNames = append(plan.EnvironmentGroupIDsNames, elemEnvGrpNameData)
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after read", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Update completed and state set", map[string]interface{}{
+		"application": plan,
+	})
+
 }
