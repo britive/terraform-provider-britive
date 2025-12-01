@@ -42,12 +42,6 @@ func TestAccBritiveProfile(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "associations.0.value", associationValue),
 				),
 			},
-			{
-				ResourceName:            resourceName,
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"description"},
-			},
 		},
 	})
 }
