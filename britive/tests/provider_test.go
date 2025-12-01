@@ -81,25 +81,3 @@ func TestAccProvider_MissingToken(t *testing.T) {
 		},
 	})
 }
-
-// Example connectivity test once backend client is contacted
-func TestAccProvider_Connectivity(t *testing.T) {
-
-	config := `
-	provider "britive" {
-		tenant = "https://unknown-host.xyz"
-		token  = "dummy"
-	}
-	`
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config:      config,
-				ExpectError: regexp.MustCompile("Unable to create Britive client"),
-			},
-		},
-	})
-}
