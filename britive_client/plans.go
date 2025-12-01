@@ -3,8 +3,9 @@ package britive_client
 import "github.com/hashicorp/terraform-plugin-framework/types"
 
 type BritiveProviderModel struct {
-	Tenant types.String `tfsdk:"tenant"`
-	Token  types.String `tfsdk:"token"`
+	Tenant     types.String `tfsdk:"tenant"`
+	Token      types.String `tfsdk:"token"`
+	ConfigPath types.String `tfsdk:"config_path"`
 }
 
 // Datasources
