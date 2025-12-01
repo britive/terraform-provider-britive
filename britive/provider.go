@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/britive/terraform-provider-britive/britive/datasources"
 	"github.com/britive/terraform-provider-britive/britive/resources"
 	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -87,7 +88,7 @@ func (p *britiveProvider) Configure(ctx context.Context, req provider.ConfigureR
 		resp.Diagnostics.AddAttributeError(
 			path.Root("tenant"),
 			"Invalid Tenant URL",
-			fmt.Sprintf("The provided tenant URL %q is not valid. A full URL with scheme is required, e.g. https://example.britive.com.", currentValue),
+			fmt.Sprintf("The provided tenant URL %q is not valid.", currentValue),
 		)
 		return
 	}
@@ -124,6 +125,7 @@ func (p *britiveProvider) Configure(ctx context.Context, req provider.ConfigureR
 func (p *britiveProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		// Add datasources here
+		datasources.NewDataSourceApplication,
 	}
 }
 

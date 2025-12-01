@@ -7,6 +7,27 @@ type BritiveProviderModel struct {
 	Token  types.String `tfsdk:"token"`
 }
 
+// Datasources
+type DataSourceApplicationPlan struct {
+	ID                       types.String                           `tfsdk:"id"`
+	Name                     types.String                           `tfsdk:"name"`
+	EnvironmentIDs           types.Set                              `tfsdk:"environment_ids"`
+	EnvironmentGroupIDs      types.Set                              `tfsdk:"environment_group_ids"`
+	EnvironmentIDsNames      []DataSourceEnvironmentIDNamePlan      `tfsdk:"environment_ids_names"`
+	EnvironmentGroupIDsNames []DataSourceEnvironmentGroupIDNamePlan `tfsdk:"environment_group_ids_names"`
+}
+
+type DataSourceEnvironmentIDNamePlan struct {
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"name"`
+}
+
+type DataSourceEnvironmentGroupIDNamePlan struct {
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"name"`
+}
+
+// Resources
 type ProfilePlan struct {
 	ID                            types.String `tfsdk:"id"`
 	AppContainerID                types.String `tfsdk:"app_container_id"`

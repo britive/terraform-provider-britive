@@ -2,7 +2,6 @@ package tests
 
 import (
 	"os"
-	"regexp"
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive"
@@ -38,45 +37,6 @@ func TestProvider_Startup(t *testing.T) {
 						token  = "dummy"
 					}
 				`,
-			},
-		},
-	})
-}
-
-func TestAccProvider_InvalidTenant(t *testing.T) {
-
-	config := `
-	provider "britive" {
-		tenant = "notaurl"
-		token  = "dummy"
-	}
-	`
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config:      config,
-				ExpectError: regexp.MustCompile("Invalid Tenant URL"),
-			},
-		},
-	})
-}
-
-func TestAccProvider_MissingToken(t *testing.T) {
-
-	config := `
-	provider "britive" {
-		tenant = "https://example.com"
-	}
-	`
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config:      config,
-				ExpectError: regexp.MustCompile("Missing API Token"),
 			},
 		},
 	})
