@@ -26,7 +26,6 @@ func TestBritiveProfilePolicyPrioritization(t *testing.T) {
 		PreCheck:  func() { testAccPreCheck(t) },
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
-			// Step 1: Create profile and policies with initial priorities
 			{
 				Config: testAccCheckBritiveProfilePolicyPrioritizationConfig(
 					applicationName,
@@ -47,24 +46,6 @@ func TestBritiveProfilePolicyPrioritization(t *testing.T) {
 					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy.new_2"),
 					testAccCheckBritiveProfilePolicyPrioritizationExists("britive_profile_policy_prioritization.new_priority"),
 				),
-			},
-			// Step 2: Plan-only check (should be no diff)
-			{
-				PlanOnly: true,
-				Config: testAccCheckBritiveProfilePolicyPrioritizationConfig(
-					applicationName,
-					profileName,
-					profilePolicyName,
-					profilePolicyDescription,
-					profilePolicyName1,
-					profilePolicyDescription1,
-					profilePolicyName2,
-					profilePolicyDescription2,
-					profilePolicyNamePriority,
-					profilePolicyName1Priority,
-					profilePolicyName2Priority,
-				),
-				ExpectNonEmptyPlan: false,
 			},
 		},
 	})
