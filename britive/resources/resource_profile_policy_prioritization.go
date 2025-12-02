@@ -250,18 +250,20 @@ func (helper *ResourcePolicyPriorityHelper) getAndMapModelToResource(d *schema.R
 		return nil
 	}
 
-	userOrder := make(map[string]string)
+	userOrder := make(map[string]int)
+	stateOrder := make(map[int]string)
 	for _, ord := range order {
 		mapOrder := ord.(map[string]interface{})
 		idArr := strings.Split(mapOrder["id"].(string), "/")
 		pId := idArr[len(idArr)-1]
-		userOrder[pId] = mapOrder["id"].(string)
+		userOrder[pId] = mapOrder["priority"].(int)
+		stateOrder[mapOrder["priority"].(int)] = mapOrder["id"].(string)
 	}
 
 	for _, policy := range policies {
 		if _, ok := userOrder[policy.PolicyID]; ok {
 			pOrder := map[string]interface{}{
-				"id":       userOrder[policy.PolicyID],
+				"id":       stateOrder[policy.Order],
 				"priority": policy.Order,
 			}
 			policyOrder = append(policyOrder, pOrder)
