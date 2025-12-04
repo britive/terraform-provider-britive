@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
+	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -26,15 +27,15 @@ import (
 )
 
 var (
-	_ resource.Resource              = &ResourceApplication{}
-	_ resource.ResourceWithConfigure = &ResourceApplication{}
-	// _ resource.ResourceWithImportState = &ResourceApplication{}
+	_ resource.Resource                = &ResourceApplication{}
+	_ resource.ResourceWithConfigure   = &ResourceApplication{}
+	_ resource.ResourceWithImportState = &ResourceApplication{}
 )
 
 type ResourceApplication struct {
-	client *britive_client.Client
-	helper *ResourceApplicationHelper
-	// importHelper *imports.ImportHelper
+	client       *britive_client.Client
+	helper       *ResourceApplicationHelper
+	importHelper *imports.ImportHelper
 }
 
 type ResourceApplicationHelper struct{}
@@ -612,6 +613,54 @@ func (ra *ResourceApplication) Delete(ctx context.Context, req resource.DeleteRe
 		"applicationID": applicationID,
 	})
 	resp.State.RemoveResource(ctx)
+}
+
+func (ra *ResourceApplication) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+
+	if err := ra.importHelper.ParseImportID([]string{"apps/(?P<id>[^/]+)", "(?P<id>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to parse import ID", err.Error())
+		tflog.Error(ctx, "Failed to parse import ID", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	applicationID := importData.Fields["id"]
+	if strings.TrimSpace(applicationID) == "" {
+		resp.Diagnostics.AddError("Failed to import application", "Application ID not found")
+		tflog.Error(ctx, "Failed to import application, Application ID is empty ('')")
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Importing application: %s", applicationID))
+
+	// Build a plan containing only ID and call helper to fetch & map the full model
+	plan := britive_client.ApplicationPlan{
+		ID: types.StringValue(ra.helper.generateUniqueID(applicationID)),
+	}
+
+	planPtr, err := ra.helper.getAndMapModelToPlan(ctx, plan, *ra.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build state from API", fmt.Sprintf("Error: %v", err))
+		tflog.Error(ctx, "Failed to build state from API during import", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	diags := resp.State.Set(ctx, planPtr)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state in Import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported application: %s", applicationID))
 }
 
 func getRemovedProperties(application *britive_client.SystemApp, properties *britive_client.Properties, oldProps, newProps []britive_client.PropertyPlan, oldSprops, newSprops []britive_client.SensitivePropertyPlan) {
