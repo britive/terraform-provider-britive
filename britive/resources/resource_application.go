@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -16,6 +15,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -80,21 +82,26 @@ func (ra *ResourceApplication) Schema(ctx context.Context, req resource.SchemaRe
 			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"application_type": schema.StringAttribute{
-				Required:    true,
-				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta'.",
+				Required: true,
 				Validators: []validator.String{
-					validate.CaseInsensitiveOneOfValidator(
-						"Snowflake",
-						"Snowflake Standalone",
-						"GCP",
-						"GCP Standalone",
-						"Google Workspace",
-						"AWS",
-						"AWS Standalone",
-						"Azure",
-						"Okta",
+					validate.StringFunc(
+						"application_type",
+						validate.CaseInsensitiveOneOf(
+							"Snowflake",
+							"Snowflake Standalone",
+							"GCP",
+							"GCP Standalone",
+							"Google Workspace",
+							"AWS",
+							"AWS Standalone",
+							"Azure",
+							"Okta",
+						),
 					),
 				},
 			},
@@ -102,14 +109,23 @@ func (ra *ResourceApplication) Schema(ctx context.Context, req resource.SchemaRe
 				Optional:    true,
 				Computed:    true,
 				Description: "Britive application version",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"catalog_app_id": schema.Int64Attribute{
 				Computed:    true,
 				Description: "Britive application base catalog ID",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"entity_root_environment_group_id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Britive application root environment ID for Snowflake Standalone applications",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -323,8 +339,7 @@ func (ra *ResourceApplication) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	log.Printf("===== out of getandmap:%v", planPtr)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &planPtr)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
 	if resp.Diagnostics.HasError() {
 		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
 			"diagnostics": resp.Diagnostics,
@@ -430,7 +445,7 @@ func (ra *ResourceApplication) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	var hasChanges bool
-	if !plan.Properties.Equal(state.Properties) || plan.SensitiveProperties.Equal(state.SensitiveProperties) {
+	if !plan.Properties.Equal(state.Properties) || !plan.SensitiveProperties.Equal(state.SensitiveProperties) {
 		hasChanges = true
 
 		tflog.Info(ctx, "Reading application", map[string]interface{}{
@@ -499,7 +514,7 @@ func (ra *ResourceApplication) Update(ctx context.Context, req resource.UpdateRe
 		}
 		tflog.Info(ctx, "Updated application properties")
 	}
-	if !plan.UserAccountMappings.Equal(state.UserAccountMappings) {
+	if !plan.UserAccountMappings.Equal(state.UserAccountMappings) || !plan.ApplicationType.Equal(state.ApplicationType) {
 		hasChanges = true
 		userMappings := britive_client.UserMappings{}
 		err = ra.helper.mapUserMappingsResourceToModel(plan, &userMappings)
@@ -541,7 +556,7 @@ func (ra *ResourceApplication) Update(ctx context.Context, req resource.UpdateRe
 			})
 			return
 		}
-		resp.Diagnostics.Append(resp.State.Set(ctx, &planPtr)...)
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
 		if resp.Diagnostics.HasError() {
 			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
 				"diagnostics": resp.Diagnostics,
@@ -776,7 +791,6 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToPlan(ctx context.Context,
 		}
 		if propertyValType == "com.britive.pab.api.Secret" || propertyValType == "com.britive.pab.api.SecretFile" {
 			if propertyValue == "*" {
-
 				for _, sp := range planSensitiveProperties {
 					if sp.Name.ValueString() == propertyName {
 						propertyValue = sp.Value.ValueString()
@@ -984,7 +998,7 @@ func (rrth *ResourceApplicationHelper) validatePropertiesAgainstSystemApps(ctx c
 			allowedProps[pt.Name] = pt
 		}
 	}
-	// Validate properti
+	// Validate properties
 	userProps := map[string]bool{}
 	planProperties, err := rrth.mapSetToPropertyPlan(plan.Properties)
 	if err != nil {

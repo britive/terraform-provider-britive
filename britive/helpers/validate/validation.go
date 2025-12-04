@@ -2,26 +2,49 @@ package validate
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-// CaseInsensitiveOneOf validates string attribute with allowed values ignoring case.
-type CaseInsensitiveOneOf struct {
-	Allowed []string
+type StringFuncValidator struct {
+	attrName string
+	fn       func(string) error
+	desc     string
 }
 
-func (v CaseInsensitiveOneOf) Description(ctx context.Context) string {
-	return "String must be one of the allowed values (case-insensitive)."
+func StringFunc(attrName string, fn func(string) error) validator.String {
+	return StringFuncValidator{
+		attrName: attrName,
+		fn:       fn,
+	}
 }
 
-func (v CaseInsensitiveOneOf) MarkdownDescription(ctx context.Context) string {
+func StringFuncWithDescription(attrName, desc string, fn func(string) error) validator.String {
+	return StringFuncValidator{
+		attrName: attrName,
+		fn:       fn,
+		desc:     desc,
+	}
+}
+
+func (v StringFuncValidator) Description(ctx context.Context) string {
+	if v.desc != "" {
+		return v.desc
+	}
+	if v.attrName != "" {
+		return fmt.Sprintf("Custom validation for %s.", v.attrName)
+	}
+	return "Custom string validation."
+}
+
+func (v StringFuncValidator) MarkdownDescription(ctx context.Context) string {
 	return v.Description(ctx)
 }
 
-func (v CaseInsensitiveOneOf) ValidateString(
+func (v StringFuncValidator) ValidateString(
 	ctx context.Context,
 	req validator.StringRequest,
 	resp *validator.StringResponse,
@@ -30,22 +53,32 @@ func (v CaseInsensitiveOneOf) ValidateString(
 		return
 	}
 
-	value := req.ConfigValue.ValueString()
-	lowerValue := strings.ToLower(value)
+	val := req.ConfigValue.ValueString()
 
-	for _, allowed := range v.Allowed {
-		if lowerValue == strings.ToLower(allowed) {
-			return // valid
+	if err := v.fn(val); err != nil {
+		title := "Invalid value"
+		if v.attrName != "" {
+			title = "Invalid " + v.attrName
 		}
-	}
 
-	resp.Diagnostics.AddAttributeError(
-		req.Path,
-		"Invalid application_type",
-		"value must be one of (case-insensitive): "+strings.Join(v.Allowed, ", "),
-	)
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			title,
+			err.Error(),
+		)
+	}
 }
 
-func CaseInsensitiveOneOfValidator(allowed ...string) validator.String {
-	return CaseInsensitiveOneOf{Allowed: allowed}
+func CaseInsensitiveOneOf(allowed ...string) func(string) error {
+	allowedLower := make(map[string]struct{}, len(allowed))
+	for _, a := range allowed {
+		allowedLower[strings.ToLower(a)] = struct{}{}
+	}
+
+	return func(s string) error {
+		if _, ok := allowedLower[strings.ToLower(s)]; ok {
+			return nil
+		}
+		return fmt.Errorf("value must be one of (case-insensitive): %s", strings.Join(allowed, ", "))
+	}
 }

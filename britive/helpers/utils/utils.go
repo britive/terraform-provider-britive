@@ -3,7 +3,7 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"io/ioutil"
+	"os"
 )
 
 func ExpandStringList(v interface{}) []string {
@@ -16,7 +16,7 @@ func ExpandStringList(v interface{}) []string {
 }
 
 func HashFileContent(filePath string) (string, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}

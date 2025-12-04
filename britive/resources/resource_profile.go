@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -79,12 +80,16 @@ func (rp *ResourceProfile) Schema(ctx context.Context, req resource.SchemaReques
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"app_container_id": schema.StringAttribute{
 				Required:    true,
 				Description: "The identity of the Britive application",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
@@ -153,6 +158,7 @@ func (rp *ResourceProfile) Schema(ctx context.Context, req resource.SchemaReques
 						"parent_name": schema.StringAttribute{
 							Optional:    true,
 							Computed:    true,
+							Default:     stringdefault.StaticString(""),
 							Description: "The parent name of the resource. Required only if the association type is ApplicationResource",
 						},
 					},
@@ -630,6 +636,10 @@ func (rph *ResourceProfileHelper) mapProfileAssociationToTypesSet(plans []britiv
 	objs := make([]attr.Value, 0, len(plans))
 
 	for _, p := range plans {
+		parent := p.ParentName
+		if parent.IsNull() || parent.IsUnknown() {
+			parent = types.StringValue("")
+		}
 		obj, diags := types.ObjectValue(
 			map[string]attr.Type{
 				"type":        types.StringType,
@@ -639,7 +649,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationToTypesSet(plans []britiv
 			map[string]attr.Value{
 				"type":        p.Type,
 				"value":       p.Value,
-				"parent_name": p.ParentName,
+				"parent_name": parent,
 			},
 		)
 		if diags.HasError() {
