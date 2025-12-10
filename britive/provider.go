@@ -204,5 +204,6 @@ func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resourc
 	return []func() resource.Resource{
 		resources.NewResourceApplication,
 		resources.NewResourceProfile,
+		resources.NewResourceAdvancedSettings,
 	}
 }

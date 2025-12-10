@@ -2,6 +2,7 @@ package validate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -80,5 +81,15 @@ func CaseInsensitiveOneOf(allowed ...string) func(string) error {
 			return nil
 		}
 		return fmt.Errorf("value must be one of (case-insensitive): %s", strings.Join(allowed, ", "))
+	}
+}
+
+func IsValidJSON() func(string) error {
+	return func(s string) error {
+		var js interface{}
+		if err := json.Unmarshal([]byte(s), &js); err != nil {
+			return fmt.Errorf("invalid JSON: %v", err)
+		}
+		return nil
 	}
 }

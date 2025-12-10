@@ -76,3 +76,39 @@ type UserAccountMappingPlan struct {
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 }
+
+type AdvancedSettingsPlan struct {
+	ID                    types.String `tfsdk:"id"`
+	ResourceID            types.String `tfsdk:"resource_id"`
+	ResourceType          types.String `tfsdk:"resource_type"`
+	JustificationSettings types.Set    `tfsdk:"justification_settings"`
+	Itsm                  types.Set    `tfsdk:"itsm"`
+	Im                    types.Set    `tfsdk:"im"`
+}
+
+type JustificationSettingsPlan struct {
+	JustificationID         types.String `tfsdk:"justification_id"`
+	IsJustificationRequired types.Bool   `tfsdk:"is_justification_required"`
+	JustificationRegex      types.String `tfsdk:"justification_regex"`
+}
+
+type ItsmPlan struct {
+	ItsmID             types.String `tfsdk:"itsm_id"`
+	ConnectionID       types.String `tfsdk:"connection_id"`
+	ConnectionType     types.String `tfsdk:"connection_type"`
+	IsItsmEnabled      types.Bool   `tfsdk:"is_itsm_enabled"`
+	ItsmFilterCriteria types.Set    `tfsdk:"itsm_filter_criteria"`
+}
+
+type ItsmFilterCriteriaPlan struct {
+	SupportedTicketType types.String `tfsdk:"supported_ticket_type"`
+	Filter              types.String `tfsdk:"filter"`
+}
+
+type ImPlan struct {
+	ImID                  types.String `tfsdk:"im_id"`
+	ConnectionID          types.String `tfsdk:"connection_id"`
+	ConnectionType        types.String `tfsdk:"connection_type"`
+	IsAutoApprovalEnabled types.Bool   `tfsdk:"is_auto_approval_enabled"`
+	EscalationPolicies    types.Set    `tfsdk:"escalation_policies"`
+}
