@@ -160,3 +160,46 @@ type SystemApp struct {
 	Version       string                  `json:"version"`
 	PropertyTypes []SystemAppPropertyType `json:"propertyTypes"`
 }
+
+// Advanced Settings - godoc
+type AdvancedSettings struct {
+	Settings []Setting `json:"settings"`
+}
+
+type Setting struct {
+	SettingsType            string               `json:"settingsType"`
+	ID                      string               `json:"id"`
+	EntityID                string               `json:"entityId"`
+	EntityType              string               `json:"entityType"`
+	IsInherited             *bool                `json:"isInherited"`
+	IsJustificationRequired *bool                `json:"isJustificationRequired,omitempty"`
+	JustificationRegex      string               `json:"justificationRegex,omitempty"`
+	ConnectionID            string               `json:"connectionId,omitempty"`
+	ConnectionType          string               `json:"connectionType,omitempty"`
+	IsITSMEnabled           *bool                `json:"isITSMEnabled,omitempty"`
+	ItsmFilterCriterias     []ItsmFilterCriteria `json:"itsmFilterCriteria,omitempty"`
+	IsAutoApprovalEnabled   *bool                `json:"isAutoApprovalEnabled,omitempty"`
+	EscalationPolicies      []string             `json:"escalationPolicies,omitempty"`
+}
+
+type ItsmFilterCriteria struct {
+	SupportedTicketType string                 `json:"supportedTicketType,omitempty"`
+	Filter              map[string]interface{} `json:"filter,omitempty"`
+}
+
+// Connections
+type Connection struct {
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Type     string `json:"type,omitempty"`
+	AuthType string `json:"authType,omitempty"`
+}
+
+// EscalationPolicies
+type EscalationPolicies struct {
+	Policies []map[string]string `json:"escalationPolicies,omitempty"`
+	Count    int                 `json:"count,omitempty"`
+	Page     int                 `json:"page,omitempty"`
+	Size     int                 `json:"size,omitempty"`
+	More     bool                `json:"more,omitempty"`
+}
