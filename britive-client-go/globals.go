@@ -5,6 +5,8 @@ import (
 )
 
 const (
+	maxRetries                       = 3
+	requestSleepTime                 = 180
 	emptyString                      = ""
 	tagLockName                      = "tag"
 	profileLockName                  = "profile"

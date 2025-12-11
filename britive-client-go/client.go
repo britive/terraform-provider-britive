@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -178,40 +179,53 @@ func (c *Client) DoWithLock(req *http.Request, key string) ([]byte, error) {
 
 // Do - Perform Britive API call
 func (c *Client) Do(req *http.Request) ([]byte, error) {
-	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
-	req.Header.Set("Content-Type", "application/json")
-	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
-	req.Header.Add("User-Agent", userAgent)
+	retries := 0
+	for {
+		req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
+		req.Header.Set("Content-Type", "application/json")
+		userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
+		req.Header.Add("User-Agent", userAgent)
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode == http.StatusNoContent {
-		return []byte(emptyString), ErrNoContent
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if res.StatusCode == http.StatusNotFound {
-		return body, ErrNotFound
-	}
-
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
-		var httpErrorResponse HTTPErrorResponse
-		err = json.Unmarshal(body, &httpErrorResponse)
-		if err == nil && httpErrorResponse.Message != emptyString {
-			return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+		res, err := c.HTTPClient.Do(req)
+		if err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
-	}
+		defer res.Body.Close()
 
-	return body, err
+		if res.StatusCode == http.StatusNoContent {
+			return []byte(emptyString), ErrNoContent
+		}
+
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		if res.StatusCode == http.StatusNotFound {
+			return body, ErrNotFound
+		}
+
+		if res.StatusCode == http.StatusTooManyRequests {
+			retries++
+			if retries >= maxRetries {
+				return nil, fmt.Errorf("429: Too Many Requests")
+			}
+
+			time.Sleep(requestSleepTime * time.Second)
+			continue
+		}
+
+		if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
+			var httpErrorResponse HTTPErrorResponse
+			err = json.Unmarshal(body, &httpErrorResponse)
+			if err == nil && httpErrorResponse.Message != emptyString {
+				return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+			}
+			return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
+		}
+
+		return body, err
+	}
 }
 
 // Lock to lock based on key
