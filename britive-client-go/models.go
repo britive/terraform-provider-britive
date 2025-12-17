@@ -182,7 +182,7 @@ type EnvAccId struct {
 
 // ProfilePolicy - godoc
 type ProfilePolicy struct {
-	ProfileID    string                     `json:"papId,omitempty"`
+	ProfileID    string                     `json:"-"`
 	PolicyID     string                     `json:"id,omitempty"`
 	Name         string                     `json:"name,omitempty"`
 	Description  string                     `json:"description"`
