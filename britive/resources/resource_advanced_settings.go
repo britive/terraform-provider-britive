@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -131,12 +130,7 @@ func (ras *ResourceAdvancedSettings) Schema(ctx context.Context, req resource.Sc
 						},
 						"justification_regex": schema.StringAttribute{
 							Optional:    true,
-							Computed:    true,
 							Description: "Resource justification setting regular expression",
-							Default:     stringdefault.StaticString(""),
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 					},
 				},
@@ -561,7 +555,7 @@ func (rash *ResourceAdvancedSettingsHelper) getAndMapModelToPlan(ctx context.Con
 		itsmPlan = append(itsmPlan, britive_client.ItsmPlan{
 			ConnectionID:   types.StringValue(rawItsmSetting.ConnectionID),
 			ConnectionType: types.StringValue(connType),
-			IsItsmEnabled:  types.BoolPointerValue(rawImSetting.IsITSMEnabled),
+			IsItsmEnabled:  types.BoolPointerValue(rawItsmSetting.IsITSMEnabled),
 			ItsmID:         types.StringValue(rawItsmSetting.ID),
 		})
 
@@ -932,17 +926,26 @@ func (rash *ResourceAdvancedSettingsHelper) mapSetToItsmPlan(set types.Set) ([]b
 		}
 
 		if !p.ItsmFilterCriteria.IsNull() {
-			var raw []map[string]interface{}
-			diags := p.ItsmFilterCriteria.ElementsAs(context.Background(), &raw, false)
-			if diags.HasError() {
-				return nil, nil, fmt.Errorf("failed to populate criteria: %v", diags)
-			} else {
-				for _, m := range raw {
-					criteria = append(criteria, britive_client.ItsmFilterCriteriaPlan{
-						SupportedTicketType: types.StringValue(m["supported_ticket_type"].(string)),
-						Filter:              types.StringValue(m["filter"].(string)),
-					})
+			elems := p.ItsmFilterCriteria.Elements()
+
+			for _, ee := range elems {
+				o, ok := ee.(types.Object)
+				if !ok {
+					return nil, nil, fmt.Errorf(
+						"expected Object inside itsm_filter_criteria, got %T", ee,
+					)
 				}
+
+				var c britive_client.ItsmFilterCriteriaPlan
+				var ctx context.Context
+				diags := o.As(ctx, &c, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, nil, fmt.Errorf(
+						"failed to convert itsm_filter_criteria element: %v", diags,
+					)
+				}
+
+				criteria = append(criteria, c)
 			}
 		}
 
