@@ -21,7 +21,12 @@ func TestBritiveApplication(t *testing.T) {
 					testAccCheckBritiveApplicationExists("britive_application.snowflake_standalone_new"),
 					testAccCheckBritiveApplicationExists("britive_application.gcp_new"),
 					testAccCheckBritiveApplicationExists("britive_application.gcp_standlone_new"),
+					testAccCheckBritiveApplicationExists("britive_application.gcp_wif_new"),
 					testAccCheckBritiveApplicationExists("britive_application.google_workspace_new"),
+					testAccCheckBritiveApplicationExists("britive_application.aws_new"),
+					testAccCheckBritiveApplicationExists("britive_application.aws_standalone_new"),
+					testAccCheckBritiveApplicationExists("britive_application.azure_new"),
+					testAccCheckBritiveApplicationExists("britive_application.okta_new"),
 				),
 			},
 		},
@@ -310,6 +315,110 @@ func testAccCheckBritiveApplicationConfig() string {
 	}
 	}
 
+	resource "britive_application" "gcp_wif_new" {
+	application_type = "gcp wif"
+	user_account_mappings {
+		name        = "Mobile"
+		description = "Mobile"
+	}
+	properties {
+		name  = "displayName"
+		value = "GCP WIF Application"
+	}
+	properties {
+		name  = "description"
+		value = "GCP WIF Application Description"
+	}
+	properties {
+		name  = "programmaticAccess"
+		value = false
+	}
+	properties {
+		name  = "consoleAccess"
+		value = true
+	}
+	properties {
+		name  = "appAccessMethod_static_loginUrl"
+		value = "https://gcp_wif.test.com"
+	}
+	properties {
+		name  = "orgId"
+		value = "test_gcp_wif1"
+	}
+	properties {
+		name  = "britiveIssuerUrl"
+		value = "https://gcp_wif_test.com/oauth2"
+	}
+	properties {
+		name  = "wifPool"
+		value = "test-gcp-wif-pool"
+	}
+	properties {
+		name  = "wifProvider"
+		value = "testgcpwifprovider"
+	}
+	properties {
+		name  = "wifSA"
+		value = "test@gcp.wif.com"
+	}
+	properties {
+		name  = "projectNumberForWifSA"
+		value = "test_gcp_wif_project_number"
+	}
+	properties {
+		name  = "projectIdForServiceAccount"
+		value = "test_gcp_wif_account"
+	}
+	properties {
+		name  = "acsUrl"
+		value = "test_gcp_wif"
+	}
+	properties {
+		name  = "audience"
+		value = "gcp_test@gcpwif.net"
+	}
+	properties {
+		name  = "enableSso"
+		value = false
+	}
+	properties {
+		name  = "primaryDomain"
+		value = "domain1"
+	}
+	properties {
+		name  = "secondaryDomain"
+		value = "domain2"
+	}
+	properties {
+		name  = "replaceDomain"
+		value = false
+	}
+	properties {
+		name  = "scanOrganization"
+		value = false
+	}
+	properties {
+		name  = "scanProjectsOnly"
+		value = true
+	}
+	properties {
+		name  = "maxSessionDurationForProfiles"
+		value = 10000
+	}
+	properties {
+		name  = "displayProgrammaticKeys"
+		value = false
+	}
+	properties {
+		name  = "gcpProjectFilter"
+		value = false
+	}
+	properties {
+		name  = "gcpProjectFilterInclusion"
+		value = false
+	}
+	}
+
 	resource "britive_application" "google_workspace_new" {
     application_type = "Google Workspace"
     version = "1.0"
@@ -379,7 +488,7 @@ func testAccCheckBritiveApplicationConfig() string {
     }
 	}
 
-	resource "britive_application" "aws_1" {
+	resource "britive_application" "aws_new" {
     application_type = "AWS"
     user_account_mappings {
       name = "Mobile"
@@ -435,7 +544,7 @@ func testAccCheckBritiveApplicationConfig() string {
     }
 	}
 
-	resource "britive_application" "aws_standalone_1" {
+	resource "britive_application" "aws_standalone_new" {
     application_type = "aws standalone"
     user_account_mappings {
       name = "Mobile"
@@ -479,7 +588,7 @@ func testAccCheckBritiveApplicationConfig() string {
     }
 	}
 
-	resource "britive_application" "azure_1" {
+	resource "britive_application" "azure_new" {
     application_type = "azure"
     user_account_mappings {
       name = "Mobile"
@@ -559,7 +668,7 @@ func testAccCheckBritiveApplicationConfig() string {
     }
 	}
 
-	resource "britive_application" "okta_1" {
+	resource "britive_application" "okta_new" {
     application_type = "okta"
     user_account_mappings {
       name = "Mobile"
