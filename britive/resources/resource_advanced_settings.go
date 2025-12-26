@@ -30,9 +30,8 @@ var (
 )
 
 type ResourceAdvancedSettings struct {
-	client       *britive_client.Client
-	helper       *ResourceAdvancedSettingsHelper
-	importHelper *imports.ImportHelper
+	client *britive_client.Client
+	helper *ResourceAdvancedSettingsHelper
 }
 
 type ResourceAdvancedSettingsHelper struct{}
