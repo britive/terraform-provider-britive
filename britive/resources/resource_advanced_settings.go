@@ -7,6 +7,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
+	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -22,15 +24,15 @@ import (
 )
 
 var (
-	_ resource.Resource              = &ResourceAdvancedSettings{}
-	_ resource.ResourceWithConfigure = &ResourceAdvancedSettings{}
-	// _ resource.ResourceWithImportState = &ResourceAdvancedSettings{}
+	_ resource.Resource                = &ResourceAdvancedSettings{}
+	_ resource.ResourceWithConfigure   = &ResourceAdvancedSettings{}
+	_ resource.ResourceWithImportState = &ResourceAdvancedSettings{}
 )
 
 type ResourceAdvancedSettings struct {
-	client *britive_client.Client
-	helper *ResourceAdvancedSettingsHelper
-	// importHelper *imports.ImportHelper
+	client       *britive_client.Client
+	helper       *ResourceAdvancedSettingsHelper
+	importHelper *imports.ImportHelper
 }
 
 type ResourceAdvancedSettingsHelper struct{}
@@ -469,9 +471,68 @@ func (ras *ResourceAdvancedSettings) Delete(ctx context.Context, req resource.De
 	tflog.Info(ctx, "advanced_settings deleted successfully")
 }
 
+func (ras *ResourceAdvancedSettings) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+
+	importID := importData.ID
+
+	log.Printf("==== %s", importID)
+
+	importArr := strings.Split(importID, "/")
+	resourceType := importArr[len(importArr)-1]
+	resourceType = strings.ToLower(resourceType)
+
+	log.Printf("==== resTypes %s", resourceType)
+
+	if !strings.EqualFold("application", resourceType) && !strings.EqualFold("profile", resourceType) && !strings.EqualFold("profile_policy", resourceType) && !strings.EqualFold("resource_manager_profile", resourceType) && !strings.EqualFold("resource_manager_profile_policy", resourceType) {
+		resp.Diagnostics.AddError("Invalid import ID", errs.NewNotSupportedError(resourceType).Error())
+		tflog.Error(ctx, fmt.Sprintf("Invalid import ID: %s", resourceType))
+		return
+	}
+
+	importArr = importArr[:len(importArr)-1]
+	resourceID := strings.Join(importArr, "/")
+
+	tflog.Info(ctx, fmt.Sprintf("Importing advanced settings, %s", resourceID))
+
+	if len(importArr) > 1 {
+		resourceID = importArr[len(importArr)-1]
+	} else {
+		resourceID = importArr[0]
+	}
+
+	plan := britive_client.AdvancedSettingsPlan{
+		ID:           types.StringValue(ras.helper.generateUniqueID(resourceID, resourceType)),
+		ResourceID:   types.StringValue(resourceID),
+		ResourceType: types.StringValue(resourceType),
+	}
+
+	planPtr, err := ras.helper.getAndMapModelToPlan(ctx, plan, *ras.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch advanced settings", fmt.Sprintf("Error: %v", err))
+		tflog.Error(ctx, "Failed to build state from API during import", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	diags := resp.State.Set(ctx, planPtr)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state in Import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Imported advanced settings")
+}
+
 func (rash *ResourceAdvancedSettingsHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.AdvancedSettingsPlan, c britive_client.Client) (*britive_client.AdvancedSettingsPlan, error) {
 	resourceID, resourceType := rash.parseUniqueID(plan.ID.ValueString())
-	tflog.Info(ctx, fmt.Sprintf("Reading advanced settings %s", resourceID))
+	tflog.Info(ctx, fmt.Sprintf("Reading advanced settings %s/%s", resourceID, resourceType))
 
 	resourceID = plan.ResourceID.ValueString()
 
@@ -479,6 +540,8 @@ func (rash *ResourceAdvancedSettingsHelper) getAndMapModelToPlan(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("==== fetched settings %#v", advancedSettings)
 
 	var rawJustificationSetting britive_client.Setting
 	var rawItsmSetting britive_client.Setting
