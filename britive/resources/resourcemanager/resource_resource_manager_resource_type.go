@@ -72,8 +72,8 @@ func NewResourceResourceType(v *validate.Validation, importHelper *imports.Impor
 							Required: true,
 							ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
 								paramType := val.(string)
-								if !strings.EqualFold(paramType, "string") && !strings.EqualFold(paramType, "password") {
-									errs = append(errs, fmt.Errorf("paramater type '%s' is not supported, try with 'string' or 'password'", val))
+								if !strings.EqualFold(paramType, "string") && !strings.EqualFold(paramType, "password") && !strings.EqualFold(paramType, "ip-cidr") && !strings.EqualFold(paramType, "regex-pattern") && !strings.EqualFold(paramType, "list") {
+									errs = append(errs, fmt.Errorf("paramater type '%s' is not supported, try with one of following  ['string', 'password', 'ip-cidr', 'regex-pattern', 'list']", val))
 								}
 								return
 							},

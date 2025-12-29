@@ -42,13 +42,18 @@ func testAccCheckBritiveResourceTypeConfig(name, description string) string {
 			is_mandatory = false
 		}
 		parameters {
-			param_name = "testfield3"
-			param_type = "string"
+			param_name   = "testfield3"
+			param_type   = "ip-cidr"
 			is_mandatory = true
 		}
 		parameters {
-			param_name = "testfield4"
-			param_type = "String"
+			param_name   = "testfield4"
+			param_type   = "regex-pattern"
+			is_mandatory = true
+		}
+		parameters {
+			param_name   = "testfield5"
+			param_type   = "list"
 			is_mandatory = true
 		}
 	}`, name, description)
