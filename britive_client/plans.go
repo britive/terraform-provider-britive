@@ -112,3 +112,12 @@ type ImPlan struct {
 	IsAutoApprovalEnabled types.Bool   `tfsdk:"is_auto_approval_enabled"`
 	EscalationPolicies    types.Set    `tfsdk:"escalation_policies"`
 }
+
+type ProfilePermissionPlan struct {
+	ID             types.String `tfsdk:"id"`
+	AppName        types.String `tfsdk:"app_name"`
+	ProfileID      types.String `tfsdk:"profile_id"`
+	ProfileName    types.String `tfsdk:"profile_name"`
+	PermissionName types.String `tfsdk:"permission_name"`
+	PermissionType types.String `tfsdk:"permission_type"`
+}

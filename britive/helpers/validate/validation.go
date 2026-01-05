@@ -93,3 +93,12 @@ func IsValidJSON() func(string) error {
 		return nil
 	}
 }
+
+func StringIsNotWhiteSpace() func(string) error {
+	return func(s string) error {
+		if strings.TrimSpace(s) == "" {
+			return fmt.Errorf("expected %q to not be an empty string or whitespace", s)
+		}
+		return nil
+	}
+}
