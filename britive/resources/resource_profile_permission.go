@@ -176,28 +176,28 @@ func (rpp *ResourceProfilePermission) Create(ctx context.Context, req resource.C
 
 	plan.ID = types.StringValue(rpp.helper.generateUniqueID(profilePermissionRequest.Permission))
 
-	// planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, plan, *rpp.client)
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Failed to get application",
-	// 		fmt.Sprintf("Error: %v", err),
-	// 	)
-	// 	tflog.Error(ctx, "Failed get and map application model to plan", map[string]interface{}{
-	// 		"error": err.Error(),
-	// 	})
-	// 	return
-	// }
+	planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, plan, *rpp.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get application",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map application model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
 	if resp.Diagnostics.HasError() {
 		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
 			"diagnostics": resp.Diagnostics,
 		})
 		return
 	}
-	// tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
-	// 	"application": planPtr,
-	// })
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"application": planPtr,
+	})
 
 }
 
@@ -219,25 +219,20 @@ func (rpp *ResourceProfilePermission) Read(ctx context.Context, req resource.Rea
 		})
 		return
 	}
-	profilePermission, err := rpp.helper.parseUniqueID(state.ID.ValueString())
+
+	planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, state, *rpp.client)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch profile permission", state.ID.ValueString())
-		tflog.Error(ctx, fmt.Sprintf("Failed to parse profile permission ID: %s", state.ID.ValueString()))
+		resp.Diagnostics.AddError(
+			"Failed to get application",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map application model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	tflog.Info(ctx, fmt.Sprintf("Reading profile permission:  %s, %#v", profilePermission.ProfileID, *profilePermission))
-
-	pp, err := rpp.client.GetProfilePermission(profilePermission.ProfileID, *profilePermission)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch profile permission", err.Error())
-		tflog.Error(ctx, fmt.Sprintf("Failed to fetch profile permission, %#v", err))
-		return
-	}
-
-	state.ID = types.StringValue(rpp.helper.generateUniqueID(*pp))
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
 	if resp.Diagnostics.HasError() {
 		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
 			"diagnostics": resp.Diagnostics,
@@ -245,7 +240,7 @@ func (rpp *ResourceProfilePermission) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	tflog.Info(ctx, fmt.Sprintf("Fetched profile permission:  %s, %#v", profilePermission.ProfileID, pp))
+	tflog.Info(ctx, fmt.Sprintf("Fetched profile permission:  %s", planPtr.ProfileID.ValueString()))
 }
 
 func (rpp *ResourceProfilePermission) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -364,6 +359,25 @@ func (rpp *ResourceProfilePermission) ImportState(ctx context.Context, req resou
 	}
 
 	tflog.Info(ctx, fmt.Sprintf("Imported profile permission: %s/%s/%s/%s", appName, profileName, permissionName, permissionType))
+}
+
+func (rpph *ResourceProfilePermissionHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ProfilePermissionPlan, c britive_client.Client) (*britive_client.ProfilePermissionPlan, error) {
+	profilePermission, err := rpph.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		return nil, err
+	}
+	pp, err := c.GetProfilePermission(profilePermission.ProfileID, *profilePermission)
+	if err != nil {
+		return nil, err
+	}
+
+	plan.ID = types.StringValue(rpph.generateUniqueID(*pp))
+	plan.ProfileID = types.StringValue(profilePermission.ProfileID)
+	plan.PermissionName = types.StringValue(profilePermission.Name)
+	plan.PermissionType = types.StringValue(profilePermission.Type)
+	plan.AppName = types.StringNull()
+	plan.ProfileName = types.StringNull()
+	return &plan, nil
 }
 
 func (rpph *ResourceProfilePermissionHelper) generateUniqueID(profilePermission britive_client.ProfilePermission) string {
