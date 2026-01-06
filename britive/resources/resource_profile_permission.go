@@ -3,7 +3,6 @@ package resources
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
@@ -171,7 +170,6 @@ func (rpp *ResourceProfilePermission) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	log.Printf("[INFO] Submitted new profile permission:  %s, %#v", profileID, profilePermissionRequest)
 	tflog.Info(ctx, fmt.Sprintf("Created profile permission: %#v", profilePermissionRequest))
 
 	plan.ID = types.StringValue(rpp.helper.generateUniqueID(profilePermissionRequest.Permission))
@@ -182,7 +180,7 @@ func (rpp *ResourceProfilePermission) Create(ctx context.Context, req resource.C
 			"Failed to get application",
 			fmt.Sprintf("Error: %v", err),
 		)
-		tflog.Error(ctx, "Failed get and map application model to plan", map[string]interface{}{
+		tflog.Error(ctx, "Failed get and map profile permission model to plan", map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
@@ -196,7 +194,7 @@ func (rpp *ResourceProfilePermission) Create(ctx context.Context, req resource.C
 		return
 	}
 	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
-		"application": planPtr,
+		"profile_permission": planPtr,
 	})
 
 }
@@ -223,10 +221,10 @@ func (rpp *ResourceProfilePermission) Read(ctx context.Context, req resource.Rea
 	planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, state, *rpp.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Failed to get application",
+			"Failed to get profile permission",
 			fmt.Sprintf("Error: %v", err),
 		)
-		tflog.Error(ctx, "Failed get and map application model to plan", map[string]interface{}{
+		tflog.Error(ctx, "Failed get and map profile permission model to plan", map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
