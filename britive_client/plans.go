@@ -77,6 +77,15 @@ type UserAccountMappingPlan struct {
 	Description types.String `tfsdk:"description"`
 }
 
+type EntityGroupPlan struct {
+	ID                types.String `tfsdk:"id"`
+	EntityID          types.String `tfsdk:"entity_id"`
+	ApplicationID     types.String `tfsdk:"application_id"`
+	EntityName        types.String `tfsdk:"entity_name"`
+	EntityDescription types.String `tfsdk:"entity_description"`
+	ParentID          types.String `tfsdk:"parent_id"`
+}
+
 type AdvancedSettingsPlan struct {
 	ID                    types.String `tfsdk:"id"`
 	ResourceID            types.String `tfsdk:"resource_id"`
