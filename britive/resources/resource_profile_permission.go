@@ -177,7 +177,7 @@ func (rpp *ResourceProfilePermission) Create(ctx context.Context, req resource.C
 	planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, plan, *rpp.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Failed to get application",
+			"Failed to get profile_permission",
 			fmt.Sprintf("Error: %v", err),
 		)
 		tflog.Error(ctx, "Failed get and map profile permission model to plan", map[string]interface{}{
@@ -360,6 +360,7 @@ func (rpp *ResourceProfilePermission) ImportState(ctx context.Context, req resou
 }
 
 func (rpph *ResourceProfilePermissionHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ProfilePermissionPlan, c britive_client.Client) (*britive_client.ProfilePermissionPlan, error) {
+	tflog.Info(ctx, "Reading profile permission")
 	profilePermission, err := rpph.parseUniqueID(plan.ID.ValueString())
 	if err != nil {
 		return nil, err
