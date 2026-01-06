@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
@@ -479,13 +478,9 @@ func (ras *ResourceAdvancedSettings) ImportState(ctx context.Context, req resour
 
 	importID := importData.ID
 
-	log.Printf("==== %s", importID)
-
 	importArr := strings.Split(importID, "/")
 	resourceType := importArr[len(importArr)-1]
 	resourceType = strings.ToLower(resourceType)
-
-	log.Printf("==== resTypes %s", resourceType)
 
 	if !strings.EqualFold("application", resourceType) && !strings.EqualFold("profile", resourceType) && !strings.EqualFold("profile_policy", resourceType) && !strings.EqualFold("resource_manager_profile", resourceType) && !strings.EqualFold("resource_manager_profile_policy", resourceType) {
 		resp.Diagnostics.AddError("Invalid import ID", errs.NewNotSupportedError(resourceType).Error())
@@ -539,8 +534,6 @@ func (rash *ResourceAdvancedSettingsHelper) getAndMapModelToPlan(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("==== fetched settings %#v", advancedSettings)
 
 	var rawJustificationSetting britive_client.Setting
 	var rawItsmSetting britive_client.Setting
@@ -728,8 +721,6 @@ func (rash *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(pl
 	if err != nil {
 		return err
 	}
-
-	log.Printf("==== justificationList:%#v", justificationList)
 
 	if len(justificationList) > 1 {
 		return fmt.Errorf("must contain exactly one justification setting")

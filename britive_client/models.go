@@ -219,3 +219,12 @@ type ProfilePermissionRequest struct {
 	Operation  string            `json:"op"`
 	Permission ProfilePermission `json:"permission"`
 }
+
+// Profile Additional Settings - godoc
+type ProfileAdditionalSettings struct {
+	ProfileID                    string `json:"papId"`
+	UseApplicationCredentialType bool   `json:"useApplicationCredentialType"`
+	ConsoleAccess                bool   `json:"consoleAccess"`
+	ProgrammaticAccess           bool   `json:"programmaticAccess"`
+	ProjectIdForServiceAccount   string `json:"projectIdForServiceAccount,omitempty"`
+}

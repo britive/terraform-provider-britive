@@ -121,3 +121,12 @@ type ProfilePermissionPlan struct {
 	PermissionName types.String `tfsdk:"permission_name"`
 	PermissionType types.String `tfsdk:"permission_type"`
 }
+
+type ProfileAdditionalSettingsPlan struct {
+	ID                         types.String `tfsdk:"id"`
+	ProfileID                  types.String `tfsdk:"profile_id"`
+	UserAppCredentialType      types.Bool   `tfsdk:"use_app_credential_type"`
+	ConsoleAccess              types.Bool   `tfsdk:"console_access"`
+	ProgrammaticAccess         types.Bool   `tfsdk:"programmatic_access"`
+	ProjectIDForServiceAccount types.String `tfsdk:"project_id_for_service_account"`
+}
