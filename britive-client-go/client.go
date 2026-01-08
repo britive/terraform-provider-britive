@@ -1,9 +1,11 @@
 package britive
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -18,7 +20,6 @@ import (
 var (
 	syncOnce sync.Once
 	client   *Client
-	mutex    sync.Mutex
 )
 
 // Client - Britive API client
@@ -185,60 +186,82 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
 	req.Header.Add("User-Agent", userAgent)
 
-	for retries := 0; retries < maxRetries; retries++ {
+	ctx := req.Context()
+	req = req.WithContext(ctx)
 
-		if isClientLocked {
-			time.Sleep(requestSleepTime * time.Second)
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, _ = io.ReadAll(req.Body)
+	}
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		r := req.Clone(ctx)
+		if bodyBytes != nil {
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		}
-		res, err := c.HTTPClient.Do(req)
+
+		res, err := c.HTTPClient.Do(r)
 		if err != nil {
-			return nil, err
-		}
-		defer res.Body.Close()
-
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		if res.StatusCode == http.StatusTooManyRequests || (res.StatusCode == http.StatusBadRequest && c.isCloudFrontError(res, body)) {
-			retries++
-			if retries >= maxRetries {
-				return nil, fmt.Errorf("%d: %s", res.StatusCode, res.Status)
+			if isRetryableTransportError(err) {
+				if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+					return nil, err
+				}
+				continue
 			}
 
-			c.lockClient()
-			isClientLocked = false
+			return nil, err
+		}
+
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+
+		if res.StatusCode == http.StatusTooManyRequests ||
+			(res.StatusCode == http.StatusBadRequest && c.isCloudFrontError(res, body)) {
+			var RequestSleepTime time.Duration
+			if attempt == 0 {
+				RequestSleepTime = 150
+			} else {
+				RequestSleepTime += RequestSleepTime / 2
+			}
+			if err := sleepWithContext(ctx, RequestSleepTime*time.Second); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
-		if res.StatusCode == http.StatusNoContent {
-			return []byte(emptyString), ErrNoContent
+		if res.StatusCode >= 400 {
+			return nil, fmt.Errorf(
+				"http %d (%s): %s",
+				res.StatusCode,
+				res.Status,
+				string(body),
+			)
 		}
 
-		if res.StatusCode == http.StatusNotFound {
-			return body, ErrNotFound
-		}
-
-		if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
-			var httpErrorResponse HTTPErrorResponse
-			err = json.Unmarshal(body, &httpErrorResponse)
-			if err == nil && httpErrorResponse.Message != emptyString {
-				return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
-			}
-			return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
-		}
-
-		return body, err
+		return body, nil
 	}
-	return nil, fmt.Errorf("Request Failed due to rate limiting")
+
+	return nil, fmt.Errorf("request failed after %d retries", maxRetries)
 }
 
-func (c *Client) lockClient() {
-	mutex.Lock()
-	isClientLocked = true
-	time.Sleep(requestSleepTime * time.Second)
-	defer mutex.Unlock()
+func isRetryableTransportError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "stream error") ||
+		strings.Contains(msg, "INTERNAL_ERROR") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "EOF")
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	select {
+	case <-time.After(d):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (c *Client) isCloudFrontError(res *http.Response, body []byte) bool {
