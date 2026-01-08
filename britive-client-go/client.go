@@ -180,12 +180,12 @@ func (c *Client) DoWithLock(req *http.Request, key string) ([]byte, error) {
 
 // Do - Perform Britive API call
 func (c *Client) Do(req *http.Request) ([]byte, error) {
-	retries := 0
-	for {
-		req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
-		req.Header.Set("Content-Type", "application/json")
-		userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
-		req.Header.Add("User-Agent", userAgent)
+	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
+	req.Header.Set("Content-Type", "application/json")
+	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
+	req.Header.Add("User-Agent", userAgent)
+
+	for retries := 0; retries < maxRetries; retries++ {
 
 		if isClientLocked {
 			time.Sleep(requestSleepTime * time.Second)
@@ -204,7 +204,7 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 		if res.StatusCode == http.StatusTooManyRequests || (res.StatusCode == http.StatusBadRequest && c.isCloudFrontError(res, body)) {
 			retries++
 			if retries >= maxRetries {
-				return nil, fmt.Errorf("429: Too Many Requests")
+				return nil, fmt.Errorf("%d: %s", res.StatusCode, res.Status)
 			}
 
 			c.lockClient()
@@ -231,13 +231,14 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 
 		return body, err
 	}
+	return nil, fmt.Errorf("Request Failed due to rate limiting")
 }
 
 func (c *Client) lockClient() {
 	mutex.Lock()
 	isClientLocked = true
 	time.Sleep(requestSleepTime * time.Second)
-	mutex.Unlock()
+	defer mutex.Unlock()
 }
 
 func (c *Client) isCloudFrontError(res *http.Response, body []byte) bool {
