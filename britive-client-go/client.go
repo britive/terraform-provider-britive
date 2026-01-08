@@ -186,6 +186,7 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
 	req.Header.Add("User-Agent", userAgent)
 
+	var RequestSleepTime time.Duration
 	ctx := req.Context()
 	req = req.WithContext(ctx)
 
@@ -217,7 +218,6 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 
 		if res.StatusCode == http.StatusTooManyRequests ||
 			(res.StatusCode == http.StatusBadRequest && c.isCloudFrontError(res, body)) {
-			var RequestSleepTime time.Duration
 			if attempt == 0 {
 				RequestSleepTime = 150
 			} else {
