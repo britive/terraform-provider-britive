@@ -6,7 +6,7 @@ import (
 
 const (
 	maxRetries                       = 3
-	requestSleepTime                 = 180
+	requestSleepTime                 = 150
 	emptyString                      = ""
 	tagLockName                      = "tag"
 	profileLockName                  = "profile"
@@ -32,6 +32,7 @@ const (
 )
 
 var (
+	isClientLocked = false
 	//ErrNotFound - godoc
 	ErrNotFound     = errors.New("could not find")
 	ErrNoContent    = errors.New("no content")
