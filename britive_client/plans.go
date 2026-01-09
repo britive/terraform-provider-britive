@@ -86,6 +86,15 @@ type EntityGroupPlan struct {
 	ParentID          types.String `tfsdk:"parent_id"`
 }
 
+type EntityEnvironmentPlan struct {
+	ID                  types.String `tfsdk:"id"`
+	EntityID            types.String `tfsdk:"entity_id"`
+	ApplicationID       types.String `tfsdk:"application_id"`
+	ParentGroupID       types.String `tfsdk:"parent_group_id"`
+	Properties          types.Set    `tfsdk:"properties"`
+	SensitiveProperties types.Set    `tfsdk:"sensitive_properties"`
+}
+
 type AdvancedSettingsPlan struct {
 	ID                    types.String `tfsdk:"id"`
 	ResourceID            types.String `tfsdk:"resource_id"`
