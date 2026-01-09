@@ -31,6 +31,7 @@ const (
 )
 
 var (
+	IsSleepWithContext = false
 	//ErrNotFound - godoc
 	ErrNotFound     = errors.New("could not find")
 	ErrNoContent    = errors.New("no content")
