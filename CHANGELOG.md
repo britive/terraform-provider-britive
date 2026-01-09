@@ -1,5 +1,4 @@
-## 2.2.6
+## 2.2.7
 
 ENHANCEMENTS:
-
-* `britive_profile_policy_prioritization`: Fixed an issue where profile policies were not being prioritized correctly.
+* `britive_application`: Support extended to create and manage applications of type GCP WIF.
