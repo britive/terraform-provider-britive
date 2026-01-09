@@ -203,13 +203,6 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 
 		res, err := c.HTTPClient.Do(r)
 		if err != nil {
-			if isRetryableTransportError(err) {
-				if err := sleepWithContext(ctx, 10*time.Second); err != nil {
-					return nil, err
-				}
-				continue
-			}
-
 			return nil, err
 		}
 
@@ -242,17 +235,6 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("request failed after %d retries", maxRetries)
-}
-
-func isRetryableTransportError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "stream error") ||
-		strings.Contains(msg, "INTERNAL_ERROR") ||
-		strings.Contains(msg, "connection reset") ||
-		strings.Contains(msg, "EOF")
 }
 
 func sleepWithContext(ctx context.Context, d time.Duration) error {
