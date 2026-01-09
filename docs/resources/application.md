@@ -492,30 +492,30 @@ resource "britive_application" "gcp_wif_new" {
 ```
 
 > **Properties:**
-> - `displayName`: Application name.
-> - `description`: Application description.
-> - `programmaticAccess`: Programmatic access.
-> - `consoleAccess`: Console access.
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `programmaticAccess`: Programmatic Access.
+> - `consoleAccess`: Console Access.
 > - `appAccessMethod_static_loginUrl`: Login URL.
-> - `orgId`: The organizations unique identifier.
-> - `britiveIssueUrl`: Britive issuer URL.
-> - `wifPool`: Workload identity pool ID.
-> - `wifProvider`: Workload identity provider ID.
-> - `wifSA`: Connected service account email.
-> - `projectNumberForWifSA`: Project number for connected service account.
-> - `projectIdForServiceAccount`: Project ID for creating service accounts.
+> - `orgId`: The Organizations Unique Identifier.
+> - `britiveIssueUrl`: Britive Issuer URL.
+> - `wifPool`: Workload Identity Pool ID.
+> - `wifProvider`: Workload Identity Provider ID.
+> - `wifSA`: Connected Service Account Email.
+> - `projectNumberForWifSA`: Project Number For Connected Service Account.
+> - `projectIdForServiceAccount`: Project ID for creating Service Accounts.
 > - `acsUrl`: ACS URL.
 > - `audience`: Audience.
 > - `enableSso`: Enable SSO.
-> - `primaryDomain`: Email domain of britive users.
-> - `secondaryDomain`: Primary domain in gcp.
-> - `replaceDomain`: Use another domain for account mapping.
-> - `scanOrganization`: Scan all folders and projects.
-> - `scanProjectsOnly`: Scan projects only.
-> - `scanExternalUsersGroups`: Scan external users and groups.
-> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
-> - `gcpProjectFilter`: Exclude projects from scan.
-> - `gcpProjectFilterInclusion`: Include projects in scan.
+> - `primaryDomain`: Email Domain of Britive Users.
+> - `secondaryDomain`: Primary Domain in Google Workspace.
+> - `replaceDomain`: Use another domain for Account Mapping.
+> - `scanOrganization`: Scan all Folders and Projects.
+> - `scanProjectsOnly`: Scan Projects only.
+> - `scanExternalUsersGroups`: Scan External Users and Groups.
+> - `maxSessionDurationForProfiles`: Maximum Session Duration for Profiles.
+> - `gcpProjectFilter`: Exclude Projects from Scan.
+> - `gcpProjectFilterInclusion`: Include projects in Scan.
 
 ### Google Workspace Application
 
