@@ -208,5 +208,6 @@ func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resources.NewResourceProfilePermission,
 		resources.NewResourceProfileAdditionalSettings,
 		resources.NewResourceEntityGroup,
+		resources.NewResourceEntityEnvironment,
 	}
 }

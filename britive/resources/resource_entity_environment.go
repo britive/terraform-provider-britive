@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -325,19 +323,156 @@ func (ree *ResourceEntityEnvironment) Update(ctx context.Context, req resource.U
 		properties := britive_client.Properties{}
 		err = ree.helper.mapPropertiesResourceToModel(plan, &properties, appEnvDetails)
 		if err != nil {
-			resp.Diagnostics.AddError("")
+			resp.Diagnostics.AddError("Failed to update entity_environment", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to map properties to resource model, %#v", err))
 			return
 		}
 
-		log.Printf("[INFO] Updating application entity environment properties")
-		_, err = c.PatchApplicationEnvPropertyTypes(applicationID, entityID, properties)
+		tflog.Info(ctx, "Updating application entity environment properties")
+		_, err = ree.client.PatchApplicationEnvPropertyTypes(ctx, applicationID, entityID, properties)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update entity_environment properties", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update entity_environment properties, %#v", err))
+			return
 		}
-		log.Printf("[INFO] Updated application entity environment properties")
+		tflog.Info(ctx, "Updated application entity environment properties")
 	}
 	if hasChanges {
-		return ree.resourceRead(ctx, d, m)
+		planPtr, err := ree.helper.getAndMapModelToPlan(ctx, plan, *ree.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to set state after update",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map entity environment model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Updated entity environment: %#v", planPtr))
+	}
+}
+
+func (ree *ResourceEntityEnvironment) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_entity_environment")
+
+	var state britive_client.EntityEnvironmentPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	applicationID, entityID, err := ree.helper.parseUniqueID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete entity environment", "appicationID or entityID not found")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse applicationID, entityID: %#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Deleting entity environment %s for application %s", entityID, applicationID))
+	err = ree.client.DeleteEntityEnvironment(ctx, applicationID, entityID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete entity environment", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete entity environment: %#v", err))
+		return
+	}
+	tflog.Info(ctx, fmt.Sprintf("Deleted entity environment %s for application %s", entityID, applicationID))
+	resp.State.RemoveResource(ctx)
+}
+
+func (ree *ResourceEntityEnvironment) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+
+	if err := ree.importHelper.ParseImportID([]string{"apps/(?P<application_id>[^/]+)/root-environment-group/environments/(?P<entity_id>[^/]+)", "(?P<application_id>[^/]+)/environments/(?P<entity_id>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import entity environment", "Invalid importID")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse importID: %#v", err))
+		return
+	}
+
+	applicationID := importData.Fields["application_id"]
+	entityID := importData.Fields["entity_id"]
+	if strings.TrimSpace(applicationID) == "" {
+		resp.Diagnostics.AddError("Failed to import entitty group", "Invalid applicationID")
+		tflog.Error(ctx, "Failed to import entity group, Invalid applicationID")
+		return
+	}
+	if strings.TrimSpace(entityID) == "" {
+		resp.Diagnostics.AddError("Failed to import entitty group", "Invalid entityID")
+		tflog.Error(ctx, "Failed to import entity group, Invalid entityID")
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Importing entity %s of type environment for application %s", entityID, applicationID))
+
+	appEnvs, err := ree.client.GetAppEnvs(ctx, applicationID, "environments")
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import entity_environment", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to fetch application environments, %#v", err))
+		return
+	}
+	envIdList, err := ree.client.GetEnvDetails(appEnvs, "id")
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import entity_environment", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to fetch list of environments, %#v", err))
+		return
+	}
+
+	for _, id := range envIdList {
+		if id == entityID {
+			plan := &britive_client.EntityEnvironmentPlan{
+				ID: types.StringValue(ree.helper.generateUniqueID(applicationID, entityID)),
+			}
+
+			planPtr, err := ree.helper.getAndMapModelToPlan(ctx, *plan, *ree.client)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Failed to import entity environment",
+					fmt.Sprintf("Error: %v", err),
+				)
+				tflog.Error(ctx, "Failed import entity environment model to plan", map[string]interface{}{
+					"error": err.Error(),
+				})
+				return
+			}
+
+			importedPlan, err := ree.helper.importAndMapPropertiesToResource(ctx, *planPtr, *ree.client)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Failed to import entity environment properties",
+					fmt.Sprintf("Error: %v", err),
+				)
+				tflog.Error(ctx, "Failed import entity environment model to plan", map[string]interface{}{
+					"error": err.Error(),
+				})
+				return
+			}
+			resp.Diagnostics.Append(resp.State.Set(ctx, importedPlan)...)
+			if resp.Diagnostics.HasError() {
+				tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+					"diagnostics": resp.Diagnostics,
+				})
+				return
+			}
+
+			tflog.Info(ctx, fmt.Sprintf("Imported entity environment : %#v", importedPlan))
+			return
+		}
 	}
 }
 
@@ -370,6 +505,8 @@ func (reeh *ResourceEntityEnvironmentHelper) getAndMapModelToPlan(ctx context.Co
 	if !associationFound {
 		return nil, errs.NewNotFoundErrorf("entity environment %s for application %s", entityID, applicationID)
 	}
+
+	tflog.Info(ctx, "Reading properties of entity environment")
 
 	applicationEnvironmentDetails, err := c.GetApplicationEnvironment(ctx, applicationID, entityID)
 	if err != nil {
@@ -425,6 +562,8 @@ func (reeh *ResourceEntityEnvironmentHelper) getAndMapModelToPlan(ctx context.Co
 	}
 	plan.Properties = stateSetProperties
 	plan.SensitiveProperties = stateSetSensitiveProperties
+
+	tflog.Info(ctx, fmt.Sprintf("Read entity_environemt, %#v", plan))
 
 	return &plan, nil
 }
@@ -524,6 +663,54 @@ func (reeh *ResourceEntityEnvironmentHelper) mapPropertiesResourceToModel(plan b
 	}
 
 	return nil
+}
+
+func (reeh *ResourceEntityEnvironmentHelper) importAndMapPropertiesToResource(ctx context.Context, plan britive_client.EntityEnvironmentPlan, c britive_client.Client) (*britive_client.EntityEnvironmentPlan, error) {
+	applicationID, entityID, err := reeh.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		return nil, err
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Importing properties for entity %s for application %s", entityID, applicationID))
+
+	// Get application Environment for entity with type Environment
+	appEnvDetails, err := c.GetApplicationEnvironment(ctx, applicationID, entityID)
+	if err != nil {
+		return nil, err
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Received entity env %#v", appEnvDetails))
+	//ToDo: check env type should be envrionment
+
+	var stateProperties []britive_client.PropertyPlan
+	var stateSensitiveProperties []britive_client.SensitivePropertyPlan
+	applicationProperties := appEnvDetails.Properties.PropertyTypes
+	for _, property := range applicationProperties {
+		propertyName := property.Name
+
+		if property.Type == "com.britive.pab.api.Secret" || property.Type == "com.britive.pab.api.SecretFile" {
+			stateSensitiveProperties = append(stateSensitiveProperties, britive_client.SensitivePropertyPlan{
+				Name:  types.StringValue(propertyName),
+				Value: types.StringValue(fmt.Sprintf("%v", property.Value)),
+			})
+		} else {
+			stateProperties = append(stateProperties, britive_client.PropertyPlan{
+				Name:  types.StringValue(propertyName),
+				Value: types.StringValue(fmt.Sprintf("%v", property.Value)),
+			})
+		}
+	}
+	stateSetProperties, err := reeh.mapPropertyPlanToSet(stateProperties)
+	if err != nil {
+		return nil, err
+	}
+	stateSetSensitiveProperties, err := reeh.mapSensitivePropertyPlanToSet(stateSensitiveProperties)
+	if err != nil {
+		return nil, err
+	}
+	plan.Properties = stateSetProperties
+	plan.SensitiveProperties = stateSetSensitiveProperties
+	return &plan, nil
 }
 
 func (reeh *ResourceEntityEnvironmentHelper) getHash(val string) string {
