@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -20,10 +21,9 @@ import (
 )
 
 var (
-	_ resource.Resource                     = &ResourceConstraint{}
-	_ resource.ResourceWithConfigure        = &ResourceConstraint{}
-	_ resource.ResourceWithImportState      = &ResourceConstraint{}
-	_ resource.ResourceWithConfigValidators = &ResourceConstraint{}
+	_ resource.Resource                = &ResourceConstraint{}
+	_ resource.ResourceWithConfigure   = &ResourceConstraint{}
+	_ resource.ResourceWithImportState = &ResourceConstraint{}
 )
 
 type ResourceConstraint struct {
@@ -115,13 +115,11 @@ func (rc *ResourceConstraint) Schema(ctx context.Context, req resource.SchemaReq
 			},
 			"permission_type": schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "The type of permission",
+				Default:     stringdefault.StaticString("role"),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
-					validate.StringModifierFunc(
-						"permission_type",
-						validate.DefaultConstraintPermissionType("role"),
-					),
 				},
 				Validators: []validator.String{
 					validate.StringFunc(

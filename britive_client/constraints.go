@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -51,7 +52,9 @@ func (c *Client) CreateConstraint(ctx context.Context, profileID, permissionName
 func (c *Client) CreateConditionConstraint(ctx context.Context, profileID, permissionName, permissionType, constraintType string, constraint ConditionConstraint) (*ConditionConstraint, error) {
 	url := fmt.Sprintf("%v/paps/%s/permissions/%s/%s/constraints/%s?operation=add", c.APIBaseURL, profileID, permissionName, permissionType, constraintType)
 
+	log.Printf("====== permissionType: %s, \nurl: %s, constraint: %#v", permissionType, url, constraint)
 	_, err := c.Put(ctx, url, constraint, ConstraintLockName)
+	log.Printf("===== err : %#v", err)
 	if errors.Is(err, ErrNoContent) || err == nil {
 		return &constraint, nil
 	}
