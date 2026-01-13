@@ -65,7 +65,7 @@ The following arguments are supported:
 
 * `permission_name` - (Required, ForceNew) Name of the permission associated with the profile.
 
-* `permission_type` - (Optional, ForceNew) The type of permission. The value is case-sensitive and must be updated by getting the same from the API response for an import (https://docs.britive.com/docs/manage-profile-permissions). Default: `"role"`.
+* `permission_type` - (Optional, Computed, ForceNew) The type of permission. The value is case-sensitive and must be updated by getting the same from the API response for an import (https://docs.britive.com/docs/manage-profile-permissions). Default: `"role"`.
 
 * `constraint_type` - (Required, ForceNew) The constraint type for a given profile permission. The value is case-sensitive and must be updated by getting the same from the britive_supported_constraints data source.
 

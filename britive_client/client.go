@@ -220,7 +220,10 @@ func (gpr *QueryRequest) Query(endpoint string) error {
 }
 
 func (c *Client) Post(ctx context.Context, url string, body interface{}, lock string) ([]byte, error) {
-	bodyContent, _ := json.Marshal(body)
+	bodyContent, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
 	bodyReader := bytes.NewReader(bodyContent)
 
 	req, err := http.NewRequest("POST", url, bodyReader)
@@ -251,7 +254,10 @@ func (c *Client) Get(ctx context.Context, url string, lock string) ([]byte, erro
 }
 
 func (c *Client) Put(ctx context.Context, url string, body interface{}, lock string) ([]byte, error) {
-	bodyContent, _ := json.Marshal(body)
+	bodyContent, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
 	bodyReader := bytes.NewReader(bodyContent)
 
 	req, err := http.NewRequest("PUT", url, bodyReader)
@@ -268,7 +274,10 @@ func (c *Client) Put(ctx context.Context, url string, body interface{}, lock str
 }
 
 func (c *Client) Patch(ctx context.Context, url string, body interface{}, lock string) ([]byte, error) {
-	bodyContent, _ := json.Marshal(body)
+	bodyContent, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
 	bodyReader := bytes.NewReader(bodyContent)
 
 	req, err := http.NewRequest("PATCH", url, bodyReader)
