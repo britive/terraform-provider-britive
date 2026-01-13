@@ -29,6 +29,18 @@ type DataSourceEnvironmentGroupIDNamePlan struct {
 }
 
 // Resources
+type ConstraintPlan struct {
+	ID             types.String `tfsdk:"id"`
+	ProfileID      types.String `tfsdk:"profile_id"`
+	PermissionName types.String `tfsdk:"permission_name"`
+	PermissionType types.String `tfsdk:"permission_type"`
+	ConstraintType types.String `tfsdk:"constraint_type"`
+	Name           types.String `tfsdk:"name"`
+	Title          types.String `tfsdk:"title"`
+	Expression     types.String `tfsdk:"expression"`
+	Description    types.String `tfsdk:"description"`
+}
+
 type ProfilePlan struct {
 	ID                            types.String `tfsdk:"id"`
 	AppContainerID                types.String `tfsdk:"app_container_id"`

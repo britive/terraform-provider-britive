@@ -177,7 +177,7 @@ func (ree *ResourceEntityEnvironment) Create(ctx context.Context, req resource.C
 
 	applicationEntity := britive_client.ApplicationEntityEnvironment{}
 
-	err := ree.helper.mapResourceToModel(plan, &applicationEntity, false)
+	err := ree.helper.mapResourceToModel(plan, &applicationEntity)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create entity environment", err.Error())
 		tflog.Error(ctx, fmt.Sprintf("Failed to map resource to model, %#v", err))
@@ -568,7 +568,7 @@ func (reeh *ResourceEntityEnvironmentHelper) getAndMapModelToPlan(ctx context.Co
 	return &plan, nil
 }
 
-func (reeh *ResourceEntityEnvironmentHelper) mapResourceToModel(plan britive_client.EntityEnvironmentPlan, applicationEntity *britive_client.ApplicationEntityEnvironment, isUpdate bool) error {
+func (reeh *ResourceEntityEnvironmentHelper) mapResourceToModel(plan britive_client.EntityEnvironmentPlan, applicationEntity *britive_client.ApplicationEntityEnvironment) error {
 	entityName, err := reeh.getPropertyByKey(plan, "displayName")
 	if err != nil {
 		return err

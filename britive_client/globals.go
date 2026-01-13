@@ -7,6 +7,7 @@ var (
 	ProfileLockName         = "profileLock"
 	ApplicationLockName     = "applicationLock"
 	AdvancedSettingLockName = "advancedSettingLock"
+	ConstraintLockName      = "constraintLock"
 )
 
 var (
