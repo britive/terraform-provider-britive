@@ -202,6 +202,7 @@ func (p *britiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		resources.NewResourceConstraint,
 		resources.NewResourceApplication,
 		resources.NewResourceProfile,
 		resources.NewResourceAdvancedSettings,
