@@ -211,33 +211,44 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 			return nil, err
 		}
 
-		body, _ := io.ReadAll(res.Body)
-		res.Body.Close()
+		if res.StatusCode == http.StatusNoContent {
+			return []byte(emptyString), ErrNoContent
+		}
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
 
 		if res.StatusCode == http.StatusTooManyRequests {
 			IsSleepWithContext = true
-			if err := sleepWithContext(ctx, parseRetryAfter(res), attempt, req); err != nil {
+			if err := sleepWithContext(ctx, parseRetryAfter(res)); err != nil {
 				return nil, err
 			}
 			continue
 		}
 
-		if res.StatusCode >= 400 {
-			return nil, fmt.Errorf(
-				"http %d (%s): %s",
-				res.StatusCode,
-				res.Status,
-				string(body),
-			)
+		if res.StatusCode == http.StatusNotFound {
+			return body, ErrNotFound
 		}
 
-		return body, nil
+		if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
+			var httpErrorResponse HTTPErrorResponse
+			err = json.Unmarshal(body, &httpErrorResponse)
+			if err == nil && httpErrorResponse.Message != emptyString {
+				return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+			}
+			return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
+		}
+
+		return body, err
 	}
 
 	return nil, fmt.Errorf("request failed after %d retries", maxRetries)
 }
 
-func sleepWithContext(ctx context.Context, d time.Duration, attempt int, req *http.Request) error {
+func sleepWithContext(ctx context.Context, d time.Duration) error {
 	d += d / 2
 	select {
 	case <-time.After(d):
@@ -249,21 +260,21 @@ func sleepWithContext(ctx context.Context, d time.Duration, attempt int, req *ht
 
 func parseRetryAfter(res *http.Response) time.Duration {
 	ra := res.Header.Get("Retry-After")
-	var wait = 30 * time.Second
+	var retryAfter = 30 * time.Second
 	if ra == "" {
-		return wait
+		return retryAfter
 	}
 	// Case 1: seconds
 	if secs, err := strconv.Atoi(ra); err == nil {
-		wait = time.Duration(secs) * time.Second
+		retryAfter = time.Duration(secs) * time.Second
 	}
 
 	// Case 2: HTTP date
 	if t, err := http.ParseTime(ra); err == nil {
-		wait = time.Until(t)
+		retryAfter = time.Until(t)
 	}
 
-	return wait
+	return retryAfter
 }
 
 // Lock to lock based on key
