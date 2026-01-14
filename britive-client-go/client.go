@@ -189,6 +189,7 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 
 	ctx := req.Context()
 	req = req.WithContext(ctx)
+	var prevRetryAfter time.Duration
 
 	var bodyBytes []byte
 	if req.Body != nil {
@@ -223,7 +224,8 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 
 		if res.StatusCode == http.StatusTooManyRequests {
 			IsSleepWithContext = true
-			if err := sleepWithContext(ctx, parseRetryAfter(res)); err != nil {
+			retryAfter := parseRetryAfter(res, prevRetryAfter)
+			if prevRetryAfter, err = sleepWithContext(ctx, retryAfter); err != nil {
 				return nil, err
 			}
 			continue
@@ -248,21 +250,21 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	return nil, fmt.Errorf("request failed after %d retries", maxRetries)
 }
 
-func sleepWithContext(ctx context.Context, d time.Duration) error {
+func sleepWithContext(ctx context.Context, d time.Duration) (time.Duration, error) {
 	d += d / 2
 	select {
 	case <-time.After(d):
-		return nil
+		return d, nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return d, ctx.Err()
 	}
 }
 
-func parseRetryAfter(res *http.Response) time.Duration {
+func parseRetryAfter(res *http.Response, prevRetryAfter time.Duration) time.Duration {
 	ra := res.Header.Get("Retry-After")
 	var retryAfter = 30 * time.Second
 	if ra == "" {
-		return retryAfter
+		return retryAfter + prevRetryAfter
 	}
 	// Case 1: seconds
 	if secs, err := strconv.Atoi(ra); err == nil {
@@ -274,7 +276,7 @@ func parseRetryAfter(res *http.Response) time.Duration {
 		retryAfter = time.Until(t)
 	}
 
-	return retryAfter
+	return retryAfter + prevRetryAfter
 }
 
 // Lock to lock based on key
