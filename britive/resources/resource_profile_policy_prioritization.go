@@ -86,7 +86,8 @@ func NewResourcePolicyPriority(v *validate.Validation, importHelper *imports.Imp
 }
 
 func (rpo *ResourcePolicyPriority) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	resourcePolicyPriority := &britive.ProfilePolicyPriority{}
 
@@ -127,7 +128,8 @@ func (rpo *ResourcePolicyPriority) resourceCreate(ctx context.Context, d *schema
 }
 
 func (rpo *ResourcePolicyPriority) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -155,7 +157,8 @@ func (rpo *ResourcePolicyPriority) resourceRead(ctx context.Context, d *schema.R
 }
 
 func (rpo *ResourcePolicyPriority) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	if d.HasChange("profile_id") || d.HasChange("policy_priority_enabled") || d.HasChange("policy_priority") {
 		resourcePolicyPriority := &britive.ProfilePolicyPriority{}
@@ -198,7 +201,8 @@ func (rpo *ResourcePolicyPriority) resourceUpdate(ctx context.Context, d *schema
 }
 
 func (rpo *ResourcePolicyPriority) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -356,7 +360,8 @@ func (helper *ResourcePolicyPriorityHelper) generateUniqueID(profileId string) s
 }
 
 func (rpo *ResourcePolicyPriority) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	if err := rpo.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/policies/priority", "(?P<profile_id>[^/]+)"}, d); err != nil {
 		return nil, err
 	}

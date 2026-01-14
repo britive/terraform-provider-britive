@@ -105,7 +105,8 @@ func NewResourceProfileSessionAttribute(importHelper *imports.ImportHelper) *Res
 //region Profile Tag Resource Context Operations
 
 func (rpt *ResourceProfileSessionAttribute) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	profileID := d.Get("profile_id").(string)
 	sessionAttribute, err := rpt.helper.getAndMapResourceToModel(d, m)
 	if err != nil {
@@ -143,7 +144,8 @@ func (rpt *ResourceProfileSessionAttribute) resourceUpdate(ctx context.Context, 
 		return nil
 	}
 
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	profileID, sessionAttributeID, err := rpt.helper.parseUniqueID(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
@@ -169,7 +171,8 @@ func (rpt *ResourceProfileSessionAttribute) resourceUpdate(ctx context.Context, 
 }
 
 func (rpt *ResourceProfileSessionAttribute) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -193,7 +196,8 @@ func (rpt *ResourceProfileSessionAttribute) resourceDelete(ctx context.Context, 
 }
 
 func (rpt *ResourceProfileSessionAttribute) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	if err := rpt.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/session-attributes/type/(?P<attribute_type>[^/]+)/mapping-name/(?P<mapping_name>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<attribute_type>[^/]+)/(?P<mapping_name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
@@ -265,7 +269,8 @@ func NewResourceProfileSessionAttributeHelper() *ResourceProfileSessionAttribute
 //region Profile Tag Helper functions
 
 func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	profileID, sessionAttributeID, err := resourceProfileSessionAttributeHelper.parseUniqueID(d.Id())
 	if err != nil {
 		return err
@@ -313,7 +318,8 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 }
 
 func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelper) getAndMapResourceToModel(d *schema.ResourceData, m interface{}) (*britive.SessionAttribute, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	attributeName := d.Get("attribute_name").(string)
 	mappingName := d.Get("mapping_name").(string)
 	attributeType := d.Get("attribute_type").(string)

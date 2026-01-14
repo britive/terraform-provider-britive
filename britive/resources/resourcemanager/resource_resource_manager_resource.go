@@ -90,7 +90,8 @@ func NewResourceServerAccess(v *validate.Validation, importHelper *imports.Impor
 //region Resource Server Access Context Operations
 
 func (rsa *ResourceServerAccess) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -130,7 +131,8 @@ func (rsa *ResourceServerAccess) resourceRead(ctx context.Context, d *schema.Res
 }
 
 func (rsa *ResourceServerAccess) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	serverAccessResourceID := d.Id()
 
@@ -159,7 +161,8 @@ func (rsa *ResourceServerAccess) resourceUpdate(ctx context.Context, d *schema.R
 }
 
 func (rsa *ResourceServerAccess) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -176,7 +179,9 @@ func (rsa *ResourceServerAccess) resourceDelete(ctx context.Context, d *schema.R
 }
 
 func (rsa *ResourceServerAccess) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	if err := rsa.importHelper.ParseImportID([]string{"resources/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
@@ -235,7 +240,8 @@ func (rrh *ResourceServerAccessHelper) mapResourceToModel(d *schema.ResourceData
 }
 
 func (rsah *ResourceServerAccessHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	serverAccessResourceID := d.Id()
 

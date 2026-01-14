@@ -61,7 +61,8 @@ func NewDataSourceAllConnections() *DataSourceAllConnections {
 }
 
 func (dataSourceAllConnections *DataSourceAllConnections) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	settingType := d.Get("setting_type").(string)
 

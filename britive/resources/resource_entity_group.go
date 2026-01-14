@@ -77,7 +77,8 @@ func NewResourceEntityGroup(importHelper *imports.ImportHelper) *ResourceEntityG
 //region Application Entity Group Resource Context Operations
 
 func (reg *ResourceEntityGroup) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var diags diag.Diagnostics
 
 	applicationEntity := britive.ApplicationEntityGroup{}
@@ -91,7 +92,7 @@ func (reg *ResourceEntityGroup) resourceCreate(ctx context.Context, d *schema.Re
 
 	applicationID := d.Get("application_id").(string)
 
-	ae, err := c.CreateEntityGroup(applicationEntity, applicationID)
+	ae, err := c.CreateEntityGroup(applicationEntity, applicationID, m)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -116,7 +117,8 @@ func (reg *ResourceEntityGroup) resourceRead(ctx context.Context, d *schema.Reso
 }
 
 func (reg *ResourceEntityGroup) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var hasChanges bool
 	if d.HasChange("application_id") || d.HasChange("entity_name") || d.HasChange("entity_description") || d.HasChange("parent_id") {
@@ -135,7 +137,7 @@ func (reg *ResourceEntityGroup) resourceUpdate(ctx context.Context, d *schema.Re
 
 		log.Printf("[INFO] Updating the entity group %#v for application %s", applicationEntity, applicationID)
 
-		ae, err := c.UpdateEntityGroup(applicationEntity, applicationID)
+		ae, err := c.UpdateEntityGroup(applicationEntity, applicationID, m)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -150,7 +152,8 @@ func (reg *ResourceEntityGroup) resourceUpdate(ctx context.Context, d *schema.Re
 }
 
 func (reg *ResourceEntityGroup) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -160,7 +163,7 @@ func (reg *ResourceEntityGroup) resourceDelete(ctx context.Context, d *schema.Re
 	}
 
 	log.Printf("[INFO] Deleting entity group %s for application %s", entityID, applicationID)
-	err = c.DeleteEntityGroup(applicationID, entityID)
+	err = c.DeleteEntityGroup(applicationID, entityID, m)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -171,7 +174,8 @@ func (reg *ResourceEntityGroup) resourceDelete(ctx context.Context, d *schema.Re
 }
 
 func (reg *ResourceEntityGroup) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 	var err error
 	if err := reg.importHelper.ParseImportID([]string{"apps/(?P<application_id>[^/]+)/root-environment-group/groups/(?P<entity_id>[^/]+)", "(?P<application_id>[^/]+)/groups/(?P<entity_id>[^/]+)"}, d); err != nil {
 		return nil, err
@@ -239,7 +243,8 @@ func (regh *ResourceEntityGroupHelper) mapResourceToModel(d *schema.ResourceData
 }
 
 func (regh *ResourceEntityGroupHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	applicationID, entityID, err := regh.parseUniqueID(d.Id())
 	if err != nil {
@@ -248,7 +253,7 @@ func (regh *ResourceEntityGroupHelper) getAndMapModelToResource(d *schema.Resour
 
 	log.Printf("[INFO] Reading entity group %s for application %s", entityID, applicationID)
 
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(applicationID)
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(applicationID, m)
 	if err != nil || appRootEnvironmentGroup == nil {
 		return err
 	}

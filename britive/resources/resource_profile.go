@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -145,7 +146,8 @@ func NewResourceProfile(v *validate.Validation, importHelper *imports.ImportHelp
 //region Profile Resource Context Operations
 
 func (rp *ResourceProfile) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -190,7 +192,8 @@ func (rp *ResourceProfile) resourceRead(ctx context.Context, d *schema.ResourceD
 }
 
 func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	profileID := d.Id()
 	appContainerID := d.Get("app_container_id").(string)
@@ -248,7 +251,8 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 }
 
 func (rp *ResourceProfile) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	var diags diag.Diagnostics
 
@@ -269,7 +273,9 @@ func (rp *ResourceProfile) resourceDelete(ctx context.Context, d *schema.Resourc
 }
 
 func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
 	if err := rp.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<name>[^/]+)", "(?P<app_name>[^/]+)/(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
@@ -332,19 +338,69 @@ func (rph *ResourceProfileHelper) appendProfileAssociations(associations []briti
 	return associations
 }
 
+func (rph *ResourceProfileHelper) cachedApplicationType(appContainerID string, m interface{}) (*britive.ApplicationType, error) {
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
+	mutex := providerMeta.Mutex
+	isLocked := false
+
+	appCache := providerMeta.AppCache
+	var applicationType *britive.ApplicationType
+	cacheKey := fmt.Sprintf("/apps/%s", appContainerID)
+	if _, ok := appCache[cacheKey]; !ok {
+		mutex.Lock()
+		isLocked = true
+		defer func() {
+			if isLocked {
+				mutex.Unlock()
+				isLocked = false
+			}
+		}()
+	}
+	if cachedData, ok := appCache[cacheKey]; ok {
+		if isLocked {
+			mutex.Unlock()
+			isLocked = false
+		}
+		applicationType = cachedData.Cache.(*britive.ApplicationType)
+	} else {
+		response, err := c.GetApplicationType(appContainerID)
+		if err != nil {
+			return nil, err
+		}
+		applicationType = response
+		newCache := &britive.AppData{
+			Cache: applicationType,
+		}
+		appCache[cacheKey] = newCache
+	}
+
+	if isLocked {
+		mutex.Unlock()
+		isLocked = false
+	}
+	return applicationType, nil
+}
+
 func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string, profileID string, d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID, m)
 	if err != nil {
 		return err
 	}
+
 	if appRootEnvironmentGroup == nil {
 		return nil
 	}
-	applicationType, err := c.GetApplicationType(appContainerID)
+
+	applicationType, err := rph.cachedApplicationType(appContainerID, m)
 	if err != nil {
 		return err
 	}
+
 	appType := applicationType.ApplicationType
 	associationScopes := make([]britive.ProfileAssociation, 0)
 	associationResources := make([]britive.ProfileAssociation, 0)
@@ -474,7 +530,8 @@ func (rph *ResourceProfileHelper) mapResourceToModel(d *schema.ResourceData, m i
 }
 
 func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	profileID := d.Id()
 
@@ -542,8 +599,10 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 }
 
 func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appContainerID string, profileID string, associations []britive.ProfileAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
-	c := m.(*britive.Client)
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID, m)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +610,7 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 		return make([]interface{}, 0), nil
 	}
 	inputAssociations := d.Get("associations").(*schema.Set)
-	applicationType, err := c.GetApplicationType(appContainerID)
+	applicationType, err := rph.cachedApplicationType(appContainerID, m)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 // CreateEntityEnvironment - Create entity environment for an application
-func (c *Client) CreateEntityEnvironment(applicationEntity ApplicationEntityEnvironment, applicationID string) (*ApplicationEntityEnvironment, error) {
+func (c *Client) CreateEntityEnvironment(applicationEntity ApplicationEntityEnvironment, applicationID string, m interface{}) (*ApplicationEntityEnvironment, error) {
 
 	applicationEntityBody, err := json.Marshal(applicationEntity)
 	if err != nil {
@@ -34,11 +34,18 @@ func (c *Client) CreateEntityEnvironment(applicationEntity ApplicationEntityEnvi
 		return nil, err
 	}
 
+	providerMeta := m.(*ProviderMeta)
+	appCache := providerMeta.AppCache
+	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
+	if _, ok := appCache[cacheKey]; ok {
+		delete(appCache, cacheKey)
+	}
+
 	return ae, nil
 }
 
 // DeleteEntityEnvironment - Delete entity from the application
-func (c *Client) DeleteEntityEnvironment(applicationID, entityID string) error {
+func (c *Client) DeleteEntityEnvironment(applicationID, entityID string, m interface{}) error {
 
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/environments/%s", c.APIBaseURL, applicationID, entityID), nil)
 	if err != nil {
@@ -48,6 +55,13 @@ func (c *Client) DeleteEntityEnvironment(applicationID, entityID string) error {
 	_, err = c.DoWithLock(req, applicationID)
 	if errors.Is(err, ErrNoContent) || err == nil {
 		return nil
+	}
+
+	providerMeta := m.(*ProviderMeta)
+	appCache := providerMeta.AppCache
+	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
+	if _, ok := appCache[cacheKey]; ok {
+		delete(appCache, cacheKey)
 	}
 
 	return err
@@ -75,7 +89,7 @@ func (c *Client) GetApplicationEnvironment(appContainerID string, entityID strin
 }
 
 // Patch Application property types
-func (c *Client) PatchApplicationEnvPropertyTypes(applicationID string, entityID string, properties Properties) (*ApplicationResponse, error) {
+func (c *Client) PatchApplicationEnvPropertyTypes(applicationID string, entityID string, properties Properties, m interface{}) (*ApplicationResponse, error) {
 
 	propertiesURL := fmt.Sprintf("%s/apps/%s/environments/%s/properties", c.APIBaseURL, applicationID, entityID)
 	pb, err := json.Marshal(properties)
@@ -98,5 +112,13 @@ func (c *Client) PatchApplicationEnvPropertyTypes(applicationID string, entityID
 	if err != nil {
 		return nil, err
 	}
+
+	providerMeta := m.(*ProviderMeta)
+	appCache := providerMeta.AppCache
+	cacheKey := fmt.Sprintf("/apps/%s/root-environment-group", applicationID)
+	if _, ok := appCache[cacheKey]; ok {
+		delete(appCache, cacheKey)
+	}
+
 	return &applicationEnvResponse, nil
 }

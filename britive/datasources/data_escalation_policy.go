@@ -37,7 +37,8 @@ func NewDataSourceEscalationPolicy() *DataSourceEscalationPolicy {
 }
 
 func (dsep *DataSourceEscalationPolicy) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	providerMeta := m.(*britive.ProviderMeta)
+	c := providerMeta.Client
 
 	policyName := d.Get("name").(string)
 	imConnectionId := d.Get("im_connection_id").(string)
