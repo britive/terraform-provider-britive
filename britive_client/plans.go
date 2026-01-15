@@ -41,28 +41,6 @@ type ConstraintPlan struct {
 	Description    types.String `tfsdk:"description"`
 }
 
-type ProfilePlan struct {
-	ID                            types.String `tfsdk:"id"`
-	AppContainerID                types.String `tfsdk:"app_container_id"`
-	Name                          types.String `tfsdk:"name"`
-	Description                   types.String `tfsdk:"description"`
-	Disabled                      types.Bool   `tfsdk:"disabled"`
-	Associations                  types.Set    `tfsdk:"associations"`
-	ExpirationDuration            types.String `tfsdk:"expiration_duration"`
-	Extendable                    types.Bool   `tfsdk:"extendable"`
-	NotificationPriorToExpiration types.String `tfsdk:"notification_prior_to_expiration"`
-	ExtensionDuration             types.String `tfsdk:"extension_duration"`
-	ExtensionLimit                types.Int64  `tfsdk:"extension_limit"`
-	DestinationUrl                types.String `tfsdk:"destination_url"`
-	AllowImpersonation            types.Bool   `tfsdk:"allow_impersonation"`
-}
-
-type ProfileAssociationPlan struct {
-	Type       types.String `tfsdk:"type"`
-	Value      types.String `tfsdk:"value"`
-	ParentName types.String `tfsdk:"parent_name"`
-}
-
 type ApplicationPlan struct {
 	ID                           types.String `tfsdk:"id"`
 	ApplicationType              types.String `tfsdk:"application_type"`
@@ -143,6 +121,28 @@ type ImPlan struct {
 	EscalationPolicies    types.Set    `tfsdk:"escalation_policies"`
 }
 
+type ProfilePlan struct {
+	ID                            types.String `tfsdk:"id"`
+	AppContainerID                types.String `tfsdk:"app_container_id"`
+	Name                          types.String `tfsdk:"name"`
+	Description                   types.String `tfsdk:"description"`
+	Disabled                      types.Bool   `tfsdk:"disabled"`
+	Associations                  types.Set    `tfsdk:"associations"`
+	ExpirationDuration            types.String `tfsdk:"expiration_duration"`
+	Extendable                    types.Bool   `tfsdk:"extendable"`
+	NotificationPriorToExpiration types.String `tfsdk:"notification_prior_to_expiration"`
+	ExtensionDuration             types.String `tfsdk:"extension_duration"`
+	ExtensionLimit                types.Int64  `tfsdk:"extension_limit"`
+	DestinationUrl                types.String `tfsdk:"destination_url"`
+	AllowImpersonation            types.Bool   `tfsdk:"allow_impersonation"`
+}
+
+type ProfileAssociationPlan struct {
+	Type       types.String `tfsdk:"type"`
+	Value      types.String `tfsdk:"value"`
+	ParentName types.String `tfsdk:"parent_name"`
+}
+
 type ProfilePermissionPlan struct {
 	ID             types.String `tfsdk:"id"`
 	AppName        types.String `tfsdk:"app_name"`
@@ -159,4 +159,24 @@ type ProfileAdditionalSettingsPlan struct {
 	ConsoleAccess              types.Bool   `tfsdk:"console_access"`
 	ProgrammaticAccess         types.Bool   `tfsdk:"programmatic_access"`
 	ProjectIDForServiceAccount types.String `tfsdk:"project_id_for_service_account"`
+}
+
+type ProfilePolicyPlan struct {
+	ID           types.String `tfsdk:"id"`
+	ProfileID    types.String `tfsdk:"profile_id"`
+	PolicyName   types.String `tfsdk:"policy_name"`
+	Description  types.String `tfsdk:"description"`
+	IsActive     types.Bool   `tfsdk:"is_active"`
+	IsDraft      types.Bool   `tfsdk:"is_draft"`
+	IsReadOnly   types.Bool   `tfsdk:"is_read_only"`
+	Consumer     types.String `tfsdk:"consumer"`
+	AccessType   types.String `tfsdk:"access_type"`
+	Members      types.String `tfsdk:"members"`
+	Condition    types.String `tfsdk:"condition"`
+	Associations types.Set    `tfsdk:"associations"`
+}
+
+type PolicyAssociationPlan struct {
+	Type  types.String `tfsdk:"type"`
+	Value types.String `tfsdk:"value"`
 }

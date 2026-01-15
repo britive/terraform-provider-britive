@@ -408,13 +408,13 @@ func (ree *ResourceEntityEnvironment) ImportState(ctx context.Context, req resou
 	applicationID := importData.Fields["application_id"]
 	entityID := importData.Fields["entity_id"]
 	if strings.TrimSpace(applicationID) == "" {
-		resp.Diagnostics.AddError("Failed to import entitty group", "Invalid applicationID")
-		tflog.Error(ctx, "Failed to import entity group, Invalid applicationID")
+		resp.Diagnostics.AddError("Failed to import entity environment", "Invalid applicationID")
+		tflog.Error(ctx, "Failed to import entity environment, Invalid applicationID")
 		return
 	}
 	if strings.TrimSpace(entityID) == "" {
-		resp.Diagnostics.AddError("Failed to import entitty group", "Invalid entityID")
-		tflog.Error(ctx, "Failed to import entity group, Invalid entityID")
+		resp.Diagnostics.AddError("Failed to import entity environment", "Invalid entityID")
+		tflog.Error(ctx, "Failed to import entity environment, Invalid entityID")
 		return
 	}
 
