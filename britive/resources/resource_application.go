@@ -88,7 +88,8 @@ func (ra *ResourceApplication) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"application_type": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure' and 'Okta'",
 				Validators: []validator.String{
 					validate.StringFunc(
 						"application_type",
@@ -97,6 +98,7 @@ func (ra *ResourceApplication) Schema(ctx context.Context, req resource.SchemaRe
 							"Snowflake Standalone",
 							"GCP",
 							"GCP Standalone",
+							"GCP WIF",
 							"Google Workspace",
 							"AWS",
 							"AWS Standalone",
