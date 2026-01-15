@@ -10,7 +10,7 @@ description: |-
 
 This resource allows you to create and manage applications in Britive.
 
--> This resource is supported only on Snowflake, Snowflake Standalone, GCP, GCP Standalone, Google Workspace, AWS, AWS Standalone, Azure, and Okta applications.
+-> This resource is supported only on Snowflake, Snowflake Standalone, GCP, GCP Standalone, GCP WIF, Google Workspace, AWS, AWS Standalone, Azure, and Okta applications.
 
 ## Example Usage
 
@@ -383,6 +383,140 @@ resource "britive_application" "new" {
 >**Sensitive Properties:**
 > - `serviceAccountCredentials`: The Service Account Credentials - Content of Private Key File as JSON String.
 
+### GCP WIF Application
+
+```hcl
+resource "britive_application" "gcp_wif_new" {
+  application_type = "gcp wif"
+  user_account_mappings {
+    name        = "Mobile"
+    description = "Mobile"
+  }
+  properties {
+    name  = "displayName"
+    value = "GCP WIF Application"
+  }
+  properties {
+    name  = "description"
+    value = "GCP WIF Application Description"
+  }
+  properties {
+    name  = "programmaticAccess"
+    value = false
+  }
+  properties {
+    name  = "consoleAccess"
+    value = true
+  }
+  properties {
+    name  = "appAccessMethod_static_loginUrl"
+    value = "https://gcp_wif.test.com"
+  }
+  properties {
+    name  = "orgId"
+    value = "test_gcp_wif1"
+  }
+  properties {
+    name  = "britiveIssuerUrl"
+    value = "https://gcp_wif_test.com/oauth2"
+  }
+  properties {
+    name  = "wifPool"
+    value = "test-gcp-wif-pool"
+  }
+  properties {
+    name  = "wifProvider"
+    value = "testgcpwifprovider"
+  }
+  properties {
+    name  = "wifSA"
+    value = "test@gcp.wif.com"
+  }
+  properties {
+    name  = "projectNumberForWifSA"
+    value = "test_gcp_wif_project_number"
+  }
+  properties {
+    name  = "projectIdForServiceAccount"
+    value = "test_gcp_wif_account"
+  }
+  properties {
+    name  = "acsUrl"
+    value = "test_gcp_wif"
+  }
+  properties {
+    name  = "audience"
+    value = "gcp_test@gcpwif.net"
+  }
+  properties {
+    name  = "enableSso"
+    value = false
+  }
+  properties {
+    name  = "primaryDomain"
+    value = "domain1"
+  }
+  properties {
+    name  = "secondaryDomain"
+    value = "domain2"
+  }
+  properties {
+    name  = "replaceDomain"
+    value = false
+  }
+  properties {
+    name  = "scanOrganization"
+    value = false
+  }
+  properties {
+    name  = "scanProjectsOnly"
+    value = true
+  }
+  properties {
+    name  = "maxSessionDurationForProfiles"
+    value = 10000
+  }
+  properties {
+    name  = "displayProgrammaticKeys"
+    value = false
+  }
+  properties {
+    name  = "gcpProjectFilter"
+    value = false
+  }
+  properties {
+    name  = "gcpProjectFilterInclusion"
+    value = false
+  }
+}
+```
+
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `programmaticAccess`: Programmatic Access.
+> - `consoleAccess`: Console Access.
+> - `appAccessMethod_static_loginUrl`: Login URL.
+> - `orgId`: The Organizations Unique Identifier.
+> - `britiveIssueUrl`: Britive Issuer URL.
+> - `wifPool`: Workload Identity Pool ID.
+> - `wifProvider`: Workload Identity Provider ID.
+> - `wifSA`: Connected Service Account Email.
+> - `projectNumberForWifSA`: Project Number For Connected Service Account.
+> - `projectIdForServiceAccount`: Project ID for creating Service Accounts.
+> - `acsUrl`: ACS URL.
+> - `audience`: Audience.
+> - `enableSso`: Enable SSO.
+> - `primaryDomain`: Email Domain of Britive Users.
+> - `secondaryDomain`: Primary Domain in Google Workspace.
+> - `replaceDomain`: Use another domain for Account Mapping.
+> - `scanOrganization`: Scan all Folders and Projects.
+> - `scanProjectsOnly`: Scan Projects only.
+> - `scanExternalUsersGroups`: Scan External Users and Groups.
+> - `maxSessionDurationForProfiles`: Maximum Session Duration for Profiles.
+> - `gcpProjectFilter`: Exclude Projects from Scan.
+> - `gcpProjectFilterInclusion`: Include projects in Scan.
+
 ### Google Workspace Application
 
 ```hcl
@@ -748,7 +882,7 @@ resource "britive_application" "okta_1" {
 
 The following arguments are supported:
 
-* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone`, `Google Workspace`, `AWS`, `AWS Standalone`, `Azure` and `Okta`.
+* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone`, `GCP WIF`, `Google Workspace`, `AWS`, `AWS Standalone`, `Azure` and `Okta`.
 
 * `version` - (Optional) The version of the application resource.  
   If specified, it must match a supported version for the selected `application_type`.  
@@ -813,6 +947,15 @@ When a property is deleted from the configuration, its value will revert to the 
     'displayName': 'GCP Standalone',
     'appAccessMethod_static_loginUrl': 'https://console.cloud.google.com',
     'maxSessionDurationForProfiles': '604800' 
+}
+```
+
+### GCP WIF
+```sh
+{
+    'displayName': 'GCP',
+    'consoleAccess': True,
+    'maxSessionDurationForProfiles': '604800'
 }
 ```
 
