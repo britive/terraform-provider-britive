@@ -56,7 +56,7 @@ func (da *DataSourceApplication) Configure(ctx context.Context, req datasource.C
 
 func (da *DataSourceApplication) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Datasource for retrieving Britive application metadata.",
+		Description: "Datasource for retrieving Britive application.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,

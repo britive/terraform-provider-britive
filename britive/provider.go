@@ -197,6 +197,8 @@ func (p *britiveProvider) Configure(ctx context.Context, req provider.ConfigureR
 func (p *britiveProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		datasources.NewDataSourceApplication,
+		datasources.NewDataSourceAllConnections,
+		datasources.NewDataSourceConnection,
 	}
 }
 

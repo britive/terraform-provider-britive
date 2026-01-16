@@ -192,3 +192,27 @@ func (c *Client) GetProfilePolicyAdvancedSettings(ctx context.Context, profileID
 
 	return profilePolicy, nil
 }
+
+// Get all Connections
+func (c *Client) GetAllConnections(ctx context.Context, settingType string) ([]Connection, error) {
+	var connectionsURL string
+	if strings.EqualFold(settingType, "ITSM") {
+		connectionsURL = fmt.Sprintf("%s/itsm-manager/connections", c.APIBaseURL)
+	} else if strings.EqualFold(settingType, "IM") {
+		connectionsURL = fmt.Sprintf("%s/im-manager/connections", c.APIBaseURL)
+	} else {
+		return nil, ErrNotSupported
+	}
+
+	body, err := c.Get(ctx, connectionsURL, AdvancedSettingLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	connectionsResponse := []Connection{}
+	err = json.Unmarshal(body, &connectionsResponse)
+	if err != nil {
+		return nil, err
+	}
+	return connectionsResponse, nil
+}

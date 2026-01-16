@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
@@ -50,7 +49,7 @@ func (v StringFuncValidator) ValidateString(
 	req validator.StringRequest,
 	resp *validator.StringResponse,
 ) {
-	if req.ConfigValue.IsUnknown() || req.ConfigValue.IsNull() || req.ConfigValue.ValueString() == britive_client.EmptyString {
+	if req.ConfigValue.IsUnknown() || req.ConfigValue.IsNull() {
 		return
 	}
 
