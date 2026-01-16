@@ -28,6 +28,27 @@ type DataSourceEnvironmentGroupIDNamePlan struct {
 	Name types.String `tfsdk:"name"`
 }
 
+type DataSourceAllConnectionsPlan struct {
+	ID          types.String               `tfsdk:"id"`
+	SettingType types.String               `tfsdk:"setting_type"`
+	Connections []DataSourceConnectionPlan `tfsdk:"connections"`
+}
+
+type DataSourceConnectionPlan struct {
+	ID       types.String `tfsdk:"id"`
+	Name     types.String `tfsdk:"name"`
+	Type     types.String `tfsdk:"type"`
+	AuthType types.String `tfsdk:"auth_type"`
+}
+
+type DataSourceSingleConnectionPlan struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Type        types.String `tfsdk:"type"`
+	SettingType types.String `tfsdk:"setting_type"`
+	AuthType    types.String `tfsdk:"auth_type"`
+}
+
 // Resources
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`
