@@ -201,3 +201,15 @@ type PolicyAssociationPlan struct {
 	Type  types.String `tfsdk:"type"`
 	Value types.String `tfsdk:"value"`
 }
+
+type ProfilePolicyPrioritizationPlan struct {
+	ID                    types.String `tfsdk:"id"`
+	ProfileID             types.String `tfsdk:"profile_id"`
+	PolicyPriorityEnabled types.Bool   `tfsdk:"policy_priority_enabled"`
+	PolicyPriority        types.Set    `tfsdk:"policy_priority"`
+}
+
+type PolicyPriorityPlan struct {
+	ID       types.String `tfsdk:"id"`
+	Priority types.Int64  `tfsdk:"priority"`
+}

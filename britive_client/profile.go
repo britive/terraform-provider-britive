@@ -114,285 +114,72 @@ func (c *Client) DeleteProfile(ctx context.Context, appContainerID string, profi
 	return nil
 }
 
-// package britive
+func (c *Client) GetProfilePolicies(ctx context.Context, profileId string) ([]ProfilePolicy, error) {
+	url := fmt.Sprintf("%s/paps/%s/policies", c.APIBaseURL, profileId)
+	body, err := c.Get(ctx, url, ProfileLockName)
+	if err != nil {
+		return nil, err
+	}
 
-// import (
-// 	"encoding/json"
-// 	"fmt"
-// 	"net/http"
-// 	"net/url"
-// 	"reflect"
-// 	"strings"
-// )
+	var policies []ProfilePolicy
+	err = json.Unmarshal(body, &policies)
+	if err != nil {
+		return nil, err
+	}
 
-// // GetProfiles - Returns all profiles
-// func (c *Client) GetProfiles(appContainerID string) (*[]Profile, error) {
-// 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/apps/%s/paps", c.APIBaseURL, appContainerID), nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	return policies, nil
+}
 
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func (c *Client) GetProfileSummary(ctx context.Context, profileID string) (*ProfileSummary, error) {
+	requestURL := fmt.Sprintf("%s/paps/%s?view=summary", c.APIBaseURL, profileID)
+	body, err := c.Get(ctx, requestURL, ProfileLockName)
+	if err != nil {
+		return nil, err
+	}
+	if string(body) == EmptyString {
+		return nil, ErrNotFound
+	}
 
-// 	profiles := make([]Profile, 0)
-// 	err = json.Unmarshal(body, &profiles)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	profileSummary := &ProfileSummary{}
+	err = json.Unmarshal(body, profileSummary)
+	if err != nil {
+		return nil, err
+	}
 
-// 	return &profiles, nil
-// }
+	return profileSummary, nil
+}
 
-// // GetProfileByName - Returns a specifc profile by name
-// func (c *Client) GetProfileByName(appContainerID string, name string) (*Profile, error) {
-// 	filter := fmt.Sprintf(`name eq "%s"`, name)
-// 	resourceURL := fmt.Sprintf(`%s/apps/%s/paps?filter=%s`, c.APIBaseURL, appContainerID, url.QueryEscape(filter))
-// 	req, err := http.NewRequest("GET", resourceURL, nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+// EnablePolicyOrdering - Enable Policy Order
+func (c *Client) EnableDisablePolicyPrioritization(ctx context.Context, profile ProfileSummary) (*ProfileSummary, error) {
+	url := fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profile.PapId)
+	resp, err := c.Patch(ctx, url, profile, ProfileLockName)
+	if err != nil {
+		return nil, err
+	}
 
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	var profileSummary ProfileSummary
 
-// 	if string(body) == emptyString {
-// 		return nil, ErrNotFound
-// 	}
+	err = json.Unmarshal(resp, &profileSummary)
+	if err != nil {
+		return nil, err
+	}
 
-// 	profiles := make([]Profile, 0)
-// 	err = json.Unmarshal(body, &profiles)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	return &profileSummary, nil
+}
 
-// 	if len(profiles) == 0 {
-// 		return nil, ErrNotFound
-// 	}
+// PrioritizePolicies - Order Policy
+func (c *Client) PrioritizePolicies(ctx context.Context, resourcePolicyPriority ProfilePolicyPriority) (*ProfilePolicyPriority, error) {
+	url := fmt.Sprintf("%s/paps/%s/policies/order", c.APIBaseURL, resourcePolicyPriority.ProfileID)
+	body, err := c.Post(ctx, url, resourcePolicyPriority.PolicyOrder, ProfileLockName)
+	if err != nil {
+		return nil, err
+	}
 
-// 	return &profiles[0], nil
-// }
+	var profilePolicyPriority ProfilePolicyPriority
+	err = json.Unmarshal(body, &profilePolicyPriority.PolicyOrder)
+	if err != nil {
+		return nil, err
+	}
 
-// // GetProfile - Returns a specifc profile
-// func (c *Client) GetProfile(profileID string) (*Profile, error) {
-// 	requestURL := fmt.Sprintf("%s/paps/%s?skipIntegrityChecks=true", c.APIBaseURL, profileID)
-// 	req, err := http.NewRequest("GET", requestURL, nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if string(body) == emptyString {
-// 		return nil, ErrNotFound
-// 	}
-
-// 	profile := &Profile{}
-// 	err = json.Unmarshal(body, profile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if reflect.DeepEqual(profile, &Profile{}) {
-// 		return nil, ErrNotFound
-// 	}
-
-// 	return profile, nil
-// }
-
-// func (c *Client) GetProfileSummary(profileID string) (*ProfileSummary, error) {
-// 	requestURL := fmt.Sprintf("%s/paps/%s?view=summary", c.APIBaseURL, profileID)
-// 	req, err := http.NewRequest("GET", requestURL, nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if string(body) == emptyString {
-// 		return nil, ErrNotFound
-// 	}
-
-// 	profileSummary := &ProfileSummary{}
-// 	err = json.Unmarshal(body, profileSummary)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if reflect.DeepEqual(profileSummary, &ProfileSummary{}) {
-// 		return nil, ErrNotFound
-// 	}
-
-// 	return profileSummary, nil
-// }
-
-// // CreateProfile - Create new profile
-// func (c *Client) CreateProfile(appContainerID string, profile Profile) (*Profile, error) {
-// 	utb, err := json.Marshal(profile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps", c.APIBaseURL, appContainerID), strings.NewReader(string(utb)))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	err = json.Unmarshal(body, &profile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &profile, nil
-// }
-
-// // UpdateProfile - Updates profile
-// func (c *Client) UpdateProfile(appContainerID string, profileID string, profile Profile) (*Profile, error) {
-
-// 	profileBody, err := json.Marshal(profile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/apps/%s/paps/%s", c.APIBaseURL, appContainerID, profileID), strings.NewReader(string(profileBody)))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	err = json.Unmarshal(body, &profile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &profile, nil
-// }
-
-// // EnableOrDisableProfile - Enable or Disable tag
-// func (c *Client) EnableOrDisableProfile(appContainerID string, profileID string, disabled bool) (*Profile, error) {
-// 	var endpoint string
-// 	if disabled {
-// 		endpoint = "disabled-statuses"
-// 	} else {
-// 		endpoint = "enabled-statuses"
-// 	}
-// 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/apps/%s/paps/%s/%s", c.APIBaseURL, appContainerID, profileID, endpoint), strings.NewReader(string([]byte("{}"))))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var profile Profile
-// 	err = json.Unmarshal(body, &profile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &profile, nil
-// }
-
-// // DeleteProfile - Delete profile
-// func (c *Client) DeleteProfile(appContainerID string, profileID string) error {
-// 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/apps/%s/paps/%s", c.APIBaseURL, appContainerID, profileID), nil)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	_, err = c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
-// // EnablePolicyOrdering - Enable Policy Order
-// func (c *Client) EnableDisablePolicyPrioritization(profile ProfileSummary) (*ProfileSummary, error) {
-// 	policyOrder, err := json.Marshal(profile)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profile.PapId), strings.NewReader(string(policyOrder)))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	resp, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var profileSummary ProfileSummary
-
-// 	err = json.Unmarshal(resp, &profileSummary)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &profileSummary, nil
-// }
-
-// // PrioritizePolicies - Order Policy
-// func (c *Client) PrioritizePolicies(resourcePolicyPriority ProfilePolicyPriority) (*ProfilePolicyPriority, error) {
-// 	policyOrder, err := json.Marshal(resourcePolicyPriority.PolicyOrder)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/policies/order", c.APIBaseURL, resourcePolicyPriority.ProfileID), strings.NewReader(string(policyOrder)))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var profilePolicyPriority ProfilePolicyPriority
-// 	err = json.Unmarshal(body, &profilePolicyPriority.PolicyOrder)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &profilePolicyPriority, nil
-// }
-
-// func (c *Client) GetProfilePolicies(profileId string) ([]ProfilePolicy, error) {
-// 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/policies", c.APIBaseURL, profileId), nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	body, err := c.DoWithLock(req, profileLockName)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var policies []ProfilePolicy
-// 	err = json.Unmarshal(body, &policies)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return policies, nil
-// }
+	return &profilePolicyPriority, nil
+}

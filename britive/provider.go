@@ -213,5 +213,6 @@ func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resources.NewResourceEntityGroup,
 		resources.NewResourceEntityEnvironment,
 		resources.NewResourceProfilePolicy,
+		resources.NewResourceProfilePolicyPrioritization,
 	}
 }

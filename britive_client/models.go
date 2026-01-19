@@ -280,3 +280,30 @@ type ProfilePolicyAssociation struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
 }
+
+type ProfileSummary struct {
+	AppContainerID                string `json:"appContainerId,omitempty"`
+	PapId                         string `json:"papId,omitempty"`
+	Name                          string `json:"name"`
+	Description                   string `json:"description"`
+	DestinationUrl                string `json:"destinationUrl,omitempty"`
+	ExpirationDuration            int    `json:"expirationDuration,omitempty"`
+	ExtensionDuration             int    `json:"extensionDuration,omitempty"`
+	Extendable                    bool   `json:"extendable"`
+	ExtensionLimit                int    `json:"extensionLimit,omitempty"`
+	NotificationPriorToExpiration int    `json:"notificationPriorToExpiration"`
+	PolicyOrderingEnabled         bool   `json:"policyOrderingEnabled"`
+	UseDefaultAppUrl              bool   `json:"useDefaultAppUrl,omitempty"`
+}
+
+type ProfilePolicyPriority struct {
+	ProfileID             string `json:"papId"`
+	PolicyOrderingEnabled bool   `json:"policyOrderingEnabled"`
+	Extendable            bool   `json:"extendable"`
+	PolicyOrder           []PolicyOrder
+}
+
+type PolicyOrder struct {
+	Id    string `json:"id"`
+	Order int    `json:"order"`
+}
