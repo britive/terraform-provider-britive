@@ -137,7 +137,7 @@ func (rt *ResourceResourceType) resourceRead(ctx context.Context, d *schema.Reso
 
 	var diags diag.Diagnostics
 
-	err := rt.helper.getAndMapModelToResource(d, m)
+	err := rt.helper.getAndMapModelToResource(d, m, false)
 
 	if err != nil {
 		return diag.FromErr(err)
@@ -234,7 +234,7 @@ func (rt *ResourceResourceType) resourceStateImporter(d *schema.ResourceData, m 
 
 	d.SetId(rt.helper.generateUniqueID(resourceType.ResourceTypeID))
 
-	err = rt.helper.getAndMapModelToResource(d, m)
+	err = rt.helper.getAndMapModelToResource(d, m, true)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (rrth *ResourceResourceTypeHelper) mapResourceToModel(d *schema.ResourceDat
 	return nil
 }
 
-func (rrth *ResourceResourceTypeHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
+func (rrth *ResourceResourceTypeHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}, imported bool) error {
 	c := m.(*britive.Client)
 
 	resourceTypeID, err := rrth.parseUniqueID(d.Id())
@@ -312,9 +312,13 @@ func (rrth *ResourceResourceTypeHelper) getAndMapModelToResource(d *schema.Resou
 
 	var parameterList []map[string]interface{}
 	for _, parameter := range resourceType.Parameters {
+		paramType := parameter.ParamType
+		if !imported {
+			paramType = paramMap[parameter.ParamName]
+		}
 		parameterList = append(parameterList, map[string]interface{}{
 			"param_name":   parameter.ParamName,
-			"param_type":   paramMap[parameter.ParamName],
+			"param_type":   paramType,
 			"is_mandatory": parameter.IsMandatory,
 		})
 	}
