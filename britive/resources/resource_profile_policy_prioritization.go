@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
-	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -90,11 +88,6 @@ func (rppp *ResourceProfilePolicyPrioritization) Schema(ctx context.Context, req
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 				Description: "Enable policy ordering",
-				Validators: []validator.Bool{
-					validate.BoolFunc(
-						validate.IsPolicyPriorityEnabled(),
-					),
-				},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -470,6 +463,9 @@ func (rppph *ResourceProfilePolicyPrioritizationHelper) mapResourceToModel(ctx c
 		return nil, err
 	}
 	policyOrderingEnabled := plan.PolicyPriorityEnabled.ValueBool()
+	if !policyOrderingEnabled {
+		return nil, fmt.Errorf("policy_priority_enabled must be set to true. Disabling policy prioritization is not supported for this resource.")
+	}
 
 	userMapPolicyToOrder := make(map[string]int)
 	userMapOrderToPolicy := make(map[int]string)
