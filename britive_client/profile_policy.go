@@ -92,7 +92,7 @@ func (c *Client) DeleteProfilePolicy(ctx context.Context, profileID string, poli
 
 // RetrieveAppIdGivenProfileId - Fetch the app Id for a given profile ID
 func (c *Client) RetrieveAppIdGivenProfileId(ctx context.Context, profileID string) (string, error) {
-	requestURL := fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profileID)
+	requestURL := fmt.Sprintf("%s/paps/%s?skipIntegrityChecks=true", c.APIBaseURL, profileID)
 	body, err := c.Get(ctx, requestURL, ProfileLockName)
 	if err != nil {
 		return EmptyString, err
