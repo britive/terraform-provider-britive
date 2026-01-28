@@ -55,6 +55,14 @@ type DataSourceEscalationPolicyPlan struct {
 	ImConnectionID types.String `tfsdk:"im_connection_id"`
 }
 
+type DataSourceSupportedConstraintsPlan struct {
+	ID              types.String `tfsdk:"id"`
+	ProfileID       types.String `tfsdk:"profile_id"`
+	PermissionName  types.String `tfsdk:"permission_name"`
+	PermissionType  types.String `tfsdk:"permission_type"`
+	ConstraintTypes types.Set    `tfsdk:"constraint_types"`
+}
+
 // Resources
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`
