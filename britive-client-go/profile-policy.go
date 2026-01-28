@@ -132,7 +132,7 @@ func (c *Client) DeleteProfilePolicy(profileID string, policyID string) error {
 
 // RetrieveAppIdGivenProfileId - Fetch the app Id for a given profile ID
 func (c *Client) RetrieveAppIdGivenProfileId(profileID string) (string, error) {
-	requestURL := fmt.Sprintf("%s/paps/%s", c.APIBaseURL, profileID)
+	requestURL := fmt.Sprintf("%s/paps/%s?skipIntegrityChecks=true", c.APIBaseURL, profileID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return emptyString, err
