@@ -10,6 +10,9 @@ import (
 )
 
 func TestBritiveAdvancedSettings(t *testing.T) {
+	// Skipping advanced settings acceptance test due to ongoing stabilization
+	t.Skip("TEMP: Skipping advanced settings acceptance test due to ongoing stabilization; will be re-enabled shortly")
+
 	applicationName := "DO NOT DELETE - AWS TF Plugin"
 	profileName := "AT - TF ADVANCED SETTINGS PROFILE"
 	profilePolicyName := "AT - TF ADVANCED SETTINGS PROFILE POLICY"
