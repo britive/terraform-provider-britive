@@ -103,6 +103,17 @@ func (dep *DataSourceEscalationPolicy) Read(ctx context.Context, req datasource.
 			if policy["name"] == policyName {
 				plan.Name = types.StringValue(policyName)
 				plan.ID = types.StringValue(policy["id"])
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+				if resp.Diagnostics.HasError() {
+					tflog.Error(ctx, "Failed to set state after read", map[string]interface{}{
+						"diagnostics": resp.Diagnostics,
+					})
+					return
+				}
+				tflog.Info(ctx, "Update completed and state set", map[string]interface{}{
+					"escalationPolicies": plan,
+				})
 				return
 			}
 			policyNames = append(policyNames, policy["name"]+",")
