@@ -216,3 +216,19 @@ func (c *Client) GetAllConnections(ctx context.Context, settingType string) ([]C
 	}
 	return connectionsResponse, nil
 }
+
+func (c *Client) GetEscalationPolicies(ctx context.Context, page int, imConnectionId, policyName string) (*EscalationPolicies, error) {
+	url := fmt.Sprintf("%s/im-integration/%s/escalation-policies/search?page=%d&size=20&searchText=%s", c.APIBaseURL, imConnectionId, page, policyName)
+
+	body, err := c.Get(ctx, url, AdvancedSettingLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies EscalationPolicies
+	err = json.Unmarshal(body, &policies)
+	if err != nil {
+		return nil, err
+	}
+	return &policies, nil
+}

@@ -49,6 +49,12 @@ type DataSourceSingleConnectionPlan struct {
 	AuthType    types.String `tfsdk:"auth_type"`
 }
 
+type DataSourceEscalationPolicyPlan struct {
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	ImConnectionID types.String `tfsdk:"im_connection_id"`
+}
+
 // Resources
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`
