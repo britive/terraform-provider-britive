@@ -5,3 +5,4 @@ ENHANCEMENTS:
 
 BUG FIXES:
 * `britive_resource_manager_resource_type` : Fixed issues with resource type imports.
+* `britive_profile_policy`: Fixed read timeouts due to integrity checks.
