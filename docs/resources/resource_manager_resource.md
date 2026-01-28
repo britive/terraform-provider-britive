@@ -21,6 +21,9 @@ resource "britive_resource_manager_resource" "example" {
     parameter_values = {
         "hostname" = "prod-server-01"
         "port"     = "22"
+        "ip"       = "190.168.1.0/24"
+        "regex"    = "testregex"
+        "list"     = "test1, test2"
     }
 
     resource_labels = {

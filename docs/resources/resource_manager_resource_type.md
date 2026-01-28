@@ -27,6 +27,21 @@ resource "britive_resource_manager_resource_type" "example" {
     param_type   = "password"
     is_mandatory = true
   }
+  parameters {
+    param_name   = "ip"
+    param_type   = "ip-cidr"
+    is_mandatory = true
+  }
+  parameters {
+    param_name   = "regex"
+    param_type   = "regex-pattern"
+    is_mandatory = true
+  }
+  parameters {
+    param_name   = "list"
+    param_type   = "list"
+    is_mandatory = true
+  }
 }
 ```
 
@@ -37,7 +52,7 @@ resource "britive_resource_manager_resource_type" "example" {
 * `icon` - (Required) The icon of the Britive resource type
 * `parameters` - (Optional) A set of parameters/fields for the resource type. Each parameter supports the following attributes:
   * `param_name` - (Required) The name of the parameter. Only letters, numbers, hyphens (`-`), and underscores (`_`) are allowed, no other special characters.
-  * `param_type` - (Required) The type of the parameter. Must be one of `string` or `password` (case-insensitive).
+  * `param_type` - (Required) The type of the parameter. Must be one of [`string`, `password`, `ip-cidr`, `regex-pattern`, `list`] (case-insensitive).
   * `is_mandatory` - (Required) A boolean indicating whether the parameter is mandatory.
 
 ## Attribute Reference

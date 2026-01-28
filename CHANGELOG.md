@@ -1,4 +1,7 @@
-## 2.2.7
+## 2.2.8
 
 ENHANCEMENTS:
-* `britive_application` : Support extended to create and manage applications of type GCP WIF.
+* `britive_resource_manager_resource_type` : Extended support for creating and managing dynamic resource types.
+
+BUG FIXES:
+* `britive_resource_manager_resource_type` : Fixed issues with resource type imports.
