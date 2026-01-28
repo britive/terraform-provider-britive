@@ -199,6 +199,7 @@ func (p *britiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 		datasources.NewDataSourceApplication,
 		datasources.NewDataSourceAllConnections,
 		datasources.NewDataSourceConnection,
+		datasources.NewDataSourceEscalationPolicy,
 	}
 }
 
