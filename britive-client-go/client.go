@@ -1,9 +1,12 @@
 package britive
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -12,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -183,35 +187,96 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
 	req.Header.Add("User-Agent", userAgent)
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
+	ctx := req.Context()
+	req = req.WithContext(ctx)
+	var prevRetryAfter time.Duration
 
-	if res.StatusCode == http.StatusNoContent {
-		return []byte(emptyString), ErrNoContent
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, _ = io.ReadAll(req.Body)
 	}
 
-	if res.StatusCode == http.StatusNotFound {
-		return body, ErrNotFound
-	}
-
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
-		var httpErrorResponse HTTPErrorResponse
-		err = json.Unmarshal(body, &httpErrorResponse)
-		if err == nil && httpErrorResponse.Message != emptyString {
-			return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		r := req.Clone(ctx)
+		if bodyBytes != nil {
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		}
-		return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
+
+		if IsSleepWithContext {
+			jitter := time.Duration(rand.Intn(5000)+1) * time.Millisecond
+			time.After(jitter)
+		}
+
+		res, err := c.HTTPClient.Do(r)
+		if err != nil {
+			return nil, err
+		}
+
+		if res.StatusCode == http.StatusNoContent {
+			return []byte(emptyString), ErrNoContent
+		}
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode == http.StatusTooManyRequests {
+			IsSleepWithContext = true
+			retryAfter := parseRetryAfter(res, prevRetryAfter)
+			if prevRetryAfter, err = sleepWithContext(ctx, retryAfter); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		if res.StatusCode == http.StatusNotFound {
+			return body, ErrNotFound
+		}
+
+		if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
+			var httpErrorResponse HTTPErrorResponse
+			err = json.Unmarshal(body, &httpErrorResponse)
+			if err == nil && httpErrorResponse.Message != emptyString {
+				return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+			}
+			return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
+		}
+
+		return body, err
 	}
 
-	return body, err
+	return nil, fmt.Errorf("request failed after %d retries", maxRetries)
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) (time.Duration, error) {
+	d += d / 2
+	select {
+	case <-time.After(d):
+		return d, nil
+	case <-ctx.Done():
+		return d, ctx.Err()
+	}
+}
+
+func parseRetryAfter(res *http.Response, prevRetryAfter time.Duration) time.Duration {
+	ra := res.Header.Get("Retry-After")
+	var retryAfter = 30 * time.Second
+	if ra == "" {
+		return retryAfter + prevRetryAfter
+	}
+	// Case 1: seconds
+	if secs, err := strconv.Atoi(ra); err == nil {
+		retryAfter = time.Duration(secs) * time.Second
+	}
+
+	// Case 2: HTTP date
+	if t, err := http.ParseTime(ra); err == nil {
+		retryAfter = time.Until(t)
+	}
+
+	return retryAfter + prevRetryAfter
 }
 
 // Lock to lock based on key
