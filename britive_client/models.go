@@ -18,6 +18,30 @@ type PaginationResponse struct {
 	Data   []interface{} `json:"data"`
 }
 
+// Tag - godoc
+type Tag struct {
+	ID                       string                    `json:"userTagId,omitempty"`
+	Name                     string                    `json:"name"`
+	Description              string                    `json:"description"`
+	Status                   string                    `json:"status,omitempty"`
+	UserTagIdentityProviders []UserTagIdentityProvider `json:"userTagIdentityProviders,omitempty"`
+	External                 interface{}               `json:"external,omitempty"`
+}
+
+// UserTagIdentityProvider - godoc
+type UserTagIdentityProvider struct {
+	IdentityProvider IdentityProvider `json:"identityProvider"`
+	ExternalID       interface{}      `json:"externalId,omitempty"`
+}
+
+// IdentityProvider - godoc
+type IdentityProvider struct {
+	ID          string `json:"id"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type,omitempty"`
+}
+
 // Condition Constraint - godoc
 type ConditionConstraint struct {
 	Title       string `json:"title"`

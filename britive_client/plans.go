@@ -63,6 +63,12 @@ type DataSourceSupportedConstraintsPlan struct {
 	ConstraintTypes types.Set    `tfsdk:"constraint_types"`
 }
 
+type DataSourceIdentityProviderPlan struct {
+	ID   types.String `tfsdk:"id"`
+	Name types.String `tfsdk:"name"`
+	Type types.String `tfsdk:"type"`
+}
+
 // Resources
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`

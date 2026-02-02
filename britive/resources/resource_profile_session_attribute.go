@@ -536,10 +536,20 @@ func (rpsah *ResourceProfileSessionAttributeHelper) getAndMapModelToPlan(ctx con
 	} else {
 		attributeValue = pt.AttributeValue
 	}
+
 	plan.ProfileID = types.StringValue(profileID)
-	plan.AttributeName = types.StringValue(attributeName)
+	if attributeName == "" {
+		plan.AttributeName = types.StringNull()
+	} else {
+		plan.AttributeName = types.StringValue(attributeName)
+	}
+
 	plan.AttributeType = types.StringValue(pt.SessionAttributeType)
-	plan.AttributeValue = types.StringValue(attributeValue)
+	if attributeValue == "" {
+		plan.AttributeValue = types.StringNull()
+	} else {
+		plan.AttributeValue = types.StringValue(attributeValue)
+	}
 	plan.MappingName = types.StringValue(pt.MappingName)
 	plan.Transitive = types.BoolValue(pt.Transitive)
 
