@@ -307,3 +307,23 @@ type PolicyOrder struct {
 	Id    string `json:"id"`
 	Order int    `json:"order"`
 }
+
+// SessionAttribute - godoc
+type SessionAttribute struct {
+	AttributeSchemaID    string `json:"attributeSchemaId"`
+	MappingName          string `json:"mappingName"`
+	Transitive           bool   `json:"transitive"`
+	SessionAttributeType string `json:"sessionAttributeType"`
+	AttributeValue       string `json:"attributeValue"`
+	ID                   string `json:"id,omitempty"`
+}
+
+// UserAttribute - godoc
+type UserAttribute struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	DataType    string `json:"dataType"`
+	MultiValued bool   `json:"multiValued"`
+	BuiltIn     bool   `json:"builtIn"`
+}

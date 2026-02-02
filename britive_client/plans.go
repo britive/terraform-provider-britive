@@ -227,3 +227,15 @@ type PolicyPriorityPlan struct {
 	ID       types.String `tfsdk:"id"`
 	Priority types.Int64  `tfsdk:"priority"`
 }
+
+type ProfileSessionAttributePlan struct {
+	ID             types.String `tfsdk:"id"`
+	AppName        types.String `tfsdk:"app_name"`
+	ProfileID      types.String `tfsdk:"profile_id"`
+	ProfileName    types.String `tfsdk:"profile_name"`
+	AttributeName  types.String `tfsdk:"attribute_name"`
+	AttributeType  types.String `tfsdk:"attribute_type"`
+	AttributeValue types.String `tfsdk:"attribute_value"`
+	MappingName    types.String `tfsdk:"mapping_name"`
+	Transitive     types.Bool   `tfsdk:"transitive"`
+}
