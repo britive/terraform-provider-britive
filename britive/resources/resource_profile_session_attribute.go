@@ -98,6 +98,9 @@ func (rpsa *ResourceProfileSessionAttribute) Schema(ctx context.Context, req res
 				Optional:    true,
 				Computed:    true,
 				Description: "Profile associated application name",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"profile_id": schema.StringAttribute{
 				Required:    true,
@@ -116,6 +119,9 @@ func (rpsa *ResourceProfileSessionAttribute) Schema(ctx context.Context, req res
 				Optional:    true,
 				Computed:    true,
 				Description: "The profile name",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"attribute_name": schema.StringAttribute{
 				Optional:    true,
@@ -131,6 +137,7 @@ func (rpsa *ResourceProfileSessionAttribute) Schema(ctx context.Context, req res
 				Default:     stringdefault.StaticString("Identity"),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
 					stringvalidator.OneOf(

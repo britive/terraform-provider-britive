@@ -488,7 +488,11 @@ func (rph *ResourceProfileHelper) getAndMapModelToPlan(ctx context.Context, clie
 	plan.ID = types.StringValue(profileID)
 	plan.AppContainerID = types.StringValue(profile.AppContainerID)
 	plan.Name = types.StringValue(profile.Name)
-	plan.Description = types.StringValue(profile.Description)
+	if strings.TrimSpace(profile.Description) == "" {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(profile.Description)
+	}
 	plan.AllowImpersonation = types.BoolValue(profile.AllowImpersonation)
 	plan.Disabled = types.BoolValue(strings.EqualFold(profile.Status, "inactive"))
 	plan.ExpirationDuration = types.StringValue(time.Duration(profile.ExpirationDuration * int64(time.Millisecond)).String())
@@ -775,8 +779,11 @@ func (rph *ResourceProfileHelper) mapPlanToModel(plan britive_client.ProfilePlan
 	profile := britive_client.Profile{
 		AppContainerID:     plan.AppContainerID.ValueString(),
 		Name:               plan.Name.ValueString(),
-		Description:        plan.Description.ValueString(),
 		AllowImpersonation: plan.AllowImpersonation.ValueBool(),
+	}
+
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		profile.Description = plan.Description.ValueString()
 	}
 
 	if !plan.DestinationUrl.IsNull() && !plan.DestinationUrl.IsUnknown() && plan.DestinationUrl.ValueString() != "" {
