@@ -543,6 +543,19 @@ func (rpsah *ResourceProfileSessionAttributeHelper) getAndMapModelToPlan(ctx con
 	plan.MappingName = types.StringValue(pt.MappingName)
 	plan.Transitive = types.BoolValue(pt.Transitive)
 
+	profile, err := c.GetProfile(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+
+	app, err := c.GetApplication(ctx, profile.AppContainerID)
+	if err != nil {
+		return nil, err
+	}
+
+	plan.ProfileName = types.StringValue(profile.Name)
+	plan.AppName = types.StringValue(app.CatalogAppDisplayName)
+
 	return &plan, nil
 }
 
