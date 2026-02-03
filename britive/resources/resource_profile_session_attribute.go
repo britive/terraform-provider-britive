@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
@@ -281,7 +280,7 @@ func (rpsa *ResourceProfileSessionAttribute) Update(ctx context.Context, req res
 		return
 	}
 
-	profileID, sessionAttributeID, err := rpsa.helper.parseUniqueID(state.ID.ValueString())
+	profileID, sessionAttributeID, err := rpsa.helper.parseUniqueID(plan.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update profile session attribute", err.Error())
 		tflog.Error(ctx, fmt.Sprintf("error:%#v", err))
@@ -359,7 +358,6 @@ func (rpsa *ResourceProfileSessionAttribute) Delete(ctx context.Context, req res
 		return
 	}
 
-	log.Printf("[INFO] Deleted profile session attribute: %s/%s", profileID, sessionAttributeID)
 	tflog.Info(ctx, fmt.Sprintf("Deleted profile session attribute: %s/%s", profileID, sessionAttributeID))
 
 	resp.State.RemoveResource(ctx)

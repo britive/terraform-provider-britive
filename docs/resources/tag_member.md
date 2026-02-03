@@ -33,6 +33,8 @@ In addition to the above arguments, the following attribute is exported.
 
 * `id` - An identifier of the resource with format `tags/{{tagID}}/users/{{userID}}`
 
+* `tag_name` - The name of Britive tag.
+
 ## Import
 
 You can import the Britive tag member using any of these accepted formats:

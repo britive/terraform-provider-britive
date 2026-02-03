@@ -70,6 +70,22 @@ type DataSourceIdentityProviderPlan struct {
 }
 
 // Resources
+type TagPlan struct {
+	ID                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	Description        types.String `tfsdk:"description"`
+	Disabled           types.Bool   `tfsdk:"disabled"`
+	IdentityProviderID types.String `tfsdk:"identity_provider_id"`
+	External           types.Bool   `tfsdk:"external"`
+}
+
+type TagMemberPlan struct {
+	ID       types.String `tfsdk:"id"`
+	TagID    types.String `tfsdk:"tag_id"`
+	TagName  types.String `tfsdk:"tag_name"`
+	Username types.String `tfsdk:"username"`
+}
+
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`
 	ProfileID      types.String `tfsdk:"profile_id"`

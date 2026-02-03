@@ -52,9 +52,5 @@ func (c *Client) getIdentityProvider(ctx context.Context, resourceURL string) (*
 		return nil, err
 	}
 
-	if identityProvider == nil {
-		return nil, ErrNotFound
-	}
-
 	return identityProvider, nil
 }

@@ -9,6 +9,8 @@ var (
 	AdvancedSettingLockName  = "advancedSettingLock"
 	ConstraintLockName       = "constraintLock"
 	IdentityProviderLockName = "identityProviderLock"
+	TagLockName              = "tagLock"
+	UserLockName             = "userLock"
 )
 
 var (
