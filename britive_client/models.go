@@ -66,6 +66,16 @@ type AdminRole struct {
 	DisplayName string `json:"displayName,omitempty"`
 }
 
+// Permission - godoc
+type Permission struct {
+	PermissionID string        `json:"id,omitempty"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description,omitempty"`
+	Consumer     string        `json:"consumer"`
+	Resources    []interface{} `json:"resources"`
+	Actions      []interface{} `json:"actions"`
+}
+
 // Condition Constraint - godoc
 type ConditionConstraint struct {
 	Title       string `json:"title"`

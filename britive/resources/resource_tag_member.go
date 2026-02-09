@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
@@ -142,7 +141,6 @@ func (rtm *ResourceTagMember) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	log.Printf("[INFO] Creating new tag member: %s/%s", tagID, user.UserID)
 	tflog.Info(ctx, fmt.Sprintf("Creating new tag member: %s/%s", tagID, user.UserID))
 	err = rtm.client.CreateTagMember(ctx, tagID, user.UserID)
 	if err != nil {

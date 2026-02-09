@@ -91,7 +91,7 @@ func (rt *ResourceTag) Schema(ctx context.Context, req resource.SchemaRequest, r
 				},
 			},
 			"description": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "The description of the Britive tag",
 			},
 			"disabled": schema.BoolAttribute{
@@ -147,7 +147,10 @@ func (rt *ResourceTag) Create(ctx context.Context, req resource.CreateRequest, r
 
 	tag := britive_client.Tag{}
 	tag.Name = plan.Name.ValueString()
-	tag.Description = plan.Description.ValueString()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		tag.Description = plan.Description.ValueString()
+	}
+
 	if plan.Disabled.ValueBool() {
 		tag.Status = "Inactive"
 	} else {
@@ -434,7 +437,11 @@ func (rth *ResourceTagHelper) getAndMapModelToPlan(ctx context.Context, plan bri
 
 	tflog.Info(ctx, fmt.Sprintf("Received tag: %#v", tag))
 	plan.Name = types.StringValue(tag.Name)
-	plan.Description = types.StringValue(tag.Description)
+	if strings.EqualFold(tag.Description, "No Description") {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(tag.Description)
+	}
 
 	if len(tag.UserTagIdentityProviders) > 0 {
 		plan.IdentityProviderID = types.StringValue(tag.UserTagIdentityProviders[0].IdentityProvider.ID)

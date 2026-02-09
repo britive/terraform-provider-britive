@@ -86,6 +86,15 @@ type TagMemberPlan struct {
 	Username types.String `tfsdk:"username"`
 }
 
+type PermissionPlan struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Consumer    types.String `tfsdk:"consumer"`
+	Resources   types.Set    `tfsdk:"resources"`
+	Actions     types.Set    `tfsdk:"actions"`
+}
+
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`
 	ProfileID      types.String `tfsdk:"profile_id"`

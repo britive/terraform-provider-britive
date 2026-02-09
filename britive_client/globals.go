@@ -11,6 +11,7 @@ var (
 	IdentityProviderLockName = "identityProviderLock"
 	TagLockName              = "tagLock"
 	UserLockName             = "userLock"
+	PermissionLockName       = "permissionLock"
 )
 
 var (
