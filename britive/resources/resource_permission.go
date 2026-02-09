@@ -248,6 +248,19 @@ func (rp *ResourcePermission) Update(ctx context.Context, req resource.UpdateReq
 		plan.ID = types.StringValue(rp.helper.generateUniqueID(permissionID))
 	}
 	if hasChanges {
+		isUserDescEmpty := false
+		isUerDescUnknown := false
+		isUserDescNull := false
+		if plan.Description.ValueString() == "" {
+			isUserDescEmpty = true
+		}
+		if plan.Description.IsUnknown() {
+			isUerDescUnknown = true
+		}
+		if plan.Description.IsNull() {
+			isUserDescNull = true
+		}
+
 		planPtr, err := rp.helper.getAndMapModelToResource(ctx, plan, rp.client)
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -260,6 +273,15 @@ func (rp *ResourcePermission) Update(ctx context.Context, req resource.UpdateReq
 			return
 		}
 
+		if isUserDescEmpty {
+			planPtr.Description = types.StringValue("")
+		}
+		if isUerDescUnknown {
+			planPtr.Description = types.StringUnknown()
+		}
+		if isUserDescNull {
+			planPtr.Description = types.StringNull()
+		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
 		if resp.Diagnostics.HasError() {
 			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
@@ -402,7 +424,9 @@ func (rph *ResourcePermissionHelper) getAndMapModelToResource(ctx context.Contex
 
 func (rph *ResourcePermissionHelper) mapResourceToModel(ctx context.Context, plan britive_client.PermissionPlan, permission *britive_client.Permission) error {
 	permission.Name = plan.Name.ValueString()
-	permission.Description = plan.Description.ValueString()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		permission.Description = plan.Description.ValueString()
+	}
 	permission.Consumer = plan.Consumer.ValueString()
 
 	resList, err := rph.mapSetToList(ctx, plan.Resources)
