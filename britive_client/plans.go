@@ -95,6 +95,13 @@ type PermissionPlan struct {
 	Actions     types.Set    `tfsdk:"actions"`
 }
 
+type RolePlan struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Permissions types.String `tfsdk:"permissions"`
+}
+
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`
 	ProfileID      types.String `tfsdk:"profile_id"`

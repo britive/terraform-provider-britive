@@ -76,6 +76,14 @@ type Permission struct {
 	Actions      []interface{} `json:"actions"`
 }
 
+// Resource - godoc
+type Role struct {
+	RoleID      string      `json:"id,omitempty"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	Permissions interface{} `json:"permissions"`
+}
+
 // Condition Constraint - godoc
 type ConditionConstraint struct {
 	Title       string `json:"title"`
