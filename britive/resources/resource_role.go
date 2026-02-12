@@ -386,7 +386,7 @@ func (rrh *ResourceRoleHelper) getAndMapModelToPlan(ctx context.Context, plan br
 	tflog.Info(ctx, fmt.Sprintf("Received role %#v", role))
 
 	plan.Name = types.StringValue(role.Name)
-	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && role.Description == "" {
 		plan.Description = types.StringNull()
 	} else {
 		plan.Description = types.StringValue(role.Description)

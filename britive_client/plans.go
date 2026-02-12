@@ -102,6 +102,20 @@ type RolePlan struct {
 	Permissions types.String `tfsdk:"permissions"`
 }
 
+type PolicyPlan struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	IsActive    types.Bool   `tfsdk:"is_active"`
+	IsDraft     types.Bool   `tfsdk:"is_draft"`
+	IsReadOnly  types.Bool   `tfsdk:"is_read_only"`
+	AccessType  types.String `tfsdk:"access_type"`
+	Members     types.String `tfsdk:"members"`
+	Condition   types.String `tfsdk:"condition"`
+	Permissions types.String `tfsdk:"permissions"`
+	Roles       types.String `tfsdk:"roles"`
+}
+
 type ConstraintPlan struct {
 	ID             types.String `tfsdk:"id"`
 	ProfileID      types.String `tfsdk:"profile_id"`

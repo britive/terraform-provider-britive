@@ -211,6 +211,7 @@ func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resources.NewResourceTagMember,
 		resources.NewResourcePermission,
 		resources.NewResourceRole,
+		resources.NewResourcePolicy,
 		resources.NewResourceConstraint,
 		resources.NewResourceApplication,
 		resources.NewResourceProfile,

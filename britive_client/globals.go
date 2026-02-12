@@ -13,6 +13,7 @@ var (
 	UserLockName             = "userLock"
 	PermissionLockName       = "permissionLock"
 	RoleLockName             = "roleLock"
+	PolicyLockName           = "policyLock"
 )
 
 var (

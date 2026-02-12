@@ -385,20 +385,27 @@ func (rpash *ResourceProfileAdditionalSettingsHelper) getAndMapModelToPlan(ctx c
 	}
 
 	plan.ProfileID = types.StringValue(profileID)
-	if (!plan.ConsoleAccess.IsNull() && !plan.ConsoleAccess.IsUnknown()) || isImport {
-		plan.ConsoleAccess =
-			types.BoolValue(profileAdditionalSettings.ConsoleAccess)
-	}
-	if (!plan.UserAppCredentialType.IsNull() && !plan.UserAppCredentialType.IsUnknown()) || isImport {
-		plan.UserAppCredentialType =
-			types.BoolValue(profileAdditionalSettings.UseApplicationCredentialType)
-	}
-	if (!plan.ProgrammaticAccess.IsNull() && !plan.ProgrammaticAccess.IsUnknown()) || isImport {
-		plan.ProgrammaticAccess =
-			types.BoolValue(profileAdditionalSettings.ProgrammaticAccess)
+	if (plan.ConsoleAccess.IsNull() || plan.ConsoleAccess.IsUnknown()) && profileAdditionalSettings.ConsoleAccess == false {
+		plan.ConsoleAccess = types.BoolNull()
+	} else {
+		plan.ConsoleAccess = types.BoolValue(profileAdditionalSettings.ConsoleAccess)
 	}
 
-	if (!plan.ProjectIDForServiceAccount.IsNull() && !plan.ProjectIDForServiceAccount.IsUnknown()) || isImport {
+	if (plan.UserAppCredentialType.IsNull() || plan.UserAppCredentialType.IsUnknown()) && profileAdditionalSettings.UseApplicationCredentialType == false {
+		plan.UserAppCredentialType = types.BoolNull()
+	} else {
+		plan.UserAppCredentialType = types.BoolValue(profileAdditionalSettings.UseApplicationCredentialType)
+	}
+
+	if (plan.ProgrammaticAccess.IsNull() || plan.ProgrammaticAccess.IsUnknown()) && profileAdditionalSettings.ProgrammaticAccess == false {
+		plan.ProgrammaticAccess = types.BoolNull()
+	} else {
+		plan.ProgrammaticAccess = types.BoolValue(profileAdditionalSettings.ProgrammaticAccess)
+	}
+
+	if (plan.ProjectIDForServiceAccount.IsNull() || plan.ProjectIDForServiceAccount.IsUnknown()) && profileAdditionalSettings.ProjectIdForServiceAccount == "" {
+		plan.ProjectIDForServiceAccount = types.StringNull()
+	} else {
 		plan.ProjectIDForServiceAccount = types.StringValue(profileAdditionalSettings.ProjectIdForServiceAccount)
 	}
 

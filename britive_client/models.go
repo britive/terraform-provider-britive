@@ -84,6 +84,21 @@ type Role struct {
 	Permissions interface{} `json:"permissions"`
 }
 
+// Policy - godoc
+type Policy struct {
+	PolicyID    string      `json:"id,omitempty"`
+	Name        string      `json:"name,omitempty"`
+	Description string      `json:"description"`
+	Condition   string      `json:"condition"`
+	Members     interface{} `json:"members"`
+	Roles       interface{} `json:"roles"`
+	Permissions interface{} `json:"permissions"`
+	AccessType  string      `json:"accessType"`
+	IsActive    bool        `json:"isActive"`
+	IsDraft     bool        `json:"isDraft"`
+	IsReadOnly  bool        `json:"isReadOnly"`
+}
+
 // Condition Constraint - godoc
 type ConditionConstraint struct {
 	Title       string `json:"title"`
@@ -322,7 +337,7 @@ type ProfileAdditionalSettings struct {
 	UseApplicationCredentialType bool   `json:"useApplicationCredentialType"`
 	ConsoleAccess                bool   `json:"consoleAccess"`
 	ProgrammaticAccess           bool   `json:"programmaticAccess"`
-	ProjectIdForServiceAccount   string `json:"projectIdForServiceAccount,omitempty"`
+	ProjectIdForServiceAccount   string `json:"projectIdForServiceAccount"`
 }
 
 // ProfilePolicy - godoc

@@ -46,10 +46,6 @@ func (c *Client) GetRole(ctx context.Context, roleID string) (*Role, error) {
 		return nil, err
 	}
 
-	if role == nil {
-		return nil, ErrNotFound
-	}
-
 	return role, nil
 }
 
