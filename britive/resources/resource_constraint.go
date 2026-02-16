@@ -498,16 +498,32 @@ func (rch *ResourceConstraintHelper) getAndMapModelToPlan(ctx context.Context, p
 		newTitle := plan.Title.ValueString()
 		newExpression := plan.Expression.ValueString()
 		newDescription := plan.Description.ValueString()
+		var stateTitle, stateExp, stateDesc string
 		if britive_client.ConditionConstraintEqual(newTitle, newExpression, newDescription, constraintResult) {
-			plan.Title = types.StringValue(newTitle)
-			plan.Expression = types.StringValue(newExpression)
-			plan.Description = types.StringValue(newDescription)
+			stateTitle = newTitle
+			stateExp = newExpression
+			stateDesc = newDescription
 		} else {
 			for _, rule := range constraintResult.Result {
-				plan.Title = types.StringValue(rule.Title)
-				plan.Expression = types.StringValue(rule.Expression)
-				plan.Description = types.StringValue(rule.Description)
+				stateTitle = rule.Title
+				stateExp = rule.Expression
+				stateDesc = rule.Description
 			}
+		}
+		if (plan.Title.IsNull() || plan.Title.IsUnknown()) && stateTitle == "" {
+			plan.Title = types.StringNull()
+		} else {
+			plan.Title = types.StringValue(stateTitle)
+		}
+		if (plan.Expression.IsNull() || plan.Expression.IsUnknown()) && stateExp == "" {
+			plan.Expression = types.StringNull()
+		} else {
+			plan.Expression = types.StringValue(stateExp)
+		}
+		if (plan.Description.IsNull() || plan.Description.IsUnknown()) && stateDesc == "" {
+			plan.Description = types.StringNull()
+		} else {
+			plan.Description = types.StringValue(stateDesc)
 		}
 	} else {
 		constraintResult, err := c.GetConstraint(ctx, profileID, permissionName, permissionType, constraintType)
@@ -519,13 +535,19 @@ func (rch *ResourceConstraintHelper) getAndMapModelToPlan(ctx context.Context, p
 		}
 
 		newName := plan.Name.ValueString()
+		var stateName string
 
 		if britive_client.ConstraintEqual(newName, constraintResult) {
-			plan.Name = types.StringValue(newName)
+			stateName = newName
 		} else {
 			for _, rule := range constraintResult.Result {
-				plan.Name = types.StringValue(rule.Name)
+				stateName = rule.Name
 			}
+		}
+		if (plan.Name.IsNull() || plan.Name.IsUnknown()) && stateName == "" {
+			plan.Name = types.StringNull()
+		} else {
+			plan.Name = types.StringValue(stateName)
 		}
 	}
 	return &plan, nil

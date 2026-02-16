@@ -9,6 +9,7 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
 	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -109,6 +110,12 @@ func (rp *ResourceProfile) Schema(ctx context.Context, req resource.SchemaReques
 			"expiration_duration": schema.StringAttribute{
 				Required:    true,
 				Description: "The expiration time for the Britive profile",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"notificationPriorToExpiration",
+						validate.IsTimeMissinUnit(),
+					),
+				},
 			},
 			"extendable": schema.BoolAttribute{
 				Optional:    true,
@@ -119,10 +126,22 @@ func (rp *ResourceProfile) Schema(ctx context.Context, req resource.SchemaReques
 			"notification_prior_to_expiration": schema.StringAttribute{
 				Optional:    true,
 				Description: "The profile expiry notification as a time value",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"notificationPriorToExpiration",
+						validate.IsTimeMissinUnit(),
+					),
+				},
 			},
 			"extension_duration": schema.StringAttribute{
 				Optional:    true,
 				Description: "The profile expiry extension as a time value",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"notificationPriorToExpiration",
+						validate.IsTimeMissinUnit(),
+					),
+				},
 			},
 			"extension_limit": schema.Int64Attribute{
 				Optional:    true,
@@ -488,7 +507,7 @@ func (rph *ResourceProfileHelper) getAndMapModelToPlan(ctx context.Context, clie
 	plan.ID = types.StringValue(profileID)
 	plan.AppContainerID = types.StringValue(profile.AppContainerID)
 	plan.Name = types.StringValue(profile.Name)
-	if strings.TrimSpace(profile.Description) == "" {
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && profile.Description == britive_client.EmptyString {
 		plan.Description = types.StringNull()
 	} else {
 		plan.Description = types.StringValue(profile.Description)
@@ -504,9 +523,9 @@ func (rph *ResourceProfileHelper) getAndMapModelToPlan(ctx context.Context, clie
 		if profile.ExtensionDuration != nil {
 			plan.ExtensionDuration = types.StringValue(time.Duration(*profile.ExtensionDuration * int64(time.Millisecond)).String())
 		}
-		plan.ExtensionLimit = types.Int64Value(profile.ExtensionLimit.(int64))
+		plan.ExtensionLimit = types.Int64Value(int64(profile.ExtensionLimit.(float64)))
 	}
-	if profile.DestinationUrl == "" {
+	if (plan.DestinationUrl.IsNull() || plan.DestinationUrl.IsUnknown()) && profile.DestinationUrl == britive_client.EmptyString {
 		plan.DestinationUrl = types.StringNull()
 	} else {
 		plan.DestinationUrl = types.StringValue(profile.DestinationUrl)

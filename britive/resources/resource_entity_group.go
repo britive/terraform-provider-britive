@@ -80,7 +80,6 @@ func (reg *ResourceEntityGroup) Schema(ctx context.Context, req resource.SchemaR
 				},
 			},
 			"entity_id": schema.StringAttribute{
-				Optional:    true,
 				Computed:    true,
 				Description: "The identity of the application entity of type environment group",
 				PlanModifiers: []planmodifier.String{
@@ -437,7 +436,6 @@ func (regh *ResourceEntityGroupHelper) mapResourceToModel(plan britive_client.En
 	applicationEntity.Name = plan.EntityName.ValueString()
 	applicationEntity.Description = plan.EntityDescription.ValueString()
 	applicationEntity.ParentID = plan.ParentID.ValueString()
-	applicationEntity.EntityID = plan.EntityID.ValueString()
 }
 
 func (resourceEntityGroupHelper *ResourceEntityGroupHelper) generateUniqueID(applicationID, entityID string) string {

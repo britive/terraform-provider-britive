@@ -101,3 +101,12 @@ func StringIsNotWhiteSpace() func(string) error {
 		return nil
 	}
 }
+
+func IsTimeMissinUnit() func(string) error {
+	return func(s string) error {
+		if strings.TrimSpace(s) == "0" {
+			return fmt.Errorf("time: missing unit in duration '0'")
+		}
+		return nil
+	}
+}

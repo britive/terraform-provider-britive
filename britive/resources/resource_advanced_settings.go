@@ -120,9 +120,6 @@ func (ras *ResourceAdvancedSettings) Schema(ctx context.Context, req resource.Sc
 						"justification_id": schema.StringAttribute{
 							Computed:    true,
 							Description: "Justification setting ID",
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 						"is_justification_required": schema.BoolAttribute{
 							Required:    true,
@@ -145,9 +142,6 @@ func (ras *ResourceAdvancedSettings) Schema(ctx context.Context, req resource.Sc
 						"itsm_id": schema.StringAttribute{
 							Computed:    true,
 							Description: "ITSM Setting ID",
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 						"connection_id": schema.StringAttribute{
 							Required:    true,
@@ -200,9 +194,6 @@ func (ras *ResourceAdvancedSettings) Schema(ctx context.Context, req resource.Sc
 						"im_id": schema.StringAttribute{
 							Computed:    true,
 							Description: "IM settings ID",
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 						"connection_id": schema.StringAttribute{
 							Required:    true,

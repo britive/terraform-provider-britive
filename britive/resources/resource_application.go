@@ -115,6 +115,12 @@ func (ra *ResourceApplication) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+				Validators: []validator.String{
+					validate.StringFunc(
+						"version",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
 			},
 			"catalog_app_id": schema.Int64Attribute{
 				Computed:    true,

@@ -86,7 +86,6 @@ func (ree *ResourceEntityEnvironment) Schema(ctx context.Context, req resource.S
 				},
 			},
 			"entity_id": schema.StringAttribute{
-				Optional:    true,
 				Computed:    true,
 				Description: "The identity of the application entity of type environment",
 				PlanModifiers: []planmodifier.String{
@@ -580,7 +579,6 @@ func (reeh *ResourceEntityEnvironmentHelper) mapResourceToModel(plan britive_cli
 	applicationEntity.Name = entityName
 	applicationEntity.Description = description
 	applicationEntity.ParentGroupID = plan.ParentGroupID.ValueString()
-	applicationEntity.EntityID = plan.EntityID.ValueString()
 	return nil
 }
 
