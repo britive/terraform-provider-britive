@@ -69,6 +69,18 @@ type DataSourceIdentityProviderPlan struct {
 	Type types.String `tfsdk:"type"`
 }
 
+type DataResourceManagerProfilePermissionsPlan struct {
+	ID          types.String                        `tfsdk:"id"`
+	ProfileID   types.String                        `tfsdk:"profile_id"`
+	Permissions []DataResourceManagerPermissionPlan `tfsdk:"permissions"`
+}
+
+type DataResourceManagerPermissionPlan struct {
+	Name         types.String `tfsdk:"name"`
+	PermissionID types.String `tfsdk:"permission_id"`
+	Version      []string     `tfsdk:"version"`
+}
+
 // Resources
 type TagPlan struct {
 	ID                 types.String `tfsdk:"id"`

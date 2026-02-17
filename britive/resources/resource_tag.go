@@ -437,7 +437,7 @@ func (rth *ResourceTagHelper) getAndMapModelToPlan(ctx context.Context, plan bri
 
 	tflog.Info(ctx, fmt.Sprintf("Received tag: %#v", tag))
 	plan.Name = types.StringValue(tag.Name)
-	if strings.EqualFold(tag.Description, "No Description") {
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && (strings.EqualFold(tag.Description, "No Description") || tag.Description == britive_client.EmptyString) {
 		plan.Description = types.StringNull()
 	} else {
 		plan.Description = types.StringValue(tag.Description)

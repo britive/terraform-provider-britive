@@ -3,17 +3,18 @@ package britive_client
 import "errors"
 
 var (
-	EmptyString              = ""
-	ProfileLockName          = "profileLock"
-	ApplicationLockName      = "applicationLock"
-	AdvancedSettingLockName  = "advancedSettingLock"
-	ConstraintLockName       = "constraintLock"
-	IdentityProviderLockName = "identityProviderLock"
-	TagLockName              = "tagLock"
-	UserLockName             = "userLock"
-	PermissionLockName       = "permissionLock"
-	RoleLockName             = "roleLock"
-	PolicyLockName           = "policyLock"
+	EmptyString                    = ""
+	ProfileLockName                = "profileLock"
+	ApplicationLockName            = "applicationLock"
+	AdvancedSettingLockName        = "advancedSettingLock"
+	ConstraintLockName             = "constraintLock"
+	IdentityProviderLockName       = "identityProviderLock"
+	TagLockName                    = "tagLock"
+	UserLockName                   = "userLock"
+	PermissionLockName             = "permissionLock"
+	RoleLockName                   = "roleLock"
+	PolicyLockName                 = "policyLock"
+	ResourceManagerProfileLockName = "resourceManagerProfileLock"
 )
 
 var (

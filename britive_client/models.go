@@ -408,3 +408,8 @@ type UserAttribute struct {
 	MultiValued bool   `json:"multiValued"`
 	BuiltIn     bool   `json:"builtIn"`
 }
+
+// Resource Manager Permissions - godoc
+type ResourceManagerPermissions struct {
+	Permissions []map[string]interface{} `json:"data"`
+}

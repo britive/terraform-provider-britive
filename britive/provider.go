@@ -202,6 +202,7 @@ func (p *britiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 		datasources.NewDataSourceEscalationPolicy,
 		datasources.NewDataSourceSupportedConstraints,
 		datasources.NewDataSourceIdentityProvider,
+		datasources.NewDataSourceResourceManagerProfilePermissions,
 	}
 }
 

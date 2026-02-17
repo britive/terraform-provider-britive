@@ -146,7 +146,7 @@ func (rpas *ResourceProfileAdditionalSettings) Create(ctx context.Context, req r
 	tflog.Info(ctx, fmt.Sprintf("Submitted new profile additional settings: %#v", pas))
 	plan.ID = types.StringValue(rpas.helper.generateUniqueID(pas.ProfileID))
 
-	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, plan, *rpas.client, false)
+	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, plan, *rpas.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Failed to get profile additional settings",
@@ -189,7 +189,7 @@ func (rpas *ResourceProfileAdditionalSettings) Read(ctx context.Context, req res
 		return
 	}
 
-	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, state, *rpas.client, false)
+	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, state, *rpas.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Failed to get profile additional settings",
@@ -257,7 +257,7 @@ func (rpas *ResourceProfileAdditionalSettings) Update(ctx context.Context, req r
 		plan.ID = types.StringValue(rpas.helper.generateUniqueID(profileID))
 	}
 	if hasChanges {
-		planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, plan, *rpas.client, false)
+		planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, plan, *rpas.client)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Failed to get profile additional settings",
@@ -348,7 +348,7 @@ func (rpas *ResourceProfileAdditionalSettings) ImportState(ctx context.Context, 
 	plan := &britive_client.ProfileAdditionalSettingsPlan{
 		ID: types.StringValue(rpas.helper.generateUniqueID(profileID)),
 	}
-	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, *plan, *rpas.client, true)
+	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, *plan, *rpas.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Failed to import profile additional settings",
@@ -371,7 +371,7 @@ func (rpas *ResourceProfileAdditionalSettings) ImportState(ctx context.Context, 
 	tflog.Info(ctx, fmt.Sprintf("Imported profile additional settings for %s", profileID))
 }
 
-func (rpash *ResourceProfileAdditionalSettingsHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ProfileAdditionalSettingsPlan, c britive_client.Client, isImport bool) (*britive_client.ProfileAdditionalSettingsPlan, error) {
+func (rpash *ResourceProfileAdditionalSettingsHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ProfileAdditionalSettingsPlan, c britive_client.Client) (*britive_client.ProfileAdditionalSettingsPlan, error) {
 	profileID, err := rpash.parseUniqueID(plan.ID.ValueString())
 	if err != nil {
 		return nil, err
