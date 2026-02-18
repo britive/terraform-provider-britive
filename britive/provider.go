@@ -11,6 +11,7 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive/datasources"
 	"github.com/britive/terraform-provider-britive/britive/resources"
+	"github.com/britive/terraform-provider-britive/britive/resources/resourcemanager"
 	"github.com/britive/terraform-provider-britive/britive_client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -224,5 +225,7 @@ func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resources.NewResourceProfilePolicy,
 		resources.NewResourceProfilePolicyPrioritization,
 		resources.NewResourceProfileSessionAttribute,
+		//ResourceManager Resources
+		resourcemanager.NewResourceResourceManagerResourceLabel,
 	}
 }

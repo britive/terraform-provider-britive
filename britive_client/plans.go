@@ -303,3 +303,22 @@ type ProfileSessionAttributePlan struct {
 	MappingName    types.String `tfsdk:"mapping_name"`
 	Transitive     types.Bool   `tfsdk:"transitive"`
 }
+
+type ResourceManagerResourceLabelPlan struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Internal    types.Bool   `tfsdk:"internal"`
+	LabelColor  types.String `tfsdk:"label_color"`
+	Values      types.Set    `tfsdk:"values"`
+}
+
+type ResourceManagerResourceLabelValuePlan struct {
+	ValueID     types.String `tfsdk:"value_id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	CreatedBy   types.Int64  `tfsdk:"created_by"`
+	UpdatedBy   types.Int64  `tfsdk:"updated_by"`
+	CreatedOn   types.String `tfsdk:"created_on"`
+	UpdatedOn   types.String `tfsdk:"updated_on"`
+}

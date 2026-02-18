@@ -413,3 +413,23 @@ type UserAttribute struct {
 type ResourceManagerPermissions struct {
 	Permissions []map[string]interface{} `json:"data"`
 }
+
+// Resource Label Resource - godoc
+type ResourceLabel struct {
+	LabelId     string               `json:"keyId,omitempty"`
+	Name        string               `json:"keyName,omitempty"`
+	Description string               `json:"description,omitempty"`
+	Internal    bool                 `json:"internal,omitempty"`
+	LabelColor  string               `json:"labelColor,omitempty"`
+	Values      []ResourceLabelValue `json:"values,omitempty"`
+}
+
+type ResourceLabelValue struct {
+	ValueId     string `json:"valueId,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	CreatedBy   int    `json:"createdBy,omitempty"`
+	UpdatedBy   int    `json:"updatedBy,omitempty"`
+	CreatedOn   string `json:"createdOn,omitempty"`
+	UpdatedOn   string `json:"updatedOn,omitempty"`
+}

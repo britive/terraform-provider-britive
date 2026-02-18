@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
@@ -106,6 +107,22 @@ func IsTimeMissinUnit() func(string) error {
 	return func(s string) error {
 		if strings.TrimSpace(s) == "0" {
 			return fmt.Errorf("time: missing unit in duration '0'")
+		}
+		return nil
+	}
+}
+
+func StringWithNoSpecialChar() func(string) error {
+	return func(s string) error {
+		if strings.TrimSpace(s) == "" {
+			return fmt.Errorf("expected %q to not be an empty string or whitespace", s)
+		}
+
+		for i := 0; i < len(s); i++ {
+			char := rune(s[i])
+			if !(unicode.IsLetter(char)) && !(s[i] == '_') && !(s[i] == '-') && !(unicode.IsDigit(char)) {
+				return fmt.Errorf("'%s' contains invalid characters. Allowed characters are: alphanumeric and special characters:['_', '-']", s)
+			}
 		}
 		return nil
 	}
