@@ -45,10 +45,6 @@ In addition to the arguments above, the following attributes are exported:
 
 * `internal` - Indicates if the label is internal to Britive.
 * `values.value_id` - The unique identifier for each label value.
-* `values.created_by` - The user ID who created the label value.
-* `values.updated_by` - The user ID who last updated the label value.
-* `values.created_on` - The timestamp when the label value was created.
-* `values.updated_on` - The timestamp when the label value was last updated.
 
 ## Import
 
