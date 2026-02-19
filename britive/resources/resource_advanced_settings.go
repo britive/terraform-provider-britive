@@ -152,7 +152,7 @@ func (ras *ResourceAdvancedSettings) Schema(ctx context.Context, req resource.Sc
 							Description: "ITSM Connection Type",
 						},
 						"is_itsm_enabled": schema.BoolAttribute{
-							Optional:    true,
+							Required:    true,
 							Description: "Whether ITSM integration is enabled",
 						},
 					},
@@ -543,11 +543,23 @@ func (rash *ResourceAdvancedSettingsHelper) getAndMapModelToPlan(ctx context.Con
 	// Mapping Justification Settings
 	if rawJustificationSetting.ID != "" && !(rawJustificationSetting.IsInherited != nil && *rawJustificationSetting.IsInherited) {
 		var justificationPlan []britive_client.JustificationSettingsPlan
-		justificationPlan = append(justificationPlan, britive_client.JustificationSettingsPlan{
+		justification := britive_client.JustificationSettingsPlan{
 			JustificationID:         types.StringValue(rawJustificationSetting.ID),
-			JustificationRegex:      types.StringValue(rawJustificationSetting.JustificationRegex),
 			IsJustificationRequired: types.BoolValue(*rawJustificationSetting.IsJustificationRequired),
-		})
+		}
+		userJustRegex, err := rash.getUserJustificationRegex(plan)
+		if err != nil {
+			return nil, err
+		}
+
+		if userJustRegex == nil && rawJustificationSetting.JustificationRegex == "" {
+			justification.JustificationRegex = types.StringNull()
+		} else {
+			justification.JustificationRegex = types.StringValue(rawJustificationSetting.JustificationRegex)
+		}
+
+		justificationPlan = append(justificationPlan, justification)
+
 		plan.JustificationSettings, err = rash.mapJustificationPlanToSet(justificationPlan)
 		if err != nil {
 			return nil, err
@@ -795,6 +807,19 @@ func (rash *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(pl
 	}
 
 	return nil
+}
+
+func (rash *ResourceAdvancedSettingsHelper) getUserJustificationRegex(plan britive_client.AdvancedSettingsPlan) (interface{}, error) {
+	userJustSet, err := rash.mapSetToJustificationPlan(plan.JustificationSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	if userJustSet[0].JustificationRegex.IsNull() || userJustSet[0].JustificationRegex.IsUnknown() {
+		return nil, nil
+	} else {
+		return userJustSet[0].JustificationRegex.ValueString(), nil
+	}
 }
 
 func (rash *ResourceAdvancedSettingsHelper) mapSetToJustificationPlan(set types.Set) ([]britive_client.JustificationSettingsPlan, error) {

@@ -317,8 +317,4 @@ type ResourceManagerResourceLabelValuePlan struct {
 	ValueID     types.String `tfsdk:"value_id"`
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
-	CreatedBy   types.Int64  `tfsdk:"created_by"`
-	UpdatedBy   types.Int64  `tfsdk:"updated_by"`
-	CreatedOn   types.String `tfsdk:"created_on"`
-	UpdatedOn   types.String `tfsdk:"updated_on"`
 }

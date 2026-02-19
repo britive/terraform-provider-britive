@@ -158,22 +158,6 @@ func (rrmrl *ResourceResourceManagerResourceLabel) Schema(ctx context.Context, r
 							Optional:    true,
 							Description: "Resource label value description",
 						},
-						"created_by": schema.Int64Attribute{
-							Computed:    true,
-							Description: "Resource label value createdBy",
-						},
-						"updated_by": schema.Int64Attribute{
-							Computed:    true,
-							Description: "Resource label value updatedBy",
-						},
-						"created_on": schema.StringAttribute{
-							Computed:    true,
-							Description: "Resource label value createdOn",
-						},
-						"updated_on": schema.StringAttribute{
-							Computed:    true,
-							Description: "Resource label value updatedOn",
-						},
 					},
 				},
 			},
@@ -454,16 +438,21 @@ func (rrmrlh *ResourceResourceManagerResourceLabelHelper) getAndMapModelToPlan(c
 	if (plan.Values.IsNull() || plan.Values.IsUnknown()) && len(resourceLabel.Values) == 0 {
 		plan.Values = types.SetNull(rrmrlh.getResourceLabelValueType())
 	} else {
+		userLabelValues, err := rrmrlh.getUserLabelValues(ctx, plan)
+		if err != nil {
+			return nil, err
+		}
+
 		var resourceLabelValues []britive_client.ResourceManagerResourceLabelValuePlan
 		for _, val := range resourceLabel.Values {
 			resourceLabelValue := britive_client.ResourceManagerResourceLabelValuePlan{
-				ValueID:     types.StringValue(val.ValueId),
-				Name:        types.StringValue(val.Name),
-				Description: types.StringValue(val.Description),
-				CreatedBy:   types.Int64Value(int64(val.CreatedBy)),
-				UpdatedBy:   types.Int64Value(int64(val.UpdatedBy)),
-				CreatedOn:   types.StringValue(val.CreatedOn),
-				UpdatedOn:   types.StringValue(val.UpdatedOn),
+				ValueID: types.StringValue(val.ValueId),
+				Name:    types.StringValue(val.Name),
+			}
+			if userLabelValues[val.Name] == nil && val.Description == "" {
+				resourceLabelValue.Description = types.StringNull()
+			} else {
+				resourceLabelValue.Description = types.StringValue(val.Description)
 			}
 
 			resourceLabelValues = append(resourceLabelValues, resourceLabelValue)
@@ -490,12 +479,13 @@ func (rrmrlh *ResourceResourceManagerResourceLabelHelper) mapResourceToModel(ctx
 		var err error
 		resourceLabelValues, err = rrmrlh.mapValuesSetToList(ctx, plan)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 	for _, val := range resourceLabelValues {
 		resourceLabelValue := &britive_client.ResourceLabelValue{
-			Name: val.Name.ValueString(),
+			Name:    val.Name.ValueString(),
+			ValueId: val.ValueID.ValueString(),
 		}
 		if !val.Description.IsNull() && !val.Description.IsUnknown() {
 			resourceLabelValue.Description = val.Description.ValueString()
@@ -531,6 +521,24 @@ func (rrmrlh *ResourceResourceManagerResourceLabelHelper) mapValuesSetToList(ctx
 	return valueList, nil
 }
 
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) getUserLabelValues(ctx context.Context, plan britive_client.ResourceManagerResourceLabelPlan) (map[string]interface{}, error) {
+	userValues, err := rrmrlh.mapValuesSetToList(ctx, plan)
+	if err != nil {
+		return nil, err
+	}
+
+	mapUserValues := make(map[string]interface{})
+	for _, val := range userValues {
+		if val.Description.IsNull() || val.Description.IsUnknown() {
+			mapUserValues[val.Name.ValueString()] = nil
+		} else {
+			mapUserValues[val.Name.ValueString()] = val.Description.ValueString()
+		}
+	}
+
+	return mapUserValues, nil
+}
+
 func (rrmrlh *ResourceResourceManagerResourceLabelHelper) mapValuesListToSet(ctx context.Context, list []britive_client.ResourceManagerResourceLabelValuePlan) (types.Set, error) {
 	attrType := rrmrlh.getResourceLabelValueType()
 	set, diags := types.SetValueFrom(
@@ -551,10 +559,6 @@ func (rrmrlh *ResourceResourceManagerResourceLabelHelper) getResourceLabelValueT
 			"value_id":    types.StringType,
 			"name":        types.StringType,
 			"description": types.StringType,
-			"created_by":  types.Int64Type,
-			"updated_by":  types.Int64Type,
-			"created_on":  types.StringType,
-			"updated_on":  types.StringType,
 		},
 	}
 }
