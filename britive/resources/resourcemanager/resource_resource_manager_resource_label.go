@@ -381,7 +381,7 @@ func (rrmrl *ResourceResourceManagerResourceLabel) ImportState(ctx context.Conte
 	}
 
 	plan := britive_client.ResourceManagerResourceLabelPlan{
-		ID: types.StringValue(body.LabelId),
+		ID: types.StringValue(rrmrl.helper.generateUniqueID(body.LabelId)),
 	}
 
 	planPtr, err := rrmrl.helper.getAndMapModelToPlan(ctx, plan, rrmrl.client)
@@ -522,6 +522,10 @@ func (rrmrlh *ResourceResourceManagerResourceLabelHelper) mapValuesSetToList(ctx
 }
 
 func (rrmrlh *ResourceResourceManagerResourceLabelHelper) getUserLabelValues(ctx context.Context, plan britive_client.ResourceManagerResourceLabelPlan) (map[string]interface{}, error) {
+	if plan.Values.IsNull() || plan.Values.IsUnknown() {
+		return map[string]interface{}{}, nil
+	}
+
 	userValues, err := rrmrlh.mapValuesSetToList(ctx, plan)
 	if err != nil {
 		return nil, err

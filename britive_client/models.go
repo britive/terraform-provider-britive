@@ -433,3 +433,18 @@ type ResourceLabelValue struct {
 	CreatedOn   string `json:"createdOn,omitempty"`
 	UpdatedOn   string `json:"updatedOn,omitempty"`
 }
+
+// ResponseTemplate - godoc
+type ResponseTemplate struct {
+	TemplateID             string `json:"templateId,omitempty"`
+	Name                   string `json:"name"`
+	Description            string `json:"description,omitempty"`
+	IsConsoleAccessEnabled bool   `json:"isConsoleAccessEnabled"`
+	ShowOnUI               bool   `json:"show_on_ui"`
+	TemplateData           string `json:"template_data"`
+}
+
+type AllResponseTemplates struct {
+	Count             int                `json:"count,omitempty"`
+	ResponseTemplates []ResponseTemplate `json:"data,omitempty"`
+}

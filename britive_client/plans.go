@@ -318,3 +318,13 @@ type ResourceManagerResourceLabelValuePlan struct {
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 }
+
+type ResourceManagerResponseTemplatePlan struct {
+	ID                     types.String `tfsdk:"id"`
+	Name                   types.String `tfsdk:"name"`
+	Description            types.String `tfsdk:"description"`
+	IsConsoleAccessEnabled types.Bool   `tfsdk:"is_console_access_enabled"`
+	ShowOnUI               types.Bool   `tfsdk:"show_on_ui"`
+	TemplateData           types.String `tfsdk:"template_data"`
+	TemplateID             types.String `tfsdk:"template_id"`
+}

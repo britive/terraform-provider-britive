@@ -227,5 +227,6 @@ func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resources.NewResourceProfileSessionAttribute,
 		//ResourceManager Resources
 		resourcemanager.NewResourceResourceManagerResourceLabel,
+		resourcemanager.NewResourceResourceManagerResponseTemplate,
 	}
 }

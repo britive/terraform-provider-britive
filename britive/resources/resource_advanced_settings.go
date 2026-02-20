@@ -810,6 +810,9 @@ func (rash *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(pl
 }
 
 func (rash *ResourceAdvancedSettingsHelper) getUserJustificationRegex(plan britive_client.AdvancedSettingsPlan) (interface{}, error) {
+	if plan.JustificationSettings.IsNull() || plan.JustificationSettings.IsUnknown() {
+		return nil, nil
+	}
 	userJustSet, err := rash.mapSetToJustificationPlan(plan.JustificationSettings)
 	if err != nil {
 		return nil, err
