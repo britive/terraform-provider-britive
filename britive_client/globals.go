@@ -17,6 +17,7 @@ var (
 	ResourceManagerProfileLockName          = "resourceManagerProfileLock"
 	ResourceManagerResourceLabelLockName    = "resourceManagerResourceLabelLock"
 	ResourceManagerResponseTemplateLockName = "resourceManagerResponseTemplateLock"
+	ResourceManagerResourceTypeLockName     = "resourceManagerResourceTypeLock"
 )
 
 var (

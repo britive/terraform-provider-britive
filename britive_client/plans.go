@@ -328,3 +328,17 @@ type ResourceManagerResponseTemplatePlan struct {
 	TemplateData           types.String `tfsdk:"template_data"`
 	TemplateID             types.String `tfsdk:"template_id"`
 }
+
+type ResourceManagerResourceTypePlan struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Icon        types.String `tfsdk:"icon"`
+	Parameters  types.Set    `tfsdk:"parameteres"`
+}
+
+type ResourceManagerResourceTypeParameterPlan struct {
+	Parametername types.String `tfsdk:"param_name"`
+	ParameterType types.String `tfsdk:"param_type"`
+	IsMandatory   types.Bool   `tfsdk:"is_mandaory"`
+}

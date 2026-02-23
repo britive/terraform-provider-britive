@@ -448,3 +448,17 @@ type AllResponseTemplates struct {
 	Count             int                `json:"count,omitempty"`
 	ResponseTemplates []ResponseTemplate `json:"data,omitempty"`
 }
+
+// ResourceType - godoc
+type ResourceType struct {
+	ResourceTypeID string      `json:"resourceTypeId,omitempty"`
+	Name           string      `json:"name"`
+	Description    string      `json:"description,omitempty"`
+	Parameters     []Parameter `json:"parameters,omitempty"`
+}
+
+type Parameter struct {
+	ParamName   string `json:"name"`
+	ParamType   string `json:"paramType"`
+	IsMandatory bool   `json:"isMandatory"`
+}

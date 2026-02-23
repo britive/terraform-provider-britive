@@ -3,6 +3,7 @@ package validate
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"strings"
 	"unicode"
@@ -123,6 +124,40 @@ func StringWithNoSpecialChar() func(string) error {
 			if !(unicode.IsLetter(char)) && !(s[i] == '_') && !(s[i] == '-') && !(unicode.IsDigit(char)) {
 				return fmt.Errorf("'%s' contains invalid characters. Allowed characters are: alphanumeric and special characters:['_', '-']", s)
 			}
+		}
+		return nil
+	}
+}
+
+func ValidateSVGString() func(string) error {
+	return func(s string) error {
+		// Check size limit: max 400KB (400 * 1024 bytes)
+		if len(s) > 400*1024 {
+			return fmt.Errorf("%s is too large: must be ≤ 400KB", s)
+		}
+
+		// Check XML is well-formed and root is <svg>
+		type SVG struct {
+			XMLName xml.Name `xml:"svg"`
+		}
+
+		var svg SVG
+		if err := xml.Unmarshal([]byte(s), &svg); err != nil {
+			return fmt.Errorf("invalid SVG XML: %s", err)
+		}
+
+		if svg.XMLName.Local != "svg" {
+			return fmt.Errorf("invalid SVG: root element is <%s>, expected <svg>", svg.XMLName.Local)
+		}
+
+		return nil
+	}
+}
+
+func ValidateResourceManagerResourceTypeParameter() func(string) error {
+	return func(s string) error {
+		if !strings.EqualFold(s, "string") && strings.EqualFold(s, "password") {
+			return fmt.Errorf("paramater type '%s' is not supported, try with 'string' or 'password'")
 		}
 		return nil
 	}
