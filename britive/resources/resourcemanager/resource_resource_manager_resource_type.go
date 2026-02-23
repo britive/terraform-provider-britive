@@ -188,7 +188,7 @@ func (rt *ResourceResourceManagerResourceType) Create(ctx context.Context, req r
 
 	plan.ID = types.StringValue(rt.helper.generateUniqueID(rto.ResourceTypeID))
 
-	planPtr, err := rt.helper.getAndMapModelToPlan(ctx, plan, *rt.client)
+	planPtr, err := rt.helper.getAndMapModelToPlan(ctx, plan, *rt.client, false)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Failed to get resource type",
@@ -232,7 +232,7 @@ func (rt *ResourceResourceManagerResourceType) Read(ctx context.Context, req res
 		return
 	}
 
-	newPlan, err := rt.helper.getAndMapModelToPlan(ctx, state, *rt.client)
+	newPlan, err := rt.helper.getAndMapModelToPlan(ctx, state, *rt.client, false)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Failed to get resource type",
@@ -257,59 +257,172 @@ func (rt *ResourceResourceManagerResourceType) Read(ctx context.Context, req res
 }
 
 func (rt *ResourceResourceManagerResourceType) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// tflog.Info(ctx, "Update called for britive_resource_manager_resource_type")
+	tflog.Info(ctx, "Update called for britive_resource_manager_resource_type")
 
-	// var plan, state britive_client.ResourceManagerResourceTypePlan
-	// resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	// resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	// if resp.Diagnostics.HasError() {
-	// 	tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
-	// 		"diagnostics": resp.Diagnostics,
-	// 	})
-	// 	return
-	// }
+	var plan, state britive_client.ResourceManagerResourceTypePlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
-	// resourceTypeID, err := rt.helper.parseUniqueID(d.Id())
-	// if err != nil {
-	// 	return diag.FromErr(err)
-	// }
+	resourceTypeID, err := rt.helper.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update resource type", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse resource type ID, error:%#v", err))
+		return
+	}
 
-	// var hasChanges bool
-	// if d.HasChange("description") || d.HasChange("parameters") || d.HasChange("name") {
-	// 	hasChanges = true
-	// 	resourceType := britive.ResourceType{}
+	var hasChanges bool
+	if !plan.Description.Equal(state.Description) || !plan.Parameters.Equal(state.Parameters) || !plan.Name.Equal(state.Name) {
+		hasChanges = true
+		resourceType := britive_client.ResourceType{}
 
-	// 	err := rt.helper.mapResourceToModel(d, m, &resourceType, true)
-	// 	if err != nil {
-	// 		return diag.FromErr(err)
-	// 	}
+		err := rt.helper.mapResourceToModel(ctx, plan, &resourceType)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update resource type", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to map resource type to model, error:%#v", err))
+			return
+		}
 
-	// 	ur, err := c.UpdateResourceType(resourceType, resourceTypeID)
-	// 	if err != nil {
-	// 		return diag.FromErr(err)
-	// 	}
+		ur, err := rt.client.UpdateResourceType(ctx, resourceType, resourceTypeID)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update resource type", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update resource type, error:%#v", err))
+			return
+		}
 
-	// 	log.Printf("[INFO] updated resource type: %#v", ur)
+		tflog.Info(ctx, fmt.Sprintf("updated resource type: %#v", ur))
 
-	// 	d.SetId(rt.helper.generateUniqueID(resourceTypeID))
-	// }
-	// if d.HasChange("icon") {
-	// 	hasChanges = true
-	// 	log.Printf("[INFO] Updating icon to resource type: %#v", resourceTypeID)
-	// 	userSVG := d.Get("icon").(string)
-	// 	err = c.AddRemoveIcon(resourceTypeID, userSVG)
-	// 	if err != nil {
-	// 		return diag.FromErr(err)
-	// 	}
+		plan.ID = types.StringValue(rt.helper.generateUniqueID(resourceTypeID))
+	}
+	if !plan.Icon.Equal(state.Icon) {
+		hasChanges = true
+		tflog.Info(ctx, fmt.Sprintf("Updating icon to resource types: %#v", resourceTypeID))
+		userSVG := plan.Icon.ValueString()
+		err = rt.client.AddRemoveIcon(ctx, resourceTypeID, userSVG)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update resource type", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update resource type, error:%#v", err))
+			return
+		}
 
-	// 	log.Printf("[INFO] Added icon to resource type: %#v", resourceTypeID)
-	// }
-	// if hasChanges {
-	// 	return rt.resourceRead(ctx, d, m)
-	// }
+		tflog.Info(ctx, fmt.Sprintf("Added icon to resource type: %#v", resourceTypeID))
+		plan.ID = types.StringValue(rt.helper.generateUniqueID(resourceTypeID))
+	}
+	if hasChanges {
+		planPtr, err := rt.helper.getAndMapModelToPlan(ctx, plan, *rt.client, false)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to get resource type",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map resource type model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+		tflog.Info(ctx, "Update completed and state set")
+	}
 }
 
-func (rth *ResourceResourceManagerResourceTypeHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ResourceManagerResourceTypePlan, c britive_client.Client) (*britive_client.ResourceManagerResourceTypePlan, error) {
+func (rt *ResourceResourceManagerResourceType) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_resource_manager_resource_type")
+
+	var state britive_client.ResourceManagerResourceTypePlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	resourceTypeID, err := rt.helper.parseUniqueID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete resource type", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse resource type ID, error:%#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Deleting resource type: %s", resourceTypeID))
+	err = rt.client.DeleteResourceType(ctx, resourceTypeID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delte resource type, error:%#v", err.Error())
+		return
+	}
+	tflog.Info(ctx, fmt.Sprintf("Resource type %s deleted", resourceTypeID))
+	resp.State.RemoveResource(ctx)
+}
+
+func (rt *ResourceResourceManagerResourceType) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+
+	if err := rt.importHelper.ParseImportID([]string{"resource-manager/resource-types/(?P<id>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import resource type", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse importID, error%#v", err))
+		return
+	}
+
+	resourceTypeID := importData.Fields["id"]
+	if strings.TrimSpace(resourceTypeID) == "" {
+		resp.Diagnostics.AddError("Failed to import resource type", "Invalid Resource type ID")
+		tflog.Error(ctx, "Failed to import resource type, Invalid Resource type ID")
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Importing resource type: %s", resourceTypeID))
+
+	resourceType, err := rt.client.GetResourceType(ctx, resourceTypeID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import resource type", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import resource type, error:%#v", err))
+		return
+	}
+
+	plan := britive_client.ResourceManagerResourceTypePlan{
+		ID:         types.StringValue(rt.helper.generateUniqueID(resourceType.ResourceTypeID)),
+		Parameters: types.SetNull(rt.helper.getParameterAttrType()),
+	}
+
+	planPtr, err := rt.helper.getAndMapModelToPlan(ctx, plan, *rt.client, true)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to set state after import",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map resource type model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported resource type: %#v", planPtr))
+}
+
+func (rth *ResourceResourceManagerResourceTypeHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ResourceManagerResourceTypePlan, c britive_client.Client, imported bool) (*britive_client.ResourceManagerResourceTypePlan, error) {
 	resourceTypeID, err := rth.parseUniqueID(plan.ID.ValueString())
 	if err != nil {
 		return nil, err
@@ -334,31 +447,41 @@ func (rth *ResourceResourceManagerResourceTypeHelper) getAndMapModelToPlan(ctx c
 		plan.Description = types.StringValue(resourceType.Description)
 	}
 
-	stateParamameters, err := rth.mapParametersToList(ctx, plan)
-	if err != nil {
-		return nil, err
-	}
-	paramMap := make(map[string]string)
+	if (plan.Parameters.IsNull() || plan.Parameters.IsUnknown()) && len(resourceType.Parameters) == 0 {
+		plan.Parameters = types.SetNull(rth.getParameterAttrType())
+	} else {
+		paramMap := make(map[string]string)
+		if !imported {
+			stateParamameters, err := rth.mapParametersToList(ctx, plan)
+			if err != nil {
+				return nil, err
+			}
 
-	for i := 0; i < len(stateParamameters); i++ {
-		parameter := stateParamameters[i]
-		paramName := parameter.Parametername.ValueString()
-		paramType := parameter.ParameterType.ValueString()
-		paramMap[paramName] = paramType
-	}
+			for i := 0; i < len(stateParamameters); i++ {
+				parameter := stateParamameters[i]
+				paramName := parameter.Parametername.ValueString()
+				paramType := parameter.ParameterType.ValueString()
+				paramMap[paramName] = paramType
+			}
+		}
 
-	var parameterList []britive_client.ResourceManagerResourceTypeParameterPlan
-	for _, parameter := range resourceType.Parameters {
-		parameterList = append(parameterList, britive_client.ResourceManagerResourceTypeParameterPlan{
-			Parametername: types.StringValue(parameter.ParamName),
-			ParameterType: types.StringValue(paramMap[parameter.ParamName]),
-			IsMandatory:   types.BoolValue(parameter.IsMandatory),
-		})
-	}
+		var parameterList []britive_client.ResourceManagerResourceTypeParameterPlan
+		for _, parameter := range resourceType.Parameters {
+			paramType := parameter.ParamType
+			if !imported {
+				paramType = paramMap[parameter.ParamName]
+			}
+			parameterList = append(parameterList, britive_client.ResourceManagerResourceTypeParameterPlan{
+				Parametername: types.StringValue(parameter.ParamName),
+				ParameterType: types.StringValue(paramType),
+				IsMandatory:   types.BoolValue(parameter.IsMandatory),
+			})
+		}
 
-	plan.Parameters, err = rth.mapParameterListToSet(ctx, parameterList)
-	if err != nil {
-		return nil, err
+		plan.Parameters, err = rth.mapParameterListToSet(ctx, parameterList)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &plan, nil
@@ -421,13 +544,7 @@ func (rth *ResourceResourceManagerResourceTypeHelper) mapParametersToList(ctx co
 func (rth *ResourceResourceManagerResourceTypeHelper) mapParameterListToSet(ctx context.Context, paramList []britive_client.ResourceManagerResourceTypeParameterPlan) (types.Set, error) {
 	set, diags := types.SetValueFrom(
 		ctx,
-		types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"param_name":   types.StringType,
-				"param_type":   types.StringType,
-				"is_mandatory": types.BoolType,
-			},
-		},
+		rth.getParameterAttrType(),
 		paramList,
 	)
 
@@ -436,4 +553,14 @@ func (rth *ResourceResourceManagerResourceTypeHelper) mapParameterListToSet(ctx 
 	}
 
 	return set, nil
+}
+
+func (rth *ResourceResourceManagerResourceTypeHelper) getParameterAttrType() types.ObjectType {
+	return types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"param_name":   types.StringType,
+			"param_type":   types.StringType,
+			"is_mandatory": types.BoolType,
+		},
+	}
 }

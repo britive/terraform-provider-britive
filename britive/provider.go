@@ -228,5 +228,6 @@ func (p *britiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		//ResourceManager Resources
 		resourcemanager.NewResourceResourceManagerResourceLabel,
 		resourcemanager.NewResourceResourceManagerResponseTemplate,
+		resourcemanager.NewResourceResourceManagerResourceType,
 	}
 }

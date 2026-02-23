@@ -390,7 +390,7 @@ func (rrmrl *ResourceResourceManagerResourceLabel) ImportState(ctx context.Conte
 			"Failed to set state after import",
 			fmt.Sprintf("Error: %v", err),
 		)
-		tflog.Error(ctx, "Failed get and map role model to plan", map[string]interface{}{
+		tflog.Error(ctx, "Failed get and map resource label model to plan", map[string]interface{}{
 			"error": err.Error(),
 		})
 		return

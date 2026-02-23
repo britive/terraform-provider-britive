@@ -361,7 +361,7 @@ func (rrt *ResourceResourceManagerResponseTemplate) ImportState(ctx context.Cont
 			"Failed to set state after import",
 			fmt.Sprintf("Error: %v", err),
 		)
-		tflog.Error(ctx, "Failed get and map role model to plan", map[string]interface{}{
+		tflog.Error(ctx, "Failed get and map response template model to plan", map[string]interface{}{
 			"error": err.Error(),
 		})
 		return

@@ -334,11 +334,11 @@ type ResourceManagerResourceTypePlan struct {
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 	Icon        types.String `tfsdk:"icon"`
-	Parameters  types.Set    `tfsdk:"parameteres"`
+	Parameters  types.Set    `tfsdk:"parameters"`
 }
 
 type ResourceManagerResourceTypeParameterPlan struct {
 	Parametername types.String `tfsdk:"param_name"`
 	ParameterType types.String `tfsdk:"param_type"`
-	IsMandatory   types.Bool   `tfsdk:"is_mandaory"`
+	IsMandatory   types.Bool   `tfsdk:"is_mandatory"`
 }

@@ -156,8 +156,8 @@ func ValidateSVGString() func(string) error {
 
 func ValidateResourceManagerResourceTypeParameter() func(string) error {
 	return func(s string) error {
-		if !strings.EqualFold(s, "string") && strings.EqualFold(s, "password") {
-			return fmt.Errorf("paramater type '%s' is not supported, try with 'string' or 'password'")
+		if !strings.EqualFold(s, "string") && !strings.EqualFold(s, "password") && !strings.EqualFold(s, "ip-cidr") && !strings.EqualFold(s, "regex-pattern") && !strings.EqualFold(s, "list") {
+			return fmt.Errorf("paramater type '%s' is not supported, try with one of following  ['string', 'password', 'ip-cidr', 'regex-pattern', 'list']", s)
 		}
 		return nil
 	}
