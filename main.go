@@ -11,7 +11,7 @@ import (
 func main() {
 
 	var debug bool
-	flag.BoolVar(&debug, "debug", false, "set this to true if you want to debug the code using delve")
+	flag.BoolVar(&debug, "debug", false, "set this as true to debug the code using delve")
 	flag.Parse()
 
 	ctx := context.Background()

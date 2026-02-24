@@ -63,7 +63,7 @@ func (p *britiveProvider) Schema(ctx context.Context, req provider.SchemaRequest
 		Description: "The Britive Provider enables Terraform to interact with the Britive REST API.",
 		Attributes: map[string]schema.Attribute{
 			"tenant": schema.StringAttribute{
-				Description: "The tenant URL or domain of your Britive instance.",
+				Description: "The tenant URL or domain of Britive instance.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must not be empty or whitespace"),

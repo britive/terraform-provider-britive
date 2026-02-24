@@ -462,3 +462,27 @@ type Parameter struct {
 	ParamType   string `json:"paramType"`
 	IsMandatory bool   `json:"isMandatory"`
 }
+
+// ResourceTypePermission - Model for resource type permissions
+type ResourceTypePermission struct {
+	PermissionID      string        `json:"permissionId,omitempty"`
+	Name              string        `json:"name"`
+	Description       string        `json:"description,omitempty"`
+	ResourceTypeID    string        `json:"resourceTypeId"`
+	ResourceTypeName  string        `json:"resourceTypeName,omitempty"`
+	IsDraft           bool          `json:"isDraft"`
+	Version           string        `json:"version,omitempty"`
+	CheckinTimeLimit  int           `json:"checkinTimeLimit,omitempty"`
+	CheckoutTimeLimit int           `json:"checkoutTimeLimit,omitempty"`
+	ShowOrigCreds     bool          `json:"showOrigCreds,omitempty"`
+	InlineFileExists  bool          `json:"inlineFileExists,omitempty"`
+	ResponseTemplates []interface{} `json:"responseTemplates,omitempty"`
+	CheckinFileName   string        `json:"checkinFileName,omitempty"`
+	CheckoutFileName  string        `json:"checkoutFileName,omitempty"`
+	Variables         []interface{} `json:"variables,omitempty"`
+}
+
+type ResourceTypePermissiosUploadUrls struct {
+	CheckInUrl  string `json:"checkinURL,omitempty"`
+	CheckOutUrl string `json:"checkoutURL,omitempty"`
+}

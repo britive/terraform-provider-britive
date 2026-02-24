@@ -342,3 +342,28 @@ type ResourceManagerResourceTypeParameterPlan struct {
 	ParameterType types.String `tfsdk:"param_type"`
 	IsMandatory   types.Bool   `tfsdk:"is_mandatory"`
 }
+
+type ResourceManagerResourceTypePermissionPlan struct {
+	ID                   types.String `tfsdk:"id"`
+	PermissionID         types.String `tfsdk:"permission_id"`
+	Name                 types.String `tfsdk:"name"`
+	Version              types.String `tfsdk:"version"`
+	ResourceTypeID       types.String `tfsdk:"resource_type_id"`
+	Description          types.String `tfsdk:"description"`
+	CheckinTimeLimit     types.Int64  `tfsdk:"checkin_time_limit"`
+	CheckoutTimeLimit    types.Int64  `tfsdk:"checkout_time_limit"`
+	IsDraft              types.Bool   `tfsdk:"is_draft"`
+	InlineFileExists     types.Bool   `tfsdk:"inline_file_exists"`
+	ResponseTemplates    types.Set    `tfsdk:"response_templates"`
+	ShowOrigCreds        types.Bool   `tfsdk:"show_orig_creds"`
+	CheckinCodeFile      types.String `tfsdk:"checkin_code_file"`
+	CheckoutCodeFile     types.String `tfsdk:"checkout_code_file"`
+	CheckinCodeFileHash  types.String `tfsdk:"checkin_code_file_hash"`
+	CheckoutCodeFileHash types.String `tfsdk:"checkout_code_file_hash"`
+	CheckinCode          types.String `tfsdk:"checkin_code"`
+	CheckoutCode         types.String `tfsdk:"checkout_code"`
+	CodeLanguage         types.String `tfsdk:"code_language"`
+	CheckinFileName      types.String `tfsdk:"checkin_file_name"`
+	CheckoutFileName     types.String `tfsdk:"checkout_file_name"`
+	Variables            types.Set    `tfsdk:"variables"`
+}
