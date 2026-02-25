@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 
@@ -17,7 +16,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -32,6 +33,7 @@ var (
 	_ resource.ResourceWithConfigure      = &ResourceResourceManagerResourceTypePermission{}
 	_ resource.ResourceWithImportState    = &ResourceResourceManagerResourceTypePermission{}
 	_ resource.ResourceWithValidateConfig = &ResourceResourceManagerResourceTypePermission{}
+	_ resource.ResourceWithModifyPlan     = &ResourceResourceManagerResourceTypePermission{}
 )
 
 const responseTemplate = "responseTemplate"
@@ -94,6 +96,9 @@ func (rtp *ResourceResourceManagerResourceTypePermission) Schema(ctx context.Con
 			"permission_id": schema.StringAttribute{
 				Computed:    true,
 				Description: "The unique identifier of permission",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
@@ -102,6 +107,9 @@ func (rtp *ResourceResourceManagerResourceTypePermission) Schema(ctx context.Con
 			"version": schema.StringAttribute{
 				Computed:    true,
 				Description: "The version of permission",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"resource_type_id": schema.StringAttribute{
 				Required:    true,
@@ -116,22 +124,34 @@ func (rtp *ResourceResourceManagerResourceTypePermission) Schema(ctx context.Con
 				Computed:    true,
 				Default:     int64default.StaticInt64(60),
 				Description: "Checkin time limit minute",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"checkout_time_limit": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Default:     int64default.StaticInt64(60),
 				Description: "Checkout time limit minute",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_draft": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 				Description: "Indicates if permission is a draft",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"inline_file_exists": schema.BoolAttribute{
 				Computed:    true,
 				Description: "Indicates if an inline file exists.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"response_templates": schema.SetAttribute{
 				Optional:    true,
@@ -143,6 +163,9 @@ func (rtp *ResourceResourceManagerResourceTypePermission) Schema(ctx context.Con
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 				Description: "Indicates if original credentials should be shown.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"checkin_code_file": schema.StringAttribute{
 				Optional:    true,
@@ -169,10 +192,16 @@ func (rtp *ResourceResourceManagerResourceTypePermission) Schema(ctx context.Con
 			"checkin_code_file_hash": schema.StringAttribute{
 				Computed:    true,
 				Description: "The file hash for check-in code",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"checkout_code_file_hash": schema.StringAttribute{
 				Computed:    true,
 				Description: "The file hash for check-out code.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"checkin_code": schema.StringAttribute{
 				Optional:    true,
@@ -209,6 +238,9 @@ func (rtp *ResourceResourceManagerResourceTypePermission) Schema(ctx context.Con
 						"Shell",
 					),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"checkin_file_name": schema.StringAttribute{
 				Computed:    true,
@@ -233,7 +265,6 @@ func (rtp *ResourceResourceManagerResourceTypePermission) ValidateConfig(
 	resp *resource.ValidateConfigResponse,
 ) {
 	var config britive_client.ResourceManagerResourceTypePermissionPlan
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -281,13 +312,11 @@ func (rtp *ResourceResourceManagerResourceTypePermission) ModifyPlan(
 	req resource.ModifyPlanRequest,
 	resp *resource.ModifyPlanResponse,
 ) {
-
 	if req.Plan.Raw.IsNull() {
 		return
 	}
 
-	var plan, state britive_client.ResourceManagerResourceTypePermissionPlan
-
+	var plan, state *britive_client.ResourceManagerResourceTypePermissionPlan
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -316,6 +345,10 @@ func (rtp *ResourceResourceManagerResourceTypePermission) ModifyPlan(
 		plan.CheckoutCodeFileHash = types.StringValue(checkoutHash)
 
 		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	}
+
+	if state == nil || state.Name.IsNull() {
+		return
 	}
 
 	oldVal := state.Name.ValueString()
@@ -636,7 +669,9 @@ func (rtp *ResourceResourceManagerResourceTypePermission) ImportState(ctx contex
 	}
 
 	plan := britive_client.ResourceManagerResourceTypePermissionPlan{
-		ID: types.StringValue(permission.PermissionID),
+		ID:                types.StringValue(permission.PermissionID),
+		ResponseTemplates: types.SetNull(types.StringType),
+		Variables:         types.SetNull(types.StringType),
 	}
 
 	planPtr, err := rtp.helper.getAndMapModelToPlan(ctx, plan, *rtp.client)
@@ -681,6 +716,16 @@ func (rtph *ResourceResourceManagerResourceTypePermissionHelper) getAndMapModelT
 		plan.Description = types.StringValue(permission.Description)
 	}
 
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && permission.Description == "" {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(permission.Description)
+	}
+
+	if plan.ResourceTypeID.IsNull() || plan.ResourceTypeID.IsUnknown() {
+		plan.ResourceTypeID = types.StringValue(permission.ResourceTypeID)
+	}
+
 	plan.IsDraft = types.BoolValue(permission.IsDraft)
 	plan.CheckinTimeLimit = types.Int64Value(int64(permission.CheckinTimeLimit))
 	plan.CheckoutTimeLimit = types.Int64Value(int64(permission.CheckoutTimeLimit))
@@ -689,6 +734,23 @@ func (rtph *ResourceResourceManagerResourceTypePermissionHelper) getAndMapModelT
 	plan.CheckinFileName = types.StringValue(permission.CheckinFileName)
 	plan.CheckoutFileName = types.StringValue(permission.CheckoutFileName)
 	plan.Version = types.StringValue(permission.Version)
+	if (plan.CheckinCodeFile.IsNull() || plan.CheckinCodeFile.IsUnknown()) && (plan.CheckoutCodeFile.IsNull() || plan.CheckoutCodeFile.IsUnknown()) {
+		plan.CheckinCodeFileHash = types.StringNull()
+		plan.CheckoutCodeFileHash = types.StringNull()
+	} else {
+		checkinHash, err := utils.HashFileContent(plan.CheckinCodeFile.ValueString())
+		if err != nil {
+			return nil, err
+		}
+
+		checkoutHash, err := utils.HashFileContent(plan.CheckoutCodeFile.ValueString())
+		if err != nil {
+			return nil, err
+		}
+
+		plan.CheckinCodeFileHash = types.StringValue(checkinHash)
+		plan.CheckoutCodeFileHash = types.StringValue(checkoutHash)
+	}
 
 	var templateNames []string
 	for _, rt := range permission.ResponseTemplates {
@@ -698,9 +760,13 @@ func (rtph *ResourceResourceManagerResourceTypePermissionHelper) getAndMapModelT
 			}
 		}
 	}
-	plan.ResponseTemplates, err = rtph.mapListToSet(ctx, templateNames)
-	if err != nil {
-		return nil, err
+	if (plan.ResponseTemplates.IsNull() || plan.ResponseTemplates.IsUnknown()) && len(templateNames) == 0 {
+		plan.ResponseTemplates = types.SetNull(types.StringType)
+	} else {
+		plan.ResponseTemplates, err = rtph.mapListToSet(ctx, templateNames)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &plan, nil
@@ -713,7 +779,7 @@ func (rtph *ResourceResourceManagerResourceTypePermissionHelper) mapResourceToMo
 	}
 
 	if len(allResponseTemplates) == 0 {
-		log.Println("Warning: No response templates returned from backend")
+		tflog.Warn(ctx, "No response templates returned from backend")
 	}
 
 	mapResponseTemplates := make(map[string]string)
