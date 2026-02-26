@@ -343,8 +343,20 @@ func (rtp *ResourceResourceManagerResourceTypePermission) ModifyPlan(
 
 		plan.CheckinCodeFileHash = types.StringValue(checkinHash)
 		plan.CheckoutCodeFileHash = types.StringValue(checkoutHash)
+		plan.InlineFileExists = types.BoolValue(false)
 
 		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	} else {
+		plan.CheckinCodeFileHash = types.StringNull()
+		plan.CheckoutCodeFileHash = types.StringNull()
+		plan.InlineFileExists = types.BoolValue(true)
+
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	}
+
+	if resp.Diagnostics.HasError() {
+		resp.Diagnostics.AddError("Invalid configuration", "Failed to save chekin and checkout file hash")
+		return
 	}
 
 	if state == nil || state.Name.IsNull() {
@@ -710,7 +722,7 @@ func (rtph *ResourceResourceManagerResourceTypePermissionHelper) getAndMapModelT
 
 	plan.PermissionID = types.StringValue(permission.PermissionID)
 	plan.Name = types.StringValue(permission.Name)
-	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && permission.Name == "" {
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && permission.Description == "" {
 		plan.Description = types.StringNull()
 	} else {
 		plan.Description = types.StringValue(permission.Description)
@@ -764,6 +776,19 @@ func (rtph *ResourceResourceManagerResourceTypePermissionHelper) getAndMapModelT
 		plan.ResponseTemplates = types.SetNull(types.StringType)
 	} else {
 		plan.ResponseTemplates, err = rtph.mapListToSet(ctx, templateNames)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var userVariables []string
+	for _, rt := range permission.Variables {
+		userVariables = append(userVariables, rt.(string))
+	}
+	if (plan.Variables.IsNull() || plan.Variables.IsUnknown()) && len(permission.Variables) == 0 {
+		plan.Variables = types.SetNull(types.StringType)
+	} else {
+		plan.Variables, err = rtph.mapListToSet(ctx, userVariables)
 		if err != nil {
 			return nil, err
 		}
