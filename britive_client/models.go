@@ -486,3 +486,19 @@ type ResourceTypePermissiosUploadUrls struct {
 	CheckInUrl  string `json:"checkinURL,omitempty"`
 	CheckOutUrl string `json:"checkoutURL,omitempty"`
 }
+
+// Server Access Resource - godoc
+type ServerAccessResource struct {
+	ResourceID                  string                   `json:"resourceId,omitempty"`
+	Name                        string                   `json:"name"`
+	Description                 string                   `json:"description"`
+	ResourceType                ServerAccessResourceType `json:"resourceType"`
+	ResourceTypeParameterValues map[string]string        `json:"paramValues"`
+	ResourceLabels              map[string][]string      `json:"resourceLabels"`
+}
+
+// Server Access Resource Type - godoc
+type ServerAccessResourceType struct {
+	ResourceTypeID string `json:"id"`
+	Name           string `json:"name"`
+}

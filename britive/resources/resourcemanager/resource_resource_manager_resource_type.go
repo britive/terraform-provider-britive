@@ -143,7 +143,7 @@ func (rt *ResourceResourceManagerResourceType) Create(ctx context.Context, req r
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
-		tflog.Error(ctx, "Failed to read plan during resource label creation", map[string]interface{}{
+		tflog.Error(ctx, "Failed to read plan during resource type creation", map[string]interface{}{
 			"diagnostics": resp.Diagnostics,
 		})
 		return
@@ -358,7 +358,7 @@ func (rt *ResourceResourceManagerResourceType) Delete(ctx context.Context, req r
 	tflog.Info(ctx, fmt.Sprintf("Deleting resource type: %s", resourceTypeID))
 	err = rt.client.DeleteResourceType(ctx, resourceTypeID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delte resource type, error:%#v", err.Error())
+		resp.Diagnostics.AddError("Failed to delete resource type", err.Error())
 		return
 	}
 	tflog.Info(ctx, fmt.Sprintf("Resource type %s deleted", resourceTypeID))

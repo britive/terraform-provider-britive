@@ -367,3 +367,13 @@ type ResourceManagerResourceTypePermissionPlan struct {
 	CheckoutFileName     types.String `tfsdk:"checkout_file_name"`
 	Variables            types.Set    `tfsdk:"variables"`
 }
+
+type ResourceManagerResourcePlan struct {
+	ID              types.String `tfsdk:"id"`
+	Name            types.String `tfsdk:"name"`
+	Description     types.String `tfsdk:"description"`
+	ResourceType    types.String `tfsdk:"resource_type"`
+	ResourceTypeID  types.String `tfsdk:"resource_type_id"`
+	ParameterValues types.Map    `tfsdk:"parameter_values"`
+	ResourceLabels  types.Map    `tfsdk:"resource_labels"`
+}

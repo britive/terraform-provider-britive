@@ -19,6 +19,7 @@ var (
 	ResourceManagerResponseTemplateLockName       = "resourceManagerResponseTemplateLock"
 	ResourceManagerResourceTypeLockName           = "resourceManagerResourceTypeLock"
 	ResourceManagerResourceTypePermissionLockName = "resourceManagerResourceTypePermissionLock"
+	ResourceManagerResourceLockName               = "resourceManagerResourceLock"
 )
 
 var (

@@ -945,14 +945,14 @@ func DiffSuppressCommaSeparatedStrings(old, new string) bool {
 	return SliceIgnoreOrderEqual(oldSlice, newSlice)
 }
 
-func ResourceLabelsMapEqual(oldMap, newMap map[string]interface{}) bool {
+func ResourceLabelsMapEqual(oldMap, newMap map[string]string) bool {
 	equalCount := 0
 
 	if len(oldMap) == len(newMap) {
 		for oldKey, oldVal := range oldMap {
 			for newKey, newVal := range newMap {
 				if strings.EqualFold(oldKey, newKey) {
-					if DiffSuppressCommaSeparatedStrings(oldVal.(string), newVal.(string)) {
+					if DiffSuppressCommaSeparatedStrings(oldVal, newVal) {
 						equalCount++
 					}
 				}
