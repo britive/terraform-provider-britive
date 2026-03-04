@@ -17,7 +17,7 @@ import (
 func (c *Client) GetResourceTypePermission(ctx context.Context, permissionID string) (*ResourceTypePermission, error) {
 	// Fetch the latest version's details
 	url := fmt.Sprintf("%s/resource-manager/permissions/%s/latest", c.APIBaseURL, permissionID)
-	body, err := c.Get(ctx, url, ResourceManagerResourceTypePermissionLockName)
+	body, err := c.Get(ctx, url, ResourceManagerResourceTypeLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (c *Client) GetResourceTypePermission(ctx context.Context, permissionID str
 func (c *Client) GetPermissionUploadUrls(ctx context.Context, permissionID string) (*ResourceTypePermissiosUploadUrls, error) {
 	// Step 1: Fetch the list of permissions
 	url := fmt.Sprintf("%s/resource-manager/permissions/get-urls/%s", c.APIBaseURL, permissionID)
-	body, err := c.Get(ctx, url, ResourceManagerResourceTypePermissionLockName)
+	body, err := c.Get(ctx, url, ResourceManagerResourceTypeLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (c *Client) UploadPermissionCodes(ctx context.Context, permissionId string,
 // CreateResourceTypePermission - Creates a new resource type permission
 func (c *Client) CreateResourceTypePermission(ctx context.Context, permission ResourceTypePermission) (*ResourceTypePermission, error) {
 	url := fmt.Sprintf("%s/resource-manager/permissions", c.APIBaseURL)
-	respBody, err := c.Post(ctx, url, permission, ResourceManagerResourceTypePermissionLockName)
+	respBody, err := c.Post(ctx, url, permission, ResourceManagerResourceTypeLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (c *Client) CreateResourceTypePermission(ctx context.Context, permission Re
 // UpdateResourceTypePermission - Updates an existing resource type permission
 func (c *Client) UpdateResourceTypePermission(ctx context.Context, permission ResourceTypePermission) (*ResourceTypePermission, error) {
 	url := fmt.Sprintf("%s/resource-manager/permissions/%s", c.APIBaseURL, permission.PermissionID)
-	respBody, err := c.Put(ctx, url, permission, ResourceManagerResourceTypePermissionLockName)
+	respBody, err := c.Put(ctx, url, permission, ResourceManagerResourceTypeLockName)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (c *Client) UpdateResourceTypePermission(ctx context.Context, permission Re
 // DeleteResourceTypePermission - Deletes a resource type permission by ID
 func (c *Client) DeleteResourceTypePermission(ctx context.Context, permissionID string) error {
 	url := fmt.Sprintf("%s/resource-manager/permissions/%s", c.APIBaseURL, permissionID)
-	err := c.Delete(ctx, url, ResourceManagerResourceTypePermissionLockName)
+	err := c.Delete(ctx, url, ResourceManagerResourceTypeLockName)
 	if errors.Is(err, ErrNoContent) || err == nil {
 		return nil
 	}

@@ -377,3 +377,9 @@ type ResourceManagerResourcePlan struct {
 	ParameterValues types.Map    `tfsdk:"parameter_values"`
 	ResourceLabels  types.Map    `tfsdk:"resource_labels"`
 }
+
+type ResourceManagerResourceBrokerPoolsPlan struct {
+	ID          types.String `tfsdk:"id"`
+	ResourceID  types.String `tfsdk:"resource_id"`
+	BrokerPools types.Set    `tfsdk:"broker_pools"`
+}

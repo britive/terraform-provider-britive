@@ -502,3 +502,11 @@ type ServerAccessResourceType struct {
 	ResourceTypeID string `json:"id"`
 	Name           string `json:"name"`
 }
+
+// Broker Pool - godoc
+type BrokerPool struct {
+	BrokerPoolID string `json:"brokerPoolId,omitempty"`
+	Name         string `json:"brokerPoolName"`
+	Description  string `json:"brokerPoolDesc,omitempty"`
+	Count        int    `json:"brokerCount,omitempty"`
+}

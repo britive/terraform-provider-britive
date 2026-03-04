@@ -70,25 +70,6 @@ func (r *ResourceResourceManagerResource) Configure(ctx context.Context, req res
 	r.helper = NewResourceResourceManagerResourceHelper()
 }
 
-type immutableStringModifier struct{}
-
-func (m immutableStringModifier) ValidateImmutableString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
-	if !req.StateValue.IsNull() && !req.PlanValue.Equal(req.StateValue) {
-		resp.Diagnostics.AddError(
-			"Immutable Field",
-			"resource_type cannot be changed once created.",
-		)
-	}
-}
-
-func (m immutableStringModifier) Description(ctx context.Context) string {
-	return "Prevents changes after creation"
-}
-
-func (m immutableStringModifier) MarkdownDescription(ctx context.Context) string {
-	return m.Description(ctx)
-}
-
 func (r *ResourceResourceManagerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Schema for Britive Resource resource",
