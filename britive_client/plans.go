@@ -383,3 +383,23 @@ type ResourceManagerResourceBrokerPoolsPlan struct {
 	ResourceID  types.String `tfsdk:"resource_id"`
 	BrokerPools types.Set    `tfsdk:"broker_pools"`
 }
+
+type ResourceManagerResourcePolicyPlan struct {
+	ID             types.String `tfsdk:"id"`
+	PolicyName     types.String `tfsdk:"policy_name"`
+	Description    types.String `tfsdk:"description"`
+	IsActive       types.Bool   `tfsdk:"is_active"`
+	IsDraft        types.Bool   `tfsdk:"is_draft"`
+	IsReadOnly     types.Bool   `tfsdk:"is_read_only"`
+	Consumer       types.String `tfsdk:"consumer"`
+	AccessType     types.String `tfsdk:"access_type"`
+	AccessLevel    types.String `tfsdk:"access_level"`
+	Members        types.String `tfsdk:"members"`
+	Condition      types.String `tfsdk:"condition"`
+	ResourceLabels types.Set    `tfsdk:"resource_labels"`
+}
+
+type ResourceLabelsForPolicy struct {
+	LabelKey types.String `tfsdk:"label_key"`
+	Values   types.Set    `tfsdk:"values"`
+}

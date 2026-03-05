@@ -1,10 +1,12 @@
 package britive_client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 )
 
 // Get Resource Name By Id - Returns the name for a specific resource given the id
@@ -87,8 +89,13 @@ func (c *Client) AddBrokerPoolsResource(ctx context.Context, brokerPoolNamesStri
 
 // DeleteBrokerPoolsResource - Delete broker pools resource
 func (c *Client) DeleteBrokerPoolsResource(ctx context.Context, serverAccessResourceID string) error {
-	url := fmt.Sprintf("%s/resource-manager/resources/%s/broker-pools", c.APIBaseURL, serverAccessResourceID)
-	err := c.Delete(ctx, url, ResourceManagerResourceLockName)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/resource-manager/resources/%s/broker-pools", c.APIBaseURL, serverAccessResourceID), bytes.NewBuffer([]byte("[]")))
+	if err != nil {
+		return err
+	}
+
+	_, err = c.DoWithLock(ctx, req, ResourceManagerResourcePlicyLockName)
 	if errors.Is(err, ErrNoContent) || err == nil {
 		return nil
 	}

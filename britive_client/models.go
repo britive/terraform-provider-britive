@@ -510,3 +510,19 @@ type BrokerPool struct {
 	Description  string `json:"brokerPoolDesc,omitempty"`
 	Count        int    `json:"brokerCount,omitempty"`
 }
+
+// Resource Manager Resource-Policy - godoc
+type ResourceManagerResourcePolicy struct {
+	PolicyID       string              `json:"id,omitempty"`
+	Name           string              `json:"name,omitempty"`
+	Description    string              `json:"description"`
+	Condition      string              `json:"condition"`
+	Members        interface{}         `json:"members"`
+	Consumer       string              `json:"consumer"`
+	AccessType     string              `json:"accessType"`
+	AccessLevel    string              `json:"accessLevel"`
+	IsActive       bool                `json:"isActive"`
+	IsDraft        bool                `json:"isDraft"`
+	IsReadOnly     bool                `json:"isReadOnly"`
+	ResourceLabels map[string][]string `json:"resourceLabels"`
+}
