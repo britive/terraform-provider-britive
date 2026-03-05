@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveEntityGroup(t *testing.T) {
+func TestAccBritiveEntityGroup(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveEntityGroupConfig(),
@@ -26,7 +26,7 @@ func TestBritiveEntityGroup(t *testing.T) {
 }
 
 func testAccCheckBritiveEntityGroupConfig() string {
-	return fmt.Sprintf(`
+	return `
 	resource "britive_application" "snowflake_standalone_new" {
     application_type = "Snowflake Standalone"
     version = "1.0"
@@ -54,19 +54,18 @@ func testAccCheckBritiveEntityGroupConfig() string {
     entity_description = "AT - Entity Group Description"
     parent_id = britive_application.snowflake_standalone_new.entity_root_environment_group_id
 	}
-	`)
+	`
 }
 
-func testAccCheckBritiveEntityGroupExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveEntityGroupExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

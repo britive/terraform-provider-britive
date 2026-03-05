@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveProfileAdditionalSettings(t *testing.T) {
+func TestAccBritiveProfileAdditionalSettings(t *testing.T) {
 	applicationName := "DO NOT DELETE - GCP TF Plugin"
 	profileName := "AT - New Britive Constraint Test"
 	profileDescription := "AT - New Britive Constraint Test Description"
@@ -20,8 +19,9 @@ func TestBritiveProfileAdditionalSettings(t *testing.T) {
 	projectIdForServiceAccount := ""
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveProfileAdditionalSettingsConfig(applicationName, profileName, profileDescription, associationValue, useAppCredentialType, consoleAccess, programmaticAccess, projectIdForServiceAccount),
@@ -60,16 +60,15 @@ func testAccCheckBritiveProfileAdditionalSettingsConfig(applicationName, profile
 
 }
 
-func testAccCheckBritiveProfileAdditionalSettingsExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveProfileAdditionalSettingsExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

@@ -3,305 +3,490 @@ package resources
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
-	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// ResourcePolicyPriority - Terraform Resource for Policy Priority
-type ResourcePolicyPriority struct {
-	Resource     *schema.Resource
-	helper       *ResourcePolicyPriorityHelper
-	validation   *validate.Validation
+var (
+	_ resource.Resource                = &ResourceProfilePolicyPrioritization{}
+	_ resource.ResourceWithConfigure   = &ResourceProfilePolicyPrioritization{}
+	_ resource.ResourceWithImportState = &ResourceProfilePolicyPrioritization{}
+)
+
+type ResourceProfilePolicyPrioritization struct {
+	client       *britive_client.Client
+	helper       *ResourceProfilePolicyPrioritizationHelper
 	importHelper *imports.ImportHelper
 }
 
-// ResourcePolicyPriorityHelper - Helper for policy priority
-type ResourcePolicyPriorityHelper struct{}
+type ResourceProfilePolicyPrioritizationHelper struct{}
 
-func NewResourcePolicyPriorityHelper() *ResourcePolicyPriorityHelper {
-	return &ResourcePolicyPriorityHelper{}
+func NewResourceProfilePolicyPrioritization() resource.Resource {
+	return &ResourceProfilePolicyPrioritization{}
 }
 
-// NewResourcePolicyPriority - Initializes new policy priority resource
-func NewResourcePolicyPriority(v *validate.Validation, importHelper *imports.ImportHelper) *ResourcePolicyPriority {
-	rpo := &ResourcePolicyPriority{
-		helper:       NewResourcePolicyPriorityHelper(),
-		validation:   v,
-		importHelper: importHelper,
+func NewResourceProfilePolicyPrioritizationHelper() *ResourceProfilePolicyPrioritizationHelper {
+	return &ResourceProfilePolicyPrioritizationHelper{}
+}
+
+func (rppp *ResourceProfilePolicyPrioritization) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_profile_policy_prioritization"
+}
+
+func (rppp *ResourceProfilePolicyPrioritization) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Profile Policy Prioritization resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rpo.Resource = &schema.Resource{
-		CreateContext: rpo.resourceCreate,
-		ReadContext:   rpo.resourceRead,
-		UpdateContext: rpo.resourceUpdate,
-		DeleteContext: rpo.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rpo.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"profile_id": {
-				Type:        schema.TypeString,
+
+	rppp.client = req.ProviderData.(*britive_client.Client)
+	if rppp.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for Resource Profile Policy Prioritization")
+	rppp.helper = NewResourceProfilePolicyPrioritizationHelper()
+}
+
+func (rppp *ResourceProfilePolicyPrioritization) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for profile policy prioritization resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"profile_id": schema.StringAttribute{
 				Required:    true,
 				Description: "Profile ID",
 			},
-			"policy_priority_enabled": {
-				Type:        schema.TypeBool,
+			"policy_priority_enabled": schema.BoolAttribute{
 				Optional:    true,
-				Default:     true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 				Description: "Enable policy ordering",
-				ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
-					if val.(bool) != true {
-						errs = append(errs, fmt.Errorf("Invalid Param."))
-					}
-					return
-				},
 			},
-			"policy_priority": {
-				Type:        schema.TypeSet,
-				Optional:    true,
+		},
+		Blocks: map[string]schema.Block{
+			"policy_priority": schema.SetNestedBlock{
 				Description: "Policies with id and priority",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:        schema.TypeString,
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
 							Required:    true,
-							Description: "Policy Id",
+							Description: "policy name",
 						},
-						"priority": {
-							Type:        schema.TypeInt,
+						"priority": schema.Int64Attribute{
 							Required:    true,
-							Description: "Priority number",
+							Description: "priority number",
 						},
 					},
 				},
 			},
 		},
 	}
-	return rpo
 }
 
-func (rpo *ResourcePolicyPriority) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rppp *ResourceProfilePolicyPrioritization) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_profile_policy_prioritization")
 
-	resourcePolicyPriority := &britive.ProfilePolicyPriority{}
-
-	log.Printf("[INFO] Mapping resource to policy priority model")
-	resourcePolicyPriority, err := rpo.helper.mapResourceToModel(c, d, resourcePolicyPriority)
-	if err != nil {
-		return diag.FromErr(err)
+	var plan britive_client.ProfilePolicyPrioritizationPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during profile_policy_prioritization creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	profileSummary, err := c.GetProfileSummary(resourcePolicyPriority.ProfileID)
+	resourcePolicyPriority := &britive_client.ProfilePolicyPriority{}
+
+	tflog.Info(ctx, "Mapping resource to policy priority model")
+	resourcePolicyPriority, err := rppp.helper.mapResourceToModel(ctx, plan, resourcePolicyPriority, *rppp.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create policy_priority", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to map resource to model, error:%#v", err))
+		return
+	}
+
+	profileSummary, err := rppp.client.GetProfileSummary(ctx, resourcePolicyPriority.ProfileID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch profile summary", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to fetch profile summary, error:%#v", err))
+		return
 	}
 
 	profileSummary.PolicyOrderingEnabled = resourcePolicyPriority.PolicyOrderingEnabled
 
-	log.Printf("[INFO] Enabling policy prioritization")
-	profileSummary, err = c.EnableDisablePolicyPrioritization(*profileSummary)
+	tflog.Info(ctx, "Enabling policy prioritization")
+	profileSummary, err = rppp.client.EnableDisablePolicyPrioritization(ctx, *profileSummary)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to enable policy prioritization", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to enable policy prioritization, error:%#v", err))
+		return
 	}
 
 	profileId := resourcePolicyPriority.ProfileID
 
 	if resourcePolicyPriority.PolicyOrderingEnabled {
-		log.Printf("[INFO] Prioritizing policies:%v", resourcePolicyPriority.PolicyOrder)
-		resourcePolicyPriority, err = c.PrioritizePolicies(*resourcePolicyPriority)
+		tflog.Info(ctx, fmt.Sprintf("Prioritizing policies:%v", resourcePolicyPriority.PolicyOrder))
+		resourcePolicyPriority, err = rppp.client.PrioritizePolicies(ctx, *resourcePolicyPriority)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to prioritize policies", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to prioritize policies, error:%#v", err))
+			return
 		}
 	}
 
-	id := rpo.helper.generateUniqueID(profileId)
+	id := rppp.helper.generateUniqueID(profileId)
 
-	d.SetId(id)
+	plan.ID = types.StringValue(id)
 
-	return rpo.resourceRead(ctx, d, m)
+	planPtr, err := rppp.helper.getAndMapModelToPlan(ctx, plan, *rppp.client, false)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get policy_order",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map policy_prioritization model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"policy_order": planPtr,
+	})
 }
 
-func (rpo *ResourcePolicyPriority) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rppp *ResourceProfilePolicyPrioritization) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_profile_policy_prioritization")
 
-	var diags diag.Diagnostics
-
-	profileId := rpo.helper.parseUniqueID(d.Id())
-
-	log.Printf("[INFO] Getting profile policies")
-	policies, err := c.GetProfilePolicies(profileId)
-	if err != nil {
-		return diag.FromErr(err)
+	if rppp.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
 	}
 
-	log.Printf("[INFO] Getting Profile")
-	profile, err := c.GetProfile(profileId)
-	if err != nil {
-		return diag.FromErr(err)
+	var state britive_client.ProfilePolicyPrioritizationPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get policy priority state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	log.Printf("[INFO] Saving state of policy order")
-	err = rpo.helper.getAndMapModelToResource(d, policies, profileId, profile.PolicyOrderingEnabled, false)
+	planPtr, err := rppp.helper.getAndMapModelToPlan(ctx, state, *rppp.client, false)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get policy priorities",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map policy prioritization model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	return diags
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Read policy priorities:  %#v", planPtr))
 }
 
-func (rpo *ResourcePolicyPriority) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rppp *ResourceProfilePolicyPrioritization) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_profile_policy_prioritization")
 
-	if d.HasChange("profile_id") || d.HasChange("policy_priority_enabled") || d.HasChange("policy_priority") {
-		resourcePolicyPriority := &britive.ProfilePolicyPriority{}
+	var plan, state britive_client.ProfilePolicyPrioritizationPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
-		log.Printf("[INFO] Mapping resource to policy priority model")
-		resourcePolicyPriority, err := rpo.helper.mapResourceToModel(c, d, resourcePolicyPriority)
+	var hasChanges bool
+	if !plan.ProfileID.Equal(state.ProfileID) || !plan.PolicyPriorityEnabled.Equal(state.PolicyPriorityEnabled) || !plan.PolicyPriority.Equal(state.PolicyPriority) {
+		hasChanges = true
+		resourcePolicyPriority := &britive_client.ProfilePolicyPriority{}
+
+		tflog.Info(ctx, "Mapping resource to policy priority model")
+		resourcePolicyPriority, err := rppp.helper.mapResourceToModel(ctx, plan, resourcePolicyPriority, *rppp.client)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update policy prioritization", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to map policy priority resource to model, error:%#v", err))
+			return
 		}
 
-		profileSummary, err := c.GetProfileSummary(resourcePolicyPriority.ProfileID)
+		profileSummary, err := rppp.client.GetProfileSummary(ctx, resourcePolicyPriority.ProfileID)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update policy prioritization", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to fetch profile summary, error:%#v", err))
+			return
 		}
 
 		profileSummary.PolicyOrderingEnabled = resourcePolicyPriority.PolicyOrderingEnabled
 
-		log.Printf("[INFO] Enabling policy prioritization")
-		profileSummary, err = c.EnableDisablePolicyPrioritization(*profileSummary)
+		tflog.Info(ctx, "Enabling policy prioritization")
+		profileSummary, err = rppp.client.EnableDisablePolicyPrioritization(ctx, *profileSummary)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to enable policy prioritization", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to enable policy prioritization, error:%#v", err))
+			return
 		}
 
 		profileId := resourcePolicyPriority.ProfileID
 
 		if resourcePolicyPriority.PolicyOrderingEnabled {
-			log.Printf("[INFO] Prioritizing policies:%v", resourcePolicyPriority.PolicyOrder)
-			resourcePolicyPriority, err = c.PrioritizePolicies(*resourcePolicyPriority)
+			tflog.Info(ctx, fmt.Sprintf("Prioritizing policies:%v", resourcePolicyPriority.PolicyOrder))
+			resourcePolicyPriority, err = rppp.client.PrioritizePolicies(ctx, *resourcePolicyPriority)
 			if err != nil {
-				return diag.FromErr(err)
+				resp.Diagnostics.AddError("Failed to update policy prioritization", err.Error())
+				tflog.Error(ctx, fmt.Sprintf("Failed to fetch profile summary, error:%#v", err))
+				return
 			}
 		}
 
-		id := rpo.helper.generateUniqueID(profileId)
-		d.SetId(id)
+		id := rppp.helper.generateUniqueID(profileId)
+		plan.ID = types.StringValue(id)
 	}
+	if hasChanges {
+		planPtr, err := rppp.helper.getAndMapModelToPlan(ctx, plan, *rppp.client, false)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to set state after update",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map policy priority model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
 
-	return rpo.resourceRead(ctx, d, m)
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
 
+		tflog.Info(ctx, fmt.Sprintf("Updated policy priorities: %#v", planPtr))
+	}
 }
 
-func (rpo *ResourcePolicyPriority) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rppp *ResourceProfilePolicyPrioritization) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_profile_policy_prioritization")
 
-	var diags diag.Diagnostics
+	var state britive_client.ProfilePolicyPrioritizationPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
-	profileId := rpo.helper.parseUniqueID(d.Id())
+	profileId := rppp.helper.parseUniqueID(state.ID.ValueString())
 
-	profileSummary, err := c.GetProfileSummary(profileId)
+	profileSummary, err := rppp.client.GetProfileSummary(ctx, profileId)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to delete policy prioritization", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to get profile summary, error:%#v", err))
+		return
 	}
 
 	profileSummary.PolicyOrderingEnabled = false
 
-	log.Printf("[INFO] Disabling policy prioritization: %s", d.Id())
-	_, err = c.EnableDisablePolicyPrioritization(*profileSummary)
+	tflog.Info(ctx, fmt.Sprintf("Disabling policy prioritization: %s", state.ID.ValueString()))
+	_, err = rppp.client.EnableDisablePolicyPrioritization(ctx, *profileSummary)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to delete policy priorities", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete policy priorities, err:%#v", err))
+		return
 	}
 
-	d.SetId("")
-
-	return diags
+	resp.State.RemoveResource(ctx)
 }
 
-func (helper *ResourcePolicyPriorityHelper) getAndMapModelToResource(d *schema.ResourceData, policies []britive.ProfilePolicy, profileId string, policyOrderingEnabled bool, imported bool) error {
-	if err := d.Set("profile_id", profileId); err != nil {
-		return err
+func (rppp *ResourceProfilePolicyPrioritization) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
 	}
 
-	if err := d.Set("policy_priority_enabled", policyOrderingEnabled); err != nil {
-		return err
+	if err := rppp.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/policies/priority", "(?P<profile_id>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import policy priorities", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse importID, error:%#v", err))
+		return
 	}
 
-	order := d.Get("policy_priority").(*schema.Set).List()
-	var policyOrder []map[string]interface{}
+	profileId := importData.Fields["profile_id"]
+
+	plan := &britive_client.ProfilePolicyPrioritizationPlan{
+		ID: types.StringValue(rppp.helper.generateUniqueID(profileId)),
+	}
+
+	planPtr, err := rppp.helper.getAndMapModelToPlan(ctx, *plan, *rppp.client, true)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to import policy priorities",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed import policy prioritization model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported policy priorities : %#v", planPtr))
+}
+
+func (rppph *ResourceProfilePolicyPrioritizationHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ProfilePolicyPrioritizationPlan, c britive_client.Client, imported bool) (*britive_client.ProfilePolicyPrioritizationPlan, error) {
+	profileId := rppph.parseUniqueID(plan.ID.ValueString())
+
+	tflog.Info(ctx, fmt.Sprintf("Getting profile policy, profileID:%s", profileId))
+	policies, err := c.GetProfilePolicies(ctx, profileId)
+	if err != nil {
+		return nil, err
+	}
+
+	profile, err := c.GetProfile(ctx, profileId)
+	if err != nil {
+		return nil, err
+	}
+
+	plan.ProfileID = types.StringValue(profileId)
+	plan.PolicyPriorityEnabled = types.BoolValue(profile.PolicyOrderingEnabled)
+
+	order, err := rppph.mapSetToPolicyOrder(plan.PolicyPriority)
+	if err != nil {
+		return nil, err
+	}
+	var policyOrder []britive_client.PolicyPriorityPlan
 
 	if len(order) == 0 && imported {
 		for _, policy := range policies {
-
-			pOrder := map[string]interface{}{
-				"id":       policy.PolicyID,
-				"priority": policy.Order,
+			pOrder := britive_client.PolicyPriorityPlan{
+				ID:       types.StringValue(policy.PolicyID),
+				Priority: types.Int64Value(int64(policy.Order)),
 			}
 			policyOrder = append(policyOrder, pOrder)
-
 		}
-		if err := d.Set("policy_priority", policyOrder); err != nil {
-			return err
+		policyOrderSet, err := rppph.mapPolicyPriorityToSet(policyOrder)
+		if err != nil {
+			return nil, err
 		}
-		return nil
+		plan.PolicyPriority = policyOrderSet
+		return &plan, nil
 	}
 
 	userOrder := make(map[string]string)
 	for _, ord := range order {
-		mapOrder := ord.(map[string]interface{})
-		idArr := strings.Split(mapOrder["id"].(string), "/")
+		idArr := strings.Split(ord.ID.ValueString(), "/")
 		pId := idArr[len(idArr)-1]
-		userOrder[pId] = mapOrder["id"].(string)
+		userOrder[pId] = ord.ID.ValueString()
 	}
 
 	for _, policy := range policies {
 		if _, ok := userOrder[policy.PolicyID]; ok {
-			pOrder := map[string]interface{}{
-				"id":       userOrder[policy.PolicyID],
-				"priority": policy.Order,
+			pOrder := britive_client.PolicyPriorityPlan{
+				ID:       types.StringValue(userOrder[policy.PolicyID]),
+				Priority: types.Int64Value(int64(policy.Order)),
 			}
 			policyOrder = append(policyOrder, pOrder)
 		}
 
 	}
-	if err := d.Set("policy_priority", policyOrder); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (helper *ResourcePolicyPriorityHelper) mapResourceToModel(c *britive.Client, d *schema.ResourceData, resourcePolicyPriority *britive.ProfilePolicyPriority) (*britive.ProfilePolicyPriority, error) {
-	profileId := d.Get("profile_id").(string)
-	policyOrder := d.Get("policy_priority").(*schema.Set).List()
-	rawPolicyOrdering, _ := d.GetOk("policy_priority_enabled")
-	policyOrderingEnabled := rawPolicyOrdering.(bool)
-
-	userMapPolicyToOrder := make(map[string]int)
-	userMapOrderToPolicy := make(map[int]string)
-	profilePolicies, err := c.GetProfilePolicies(profileId)
+	policyOrderSet, err := rppph.mapPolicyPriorityToSet(policyOrder)
 	if err != nil {
 		return nil, err
 	}
-	for _, rawPolicy := range policyOrder {
-		policy := rawPolicy.(map[string]interface{})
-		policyIdArr := strings.Split(policy["id"].(string), "/")
-		policy["id"] = policyIdArr[len(policyIdArr)-1]
-		if policy["priority"].(int) < 0 || policy["priority"].(int) >= len(profilePolicies) {
-			return nil, fmt.Errorf("invalid priority value: %d. The total number of policies is %d, so the priority must be between 0 and %d, inclusive.", policy["priority"].(int), len(profilePolicies), len(profilePolicies)-1)
+	plan.PolicyPriority = policyOrderSet
+
+	return &plan, nil
+}
+
+func (rppph *ResourceProfilePolicyPrioritizationHelper) mapResourceToModel(ctx context.Context, plan britive_client.ProfilePolicyPrioritizationPlan, resourcePolicyPriority *britive_client.ProfilePolicyPriority, c britive_client.Client) (*britive_client.ProfilePolicyPriority, error) {
+	profileId := plan.ProfileID.ValueString()
+	policyOrder, err := rppph.mapSetToPolicyOrder(plan.PolicyPriority)
+	if err != nil {
+		return nil, err
+	}
+	policyOrderingEnabled := plan.PolicyPriorityEnabled.ValueBool()
+	if !policyOrderingEnabled {
+		return nil, fmt.Errorf("policy_priority_enabled must be set to true. Disabling policy prioritization is not supported for this resource.")
+	}
+
+	userMapPolicyToOrder := make(map[string]int)
+	userMapOrderToPolicy := make(map[int]string)
+	profilePolicies, err := c.GetProfilePolicies(ctx, profileId)
+	if err != nil {
+		return nil, err
+	}
+	for _, policy := range policyOrder {
+		policyIdArr := strings.Split(policy.ID.ValueString(), "/")
+		policy.ID = types.StringValue(policyIdArr[len(policyIdArr)-1])
+		if policy.Priority.ValueInt64() < 0 || int(policy.Priority.ValueInt64()) >= len(profilePolicies) {
+			return nil, fmt.Errorf("invalid priority value: %d. The total number of policies is %d, so the priority must be between 0 and %d, inclusive.", policy.Priority.ValueInt64(), len(profilePolicies), len(profilePolicies)-1)
 		}
-		if _, ok := userMapPolicyToOrder[policy["id"].(string)]; ok {
-			return nil, fmt.Errorf("duplicate policy detected: %s. Each policy ID must be unique.", policy["id"].(string))
+		if _, ok := userMapPolicyToOrder[policy.ID.ValueString()]; ok {
+			return nil, fmt.Errorf("duplicate policy detected: %s. Each policy ID must be unique.", policy.ID.ValueString())
 		}
-		if _, ok := userMapOrderToPolicy[policy["priority"].(int)]; ok {
-			return nil, fmt.Errorf("duplicate priority detected: %d. Each priority value must be unique.", policy["priority"].(int))
+		if _, ok := userMapOrderToPolicy[int(policy.Priority.ValueInt64())]; ok {
+			return nil, fmt.Errorf("duplicate priority detected: %d. Each priority value must be unique.", policy.Priority.ValueInt64())
 		}
-		userMapOrderToPolicy[policy["priority"].(int)] = policy["id"].(string)
-		userMapPolicyToOrder[policy["id"].(string)] = policy["priority"].(int)
+		userMapOrderToPolicy[int(policy.Priority.ValueInt64())] = policy.ID.ValueString()
+		userMapPolicyToOrder[policy.ID.ValueString()] = int(policy.Priority.ValueInt64())
 	}
 
 	skipped := 0
@@ -309,7 +494,7 @@ func (helper *ResourcePolicyPriorityHelper) mapResourceToModel(c *britive.Client
 	checkPolicy := make(map[string]int)
 
 	for i := 0; i < len(profilePolicies); i++ {
-		var tempPolicyOrder britive.PolicyOrder
+		var tempPolicyOrder britive_client.PolicyOrder
 
 		if _, ok := userMapOrderToPolicy[i]; ok {
 			tempPolicyOrder.Id = userMapOrderToPolicy[i]
@@ -335,8 +520,6 @@ func (helper *ResourcePolicyPriorityHelper) mapResourceToModel(c *britive.Client
 		resourcePolicyPriority.PolicyOrder = append(resourcePolicyPriority.PolicyOrder, tempPolicyOrder)
 	}
 
-	log.Printf("%v", resourcePolicyPriority.PolicyOrder)
-
 	resourcePolicyPriority.ProfileID = profileId
 	resourcePolicyPriority.Extendable = false
 	resourcePolicyPriority.PolicyOrderingEnabled = policyOrderingEnabled
@@ -344,41 +527,67 @@ func (helper *ResourcePolicyPriorityHelper) mapResourceToModel(c *britive.Client
 	return resourcePolicyPriority, nil
 }
 
-func (helper *ResourcePolicyPriorityHelper) parseUniqueID(id string) string {
+func (rppph *ResourceProfilePolicyPrioritizationHelper) parseUniqueID(id string) string {
 	idArr := strings.Split(id, "/")
 	profileId := idArr[len(idArr)-3]
 
 	return profileId
 }
 
-func (helper *ResourcePolicyPriorityHelper) generateUniqueID(profileId string) string {
+func (rppph *ResourceProfilePolicyPrioritizationHelper) generateUniqueID(profileId string) string {
 	return fmt.Sprintf("paps/%s/policies/priority", profileId)
 }
 
-func (rpo *ResourcePolicyPriority) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-	if err := rpo.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/policies/priority", "(?P<profile_id>[^/]+)"}, d); err != nil {
-		return nil, err
+func (rppph *ResourceProfilePolicyPrioritizationHelper) mapSetToPolicyOrder(policyOrderSet types.Set) ([]britive_client.PolicyPriorityPlan, error) {
+	var result []britive_client.PolicyPriorityPlan
+	objs := policyOrderSet.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, fmt.Errorf("expected Object, got %T", e)
+		}
+		var p britive_client.PolicyPriorityPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to convert object to PolicyProperty resource: %v", diags)
+		}
+		result = append(result, p)
+	}
+	return result, nil
+}
+
+func (rppph *ResourceProfilePolicyPrioritizationHelper) mapPolicyPriorityToSet(policyPriority []britive_client.PolicyPriorityPlan) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(policyPriority))
+
+	for _, p := range policyPriority {
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"id":       types.StringType,
+				"priority": types.Int64Type,
+			},
+			map[string]attr.Value{
+				"id":       p.ID,
+				"priority": p.Priority,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create object for policy priority: %v", diags)
+		}
+		objs = append(objs, obj)
 	}
 
-	profileId := d.Get("profile_id").(string)
-
-	d.SetId(rpo.helper.generateUniqueID(profileId))
-
-	policies, err := c.GetProfilePolicies(profileId)
-	if err != nil {
-		return nil, err
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"id":       types.StringType,
+				"priority": types.Int64Type,
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create sensitive properties set: %v", diags)
 	}
 
-	profile, err := c.GetProfile(profileId)
-	if err != nil {
-		return nil, err
-	}
-
-	err = rpo.helper.getAndMapModelToResource(d, policies, profileId, profile.PolicyOrderingEnabled, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return []*schema.ResourceData{d}, nil
+	return set, nil
 }

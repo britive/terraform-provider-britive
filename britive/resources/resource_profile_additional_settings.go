@@ -2,240 +2,423 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// ResourceProfileAdditionalSettings - Terraform Resource for Profile Additional Settings
+var (
+	_ resource.Resource                = &ResourceProfileAdditionalSettings{}
+	_ resource.ResourceWithConfigure   = &ResourceProfileAdditionalSettings{}
+	_ resource.ResourceWithImportState = &ResourceProfileAdditionalSettings{}
+)
+
 type ResourceProfileAdditionalSettings struct {
-	Resource     *schema.Resource
+	client       *britive_client.Client
 	helper       *ResourceProfileAdditionalSettingsHelper
 	importHelper *imports.ImportHelper
 }
 
-// NewResourceProfileAdditionalSettings - Initialization of new profile additional settings resource
-func NewResourceProfileAdditionalSettings(importHelper *imports.ImportHelper) *ResourceProfileAdditionalSettings {
-	rpas := &ResourceProfileAdditionalSettings{
-		helper:       NewResourceProfileAdditionalSettingsHelper(),
-		importHelper: importHelper,
+type ResourceProfileAdditionalSettingsHelper struct{}
+
+func NewResourceProfileAdditionalSettings() resource.Resource {
+	return &ResourceProfileAdditionalSettings{}
+}
+
+func NewResourceProfileAdditionalSettingsHelper() *ResourceProfileAdditionalSettingsHelper {
+	return &ResourceProfileAdditionalSettingsHelper{}
+}
+
+func (rpas *ResourceProfileAdditionalSettings) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_profile_additional_settings"
+}
+
+func (rpas *ResourceProfileAdditionalSettings) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Profile Additional Settings resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rpas.Resource = &schema.Resource{
-		CreateContext: rpas.resourceCreate,
-		ReadContext:   rpas.resourceRead,
-		UpdateContext: rpas.resourceUpdate,
-		DeleteContext: rpas.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rpas.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"profile_id": {
-				Type:         schema.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				Description:  "The identifier of the profile",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
+
+	rpas.client = req.ProviderData.(*britive_client.Client)
+	if rpas.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for Resource Profile Additional Settings")
+	rpas.helper = NewResourceProfileAdditionalSettingsHelper()
+}
+
+func (rpas *ResourceProfileAdditionalSettings) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for profile additional settings resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"use_app_credential_type": {
-				Type:        schema.TypeBool,
+			"profile_id": schema.StringAttribute{
+				Required:    true,
+				Description: "The identifier of the profile",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					validate.StringFunc(
+						"profileId",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"use_app_credential_type": schema.BoolAttribute{
 				Optional:    true,
 				Description: "Inherit the credential type settings from the application",
 			},
-			"console_access": {
-				Type:        schema.TypeBool,
+			"console_access": schema.BoolAttribute{
 				Optional:    true,
 				Description: "Provide the console access for the profile, overriden if use_app_credential_type is set to true",
 			},
-			"programmatic_access": {
-				Type:        schema.TypeBool,
+			"programmatic_access": schema.BoolAttribute{
 				Optional:    true,
 				Description: "Provide the programmatic access for the profile, overriden if use_app_credential_type is set to true",
 			},
-			"project_id_for_service_account": {
-				Type:        schema.TypeString,
+			"project_id_for_service_account": schema.StringAttribute{
 				Optional:    true,
 				Description: "The project id for creating service accounts",
 			},
 		},
 	}
-	return rpas
 }
 
-//region Profile Additional Settings Resource Context Operations
+func (rpas *ResourceProfileAdditionalSettings) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_profile_permission")
 
-func (rpas *ResourceProfileAdditionalSettings) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
-
-	profileAdditionalSettings := britive.ProfileAdditionalSettings{}
-
-	err := rpas.helper.mapResourceToModel(d, m, &profileAdditionalSettings, false)
-	if err != nil {
-		return diag.FromErr(err)
+	var plan britive_client.ProfileAdditionalSettingsPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during profile_permission creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	log.Printf("[INFO] Creating new profile additional settings: %#v", profileAdditionalSettings)
+	profileAdditionalSettings := britive_client.ProfileAdditionalSettings{}
 
-	pas, err := c.UpdateProfileAdditionalSettings(profileAdditionalSettings)
+	err := rpas.helper.mapResourceToModel(plan, &profileAdditionalSettings, false)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create profile additional settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to map profile additional settings to model, %#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Submitted new profile additional settings: %#v", pas)
-	d.SetId(rpas.helper.generateUniqueID(profileAdditionalSettings.ProfileID))
-	rpas.resourceRead(ctx, d, m)
-	return diags
+	tflog.Info(ctx, fmt.Sprintf("Creating new profile additional settings: %#v", profileAdditionalSettings))
+
+	pas, err := rpas.client.UpdateProfileAdditionalSettings(ctx, profileAdditionalSettings)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create profile additional settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to create profile additional settings, %#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Submitted new profile additional settings: %#v", pas))
+	plan.ID = types.StringValue(rpas.helper.generateUniqueID(pas.ProfileID))
+
+	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, plan, *rpas.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get profile additional settings",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map profile additional settings model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"profile_additional_settings": planPtr,
+	})
 }
 
-func (rpas *ResourceProfileAdditionalSettings) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-	c := m.(*britive.Client)
+func (rpas *ResourceProfileAdditionalSettings) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_profile_additional_settings")
 
-	profileID, err := rpas.helper.parseUniqueID(d.Id())
+	if rpas.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
+	}
+
+	var state britive_client.ProfileAdditionalSettingsPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get profile additional settings state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, state, *rpas.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get profile additional settings",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map profile additional settings model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	log.Printf("[INFO] Reading profile additional settings: %s", profileID)
-
-	profileAdditionalSettings, err := c.GetProfileAdditionalSettings(profileID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("profile additional settings for %s", profileID))
-	}
-	if err != nil {
-		return diag.FromErr(err)
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	err = rpas.helper.mapModelToResource(d, m, false, profileAdditionalSettings, profileID)
-
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	return diags
+	tflog.Info(ctx, fmt.Sprintf("Fetched profile additional settings:  %s", planPtr.ProfileID.ValueString()))
 }
 
-func (rpas *ResourceProfileAdditionalSettings) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rpas *ResourceProfileAdditionalSettings) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_profile_additional_settings")
+
+	var plan, state britive_client.ProfileAdditionalSettingsPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
 	var hasChanges bool
-	if d.HasChange("profile_id") || d.HasChange("use_app_credential_type") || d.HasChange("console_access") || d.HasChange("programmatic_access") || d.HasChange("project_id_for_service_account") {
+	if !plan.ProfileID.Equal(state.ProfileID) || !plan.UserAppCredentialType.Equal(state.UserAppCredentialType) || !plan.ConsoleAccess.Equal(state.ConsoleAccess) || !plan.ProgrammaticAccess.Equal(state.ProgrammaticAccess) || !plan.ProjectIDForServiceAccount.Equal(state.ProjectIDForServiceAccount) {
 		hasChanges = true
-		profileID, err := rpas.helper.parseUniqueID(d.Id())
+		profileID, err := rpas.helper.parseUniqueID(plan.ID.ValueString())
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update orofile additional settings", "Unable to fetch profile additional settings ID")
+			tflog.Error(ctx, fmt.Sprintf("Failed to parse ID, %#v", err))
+			return
 		}
 
-		profileAdditionalSettings := britive.ProfileAdditionalSettings{}
+		profileAdditionalSettings := britive_client.ProfileAdditionalSettings{}
 
-		err = rpas.helper.mapResourceToModel(d, m, &profileAdditionalSettings, false)
+		err = rpas.helper.mapResourceToModel(plan, &profileAdditionalSettings, false)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update profile additional settings", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to map resource to model, %#v", err))
+			return
 		}
 
 		profileAdditionalSettings.ProfileID = profileID
 
-		upas, err := c.UpdateProfileAdditionalSettings(profileAdditionalSettings)
+		upas, err := rpas.client.UpdateProfileAdditionalSettings(ctx, profileAdditionalSettings)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update profile additional settings", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update profile additional settings: %#v", err))
+			return
 		}
 
-		log.Printf("[INFO] Submitted updated profile additional settings: %#v", upas)
-		d.SetId(rpas.helper.generateUniqueID(profileAdditionalSettings.ProfileID))
+		tflog.Info(ctx, fmt.Sprintf("Submitted updated profile additional settings: %#v", upas))
+		plan.ID = types.StringValue(rpas.helper.generateUniqueID(profileID))
 	}
 	if hasChanges {
-		return rpas.resourceRead(ctx, d, m)
+		planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, plan, *rpas.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to get profile additional settings",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map profile additional settings model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Updated profile additional settings:  %s", planPtr.ProfileID.ValueString()))
 	}
-	return nil
 }
 
-func (rpas *ResourceProfileAdditionalSettings) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rpas *ResourceProfileAdditionalSettings) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_profile_additional_settings")
 
-	var diags diag.Diagnostics
-
-	profileID, err := rpas.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
+	var state britive_client.ProfileAdditionalSettingsPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	profileAdditionalSettings := britive.ProfileAdditionalSettings{}
-
-	err = rpas.helper.mapResourceToModel(d, m, &profileAdditionalSettings, true)
+	profileID, err := rpas.helper.parseUniqueID(state.ID.ValueString())
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to delete profile additional settings", "Unable to fetch profile additional settings ID")
+		tflog.Error(ctx, fmt.Sprintf("Unable to fetch profile additional settings ID: %#v", err))
+		return
+	}
+
+	profileAdditionalSettings := britive_client.ProfileAdditionalSettings{}
+
+	err = rpas.helper.mapResourceToModel(state, &profileAdditionalSettings, true)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete profile additional settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete profile additional settings: %#v", err))
+		return
 	}
 
 	profileAdditionalSettings.ProfileID = profileID
 
-	log.Printf("[INFO] Deleting profile additional settings for %s", profileID)
+	tflog.Info(ctx, fmt.Sprintf("Deleting profile additional settings for %s", profileID))
 
-	_, err = c.UpdateProfileAdditionalSettings(profileAdditionalSettings)
+	_, err = rpas.client.UpdateProfileAdditionalSettings(ctx, profileAdditionalSettings)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to update profile additional settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to update profile additional settings: %#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Deleted profile additional settings for %s", profileID)
-	d.SetId("")
-
-	return diags
+	tflog.Info(ctx, fmt.Sprintf("Deleted profile additional settings for %s", profileID))
+	resp.State.RemoveResource(ctx)
 }
 
-func (rpas *ResourceProfileAdditionalSettings) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-	if err := rpas.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/additional-settings"}, d); err != nil {
-		return nil, err
+func (rpas *ResourceProfileAdditionalSettings) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+	if err := rpas.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/additional-settings"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import profile additional settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import profile additional settings: %#v", err))
+		return
 	}
 
-	profileID := d.Get("profile_id").(string)
+	profileID := importData.Fields["profile_id"]
 	if strings.TrimSpace(profileID) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("profile_id")
+		resp.Diagnostics.AddError("Failed to import profile additional settings", "ProfileID not found")
+		tflog.Error(ctx, "ProfileID not found")
+		return
 	}
 
-	log.Printf("[INFO] Importing profile additional settings for %s", profileID)
+	tflog.Info(ctx, fmt.Sprintf("Importing profile additional settings for %s", profileID))
 
-	profileAdditionalSettings, err := c.GetProfileAdditionalSettings(profileID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("profile additional settings for %s", profileID)
+	plan := &britive_client.ProfileAdditionalSettingsPlan{
+		ID: types.StringValue(rpas.helper.generateUniqueID(profileID)),
 	}
+	planPtr, err := rpas.helper.getAndMapModelToPlan(ctx, *plan, *rpas.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to import profile additional settings",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed import profile additional settings model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported profile additional settings for %s", profileID))
+}
+
+func (rpash *ResourceProfileAdditionalSettingsHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ProfileAdditionalSettingsPlan, c britive_client.Client) (*britive_client.ProfileAdditionalSettingsPlan, error) {
+	profileID, err := rpash.parseUniqueID(plan.ID.ValueString())
 	if err != nil {
 		return nil, err
 	}
 
-	d.SetId(rpas.helper.generateUniqueID(profileID))
+	tflog.Info(ctx, fmt.Sprintf("Reading profile additional settings: %s", profileID))
 
-	err = rpas.helper.mapModelToResource(d, m, true, profileAdditionalSettings, profileID)
+	profileAdditionalSettings, err := c.GetProfileAdditionalSettings(ctx, profileID)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[INFO] Imported profile additional settings for %s", profileID)
-	return []*schema.ResourceData{d}, nil
+
+	plan.ProfileID = types.StringValue(profileID)
+	if (plan.ConsoleAccess.IsNull() || plan.ConsoleAccess.IsUnknown()) && profileAdditionalSettings.ConsoleAccess == false {
+		plan.ConsoleAccess = types.BoolNull()
+	} else {
+		plan.ConsoleAccess = types.BoolValue(profileAdditionalSettings.ConsoleAccess)
+	}
+
+	if (plan.UserAppCredentialType.IsNull() || plan.UserAppCredentialType.IsUnknown()) && profileAdditionalSettings.UseApplicationCredentialType == false {
+		plan.UserAppCredentialType = types.BoolNull()
+	} else {
+		plan.UserAppCredentialType = types.BoolValue(profileAdditionalSettings.UseApplicationCredentialType)
+	}
+
+	if (plan.ProgrammaticAccess.IsNull() || plan.ProgrammaticAccess.IsUnknown()) && profileAdditionalSettings.ProgrammaticAccess == false {
+		plan.ProgrammaticAccess = types.BoolNull()
+	} else {
+		plan.ProgrammaticAccess = types.BoolValue(profileAdditionalSettings.ProgrammaticAccess)
+	}
+
+	if (plan.ProjectIDForServiceAccount.IsNull() || plan.ProjectIDForServiceAccount.IsUnknown()) && profileAdditionalSettings.ProjectIdForServiceAccount == "" {
+		plan.ProjectIDForServiceAccount = types.StringNull()
+	} else {
+		plan.ProjectIDForServiceAccount = types.StringValue(profileAdditionalSettings.ProjectIdForServiceAccount)
+	}
+
+	return &plan, nil
 }
 
-//endregion
+func (rpash *ResourceProfileAdditionalSettingsHelper) mapResourceToModel(plan britive_client.ProfileAdditionalSettingsPlan, profileAdditionalSettings *britive_client.ProfileAdditionalSettings, isDelete bool) error {
+	profileAdditionalSettings.ProfileID = plan.ProfileID.ValueString()
+	var isProjectIdSet bool
+	if !plan.ProjectIDForServiceAccount.IsNull() && !plan.ProjectIDForServiceAccount.IsUnknown() {
+		isProjectIdSet = true
+	}
 
-// ResourceProfileAdditionalSettingsHelper - Terraform Resource for Profile Additional Settings Helper
-type ResourceProfileAdditionalSettingsHelper struct {
-}
-
-// NewResourceProfileAdditionalSettingsHelper - Initialization of new profile additional settings resource helper
-func NewResourceProfileAdditionalSettingsHelper() *ResourceProfileAdditionalSettingsHelper {
-	return &ResourceProfileAdditionalSettingsHelper{}
-}
-
-//region ProfileAdditionalSettings Resource helper functions
-
-func (rpash *ResourceProfileAdditionalSettingsHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, profileAdditionalSettings *britive.ProfileAdditionalSettings, isDelete bool) error {
-	profileAdditionalSettings.ProfileID = d.Get("profile_id").(string)
-	projectId, isProjectIdSet := d.GetOk("project_id_for_service_account")
 	if isDelete {
 		profileAdditionalSettings.UseApplicationCredentialType = true
 		profileAdditionalSettings.ConsoleAccess = false
@@ -244,37 +427,11 @@ func (rpash *ResourceProfileAdditionalSettingsHelper) mapResourceToModel(d *sche
 			profileAdditionalSettings.ProjectIdForServiceAccount = ""
 		}
 	} else {
-		profileAdditionalSettings.UseApplicationCredentialType = d.Get("use_app_credential_type").(bool)
-		profileAdditionalSettings.ConsoleAccess = d.Get("console_access").(bool)
-		profileAdditionalSettings.ProgrammaticAccess = d.Get("programmatic_access").(bool)
+		profileAdditionalSettings.UseApplicationCredentialType = plan.UserAppCredentialType.ValueBool()
+		profileAdditionalSettings.ConsoleAccess = plan.ConsoleAccess.ValueBool()
+		profileAdditionalSettings.ProgrammaticAccess = plan.ProgrammaticAccess.ValueBool()
 		if isProjectIdSet == true {
-			profileAdditionalSettings.ProjectIdForServiceAccount = projectId.(string)
-		}
-	}
-
-	return nil
-}
-
-func (rpash *ResourceProfileAdditionalSettingsHelper) mapModelToResource(d *schema.ResourceData, m interface{}, isImport bool, profileAdditionalSettings *britive.ProfileAdditionalSettings, profileID string) error {
-
-	log.Printf("[INFO] Received profile additional settings: %#v", profileAdditionalSettings)
-
-	if err := d.Set("profile_id", profileID); err != nil {
-		return err
-	}
-	if err := d.Set("use_app_credential_type", profileAdditionalSettings.UseApplicationCredentialType); err != nil {
-		return err
-	}
-	if err := d.Set("console_access", profileAdditionalSettings.ConsoleAccess); err != nil {
-		return err
-	}
-	if err := d.Set("programmatic_access", profileAdditionalSettings.ProgrammaticAccess); err != nil {
-		return err
-	}
-	_, isProjectIdSet := d.GetOk("project_id_for_service_account")
-	if isProjectIdSet || isImport {
-		if err := d.Set("project_id_for_service_account", profileAdditionalSettings.ProjectIdForServiceAccount); err != nil {
-			return err
+			profileAdditionalSettings.ProjectIdForServiceAccount = plan.ProjectIDForServiceAccount.ValueString()
 		}
 	}
 
@@ -295,5 +452,3 @@ func (resourceProfileAdditionalSettingsHelper *ResourceProfileAdditionalSettings
 	profileID = profileAdditionalSettings[1]
 	return
 }
-
-//endregion

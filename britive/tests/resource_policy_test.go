@@ -5,12 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritivePolicy(t *testing.T) {
+func TestAccBritivePolicy(t *testing.T) {
 	permissionName := "AT - Britive Permission Test Policy"
 	permissionDescription := "AT - Britive Permission Test Policy Description"
 	roleName := "AT - Britive Role Test Policy"
@@ -19,13 +18,15 @@ func TestBritivePolicy(t *testing.T) {
 	policyDescription := "AT - Britive Policy Test Description"
 	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2006-01-02 15:04:05")
 	timeOfAccessTo := time.Now().AddDate(0, 0, 7).Format("2006-01-02 15:04:05")
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritivePolicyConfig(permissionName, permissionDescription, roleName, roleDescription, policyName, policyDescription, timeOfAccessFrom, timeOfAccessTo),
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckBritivePolicyExists("britive_policy.new"),
 				),
 			},
@@ -206,16 +207,15 @@ func testAccCheckBritivePolicyConfig(permissionName, permissionDescription, role
 
 }
 
-func testAccCheckBritivePolicyExists(n string) resource.TestCheckFunc {
+func testAccCheckBritivePolicyExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

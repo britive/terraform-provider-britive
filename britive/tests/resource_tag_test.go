@@ -4,22 +4,23 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveTag(t *testing.T) {
+func TestAccBritiveTag(t *testing.T) {
 	name := "AT - New Britive Tag Test"
 	description := "AT - New Britive Tag Test Description"
 	identityProviderName := "Britive"
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveTagConfig(name, description, identityProviderName),
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckBritiveTagExists("britive_tag.new"),
 				),
 			},
@@ -40,16 +41,15 @@ func testAccCheckBritiveTagConfig(name string, description string, identityProvi
 	}`, identityProviderName, name, description)
 }
 
-func testAccCheckBritiveTagExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveTagExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

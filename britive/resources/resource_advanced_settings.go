@@ -3,130 +3,179 @@ package resources
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+var (
+	_ resource.Resource                = &ResourceAdvancedSettings{}
+	_ resource.ResourceWithConfigure   = &ResourceAdvancedSettings{}
+	_ resource.ResourceWithImportState = &ResourceAdvancedSettings{}
 )
 
 type ResourceAdvancedSettings struct {
-	Resource     *schema.Resource
-	helper       *ResourceAdvancedSettingsHelper
-	validation   *validate.Validation
-	importHelper *imports.ImportHelper
+	client *britive_client.Client
+	helper *ResourceAdvancedSettingsHelper
 }
 
-func NewResourceAdvancedSettings(v *validate.Validation, importHelper *imports.ImportHelper) *ResourceAdvancedSettings {
-	rst := &ResourceAdvancedSettings{
-		helper:       NewResourceAdvancedSettingsHelper(),
-		validation:   v,
-		importHelper: importHelper,
+type ResourceAdvancedSettingsHelper struct{}
+
+func NewResourceAdvancedSettings() resource.Resource {
+	return &ResourceAdvancedSettings{}
+}
+
+func NewResourceAdvancedSettingsHelper() *ResourceAdvancedSettingsHelper {
+	return &ResourceAdvancedSettingsHelper{}
+}
+
+func (ras *ResourceAdvancedSettings) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_advanced_settings"
+}
+
+func (ras *ResourceAdvancedSettings) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Advanced Setting resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rst.Resource = &schema.Resource{
-		CreateContext: rst.resourceCreate,
-		UpdateContext: rst.resourceUpdate,
-		ReadContext:   rst.resourceRead,
-		DeleteContext: rst.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rst.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"resource_id": {
-				Type:        schema.TypeString,
+
+	ras.client = req.ProviderData.(*britive_client.Client)
+	if ras.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for ResourceAdvancedSettings")
+	ras.helper = NewResourceAdvancedSettingsHelper()
+}
+
+func (ras *ResourceAdvancedSettings) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for advanced settings resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"resource_id": schema.StringAttribute{
 				Required:    true,
-				ForceNew:    true,
-				Description: "Britive resource id",
+				Description: "Britive resource ID",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
-			"resource_type": {
-				Type:         schema.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				Description:  "Britive resource type",
-				ValidateFunc: validation.StringInSlice([]string{"APPLICATION", "PROFILE", "PROFILE_POLICY", "RESOURCE_MANAGER_PROFILE", "RESOURCE_MANAGER_PROFILE_POLICY"}, true),
+			"resource_type": schema.StringAttribute{
+				Required:    true,
+				Description: "Britive resource type",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					validate.StringFunc(
+						"resource_type",
+						validate.CaseInsensitiveOneOf(
+							"APPLICATION",
+							"PROFILE",
+							"PROFILE_POLICY",
+							"RESOURCE_MANAGER_PROFILE",
+							"RESOURCE_MANAGER_PROFILE_POLICY",
+						),
+					),
+				},
 			},
-			"justification_settings": {
-				Type:        schema.TypeList,
-				MaxItems:    1,
-				Optional:    true,
-				Description: "Resource's Justification Settings",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"justification_id": {
-							Type:        schema.TypeString,
+		},
+		Blocks: map[string]schema.Block{
+			"justification_settings": schema.SetNestedBlock{
+				Description: "Resource justification settings",
+				Validators: []validator.Set{
+					setvalidator.SizeAtMost(1),
+				},
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"justification_id": schema.StringAttribute{
 							Computed:    true,
-							Description: "Justification Setting ID",
+							Description: "Justification setting ID",
 						},
-						"is_justification_required": {
-							Type:        schema.TypeBool,
+						"is_justification_required": schema.BoolAttribute{
 							Required:    true,
-							Description: "Resource justification",
+							Description: "Required resource justification or not",
 						},
-						"justification_regex": {
-							Type:        schema.TypeString,
+						"justification_regex": schema.StringAttribute{
 							Optional:    true,
-							Description: "Resource justification Regular Expression",
-							Default:     "",
+							Description: "Resource justification setting regular expression",
 						},
 					},
 				},
 			},
-			"itsm": {
-				Type:        schema.TypeList,
-				MaxItems:    1,
-				Optional:    true,
-				Description: "Resource ITSM Setting",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"itsm_id": {
-							Type:        schema.TypeString,
+			"itsm": schema.SetNestedBlock{
+				Description: "Resource ITSM settings",
+				Validators: []validator.Set{
+					setvalidator.SizeAtMost(1),
+				},
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"itsm_id": schema.StringAttribute{
 							Computed:    true,
 							Description: "ITSM Setting ID",
 						},
-						"connection_id": {
-							Type:        schema.TypeString,
+						"connection_id": schema.StringAttribute{
 							Required:    true,
-							Description: "ITSM Connection id",
+							Description: "ITSM Connection ID",
 						},
-						"connection_type": {
-							Type:        schema.TypeString,
+						"connection_type": schema.StringAttribute{
 							Required:    true,
-							Description: "ITSM Connection type",
+							Description: "ITSM Connection Type",
 						},
-						"is_itsm_enabled": {
-							Type:        schema.TypeBool,
+						"is_itsm_enabled": schema.BoolAttribute{
 							Required:    true,
-							Description: "itsm comment",
+							Description: "Whether ITSM integration is enabled",
 						},
-						"itsm_filter_criteria": {
-							Type:        schema.TypeSet,
-							Required:    true,
-							Description: "filters",
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"supported_ticket_type": {
-										Type:        schema.TypeString,
+					},
+					Blocks: map[string]schema.Block{
+						"itsm_filter_criteria": schema.SetNestedBlock{
+							Description: "ITSM settings filter criteria",
+							Validators: []validator.Set{
+								setvalidator.SizeAtLeast(1),
+							},
+							NestedObject: schema.NestedBlockObject{
+								Attributes: map[string]schema.Attribute{
+									"supported_ticket_type": schema.StringAttribute{
 										Required:    true,
-										Description: "supported ticket type",
+										Description: "supported ticket type for ITSM filter criteria",
 									},
-									"filter": {
-										Type:        schema.TypeString,
+									"filter": schema.StringAttribute{
 										Required:    true,
-										Description: "filter",
-										ValidateFunc: func(i interface{}, s string) (warns []string, errs []error) {
-											str := i.(string)
-											var js interface{}
-											if err := json.Unmarshal([]byte(str), &js); err != nil {
-												errs = append(errs, err)
-											}
-											return
+										Description: "Filter for ITSM filter criteria",
+										Validators: []validator.String{
+											validate.StringFunc(
+												"filter",
+												validate.IsValidJSON(),
+											),
 										},
 									},
 								},
@@ -135,81 +184,83 @@ func NewResourceAdvancedSettings(v *validate.Validation, importHelper *imports.I
 					},
 				},
 			},
-			"im": {
-				Type:        schema.TypeList,
-				Optional:    true,
-				Description: "Resource IM Setting",
-				MaxItems:    1,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"im_id": {
-							Type:        schema.TypeString,
+			"im": schema.SetNestedBlock{
+				Description: "Resource IM setting",
+				Validators: []validator.Set{
+					setvalidator.SizeAtMost(1),
+				},
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"im_id": schema.StringAttribute{
 							Computed:    true,
-							Description: "IM Setting ID",
+							Description: "IM settings ID",
 						},
-						"connection_id": {
-							Type:        schema.TypeString,
+						"connection_id": schema.StringAttribute{
 							Required:    true,
-							Description: "IM Connection id",
+							Description: "IM connection ID",
 						},
-						"connection_type": {
-							Type:        schema.TypeString,
+						"connection_type": schema.StringAttribute{
 							Required:    true,
-							Description: "IM Connection type",
+							Description: "IM connection type",
 						},
-						"is_auto_approval_enabled": {
-							Type:        schema.TypeBool,
+						"is_auto_approval_enabled": schema.BoolAttribute{
 							Required:    true,
 							Description: "IM auto approval toggle",
 						},
-						"escalation_policies": {
-							Type:        schema.TypeSet,
+						"escalation_policies": schema.SetAttribute{
 							Required:    true,
 							Description: "IM Escalation Policies",
-							Elem: &schema.Schema{
-								Type: schema.TypeString,
-							},
+							ElementType: types.StringType,
 						},
 					},
 				},
 			},
 		},
 	}
-	return rst
 }
 
-func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (ras *ResourceAdvancedSettings) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_advanced_settings")
+	var plan britive_client.AdvancedSettingsPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during advanced settings creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
-	var diags diag.Diagnostics
-
-	resourceId := d.Get("resource_id").(string)
-	resourceType := d.Get("resource_type").(string)
+	resourceId := plan.ResourceID.ValueString()
+	resourceType := plan.ResourceType.ValueString()
 	resourceType = strings.ToLower(resourceType)
 
-	if resourceId == "" {
-		return diag.FromErr(errs.NewNotFoundErrorf("resource_id"))
+	if resourceId == "" || plan.ResourceID.IsNull() || plan.ResourceID.IsUnknown() {
+		resp.Diagnostics.AddError("Invalid resource_id", fmt.Sprintf("resource_id: %s", resourceId))
+		tflog.Info(ctx, fmt.Sprintf("Invalid resource_id: %s", resourceId))
+		return
 	}
 	if resourceType == "" {
-		return diag.FromErr(errs.NewNotFoundErrorf("resource_type"))
+		resp.Diagnostics.AddError("Invalid resource_type", fmt.Sprintf("resource_type: %s", resourceType))
+		tflog.Info(ctx, fmt.Sprintf("Invalid resource_type: %s", resourceType))
+		return
 	}
 
-	advancedSettings := britive.AdvancedSettings{}
-	err := rst.helper.mapAdvancedSettingResourceToModel(d, m, &advancedSettings)
+	advancedSettings := britive_client.AdvancedSettings{}
+	err := ras.helper.mapAdvancedSettingResourceToModel(plan, &advancedSettings)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to map adanced settings to resource", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to map advanced settings to resource, %T", err))
+		return
 	}
 
-	log.Printf("[INFO] Adding new advanced settings %#v", advancedSettings)
+	tflog.Info(ctx, fmt.Sprintf("Added new advanced settings %#v", advancedSettings))
 
-	advancedSettingsCheck, err := c.GetAdvancedSettings(resourceId, resourceType)
-	if errors.Is(err, britive.ErrNotFound) {
-		err = errs.NewNotFoundErrorf("advanced settings of %s", resourceId)
-	} else if errors.Is(err, britive.ErrNotSupported) {
-		err = errs.NewNotSupportedError(resourceType)
-	}
+	advancedSettingsCheck, err := ras.client.GetAdvancedSettings(ctx, resourceId, resourceType)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to fetch advanced settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to fetch advanced settings, %T", err))
+		return
 	}
 
 	isUpdate := false
@@ -217,136 +268,267 @@ func (rst *ResourceAdvancedSettings) resourceCreate(ctx context.Context, d *sche
 		isUpdate = true
 	}
 
-	err = c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, isUpdate)
-	if errors.Is(err, britive.ErrNotFound) {
-		err = errs.NewNotFoundErrorf("advanced settings of %s", resourceId)
-	} else if errors.Is(err, britive.ErrNotSupported) {
-		err = errs.NewNotSupportedError(resourceType)
-	}
+	err = ras.client.CreateUpdateAdvancedSettings(ctx, resourceId, resourceType, advancedSettings, isUpdate)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create advanced settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to create advanced settings, %T", err))
+		return
 	}
 
-	log.Printf("[INFO] Submitted new advanced settings: %#v", advancedSettings)
+	tflog.Info(ctx, fmt.Sprintf("Submitted new advanced settings: %#v", advancedSettings))
 
-	settingId := rst.helper.generateUniqueID(resourceId, resourceType)
+	settingId := ras.helper.generateUniqueID(resourceId, resourceType)
+	plan.ID = types.StringValue(settingId)
 
-	d.SetId(settingId)
+	tflog.Info(ctx, fmt.Sprintf("Generated advanced settings id: %s", settingId))
 
-	rst.resourceRead(ctx, d, m)
+	planPtr, err := ras.helper.getAndMapModelToPlan(ctx, plan, *ras.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get advanced settings",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map advanced settings model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
 
-	log.Printf("[INFO] Updated state after advaned settings submission: %#v", advancedSettings)
-
-	return diags
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"advanced_settings": planPtr,
+	})
 }
 
-func (rst *ResourceAdvancedSettings) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (ras *ResourceAdvancedSettings) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_advanced_settings")
 
-	var diags diag.Diagnostics
-
-	advancedSettings := britive.AdvancedSettings{}
-
-	log.Printf("[INFO] Mapping resource to model for update")
-
-	err := rst.helper.mapAdvancedSettingResourceToModel(d, m, &advancedSettings)
-	if err != nil {
-		return diag.FromErr(err)
+	if ras.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
 	}
 
-	resourceId := d.Get("resource_id").(string)
-	resourceType := d.Get("resource_type").(string)
+	var state britive_client.AdvancedSettingsPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get advanced settings state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	newPlan, err := ras.helper.getAndMapModelToPlan(ctx, state, *ras.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get advanced settings",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "get and map advanced settings model to plan failed in Read", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	diags = resp.State.Set(ctx, newPlan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state in Read", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Read completed for britive_advanced_settings")
+}
+
+func (ras *ResourceAdvancedSettings) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_advanced_settings")
+
+	var plan, state britive_client.AdvancedSettingsPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	advancedSettings := britive_client.AdvancedSettings{}
+
+	tflog.Info(ctx, "Mapping resource to model for update")
+
+	err := ras.helper.mapAdvancedSettingResourceToModel(plan, &advancedSettings)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update advanced settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to map advanced_settings resource to model: %#v", err))
+		return
+	}
+
+	resourceId := plan.ResourceID.ValueString()
+	resourceType := plan.ResourceType.ValueString()
 	resourceType = strings.ToLower(resourceType)
 
 	if resourceId == "" {
-		return diag.FromErr(errs.NewNotFoundErrorf("resource_id"))
+		resp.Diagnostics.AddError("Failed to update advanced_settings", "resource_id not found")
+		tflog.Error(ctx, "resource_id not found : ''")
+		return
 	}
 	if resourceType == "" {
-		return diag.FromErr(errs.NewNotFoundErrorf("resource_type"))
+		resp.Diagnostics.AddError("Failed to update advanced_settings", "resource_type not found")
+		tflog.Error(ctx, "resource_type not found : ''")
+		return
 	}
 
-	log.Printf("[INFO] Updating advanced settings: %#v", advancedSettings)
+	tflog.Info(ctx, fmt.Sprintf("Updating advanced settings: %#v", advancedSettings))
 
-	err = c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, true)
-	if errors.Is(err, britive.ErrNotFound) {
-		err = errs.NewNotFoundErrorf("advanced settings of %s", resourceId)
-	} else if errors.Is(err, britive.ErrNotSupported) {
-		err = errs.NewNotSupportedError(resourceType)
-	}
+	err = ras.client.CreateUpdateAdvancedSettings(ctx, resourceId, resourceType, advancedSettings, true)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to update advanced_settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to update advanced settings: %#v", err))
+		return
 	}
 
-	rst.resourceRead(ctx, d, m)
-
-	log.Printf("[INFO] Updated state after advanced settings: %#v", advancedSettings)
-	return diags
+	planPtr, err := ras.helper.getAndMapModelToPlan(ctx, plan, *ras.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get advanced_settings",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map advanced_settings model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Update completed and state set")
 }
 
-func (rst *ResourceAdvancedSettings) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
+func (ras *ResourceAdvancedSettings) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_advanced_settings")
 
-	err := rst.helper.getAndMapModelToResource(d, m)
-	if errors.Is(err, britive.ErrNotFound) {
-		err = errs.NewNotFoundErrorf("advanced settings")
+	var state britive_client.AdvancedSettingsPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
-	if err != nil {
-		return diag.FromErr(err)
-	}
 
-	return diags
-}
+	advancedSettings := britive_client.AdvancedSettings{}
 
-func (rst *ResourceAdvancedSettings) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
-	advancedSettings := britive.AdvancedSettings{}
-
-	resourceId := d.Get("resource_id").(string)
-	resourceType := d.Get("resource_type").(string)
+	resourceId := state.ResourceID.ValueString()
+	resourceType := state.ResourceType.ValueString()
 	resourceType = strings.ToLower(resourceType)
 
 	if resourceId == "" {
-		return diag.FromErr(errs.NewNotFoundErrorf("resource_id"))
+		resp.Diagnostics.AddError("Failed to delete advanced_settings", "resource_id not found")
+		tflog.Error(ctx, "resource_id not found : ''")
+		return
 	}
 	if resourceType == "" {
-		return diag.FromErr(errs.NewNotFoundErrorf("resource_type"))
+		resp.Diagnostics.AddError("Failed to delete advanced_settings", "resource_type not found")
+		tflog.Error(ctx, "resource_type not found : ''")
+		return
 	}
 
-	log.Printf("[INFO] Deleting advanced settings of %s", resourceId)
+	tflog.Info(ctx, fmt.Sprintf("Deleting advanced settings of %s", resourceId))
 
-	err := c.CreateUpdateAdvancedSettings(resourceId, resourceType, advancedSettings, true)
-	if errors.Is(err, britive.ErrNotFound) {
-		err = errs.NewNotFoundErrorf("advanced settings of %s", resourceId)
-	} else if errors.Is(err, britive.ErrNotSupported) {
-		err = errs.NewNotSupportedError(resourceType)
-	}
+	err := ras.client.CreateUpdateAdvancedSettings(ctx, resourceId, resourceType, advancedSettings, true)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to delete advanced_settings", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete advanced_settings: %#v", err))
+		return
 	}
-	d.SetId("")
 
-	log.Printf("[INFO] Advanced settings %v deleted", resourceId)
-	return diags
+	resp.State.RemoveResource(ctx)
+	tflog.Info(ctx, "advanced_settings deleted successfully")
 }
 
-func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+func (ras *ResourceAdvancedSettings) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
 
-	resourceID, resourceType := rrst.parseUniqueID(d.Id())
-	log.Printf("[INFO] Reading advanced settings %s", resourceID)
-
-	rawResourceID := d.Get("resource_id")
-	resourceID = rawResourceID.(string)
-
-	advancedSettings, err := c.GetAdvancedSettings(resourceID, resourceType)
-	if err != nil {
-		return err
+	importData := &imports.ImportHelperData{
+		ID: importId,
 	}
 
-	var rawJustificationSetting britive.Setting
-	var rawItsmSetting britive.Setting
-	var rawImSetting britive.Setting
+	importID := importData.ID
+
+	importArr := strings.Split(importID, "/")
+	resourceType := importArr[len(importArr)-1]
+	resourceType = strings.ToLower(resourceType)
+
+	if !strings.EqualFold("application", resourceType) && !strings.EqualFold("profile", resourceType) && !strings.EqualFold("profile_policy", resourceType) && !strings.EqualFold("resource_manager_profile", resourceType) && !strings.EqualFold("resource_manager_profile_policy", resourceType) {
+		resp.Diagnostics.AddError("Invalid import ID", errs.NewNotSupportedError(resourceType).Error())
+		tflog.Error(ctx, fmt.Sprintf("Invalid import ID: %s", resourceType))
+		return
+	}
+
+	importArr = importArr[:len(importArr)-1]
+	resourceID := strings.Join(importArr, "/")
+
+	tflog.Info(ctx, fmt.Sprintf("Importing advanced settings, %s", resourceID))
+
+	if len(importArr) > 1 {
+		resourceID = importArr[len(importArr)-1]
+	} else {
+		resourceID = importArr[0]
+	}
+
+	plan := britive_client.AdvancedSettingsPlan{
+		ID:           types.StringValue(ras.helper.generateUniqueID(resourceID, resourceType)),
+		ResourceID:   types.StringValue(resourceID),
+		ResourceType: types.StringValue(resourceType),
+	}
+
+	planPtr, err := ras.helper.getAndMapModelToPlan(ctx, plan, *ras.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch advanced settings", fmt.Sprintf("Error: %v", err))
+		tflog.Error(ctx, "Failed to build state from API during import", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	diags := resp.State.Set(ctx, planPtr)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state in Import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Imported advanced settings")
+}
+
+func (rash *ResourceAdvancedSettingsHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.AdvancedSettingsPlan, c britive_client.Client) (*britive_client.AdvancedSettingsPlan, error) {
+	resourceID, resourceType := rash.parseUniqueID(plan.ID.ValueString())
+	tflog.Info(ctx, fmt.Sprintf("Reading advanced settings %s/%s", resourceID, resourceType))
+
+	resourceID = plan.ResourceID.ValueString()
+
+	advancedSettings, err := c.GetAdvancedSettings(ctx, resourceID, resourceType)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawJustificationSetting britive_client.Setting
+	var rawItsmSetting britive_client.Setting
+	var rawImSetting britive_client.Setting
 
 	for _, rawSetting := range advancedSettings.Settings {
 		if strings.EqualFold(rawSetting.SettingsType, "JUSTIFICATION") {
@@ -359,48 +541,67 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 	}
 
 	// Mapping Justification Settings
-	if rawJustificationSetting.ID != "" && !(rawJustificationSetting.IsInherited != nil && *rawJustificationSetting.IsInherited == true) {
-		justificationSetting := []map[string]interface{}{
-			{
-				"is_justification_required": rawJustificationSetting.IsJustificationRequired,
-				"justification_regex":       rawJustificationSetting.JustificationRegex,
-				"justification_id":          rawJustificationSetting.ID,
-			},
+	if rawJustificationSetting.ID != "" && !(rawJustificationSetting.IsInherited != nil && *rawJustificationSetting.IsInherited) {
+		var justificationPlan []britive_client.JustificationSettingsPlan
+		justification := britive_client.JustificationSettingsPlan{
+			JustificationID:         types.StringValue(rawJustificationSetting.ID),
+			IsJustificationRequired: types.BoolValue(*rawJustificationSetting.IsJustificationRequired),
 		}
-		if err := d.Set("justification_settings", justificationSetting); err != nil {
-			return err
+		userJustRegex, err := rash.getUserJustificationRegex(plan)
+		if err != nil {
+			return nil, err
+		}
+
+		if userJustRegex == nil && rawJustificationSetting.JustificationRegex == "" {
+			justification.JustificationRegex = types.StringNull()
+		} else {
+			justification.JustificationRegex = types.StringValue(rawJustificationSetting.JustificationRegex)
+		}
+
+		justificationPlan = append(justificationPlan, justification)
+
+		plan.JustificationSettings, err = rash.mapJustificationPlanToSet(justificationPlan)
+		if err != nil {
+			return nil, err
 		}
 	} else {
-		if err := d.Set("justification_settings", nil); err != nil {
-			return err
+		var justificationSettingsObjType = types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"justification_id":          types.StringType,
+				"justification_regex":       types.StringType,
+				"is_justification_required": types.BoolType,
+			},
 		}
+		emptySet := types.SetNull(justificationSettingsObjType)
+		plan.JustificationSettings = emptySet
 	}
 
 	// Mapping ITSM setting
-	if rawItsmSetting.ID != "" && !(rawItsmSetting.IsInherited != nil && *rawItsmSetting.IsInherited == true) {
-		itsmFilterCriteria := []map[string]interface{}{}
+	if rawItsmSetting.ID != "" && !(rawItsmSetting.IsInherited != nil && *rawItsmSetting.IsInherited) {
+		var itsmFilterCriteriaPlan []britive_client.ItsmFilterCriteriaPlan
 		for _, criteria := range rawItsmSetting.ItsmFilterCriterias {
 			filterStr := ""
 			if criteria.Filter != nil {
 				bytes, err := json.Marshal(criteria.Filter)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				filterStr = string(bytes)
 			}
-			itsmFilterCriteria = append(itsmFilterCriteria, map[string]interface{}{
-				"supported_ticket_type": criteria.SupportedTicketType,
-				"filter":                filterStr,
+			itsmFilterCriteriaPlan = append(itsmFilterCriteriaPlan, britive_client.ItsmFilterCriteriaPlan{
+				SupportedTicketType: types.StringValue(criteria.SupportedTicketType),
+				Filter:              types.StringValue(filterStr),
 			})
 		}
 
 		var userConnType, connType string
-		if itsmRaw, ok := d.GetOk("itsm"); ok {
-			itsmList := itsmRaw.([]interface{})
-			if len(itsmList) == 1 {
-				itsm := itsmList[0].(map[string]interface{})
-				userConnType = itsm["connection_type"].(string)
-			}
+		itsmStatePlan, _, err := rash.mapSetToItsmPlan(plan.Itsm)
+		if err != nil {
+			return nil, err
+		}
+		if len(itsmStatePlan) == 1 {
+			itsm := itsmStatePlan[0]
+			userConnType = itsm.ConnectionType.ValueString()
 		}
 		if strings.EqualFold(rawItsmSetting.ConnectionType, userConnType) {
 			connType = userConnType
@@ -408,69 +609,107 @@ func (rrst *ResourceAdvancedSettingsHelper) getAndMapModelToResource(d *schema.R
 			connType = rawItsmSetting.ConnectionType
 		}
 
-		itsmSetting := []map[string]interface{}{
-			{
-				"connection_id":        rawItsmSetting.ConnectionID,
-				"connection_type":      connType,
-				"is_itsm_enabled":      rawItsmSetting.IsITSMEnabled,
-				"itsm_filter_criteria": itsmFilterCriteria,
-				"itsm_id":              rawItsmSetting.ID,
-			},
-		}
+		var itsmPlan []britive_client.ItsmPlan
+		itsmPlan = append(itsmPlan, britive_client.ItsmPlan{
+			ConnectionID:   types.StringValue(rawItsmSetting.ConnectionID),
+			ConnectionType: types.StringValue(connType),
+			IsItsmEnabled:  types.BoolPointerValue(rawItsmSetting.IsITSMEnabled),
+			ItsmID:         types.StringValue(rawItsmSetting.ID),
+		})
 
-		if err := d.Set("itsm", itsmSetting); err != nil {
-			return err
+		plan.Itsm, err = rash.mapItsmPlanToSet(itsmPlan, itsmFilterCriteriaPlan)
+		if err != nil {
+			return nil, err
 		}
 
 	} else {
-		if err := d.Set("itsm", nil); err != nil {
-			return err
+		var itsmFilterCriteriaObjType = types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"supported_ticket_type": types.StringType,
+				"filter":                types.StringType,
+			},
 		}
+
+		var itsmObjType = types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"itsm_id":              types.StringType,
+				"connection_id":        types.StringType,
+				"connection_type":      types.StringType,
+				"is_itsm_enabled":      types.BoolType,
+				"itsm_filter_criteria": types.SetType{ElemType: itsmFilterCriteriaObjType},
+			},
+		}
+		emptySet := types.SetNull(itsmObjType)
+		plan.Itsm = emptySet
 	}
 
 	// Mapping IM Settings
-	if rawImSetting.ID != "" && !(rawImSetting.IsInherited != nil && *rawImSetting.IsInherited == true) {
+	if rawImSetting.ID != "" && !(rawImSetting.IsInherited != nil && *rawImSetting.IsInherited) {
 		var userConnType, connType string
-		if imRaw, ok := d.GetOk("im"); ok {
-			imList := imRaw.([]interface{})
-			if len(imList) == 1 {
-				im := imList[0].(map[string]interface{})
-				userConnType = im["connection_type"].(string)
-			}
+		imStatePlan, _, err := rash.mapSetToImPlan(plan.Im)
+		if err != nil {
+			return nil, err
+		}
+		if len(imStatePlan) == 1 {
+			im := imStatePlan[0]
+			userConnType = im.ConnectionType.ValueString()
 		}
 		if strings.EqualFold(rawImSetting.ConnectionType, userConnType) {
 			connType = userConnType
 		} else {
 			connType = rawImSetting.ConnectionType
 		}
-
-		imSetting := []map[string]interface{}{
-			{
-				"connection_id":            rawImSetting.ConnectionID,
-				"connection_type":          connType,
-				"escalation_policies":      rawImSetting.EscalationPolicies,
-				"is_auto_approval_enabled": rawImSetting.IsAutoApprovalEnabled,
-				"im_id":                    rawImSetting.ID,
-			},
-		}
-		if err := d.Set("im", imSetting); err != nil {
-			return err
+		var imPlan []britive_client.ImPlan
+		imPlan = append(imPlan, britive_client.ImPlan{
+			ConnectionID:          types.StringValue(rawImSetting.ConnectionID),
+			ConnectionType:        types.StringValue(connType),
+			IsAutoApprovalEnabled: types.BoolPointerValue(rawImSetting.IsAutoApprovalEnabled),
+			ImID:                  types.StringValue(rawImSetting.ID),
+		})
+		plan.Im, err = rash.mapImPlanToSet(imPlan, rawImSetting.EscalationPolicies)
+		if err != nil {
+			return nil, err
 		}
 	} else {
-		if err := d.Set("im", nil); err != nil {
-			return err
+		var imObjType = types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"im_id":                    types.StringType,
+				"connection_id":            types.StringType,
+				"connection_type":          types.StringType,
+				"is_auto_approval_enabled": types.BoolType,
+				"escalation_policies":      types.SetType{ElemType: types.StringType},
+			},
 		}
+		emptySet := types.SetNull(imObjType)
+		plan.Im = emptySet
 	}
 
-	log.Printf("[INFO] Updated state of advanced settings %#v", advancedSettings)
+	tflog.Info(ctx, fmt.Sprintf("Updated state of advanced settings %#v", plan))
 
-	return nil
+	return &plan, nil
 }
 
-func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d *schema.ResourceData, m interface{}, advancedSettings *britive.AdvancedSettings) error {
+func (rash *ResourceAdvancedSettingsHelper) generateUniqueID(resourceID, resourceType string) string {
+	resourceArr := strings.Split(resourceID, "/")
+	if len(resourceArr) > 1 {
+		return resourceType + "/" + resourceArr[len(resourceArr)-1] + "/advanced-settings"
+	}
+	generatedID := resourceType + "/" + resourceID + "/advanced-settings"
+
+	return generatedID
+}
+
+func (rash *ResourceAdvancedSettingsHelper) parseUniqueID(ID string) (string, string) {
+	arr := strings.Split(ID, "/")
+	resourceId := arr[1]
+	resourceType := arr[0]
+	return resourceId, resourceType
+}
+
+func (rash *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(plan britive_client.AdvancedSettingsPlan, advancedSettings *britive_client.AdvancedSettings) error {
 	isInherited := false
-	resourceId := d.Get("resource_id").(string)
-	resourceType := d.Get("resource_type").(string)
+	resourceId := plan.ResourceID.ValueString()
+	resourceType := plan.ResourceType.ValueString()
 	resourceTypeArr := strings.Split(resourceType, "_")
 	resourceType = resourceTypeArr[len(resourceTypeArr)-1]
 	resourceType = strings.ToUpper(resourceType)
@@ -481,197 +720,417 @@ func (rrst *ResourceAdvancedSettingsHelper) mapAdvancedSettingResourceToModel(d 
 	}
 
 	// Handle justification settings
-	if justificationRaw, ok := d.GetOk("justification_settings"); ok {
-		justificationList := justificationRaw.([]interface{})
-		if len(justificationList) != 1 {
-			return fmt.Errorf("Invalid: must contain exactly one justification setting")
-		}
+	justificationList, err := rash.mapSetToJustificationPlan(plan.JustificationSettings)
+	if err != nil {
+		return err
+	}
 
-		userJustificationSetting := justificationList[0].(map[string]interface{})
-		justificationSetting := britive.Setting{
-			SettingsType: "JUSTIFICATION",
-			EntityID:     resourceId,
-			EntityType:   resourceType,
-			IsInherited:  &isInherited,
-		}
-
-		if val, ok := userJustificationSetting["justification_id"].(string); ok {
-			justificationSetting.ID = val
-		}
-
-		if val, ok := userJustificationSetting["is_justification_required"].(bool); ok {
-			justificationSetting.IsJustificationRequired = &val
-		}
-
-		if val, ok := userJustificationSetting["justification_regex"].(string); ok {
-			justificationSetting.JustificationRegex = val
+	if len(justificationList) > 1 {
+		return fmt.Errorf("must contain exactly one justification setting")
+	}
+	if len(justificationList) == 1 {
+		userJustificationSetting := justificationList[0]
+		justificationSetting := britive_client.Setting{
+			SettingsType:            "JUSTIFICATION",
+			EntityID:                resourceId,
+			EntityType:              resourceType,
+			IsInherited:             &isInherited,
+			ID:                      userJustificationSetting.JustificationID.ValueString(),
+			IsJustificationRequired: userJustificationSetting.IsJustificationRequired.ValueBoolPointer(),
+			JustificationRegex:      userJustificationSetting.JustificationRegex.ValueString(),
 		}
 
 		advancedSettings.Settings = append(advancedSettings.Settings, justificationSetting)
 	}
 
 	// Handle ITSM settings
-	if itsmRaw, ok := d.GetOk("itsm"); ok {
-		itsmList := itsmRaw.([]interface{})
-		if len(itsmList) != 1 {
-			return fmt.Errorf("Invalid: must contain exactly one ITSM setting")
+	itsmList, itsmFilterList, err := rash.mapSetToItsmPlan(plan.Itsm)
+	if err != nil {
+		return err
+	}
+	if len(itsmList) > 1 {
+		return fmt.Errorf("must contain exactly one ITSM setting")
+	}
+	if len(itsmList) == 1 {
+		userItsmSetting := itsmList[0]
+		itsmSetting := britive_client.Setting{
+			SettingsType:   "ITSM",
+			EntityID:       resourceId,
+			EntityType:     resourceType,
+			IsInherited:    &isInherited,
+			ID:             userItsmSetting.ItsmID.ValueString(),
+			ConnectionID:   userItsmSetting.ConnectionID.ValueString(),
+			ConnectionType: userItsmSetting.ConnectionType.ValueString(),
+			IsITSMEnabled:  userItsmSetting.IsItsmEnabled.ValueBoolPointer(),
 		}
 
-		userItsmSetting := itsmList[0].(map[string]interface{})
-		itsmSetting := britive.Setting{
-			SettingsType: "ITSM",
-			EntityID:     resourceId,
-			EntityType:   resourceType,
-			IsInherited:  &isInherited,
-		}
-
-		if val, ok := userItsmSetting["itsm_id"].(string); ok {
-			itsmSetting.ID = val
-		}
-
-		if val, ok := userItsmSetting["connection_id"].(string); ok {
-			itsmSetting.ConnectionID = val
-		}
-		if val, ok := userItsmSetting["connection_type"].(string); ok {
-			itsmSetting.ConnectionType = val
-		}
-
-		if val, ok := userItsmSetting["is_itsm_enabled"].(bool); ok {
-			itsmSetting.IsITSMEnabled = &val
-		}
-		if rawSet, ok := userItsmSetting["itsm_filter_criteria"].(*schema.Set); ok {
-			values := rawSet.List()
-			for _, item := range values {
-				val := item.(map[string]interface{})
-
-				var js map[string]interface{}
-				if err := json.Unmarshal([]byte(val["filter"].(string)), &js); err != nil {
-					return err
-				}
-
-				itsmFilter := britive.ItsmFilterCriteria{
-					SupportedTicketType: val["supported_ticket_type"].(string),
-					Filter:              make(map[string]interface{}),
-				}
-
-				for k, v := range js {
-					itsmFilter.Filter[k] = v
-				}
-				itsmSetting.ItsmFilterCriterias = append(itsmSetting.ItsmFilterCriterias, itsmFilter)
+		for _, item := range itsmFilterList {
+			var js map[string]interface{}
+			if err := json.Unmarshal([]byte(item.Filter.ValueString()), &js); err != nil {
+				return err
 			}
-		}
+			itsmFilter := britive_client.ItsmFilterCriteria{
+				SupportedTicketType: item.SupportedTicketType.ValueString(),
+				Filter:              make(map[string]interface{}),
+			}
 
+			for k, v := range js {
+				itsmFilter.Filter[k] = v
+			}
+			itsmSetting.ItsmFilterCriterias = append(itsmSetting.ItsmFilterCriterias, itsmFilter)
+		}
 		advancedSettings.Settings = append(advancedSettings.Settings, itsmSetting)
 	}
 
 	// Handle IM settings
-	if imRaw, ok := d.GetOk("im"); ok {
-		imList := imRaw.([]interface{})
-		if len(imList) != 1 {
-			return fmt.Errorf("Invalid: must contain exactly one IM setting")
+	imList, escPolicies, err := rash.mapSetToImPlan(plan.Im)
+	if err != nil {
+		return err
+	}
+	if len(imList) > 1 {
+		return fmt.Errorf("must contain exactly one IM setting")
+	}
+	if len(imList) == 1 {
+		userImSetting := imList[0]
+		imSetting := britive_client.Setting{
+			SettingsType:          "IM",
+			EntityID:              resourceId,
+			EntityType:            resourceType,
+			IsInherited:           &isInherited,
+			ID:                    userImSetting.ImID.ValueString(),
+			ConnectionID:          userImSetting.ConnectionID.ValueString(),
+			ConnectionType:        userImSetting.ConnectionType.ValueString(),
+			IsAutoApprovalEnabled: userImSetting.IsAutoApprovalEnabled.ValueBoolPointer(),
+			EscalationPolicies:    escPolicies,
 		}
-
-		userImSetting := imList[0].(map[string]interface{})
-		imSetting := britive.Setting{
-			SettingsType: "IM",
-			EntityID:     resourceId,
-			EntityType:   resourceType,
-			IsInherited:  &isInherited,
-		}
-
-		if val, ok := userImSetting["im_id"].(string); ok {
-			imSetting.ID = val
-		}
-
-		if val, ok := userImSetting["connection_id"].(string); ok {
-			imSetting.ConnectionID = val
-		}
-		if val, ok := userImSetting["connection_type"].(string); ok {
-			imSetting.ConnectionType = val
-		}
-
-		if val, ok := userImSetting["is_auto_approval_enabled"].(bool); ok {
-			imSetting.IsAutoApprovalEnabled = &val
-		}
-
-		if rawSet, ok := userImSetting["escalation_policies"].(*schema.Set); ok {
-			var policies []string
-			for _, v := range rawSet.List() {
-				if str, ok := v.(string); ok {
-					policies = append(policies, str)
-				}
-			}
-			imSetting.EscalationPolicies = policies
-		}
-
 		advancedSettings.Settings = append(advancedSettings.Settings, imSetting)
 	}
 
 	return nil
 }
 
-type ResourceAdvancedSettingsHelper struct {
-}
-
-func NewResourceAdvancedSettingsHelper() *ResourceAdvancedSettingsHelper {
-	return &ResourceAdvancedSettingsHelper{}
-}
-
-func (rrst *ResourceAdvancedSettingsHelper) generateUniqueID(resourceID, resourceType string) string {
-	resourceArr := strings.Split(resourceID, "/")
-	if len(resourceArr) > 1 {
-		return resourceType + "/" + resourceArr[len(resourceArr)-1] + "/advanced-settings"
+func (rash *ResourceAdvancedSettingsHelper) getUserJustificationRegex(plan britive_client.AdvancedSettingsPlan) (interface{}, error) {
+	if plan.JustificationSettings.IsNull() || plan.JustificationSettings.IsUnknown() {
+		return nil, nil
 	}
-	generatedID := resourceType + "/" + resourceID + "/advanced-settings"
-
-	log.Printf("[INFO] Generated advanced settings ID: %s", generatedID)
-
-	return generatedID
-}
-
-func (rrst *ResourceAdvancedSettingsHelper) parseUniqueID(ID string) (string, string) {
-	arr := strings.Split(ID, "/")
-	resourceId := arr[1]
-	resourceType := arr[0]
-	return resourceId, resourceType
-}
-
-func (rst *ResourceAdvancedSettings) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-
-	importID := d.Id()
-
-	importArr := strings.Split(importID, "/")
-	resourceType := importArr[len(importArr)-1]
-	resourceType = strings.ToLower(resourceType)
-
-	if !strings.EqualFold("application", resourceType) && !strings.EqualFold("profile", resourceType) && !strings.EqualFold("profile_policy", resourceType) && !strings.EqualFold("resource_manager_profile", resourceType) && !strings.EqualFold("resource_manager_profile_policy", resourceType) {
-		return nil, errs.NewNotSupportedError(resourceType)
-	}
-
-	importArr = importArr[:len(importArr)-1]
-	resourceID := strings.Join(importArr, "/")
-
-	resource := resourceID
-
-	log.Printf("[INFO] Importing advanced settings, %s", resourceID)
-
-	advancedSettings, err := c.GetAdvancedSettings(resourceID, resourceType)
+	userJustSet, err := rash.mapSetToJustificationPlan(plan.JustificationSettings)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(importArr) > 1 {
-		resourceID = importArr[len(importArr)-1]
+	if userJustSet[0].JustificationRegex.IsNull() || userJustSet[0].JustificationRegex.IsUnknown() {
+		return nil, nil
 	} else {
-		resourceID = importArr[0]
+		return userJustSet[0].JustificationRegex.ValueString(), nil
+	}
+}
+
+func (rash *ResourceAdvancedSettingsHelper) mapSetToJustificationPlan(set types.Set) ([]britive_client.JustificationSettingsPlan, error) {
+	var result []britive_client.JustificationSettingsPlan
+	if set.IsNull() || set.IsUnknown() {
+		return result, nil
+	}
+	objs := set.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, fmt.Errorf("expected Object, got %T", e)
+		}
+		var p britive_client.JustificationSettingsPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to convert object to JustificationSettingsPlan: %v", diags)
+		}
+		result = append(result, p)
+	}
+	return result, nil
+}
+
+func (rash *ResourceAdvancedSettingsHelper) mapJustificationPlanToSet(plans []britive_client.JustificationSettingsPlan) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(plans))
+
+	for _, p := range plans {
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"justification_id":          types.StringType,
+				"is_justification_required": types.BoolType,
+				"justification_regex":       types.StringType,
+			},
+			map[string]attr.Value{
+				"justification_id":          p.JustificationID,
+				"is_justification_required": p.IsJustificationRequired,
+				"justification_regex":       p.JustificationRegex,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create object for justification settings: %v", diags)
+		}
+		objs = append(objs, obj)
 	}
 
-	d.SetId(rst.helper.generateUniqueID(resourceID, resourceType))
-	d.Set("resource_id", resource)
-	d.Set("resource_type", resourceType)
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"justification_id":          types.StringType,
+				"is_justification_required": types.BoolType,
+				"justification_regex":       types.StringType,
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create justification settings set: %v", diags)
+	}
 
-	log.Printf("[INFO] Imported advanced settings: %s, advanced settin: %#v", resourceID, advancedSettings)
+	return set, nil
+}
 
-	return []*schema.ResourceData{d}, nil
+func (rash *ResourceAdvancedSettingsHelper) mapSetToImPlan(set types.Set) ([]britive_client.ImPlan, []string, error) {
+	var result []britive_client.ImPlan
+	var policies []string
+
+	if set.IsNull() || set.IsUnknown() {
+		return result, policies, nil
+	}
+
+	objs := set.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected Object for im element, got %T", e)
+		}
+
+		var p britive_client.ImPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, nil, fmt.Errorf("failed to convert object to ImPlan: %v", diags)
+		}
+
+		var thisPolicies []string
+		if !p.EscalationPolicies.IsNull() {
+			diags := p.EscalationPolicies.ElementsAs(context.Background(), &thisPolicies, false)
+			if diags.HasError() {
+				return nil, nil, fmt.Errorf("failed to read escalation_policies: %v", diags)
+			}
+		}
+
+		policies = thisPolicies
+
+		result = append(result, p)
+	}
+	return result, policies, nil
+}
+
+func (rash *ResourceAdvancedSettingsHelper) mapImPlanToSet(plans []britive_client.ImPlan, escPolicies []string) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(plans))
+
+	for _, p := range plans {
+		policyObjs := make([]attr.Value, 0, len(escPolicies))
+		for _, pol := range escPolicies {
+			policyObjs = append(policyObjs, types.StringValue(pol))
+		}
+		policySet, diags := types.SetValue(types.StringType, policyObjs)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create escalation_policies set: %v", diags)
+		}
+
+		// create object for im nested block
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"im_id":                    types.StringType,
+				"connection_id":            types.StringType,
+				"connection_type":          types.StringType,
+				"is_auto_approval_enabled": types.BoolType,
+				"escalation_policies":      types.SetType{ElemType: types.StringType},
+			},
+			map[string]attr.Value{
+				"im_id":                    p.ImID,
+				"connection_id":            p.ConnectionID,
+				"connection_type":          p.ConnectionType,
+				"is_auto_approval_enabled": p.IsAutoApprovalEnabled,
+				"escalation_policies":      policySet,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create object for im: %v", diags)
+		}
+		objs = append(objs, obj)
+	}
+
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"im_id":                    types.StringType,
+				"connection_id":            types.StringType,
+				"connection_type":          types.StringType,
+				"is_auto_approval_enabled": types.BoolType,
+				"escalation_policies":      types.SetType{ElemType: types.StringType},
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create im set: %v", diags)
+	}
+
+	return set, nil
+}
+
+func (rash *ResourceAdvancedSettingsHelper) mapSetToItsmPlan(set types.Set) ([]britive_client.ItsmPlan, []britive_client.ItsmFilterCriteriaPlan, error) {
+	var result []britive_client.ItsmPlan
+	var criteria []britive_client.ItsmFilterCriteriaPlan
+
+	if set.IsNull() || set.IsUnknown() {
+		return result, criteria, nil
+	}
+
+	objs := set.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected Object for itsm element, got %T", e)
+		}
+
+		var p britive_client.ItsmPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, nil, fmt.Errorf("failed to convert object to ItsmPlan: %v", diags)
+		}
+
+		if !p.ItsmFilterCriteria.IsNull() {
+			elems := p.ItsmFilterCriteria.Elements()
+
+			for _, ee := range elems {
+				o, ok := ee.(types.Object)
+				if !ok {
+					return nil, nil, fmt.Errorf(
+						"expected Object inside itsm_filter_criteria, got %T", ee,
+					)
+				}
+
+				var c britive_client.ItsmFilterCriteriaPlan
+				var ctx context.Context
+				diags := o.As(ctx, &c, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, nil, fmt.Errorf(
+						"failed to convert itsm_filter_criteria element: %v", diags,
+					)
+				}
+
+				criteria = append(criteria, c)
+			}
+		}
+
+		if len(criteria) == 0 {
+			elems := p.ItsmFilterCriteria.Elements()
+			for _, ee := range elems {
+				o, ok := ee.(types.Object)
+				if !ok {
+					return nil, nil, fmt.Errorf("expected Object inside itsm_filter_criteria, got %T", ee)
+				}
+				var c britive_client.ItsmFilterCriteriaPlan
+				diags := o.As(context.Background(), &c, basetypes.ObjectAsOptions{})
+				if diags.HasError() {
+					return nil, nil, fmt.Errorf("failed to convert itsm_filter_criteria element: %v", diags)
+				}
+				criteria = append(criteria, c)
+			}
+		}
+
+		api := britive_client.ItsmPlan{
+			ItsmID:         p.ItsmID,
+			ConnectionID:   p.ConnectionID,
+			ConnectionType: p.ConnectionType,
+			IsItsmEnabled:  p.IsItsmEnabled,
+		}
+
+		result = append(result, api)
+
+	}
+	return result, criteria, nil
+}
+
+func (rash *ResourceAdvancedSettingsHelper) mapItsmPlanToSet(plans []britive_client.ItsmPlan, itsmFilterCriterias []britive_client.ItsmFilterCriteriaPlan) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(plans))
+
+	for _, p := range plans {
+		critObjs := make([]attr.Value, 0, len(itsmFilterCriterias))
+		for _, c := range itsmFilterCriterias {
+			co, diags := types.ObjectValue(
+				map[string]attr.Type{
+					"supported_ticket_type": types.StringType,
+					"filter":                types.StringType,
+				},
+				map[string]attr.Value{
+					"supported_ticket_type": c.SupportedTicketType,
+					"filter":                c.Filter,
+				},
+			)
+			if diags.HasError() {
+				return types.Set{}, fmt.Errorf("failed to create itsm_filter_criteria object: %v", diags)
+			}
+			critObjs = append(critObjs, co)
+		}
+		critSet, diags := types.SetValue(
+			types.ObjectType{
+				AttrTypes: map[string]attr.Type{
+					"supported_ticket_type": types.StringType,
+					"filter":                types.StringType,
+				},
+			},
+			critObjs,
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create itsm_filter_criteria set: %v", diags)
+		}
+
+		// create outer itsm object
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"itsm_id":         types.StringType,
+				"connection_id":   types.StringType,
+				"connection_type": types.StringType,
+				"is_itsm_enabled": types.BoolType,
+				"itsm_filter_criteria": types.SetType{ElemType: types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"supported_ticket_type": types.StringType,
+						"filter":                types.StringType,
+					},
+				}},
+			},
+			map[string]attr.Value{
+				"itsm_id":              p.ItsmID,
+				"connection_id":        p.ConnectionID,
+				"connection_type":      p.ConnectionType,
+				"is_itsm_enabled":      p.IsItsmEnabled,
+				"itsm_filter_criteria": critSet,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create itsm object: %v", diags)
+		}
+		objs = append(objs, obj)
+	}
+
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"itsm_id":         types.StringType,
+				"connection_id":   types.StringType,
+				"connection_type": types.StringType,
+				"is_itsm_enabled": types.BoolType,
+				"itsm_filter_criteria": types.SetType{ElemType: types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"supported_ticket_type": types.StringType,
+						"filter":                types.StringType,
+					},
+				}},
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create itsm set: %v", diags)
+	}
+	return set, nil
 }

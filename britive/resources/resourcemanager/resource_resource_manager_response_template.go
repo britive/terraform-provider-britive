@@ -4,215 +4,439 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// ResourceResponseTemplate - Terraform Resource for Response Template
-type ResourceResponseTemplate struct {
-	Resource     *schema.Resource
-	helper       *ResourceResponseTemplateHelper
-	validation   *validate.Validation
+var (
+	_ resource.Resource                   = &ResourceResourceManagerResponseTemplate{}
+	_ resource.ResourceWithConfigure      = &ResourceResourceManagerResponseTemplate{}
+	_ resource.ResourceWithImportState    = &ResourceResourceManagerResponseTemplate{}
+	_ resource.ResourceWithValidateConfig = &ResourceResourceManagerResponseTemplate{}
+)
+
+type ResourceResourceManagerResponseTemplate struct {
+	client       *britive_client.Client
+	helper       *ResourceResourceManagerResponseTemplateHelper
 	importHelper *imports.ImportHelper
 }
 
-// NewResourceResponseTemplate - Initialization of new response template resource
-func NewResourceResponseTemplate(v *validate.Validation, importHelper *imports.ImportHelper) *ResourceResponseTemplate {
-	rrt := &ResourceResponseTemplate{
-		helper:       NewResourceResponseTemplateHelper(),
-		importHelper: importHelper,
-		validation:   v,
+type ResourceResourceManagerResponseTemplateHelper struct{}
+
+func NewResourceResourceManagerResponseTemplate() resource.Resource {
+	return &ResourceResourceManagerResponseTemplate{}
+}
+
+func NewResourceResourceManagerResponseTemplateHelper() *ResourceResourceManagerResponseTemplateHelper {
+	return &ResourceResourceManagerResponseTemplateHelper{}
+}
+
+func (rrt *ResourceResourceManagerResponseTemplate) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_resource_manager_response_template"
+}
+
+func (rrt *ResourceResourceManagerResponseTemplate) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Resource Manager Response Template resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rrt.Resource = &schema.Resource{
-		CreateContext: rrt.resourceCreate,
-		ReadContext:   rrt.resourceRead,
-		UpdateContext: rrt.resourceUpdate,
-		DeleteContext: rrt.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rrt.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The name of the response template.",
-				ValidateFunc: rrt.validation.StringWithNoSpecialChar,
-			},
-			"description": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "A description of the response template.",
-			},
-			"is_console_access_enabled": {
-				Type:        schema.TypeBool,
-				Optional:    true,
-				Default:     false,
-				Description: "Boolean flag to enable console access.",
-			},
-			"show_on_ui": {
-				Type:        schema.TypeBool,
-				Optional:    true,
-				Default:     false,
-				Description: "Boolean flag to determine if the template is visible on the UI.",
-			},
-			"template_data": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "The template content with placeholders.",
-			},
-			"template_id": {
-				Type:        schema.TypeString,
+
+	rrt.client = req.ProviderData.(*britive_client.Client)
+	if rrt.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for ResourceTag")
+	rrt.helper = NewResourceResourceManagerResponseTemplateHelper()
+}
+
+func (rrt *ResourceResourceManagerResponseTemplate) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for Britive Response Template resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
 				Computed:    true,
-				Description: "The unique identifier of the response template.",
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: "The name of template",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"name",
+						validate.StringWithNoSpecialChar(),
+					),
+				},
+			},
+			"description": schema.StringAttribute{
+				Optional:    true,
+				Description: "The description of the Resource label",
+			},
+			"is_console_access_enabled": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "flag to enable console access",
+				Default:     booldefault.StaticBool(false),
+			},
+			"show_on_ui": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Boolean flag to determine if the template is visible on the UI",
+				Default:     booldefault.StaticBool(false),
+			},
+			"template_data": schema.StringAttribute{
+				Optional:    true,
+				Description: "The template content with placeholders",
+			},
+			"template_id": schema.StringAttribute{
+				Computed:    true,
+				Description: "The unique identifier of the response template",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
-		CustomizeDiff: func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
-			isConsoleAccessEnabled := d.Get("is_console_access_enabled").(bool)
-			showOnUI := d.Get("show_on_ui").(bool)
-
-			if isConsoleAccessEnabled && showOnUI {
-				return fmt.Errorf("both 'is_console_access_enabled' and 'show_on_ui' cannot be true at the same time")
-			}
-
-			return nil
-		},
 	}
-	return rrt
 }
 
-func (rrt *ResourceResponseTemplate) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rrt *ResourceResourceManagerResponseTemplate) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config britive_client.ResourceManagerResponseTemplatePlan
 
-	template := &britive.ResponseTemplate{}
-	rrt.helper.mapResourceToModel(d, m, template, false)
-
-	log.Printf("[INFO] Creating response template: %#v", template)
-
-	resp, err := c.CreateResponseTemplate(*template)
-	if err != nil {
-		return diag.FromErr(err)
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		resp.Diagnostics.AddError("Invalid configuartion", "Failed to validate schema")
+		tflog.Error(ctx, "Failed to validate configuration")
+		return
 	}
 
-	d.SetId(rrt.helper.generateUniqueID(resp.TemplateID))
-	log.Printf("[INFO] Created response template: %#v", template)
-	return rrt.resourceRead(ctx, d, m)
+	if (!config.IsConsoleAccessEnabled.IsNull() || !config.IsConsoleAccessEnabled.IsUnknown()) && (!config.ShowOnUI.IsNull() || !config.ShowOnUI.IsUnknown()) && config.IsConsoleAccessEnabled.ValueBool() && config.ShowOnUI.ValueBool() {
+		errorMsg := "both 'is_console_access_enabled' and 'show_on_ui' cannot be true at the same time"
+		resp.Diagnostics.AddError("Invalid configuartion", errorMsg)
+		tflog.Error(ctx, fmt.Sprintf("Failed to validate configuration, error: %s", errorMsg))
+		return
+	}
 }
 
-func (rrt *ResourceResponseTemplate) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
+func (rrt *ResourceResourceManagerResponseTemplate) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_resource_manager_response_template")
 
-	templateID, err := rrt.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(errs.NewInvalidResourceIDError("response template", d.Id()))
+	var plan britive_client.ResourceManagerResponseTemplatePlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		resp.Diagnostics.AddError("Failed to read plan", "Invalid plan")
+		tflog.Error(ctx, "Failed to read plan during response template creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	log.Printf("[INFO] Reading response template: %s", templateID)
+	template := &britive_client.ResponseTemplate{}
+	rrt.helper.mapResourceToModel(plan, template)
 
-	resp, err := c.GetResponseTemplate(templateID)
+	tflog.Info(ctx, fmt.Sprintf("Creating response template: %#v", template))
+
+	response, err := rrt.client.CreateResponseTemplate(ctx, *template)
 	if err != nil {
-		if errors.Is(err, britive.ErrNotFound) {
-			return diag.FromErr(errs.NewNotFoundErrorf("response template %s", templateID))
-		}
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create response template", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to create response template, error:%#v", err))
+		return
 	}
 
-	rrt.helper.getAndMapModelToResource(d, resp)
-	log.Printf("[INFO] Received response template: %s", templateID)
-	return diags
+	plan.ID = types.StringValue(rrt.helper.generateUniqueID(response.TemplateID))
+	tflog.Info(ctx, fmt.Sprintf("Created response template: %#v", template))
+
+	planPtr, err := rrt.helper.getAndMapModelToPlan(ctx, plan, *rrt.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get response template",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map response template model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"response template": planPtr,
+	})
 }
 
-func (rrt *ResourceResponseTemplate) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
+func (rrt *ResourceResourceManagerResponseTemplate) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_resource_manager_response_template")
 
-	templateID, err := rrt.helper.parseUniqueID(d.Id())
+	if rrt.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
+	}
+
+	var state britive_client.ResourceManagerResponseTemplatePlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get response template state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	newPlan, err := rrt.helper.getAndMapModelToPlan(ctx, state, *rrt.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get response template",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "get and map response template model to plan failed in Read", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	diags = resp.State.Set(ctx, newPlan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state in Read", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Read completed for britive_resource_manager_response_template")
+}
+
+func (rrt *ResourceResourceManagerResponseTemplate) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_resource_manager_response_template")
+
+	var plan, state britive_client.ResourceManagerResponseTemplatePlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	templateID, err := rrt.helper.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update response template", "Invalid template ID")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse response template id, error: %#v", err))
+		return
 	}
 
 	var hasChanges bool
-	if d.HasChange("name") || d.HasChange("description") || d.HasChange("is_console_access_enabled") || d.HasChange("show_on_ui") || d.HasChange("template_data") {
+	if !plan.Name.Equal(state.Name) || !plan.Description.Equal(state.Description) || !plan.IsConsoleAccessEnabled.Equal(state.IsConsoleAccessEnabled) || !plan.ShowOnUI.Equal(state.ShowOnUI) || !plan.TemplateData.Equal(state.TemplateData) {
 		hasChanges = true
 
-		template := &britive.ResponseTemplate{}
-		rrt.helper.mapResourceToModel(d, m, template, true)
+		template := &britive_client.ResponseTemplate{}
+		rrt.helper.mapResourceToModel(plan, template)
 
-		log.Printf("[INFO] Updating response template: %s", templateID)
+		tflog.Info(ctx, fmt.Sprintf("Updating response template: %s", templateID))
 
-		_, err := c.UpdateResponseTemplate(templateID, *template)
+		_, err := rrt.client.UpdateResponseTemplate(ctx, templateID, *template)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update response template", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update response template, error:%#v", err))
+			return
 		}
-		log.Printf("[INFO] Updated response template: %s", templateID)
+		tflog.Info(ctx, fmt.Sprintf("Updated response template: %s", templateID))
+		plan.ID = types.StringValue(rrt.helper.generateUniqueID(templateID))
 	}
-
 	if hasChanges {
-		return rrt.resourceRead(ctx, d, m)
+		planPtr, err := rrt.helper.getAndMapModelToPlan(ctx, plan, *rrt.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to get response template",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map response temaplate model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+		tflog.Info(ctx, "Update completed and state set")
 	}
-
-	return diags
 }
 
-func (rrt *ResourceResponseTemplate) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
+func (rrt *ResourceResourceManagerResponseTemplate) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_resource_manager_response_template")
 
-	templateID, err := rrt.helper.parseUniqueID(d.Id())
+	var state britive_client.ResourceManagerResponseTemplatePlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	templateID, err := rrt.helper.parseUniqueID(state.ID.ValueString())
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to delete response template", "Invalid response template ID")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse response template, error:%#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Deleting response template: %s", templateID)
+	tflog.Info(ctx, fmt.Sprintf("Deleting response template: %s", templateID))
 
-	err = c.DeleteResponseTemplate(templateID)
+	err = rrt.client.DeleteResponseTemplate(ctx, templateID)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to delete response template", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete response template, error:%#v", err))
+		return
 	}
-	log.Printf("[INFO] Resource template %s deleted", templateID)
-	d.SetId("")
-	return diags
+	tflog.Info(ctx, fmt.Sprintf("Resource template %s deleted", templateID))
+	resp.State.RemoveResource(ctx)
 }
 
-// ResourceResponseTemplateHelper - Helper for Response Template Resource
-type ResourceResponseTemplateHelper struct{}
+func (rrt *ResourceResourceManagerResponseTemplate) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importID := req.ID
 
-func NewResourceResponseTemplateHelper() *ResourceResponseTemplateHelper {
-	return &ResourceResponseTemplateHelper{}
+	importData := &imports.ImportHelperData{
+		ID: importID,
+	}
+
+	if err := rrt.importHelper.ParseImportID([]string{"resource-manager/response-templates/(?P<id>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import response template", "Invalid importID")
+		tflog.Error(ctx, fmt.Sprintf("Faield to parse importID, error:%#v", err))
+		return
+	}
+	templateID := importData.Fields["id"]
+	tflog.Info(ctx, fmt.Sprintf("Importing response template: %s", templateID))
+
+	response, err := rrt.client.GetResponseTemplate(ctx, templateID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import response template", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import response template, error:%#v", err))
+		return
+	}
+
+	plan := britive_client.ResourceManagerResponseTemplatePlan{
+		ID: types.StringValue(rrt.helper.generateUniqueID(response.TemplateID)),
+	}
+	planPtr, err := rrt.helper.getAndMapModelToPlan(ctx, plan, *rrt.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to set state after import",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map response template model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported response template: %#v", planPtr))
 }
 
-func (helper *ResourceResponseTemplateHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, template *britive.ResponseTemplate, isUpdate bool) {
-	template.Name = d.Get("name").(string)
-	template.Description = d.Get("description").(string)
-	template.IsConsoleAccessEnabled = d.Get("is_console_access_enabled").(bool)
+func (rrth *ResourceResourceManagerResponseTemplateHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ResourceManagerResponseTemplatePlan, c britive_client.Client) (*britive_client.ResourceManagerResponseTemplatePlan, error) {
+	templateID, err := rrth.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		return nil, errs.NewInvalidResourceIDError("response template", plan.ID.ValueString())
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Reading response template: %s", templateID))
+
+	template, err := c.GetResponseTemplate(ctx, templateID)
+	if err != nil {
+		if errors.Is(err, britive_client.ErrNotFound) {
+			return nil, errs.NewNotFoundErrorf("response template %s", templateID)
+		}
+		return nil, err
+	}
+
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && template.Description == "" {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(template.Description)
+	}
+
+	plan.IsConsoleAccessEnabled = types.BoolValue(template.IsConsoleAccessEnabled)
+	plan.ShowOnUI = types.BoolValue(template.ShowOnUI)
+
+	if (plan.TemplateData.IsNull() || plan.TemplateData.IsUnknown()) && template.TemplateData == "" {
+		plan.TemplateData = types.StringNull()
+	} else {
+		plan.TemplateData = types.StringValue(template.TemplateData)
+	}
+
+	plan.TemplateID = types.StringValue(template.TemplateID)
+
+	return &plan, nil
+}
+
+func (rrth *ResourceResourceManagerResponseTemplateHelper) mapResourceToModel(plan britive_client.ResourceManagerResponseTemplatePlan, template *britive_client.ResponseTemplate) {
+	template.Name = plan.Name.ValueString()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		template.Description = plan.Description.ValueString()
+	}
+	if !plan.IsConsoleAccessEnabled.IsNull() && !plan.IsConsoleAccessEnabled.IsUnknown() {
+		template.IsConsoleAccessEnabled = plan.IsConsoleAccessEnabled.ValueBool()
+	}
 	if template.IsConsoleAccessEnabled {
 		template.ShowOnUI = false
 	} else {
-		template.ShowOnUI = d.Get("show_on_ui").(bool)
+		template.ShowOnUI = plan.ShowOnUI.ValueBool()
 	}
-	template.TemplateData = d.Get("template_data").(string)
+	if !plan.TemplateData.IsNull() && !plan.TemplateData.IsUnknown() {
+		template.TemplateData = plan.TemplateData.ValueString()
+	}
 }
 
-func (helper *ResourceResponseTemplateHelper) getAndMapModelToResource(d *schema.ResourceData, template *britive.ResponseTemplate) {
-	d.Set("name", template.Name)
-	d.Set("description", template.Description)
-	d.Set("is_console_access_enabled", template.IsConsoleAccessEnabled)
-	d.Set("show_on_ui", template.ShowOnUI)
-	d.Set("template_data", template.TemplateData)
-}
-
-func (helper *ResourceResponseTemplateHelper) generateUniqueID(templateID string) string {
+func (rrth *ResourceResourceManagerResponseTemplateHelper) generateUniqueID(templateID string) string {
 	return fmt.Sprintf("resource-manager/response-templates/%s", templateID)
 }
 
-func (helper *ResourceResponseTemplateHelper) parseUniqueID(ID string) (responseTemplateID string, err error) {
+func (rrth *ResourceResourceManagerResponseTemplateHelper) parseUniqueID(ID string) (responseTemplateID string, err error) {
 	responseTemplatesParts := strings.Split(ID, "/")
 
 	if len(responseTemplatesParts) < 3 {
@@ -222,24 +446,4 @@ func (helper *ResourceResponseTemplateHelper) parseUniqueID(ID string) (response
 
 	responseTemplateID = responseTemplatesParts[2]
 	return
-}
-
-func (rrt *ResourceResponseTemplate) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-
-	if err := rrt.importHelper.ParseImportID([]string{"resource-manager/response-templates/(?P<id>[^/]+)"}, d); err != nil {
-		return nil, err
-	}
-	templateID := d.Id()
-	log.Printf("[INFO] Importing response template: %s", templateID)
-
-	resp, err := c.GetResponseTemplate(templateID)
-	if err != nil {
-		return nil, err
-	}
-
-	d.SetId(rrt.helper.generateUniqueID(resp.TemplateID))
-	rrt.helper.getAndMapModelToResource(d, resp)
-	log.Printf("[INFO] Imported response template: %s", templateID)
-	return []*schema.ResourceData{d}, nil
 }

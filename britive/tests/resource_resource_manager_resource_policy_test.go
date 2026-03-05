@@ -5,25 +5,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveResourceResourcePolicy(t *testing.T) {
+func TestAccBritiveResourceManagerResourcePolicy(t *testing.T) {
 	resourceLabelName1 := "AT-Britive_Resource_Manager_Test_Resource_Label-1"
 	resourceLabelDescription1 := "AT-Britive_Resource_Manager_Test_Resource_Label_1_Description"
 	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2006-01-02 15:04:05")
 	timeOfAccessTo := time.Now().AddDate(0, 0, 7).Format("2006-01-02 15:04:05")
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceResourcePolicyConfig(resourceLabelName1, resourceLabelDescription1, timeOfAccessFrom, timeOfAccessTo),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckBritiveResourceResourcePolicyExists("britive_resource_manager_resource_label.resource_label_1"),
-					testAccCheckBritiveResourceManagerProfilePolicyExists("britive_resource_manager_resource_policy.resource_policy_1"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckBritiveResourceManagerResourcePolicyExists("britive_resource_manager_resource_label.resource_label_1"),
+					testAccCheckBritiveResourceManagerResourcePolicyExists("britive_resource_manager_resource_policy.resource_policy_1"),
 				),
 			},
 		},
@@ -115,16 +116,15 @@ func testAccCheckBritiveResourceResourcePolicyConfig(resourceLabelName1, resourc
 	`, resourceLabelName1, resourceLabelDescription1, timeOfAccessFrom, timeOfAccessTo)
 }
 
-func testAccCheckBritiveResourceResourcePolicyExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveResourceManagerResourcePolicyExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveProfilePolicyPrioritization(t *testing.T) {
+func TestAccBritiveProfilePolicyPrioritization(t *testing.T) {
 	applicationName := "DO NOT DELETE - AWS TF Plugin"
 	profileName := "AT - New Britive Profile Policy for Prioritization Test"
 	profilePolicyName := "AT - New Britive Profile Policy for Prioritization Test"
@@ -23,8 +22,9 @@ func TestBritiveProfilePolicyPrioritization(t *testing.T) {
 	profilePolicyName2Priority := 2
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveProfilePolicyPrioritizationConfig(
@@ -150,16 +150,15 @@ resource "britive_profile_policy_prioritization" "new_priority" {
 `, applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority)
 }
 
-func testAccCheckBritiveProfilePolicyPrioritizationExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveProfilePolicyPrioritizationExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

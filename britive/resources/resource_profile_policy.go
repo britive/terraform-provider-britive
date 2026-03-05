@@ -5,293 +5,553 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// ResourceProfilePolicy - Terraform Resource for Profile Policy
+var (
+	_ resource.Resource                = &ResourceProfilePolicy{}
+	_ resource.ResourceWithConfigure   = &ResourceProfilePolicy{}
+	_ resource.ResourceWithImportState = &ResourceProfilePolicy{}
+)
+
 type ResourceProfilePolicy struct {
-	Resource     *schema.Resource
+	client       *britive_client.Client
 	helper       *ResourceProfilePolicyHelper
 	importHelper *imports.ImportHelper
 }
 
-// NewResourceProfilePolicy - Initialization of new profile policy resource
-func NewResourceProfilePolicy(importHelper *imports.ImportHelper) *ResourceProfilePolicy {
-	rpp := &ResourceProfilePolicy{
-		helper:       NewResourceProfilePolicyHelper(),
-		importHelper: importHelper,
+type ResourceProfilePolicyHelper struct{}
+
+func NewResourceProfilePolicy() resource.Resource {
+	return &ResourceProfilePolicy{}
+}
+
+func NewResourceProfilePolicyHelper() *ResourceProfilePolicyHelper {
+	return &ResourceProfilePolicyHelper{}
+}
+
+func (rpp *ResourceProfilePolicy) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_profile_policy"
+}
+
+func (rpp *ResourceProfilePolicy) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Profile Policy resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rpp.Resource = &schema.Resource{
-		CreateContext: rpp.resourceCreate,
-		ReadContext:   rpp.resourceRead,
-		UpdateContext: rpp.resourceUpdate,
-		DeleteContext: rpp.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rpp.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"profile_id": {
-				Type:         schema.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				Description:  "The identifier of the profile",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
+
+	rpp.client = req.ProviderData.(*britive_client.Client)
+	if rpp.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for Resource Profile Policy")
+	rpp.helper = NewResourceProfilePolicyHelper()
+}
+
+func (rpp *ResourceProfilePolicy) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for profile policy resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"policy_name": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The policy associated with the profile",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
+			"profile_id": schema.StringAttribute{
+				Required:    true,
+				Description: "The identifier of the profile",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					validate.StringFunc(
+						"profileId",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
 			},
-			"description": {
-				Type:        schema.TypeString,
+			"policy_name": schema.StringAttribute{
+				Required:    true,
+				Description: "The policy name associated with profile",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"applicationId",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"description": schema.StringAttribute{
 				Optional:    true,
-				Default:     "",
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
 				Description: "The description of the profile policy",
 			},
-			"is_active": {
-				Type:        schema.TypeBool,
+			"is_active": schema.BoolAttribute{
 				Optional:    true,
-				Default:     true,
-				Description: "Is the policy active",
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+				Description: "Is policy active",
 			},
-			"is_draft": {
-				Type:        schema.TypeBool,
+			"is_draft": schema.BoolAttribute{
 				Optional:    true,
-				Default:     false,
-				Description: "Is the policy a draft",
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: "Is policy a draft",
 			},
-			"is_read_only": {
-				Type:        schema.TypeBool,
+			"is_read_only": schema.BoolAttribute{
 				Optional:    true,
-				Default:     false,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
 				Description: "Is the policy read only",
 			},
-			"consumer": {
-				Type:        schema.TypeString,
+			"consumer": schema.StringAttribute{
 				Optional:    true,
-				Default:     "papservice",
+				Computed:    true,
+				Default:     stringdefault.StaticString("papservice"),
 				Description: "The consumer service",
 			},
-			"access_type": {
-				Type:        schema.TypeString,
+			"access_type": schema.StringAttribute{
 				Optional:    true,
-				Default:     "Allow",
-				Description: "Type of access for the policy",
+				Computed:    true,
+				Default:     stringdefault.StaticString("Allow"),
+				Description: "Type of access for profile policy",
 			},
-			"members": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				Default:      "{}",
-				Description:  "Members of the policy",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"condition": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				Default:      "",
-				Description:  "Condition of the policy",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"associations": {
-				Type:        schema.TypeSet,
+			"members": schema.StringAttribute{
 				Optional:    true,
-				Description: "The list of associations for the Britive profile policy",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"type": {
-							Type:         schema.TypeString,
-							Required:     true,
-							Description:  "The type of association, should be one of [Environment, EnvironmentGroup]",
-							ValidateFunc: validation.StringInSlice([]string{"Environment", "EnvironmentGroup"}, false),
+				Computed:    true,
+				Default:     stringdefault.StaticString("{}"),
+				Description: "Members of profile policy",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"members",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"condition": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+				Description: "Condition of profile policy",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"members",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+		},
+		Blocks: map[string]schema.Block{
+			"associations": schema.SetNestedBlock{
+				Description: "The list associations for profile policy",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"type": schema.StringAttribute{
+							Required:    true,
+							Description: "The type of association, should be one of [Environment, EnvironmentGroup]",
+							Validators: []validator.String{
+								stringvalidator.OneOf(
+									"Environment",
+									"EnvironmentGroup",
+								),
+							},
 						},
-						"value": {
-							Type:         schema.TypeString,
-							Required:     true,
-							Description:  "The association value",
-							ValidateFunc: validation.StringIsNotWhiteSpace,
+						"value": schema.StringAttribute{
+							Required:    true,
+							Description: "The association value",
+							Validators: []validator.String{
+								validate.StringFunc(
+									"assocationValue",
+									validate.StringIsNotWhiteSpace(),
+								),
+							},
 						},
 					},
 				},
 			},
 		},
 	}
-	return rpp
 }
 
-//region Profile Policy Resource Context Operations
+func (rpp *ResourceProfilePolicy) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_profile_policy")
 
-func (rpp *ResourceProfilePolicy) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
-
-	profilePolicy := britive.ProfilePolicy{}
-
-	err := rpp.helper.mapResourceToModel(d, m, &profilePolicy, false)
-	if err != nil {
-		return diag.FromErr(err)
+	var plan britive_client.ProfilePolicyPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during profile_policy creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	log.Printf("[INFO] Creating new profile policy: %#v", profilePolicy)
+	profilePolicy := britive_client.ProfilePolicy{}
 
-	pp, err := c.CreateProfilePolicy(profilePolicy)
+	err := rpp.helper.mapResourceToModel(ctx, plan, &profilePolicy, rpp.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create profile policy", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to map resource to model, error: %#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Submitted new profile policy: %#v", pp)
-	d.SetId(rpp.helper.generateUniqueID(profilePolicy.ProfileID, pp.PolicyID))
-	rpp.resourceRead(ctx, d, m)
-	return diags
+	tflog.Info(ctx, fmt.Sprintf("Creating profile policy: %#v", profilePolicy))
+
+	pp, err := rpp.client.CreateProfilePolicy(ctx, profilePolicy)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create profile policy", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to create profile policy, error: %#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Submitted profile policy: %#v", pp))
+	plan.ID = types.StringValue(rpp.helper.generateUniqueID(profilePolicy.ProfileID, pp.PolicyID))
+
+	planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, plan, rpp.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get profile_policy",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map profile_policy model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"profile_poicy": planPtr,
+	})
 }
 
-func (rpp *ResourceProfilePolicy) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func (rpp *ResourceProfilePolicy) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_profile_policy")
 
-	var diags diag.Diagnostics
-
-	err := rpp.helper.getAndMapModelToResource(d, m)
-
-	if err != nil {
-		return diag.FromErr(err)
+	if rpp.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
 	}
 
-	return diags
+	var state britive_client.ProfilePolicyPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get profile policy state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, state, rpp.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get profile policy",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map profile policy model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Read profile policy:  %#v", planPtr))
 }
 
-func (rpp *ResourceProfilePolicy) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rpp *ResourceProfilePolicy) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_profile_policy")
+
+	var plan, state britive_client.ProfilePolicyPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
 	var hasChanges bool
-	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("members") || d.HasChange("condition") || d.HasChange("associations") {
+	if plan.ProfileID.Equal(state.ProfileID) || plan.PolicyName.Equal(state.PolicyName) || plan.Description.Equal(state.Description) || plan.IsActive.Equal(state.IsActive) || plan.IsDraft.Equal(state.IsDraft) || plan.IsReadOnly.Equal(state.IsReadOnly) || plan.Consumer.Equal(state.Consumer) || plan.AccessType.Equal(state.AccessType) || plan.Members.Equal(state.Members) || plan.Condition.Equal(state.Condition) || plan.Associations.Equal(state.Associations) {
 		hasChanges = true
-		profileID, policyID, err := rpp.helper.parseUniqueID(d.Id())
+		profileID, policyID, err := rpp.helper.parseUniqueID(plan.ID.ValueString())
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to parse policyID", "Invalid policyID")
+			tflog.Error(ctx, fmt.Sprintf("Failed to parse policyID, error:%#v", err))
+			return
 		}
 
-		profilePolicy := britive.ProfilePolicy{}
+		profilePolicy := britive_client.ProfilePolicy{}
 
-		err = rpp.helper.mapResourceToModel(d, m, &profilePolicy, true)
+		err = rpp.helper.mapResourceToModel(ctx, plan, &profilePolicy, rpp.client)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update profile policy", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to map resource to model, error:%#v", err))
+			return
 		}
 
 		profilePolicy.PolicyID = policyID
 		profilePolicy.ProfileID = profileID
 
-		old_name, _ := d.GetChange("policy_name")
-		oldMem, _ := d.GetChange("members")
-		oldCon, _ := d.GetChange("condition")
-		upp, err := c.UpdateProfilePolicy(profilePolicy, old_name.(string))
+		old_name := state.PolicyName.ValueString()
+		oldMem := state.Members.ValueString()
+		oldCon := state.Condition.ValueString()
+		upp, err := rpp.client.UpdateProfilePolicy(ctx, profilePolicy, old_name)
 		if err != nil {
-			if errState := d.Set("members", oldMem.(string)); errState != nil {
-				return diag.FromErr(errState)
-			}
-			if errState := d.Set("condition", oldCon.(string)); errState != nil {
-				return diag.FromErr(errState)
-			}
-			return diag.FromErr(err)
+			plan.Members = types.StringValue(oldMem)
+			plan.Condition = types.StringValue(oldCon)
+			resp.Diagnostics.AddError("Failed to update profile policy", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update profile policy. error:%#v", err))
+			return
 		}
 
-		log.Printf("[INFO] Submitted Updated profile policy: %#v", upp)
-		d.SetId(rpp.helper.generateUniqueID(profilePolicy.ProfileID, profilePolicy.PolicyID))
+		tflog.Info(ctx, fmt.Sprintf("Submitted Updated profile policy: %#v", upp))
+		plan.ID = types.StringValue(rpp.helper.generateUniqueID(profilePolicy.ProfileID, profilePolicy.PolicyID))
 	}
 	if hasChanges {
-		return rpp.resourceRead(ctx, d, m)
+		planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, plan, rpp.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to set state after update",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map profile policy model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Updated profile policy: %#v", planPtr))
 	}
-	return nil
 }
 
-func (rpp *ResourceProfilePolicy) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rpp *ResourceProfilePolicy) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_profile_policy")
 
-	var diags diag.Diagnostics
-
-	profileID, policyID, err := rpp.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
+	var state britive_client.ProfilePolicyPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	log.Printf("[INFO] Deleting profile policy: %s/%s", profileID, policyID)
-	err = c.DeleteProfilePolicy(profileID, policyID)
+	profileID, policyID, err := rpp.helper.parseUniqueID(state.ID.ValueString())
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddWarning("Failed to delete profile policy", "Failed to parse policyID")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse policyID, error:%#v", err))
+		return
 	}
-	log.Printf("[INFO] Deleted profile policy: %s/%s", profileID, policyID)
-	d.SetId("")
 
-	return diags
+	tflog.Info(ctx, fmt.Sprintf("Deleting profile policy: %s/%s", profileID, policyID))
+	err = rpp.client.DeleteProfilePolicy(ctx, profileID, policyID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete profile policy", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete profile policy, error:%#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Deleted profile policy %s/%s", profileID, policyID))
+	resp.State.RemoveResource(ctx)
+
 }
 
-func (rpp *ResourceProfilePolicy) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-	if err := rpp.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/policies/(?P<policy_name>[^/]+)", "(?P<profile_id>[^/]+)/(?P<policy_name>[^/]+)"}, d); err != nil {
-		return nil, err
+func (rpp *ResourceProfilePolicy) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
 	}
 
-	profileID := d.Get("profile_id").(string)
-	policyName := d.Get("policy_name").(string)
+	if err := rpp.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/policies/(?P<policy_name>[^/]+)", "(?P<profile_id>[^/]+)/(?P<policy_name>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import profile policy", "Invalid importID")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse importID: %#v", err))
+		return
+	}
+
+	profileID := importData.Fields["profile_id"]
+	policyName := importData.Fields["policy_name"]
 	if strings.TrimSpace(profileID) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("profile_id")
+		resp.Diagnostics.AddError("Failed to import profile policy", "Invalid profileID")
+		tflog.Error(ctx, "Failed to import profile policy, Invalid profileID")
+		return
 	}
 	if strings.TrimSpace(policyName) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("policy_name")
+		resp.Diagnostics.AddError("Failed to import profile policy", "Invalid policyName")
+		tflog.Error(ctx, "Failed to import profile policy, Invalid policyName")
+		return
 	}
 
-	log.Printf("[INFO] Importing profile policy: %s/%s", profileID, policyName)
+	tflog.Info(ctx, fmt.Sprintf("Importing profile policy: %s/%s", profileID, policyName))
 
-	policy, err := c.GetProfilePolicyByName(profileID, policyName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("policy %s for profile %s", policyName, profileID)
+	policy, err := rpp.client.GetProfilePolicyByName(ctx, profileID, policyName)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import profile policy", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import profile policy, error:%#v", err))
+		return
+	}
+
+	plan := &britive_client.ProfilePolicyPlan{
+		ID: types.StringValue(rpp.helper.generateUniqueID(profileID, policy.PolicyID)),
+	}
+
+	planPtr, err := rpp.helper.getAndMapModelToPlan(ctx, *plan, rpp.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to import profile policy",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed import profile policy model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported profile policy : %#v", planPtr))
+}
+
+func (rpph *ResourceProfilePolicyHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ProfilePolicyPlan, c *britive_client.Client) (*britive_client.ProfilePolicyPlan, error) {
+	profileID, policyID, err := rpph.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		return nil, err
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Reading profile policy: %s/%s", profileID, policyID))
+
+	profilePolicyId, err := c.GetProfilePolicy(ctx, profileID, policyID)
+	if errors.Is(err, britive_client.ErrNotFound) {
+		return nil, errs.NewNotFoundErrorf("policy %s in profile %s", policyID, profileID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	profilePolicy, err := c.GetProfilePolicyByName(ctx, profileID, profilePolicyId.Name)
+	if errors.Is(err, britive_client.ErrNotFound) {
+		return nil, errs.NewNotFoundErrorf("policy %s in profile %s", profilePolicy.Name, profileID)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	d.SetId(rpp.helper.generateUniqueID(profileID, policy.PolicyID))
+	profilePolicy.ProfileID = profileID
 
-	err = rpp.helper.getAndMapModelToResource(d, m)
+	tflog.Info(ctx, fmt.Sprintf("Received profile policy: %#v", profilePolicy))
+
+	plan.ProfileID = types.StringValue(profilePolicy.ProfileID)
+	plan.PolicyName = types.StringValue(profilePolicy.Name)
+	plan.Description = types.StringValue(profilePolicy.Description)
+	plan.Consumer = types.StringValue(profilePolicy.Consumer)
+	plan.AccessType = types.StringValue(profilePolicy.AccessType)
+	plan.IsActive = types.BoolValue(profilePolicy.IsActive)
+	plan.IsDraft = types.BoolValue(profilePolicy.IsDraft)
+	plan.IsReadOnly = types.BoolValue(profilePolicy.IsReadOnly)
+
+	newCon := plan.Condition.ValueString()
+	if britive_client.ConditionEqual(profilePolicy.Condition, newCon) {
+		plan.Condition = types.StringValue(newCon)
+	} else {
+		plan.Condition = types.StringValue(profilePolicy.Condition)
+	}
+
+	mem, err := json.Marshal(profilePolicy.Members)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[INFO] Imported profile policy: %s/%s", profileID, policyName)
-	return []*schema.ResourceData{d}, nil
+
+	newMem := plan.Members.ValueString()
+	if britive_client.MembersEqual(string(mem), newMem) {
+		plan.Members = types.StringValue(newMem)
+	} else {
+		plan.Members = types.StringValue(string(mem))
+	}
+
+	associations, err := rpph.mapProfilePolicyAssociationsModelToResource(ctx, plan, profilePolicy.ProfileID, profilePolicy.Associations, c)
+	if err != nil {
+		return nil, err
+	}
+	associationSet, err := rpph.mapAssociationsToSet(associations)
+	if err != nil {
+		return nil, err
+	}
+	plan.Associations = associationSet
+
+	return &plan, nil
 }
 
-//endregion
+func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(ctx context.Context, plan britive_client.ProfilePolicyPlan, profilePolicy *britive_client.ProfilePolicy, c *britive_client.Client) error {
+	profilePolicy.ProfileID = plan.ProfileID.ValueString()
+	profilePolicy.Name = plan.PolicyName.ValueString()
+	profilePolicy.Description = plan.Description.ValueString()
+	profilePolicy.Consumer = plan.Consumer.ValueString()
+	profilePolicy.AccessType = plan.AccessType.ValueString()
+	profilePolicy.IsActive = plan.IsActive.ValueBool()
+	profilePolicy.IsDraft = plan.IsDraft.ValueBool()
+	profilePolicy.IsReadOnly = plan.IsReadOnly.ValueBool()
+	profilePolicy.Condition = plan.Condition.ValueString()
+	json.Unmarshal([]byte(plan.Members.ValueString()), &profilePolicy.Members)
 
-// ResourceProfilePolicyHelper - Terraform Resource for Profile Policy Helper
-type ResourceProfilePolicyHelper struct {
-}
-
-// NewResourceProfilePolicyHelper - Initialization of new profile policy resource helper
-func NewResourceProfilePolicyHelper() *ResourceProfilePolicyHelper {
-	return &ResourceProfilePolicyHelper{}
-}
-
-//region ProfilePolicy Resource helper functions
-
-func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, profilePolicy *britive.ProfilePolicy, isUpdate bool) error {
-	profilePolicy.ProfileID = d.Get("profile_id").(string)
-	profilePolicy.Name = d.Get("policy_name").(string)
-	profilePolicy.Description = d.Get("description").(string)
-	profilePolicy.Consumer = d.Get("consumer").(string)
-	profilePolicy.AccessType = d.Get("access_type").(string)
-	profilePolicy.IsActive = d.Get("is_active").(bool)
-	profilePolicy.IsDraft = d.Get("is_draft").(bool)
-	profilePolicy.IsReadOnly = d.Get("is_read_only").(bool)
-	profilePolicy.Condition = d.Get("condition").(string)
-	json.Unmarshal([]byte(d.Get("members").(string)), &profilePolicy.Members)
-
-	associations, err := rpph.getProfilePolicyAssociations(profilePolicy.ProfileID, d, m)
+	associations, err := rpph.getProfilePolicyAssociations(ctx, plan, profilePolicy.ProfileID, c)
 	if err != nil {
 		return err
 	}
@@ -300,92 +560,81 @@ func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceDa
 	return nil
 }
 
-func (rpph *ResourceProfilePolicyHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
-
-	profileID, policyID, err := rpph.parseUniqueID(d.Id())
+func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(ctx context.Context, plan britive_client.ProfilePolicyPlan, profileID string, c *britive_client.Client) ([]britive_client.ProfilePolicyAssociation, error) {
+	associationScopes := make([]britive_client.ProfilePolicyAssociation, 0)
+	as, err := rpph.mapSetToAssociations(plan.Associations)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	log.Printf("[INFO] Reading profile policy: %s/%s", profileID, policyID)
-
-	profilePolicyId, err := c.GetProfilePolicy(profileID, policyID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("policy %s in profile %s", policyID, profileID)
+	if len(as) == 0 {
+		return associationScopes, nil
 	}
+
+	appId, err := c.RetrieveAppIdGivenProfileId(ctx, profileID)
 	if err != nil {
-		return err
+		return associationScopes, err
 	}
-	profilePolicy, err := c.GetProfilePolicyByName(profileID, profilePolicyId.Name)
-	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("policy %s in profile %s", profilePolicy.Name, profileID)
-	}
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(ctx, appId)
 	if err != nil {
-		return err
+		return associationScopes, err
 	}
-
-	profilePolicy.ProfileID = profileID
-
-	log.Printf("[INFO] Received profile policy: %#v", profilePolicy)
-
-	if err := d.Set("profile_id", profilePolicy.ProfileID); err != nil {
-		return err
+	if appRootEnvironmentGroup == nil {
+		return associationScopes, nil
 	}
-	if err := d.Set("policy_name", profilePolicy.Name); err != nil {
-		return err
+	applicationType, err := c.GetApplicationType(ctx, appId)
+	if err != nil {
+		return associationScopes, err
 	}
-	if err := d.Set("description", profilePolicy.Description); err != nil {
-		return err
-	}
-	if err := d.Set("consumer", profilePolicy.Consumer); err != nil {
-		return err
-	}
-	if err := d.Set("access_type", profilePolicy.AccessType); err != nil {
-		return err
-	}
-	if err := d.Set("is_active", profilePolicy.IsActive); err != nil {
-		return err
-	}
-	if err := d.Set("is_draft", profilePolicy.IsDraft); err != nil {
-		return err
-	}
-	if err := d.Set("is_read_only", profilePolicy.IsReadOnly); err != nil {
-		return err
-	}
-
-	newCon := d.Get("condition")
-	if britive.ConditionEqual(profilePolicy.Condition, newCon.(string)) {
-		if err := d.Set("condition", newCon.(string)); err != nil {
-			return err
+	appType := applicationType.ApplicationType
+	unmatchedAssociations := make([]britive_client.PolicyAssociationPlan, 0)
+	for _, a := range as {
+		associationType := a.Type.ValueString()
+		associationValue := a.Value.ValueString()
+		var rootAssociations []britive_client.Association
+		isAssociationExists := false
+		if associationType == "EnvironmentGroup" {
+			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
+			if appType == "AWS" && strings.EqualFold("root", associationValue) {
+				associationValue = "Root"
+			} else if appType == "AWS Standalone" && strings.EqualFold("root", associationValue) {
+				associationValue = "root"
+			}
+		} else {
+			rootAssociations = appRootEnvironmentGroup.Environments
 		}
-	} else if err := d.Set("condition", profilePolicy.Condition); err != nil {
-		return err
-	}
-
-	mem, err := json.Marshal(profilePolicy.Members)
-	if err != nil {
-		return err
-	}
-
-	newMem := d.Get("members")
-	if britive.MembersEqual(string(mem), newMem.(string)) {
-		if err := d.Set("members", newMem.(string)); err != nil {
-			return err
+		for _, aeg := range rootAssociations {
+			if aeg.Name == associationValue || aeg.ID == associationValue {
+				isAssociationExists = true
+				associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
+				break
+			} else if associationType == "Environment" && appType == "AWS Standalone" {
+				newAssociationValue := c.GetEnvId(ctx, appId, associationValue)
+				if aeg.ID == newAssociationValue {
+					isAssociationExists = true
+					associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
+					break
+				}
+			}
 		}
-	} else if err := d.Set("members", string(mem)); err != nil {
-		return err
-	}
+		if !isAssociationExists {
+			unmatchedAssociations = append(unmatchedAssociations, a)
+		}
 
-	associations, err := rpph.mapProfilePolicyAssociationsModelToResource(profilePolicy.ProfileID, profilePolicy.Associations, d, m)
-	if err != nil {
-		return err
 	}
-	if err := d.Set("associations", associations); err != nil {
-		return err
+	if len(unmatchedAssociations) > 0 {
+		return nil, errs.NewNotFoundErrorf("associations %v", unmatchedAssociations)
 	}
+	return associationScopes, nil
+}
 
-	return nil
+func (rpph *ResourceProfilePolicyHelper) appendProfilePolicyAssociations(associations []britive_client.ProfilePolicyAssociation, associationType string, associationID string) []britive_client.ProfilePolicyAssociation {
+	associations = append(associations, britive_client.ProfilePolicyAssociation{
+		Type:  associationType,
+		Value: associationID,
+	})
+	return associations
 }
 
 func (resourceProfilePolicyHelper *ResourceProfilePolicyHelper) generateUniqueID(profileID string, policyID string) string {
@@ -404,116 +653,41 @@ func (resourceProfilePolicyHelper *ResourceProfilePolicyHelper) parseUniqueID(ID
 	return
 }
 
-//endregion
-
-func (rpph *ResourceProfilePolicyHelper) appendProfilePolicyAssociations(associations []britive.ProfilePolicyAssociation, associationType string, associationID string) []britive.ProfilePolicyAssociation {
-	associations = append(associations, britive.ProfilePolicyAssociation{
-		Type:  associationType,
-		Value: associationID,
-	})
-	return associations
-}
-
-func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID string, d *schema.ResourceData, m interface{}) ([]britive.ProfilePolicyAssociation, error) {
-	c := m.(*britive.Client)
-	associationScopes := make([]britive.ProfilePolicyAssociation, 0)
-	as := d.Get("associations").(*schema.Set)
-	if as == nil {
-		return associationScopes, nil
-	}
-
-	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
+func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToResource(ctx context.Context, plan britive_client.ProfilePolicyPlan, profileID string, associations []britive_client.ProfilePolicyAssociation, c *britive_client.Client) ([]britive_client.PolicyAssociationPlan, error) {
+	profilePolicyAssociations := make([]britive_client.PolicyAssociationPlan, 0)
+	inputAssociations, err := rpph.mapSetToAssociations(plan.Associations)
 	if err != nil {
-		return associationScopes, err
+		return nil, err
 	}
-
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
-	if err != nil {
-		return associationScopes, err
-	}
-	if appRootEnvironmentGroup == nil {
-		return associationScopes, nil
-	}
-	applicationType, err := c.GetApplicationType(appId)
-	if err != nil {
-		return associationScopes, err
-	}
-	appType := applicationType.ApplicationType
-	unmatchedAssociations := make([]interface{}, 0)
-	for _, a := range as.List() {
-		s := a.(map[string]interface{})
-		associationType := s["type"].(string)
-		associationValue := s["value"].(string)
-		var rootAssociations []britive.Association
-		isAssociationExists := false
-		if associationType == "EnvironmentGroup" {
-			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
-			if appType == "AWS" && strings.EqualFold("root", associationValue) {
-				associationValue = "Root"
-			} else if appType == "AWS Standalone" && strings.EqualFold("root", associationValue) {
-				associationValue = "root"
-			}
-		} else {
-			rootAssociations = appRootEnvironmentGroup.Environments
-		}
-		for _, aeg := range rootAssociations {
-			if aeg.Name == associationValue || aeg.ID == associationValue {
-				isAssociationExists = true
-				associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
-				break
-			} else if associationType == "Environment" && appType == "AWS Standalone" {
-				newAssociationValue := c.GetEnvId(appId, associationValue)
-				if aeg.ID == newAssociationValue {
-					isAssociationExists = true
-					associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
-					break
-				}
-			}
-		}
-		if !isAssociationExists {
-			unmatchedAssociations = append(unmatchedAssociations, s)
-		}
-
-	}
-	if len(unmatchedAssociations) > 0 {
-		return nil, errs.NewNotFoundErrorf("associations %v", unmatchedAssociations)
-	}
-	return associationScopes, nil
-}
-
-func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToResource(profileID string, associations []britive.ProfilePolicyAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
-	c := m.(*britive.Client)
-	profilePolicyAssociations := make([]interface{}, 0)
-	inputAssociations := d.Get("associations").(*schema.Set)
 	if inputAssociations == nil {
 		return profilePolicyAssociations, nil
 	}
 
-	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
+	appId, err := c.RetrieveAppIdGivenProfileId(ctx, profileID)
 	if err != nil {
 		return profilePolicyAssociations, err
 	}
 
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appId)
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(ctx, appId)
 	if err != nil {
 		return profilePolicyAssociations, err
 	}
 	if len(associations) == 0 || appRootEnvironmentGroup == nil {
 		return profilePolicyAssociations, nil
 	}
-	applicationType, err := c.GetApplicationType(appId)
+	applicationType, err := c.GetApplicationType(ctx, appId)
 	if err != nil {
 		return profilePolicyAssociations, err
 	}
 	appType := applicationType.ApplicationType
 	for _, association := range associations {
-		var rootAssociations []britive.Association
+		var rootAssociations []britive_client.Association
 		if association.Type == "EnvironmentGroup" {
 			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
 		} else {
 			rootAssociations = appRootEnvironmentGroup.Environments
 		}
-		var a *britive.Association
+		var a *britive_client.Association
 		for _, aeg := range rootAssociations {
 			if aeg.ID == association.Value {
 				a = &aeg
@@ -523,12 +697,11 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 		if a == nil {
 			return profilePolicyAssociations, errs.NewNotFoundErrorf("association %s", association.Value)
 		}
-		profilePolicyAssociation := make(map[string]interface{})
+		var profilePolicyAssociation britive_client.PolicyAssociationPlan
 		associationValue := a.Name
-		for _, inputAssociation := range inputAssociations.List() {
-			ia := inputAssociation.(map[string]interface{})
-			iat := ia["type"].(string)
-			iav := ia["value"].(string)
+		for _, inputAssociation := range inputAssociations {
+			iat := inputAssociation.Type.ValueString()
+			iav := inputAssociation.Value.ValueString()
 			if association.Type == "EnvironmentGroup" && (appType == "AWS" || appType == "AWS Standalone") && strings.EqualFold("root", a.Name) && strings.EqualFold("root", iav) {
 				associationValue = iav
 			}
@@ -536,18 +709,72 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 				associationValue = a.ID
 				break
 			} else if association.Type == "Environment" && appType == "AWS Standalone" {
-				envId := c.GetEnvId(appId, iav)
+				envId := c.GetEnvId(ctx, appId, iav)
 				if association.Type == iat && a.ID == envId {
 					associationValue = iav
 					break
 				}
 			}
 		}
-		profilePolicyAssociation["type"] = association.Type
-		profilePolicyAssociation["value"] = associationValue
+		profilePolicyAssociation.Type = types.StringValue(association.Type)
+		profilePolicyAssociation.Value = types.StringValue(associationValue)
 		profilePolicyAssociations = append(profilePolicyAssociations, profilePolicyAssociation)
 
 	}
 	return profilePolicyAssociations, nil
 
+}
+
+func (rpph *ResourceProfilePolicyHelper) mapAssociationsToSet(associationPlan []britive_client.PolicyAssociationPlan) (types.Set, error) {
+	objs := make([]attr.Value, 0, len(associationPlan))
+
+	for _, p := range associationPlan {
+		obj, diags := types.ObjectValue(
+			map[string]attr.Type{
+				"type":  types.StringType,
+				"value": types.StringType,
+			},
+			map[string]attr.Value{
+				"type":  p.Type,
+				"value": p.Value,
+			},
+		)
+		if diags.HasError() {
+			return types.Set{}, fmt.Errorf("failed to create object for profile policy associations: %v", diags)
+		}
+		objs = append(objs, obj)
+	}
+
+	set, diags := types.SetValue(
+		types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"type":  types.StringType,
+				"value": types.StringType,
+			},
+		},
+		objs,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("failed to create profile policy associations set: %v", diags)
+	}
+	return set, nil
+}
+
+func (rpph *ResourceProfilePolicyHelper) mapSetToAssociations(associationeSet types.Set) ([]britive_client.PolicyAssociationPlan, error) {
+	var result []britive_client.PolicyAssociationPlan
+	objs := associationeSet.Elements()
+	for _, e := range objs {
+		obj, ok := e.(types.Object)
+		if !ok {
+			return nil, fmt.Errorf("expected Object, got %T", e)
+		}
+
+		var p britive_client.PolicyAssociationPlan
+		diags := obj.As(context.Background(), &p, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to convert object to PolicyAssociations: %v", diags)
+		}
+		result = append(result, p)
+	}
+	return result, nil
 }

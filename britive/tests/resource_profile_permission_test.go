@@ -4,21 +4,22 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveProfilePermission(t *testing.T) {
+func TestAccBritiveProfilePermission(t *testing.T) {
 	applicationName := "DO NOT DELETE - Azure TF Plugin"
 	profileName := "AT - New Britive Profile Permission Test"
 	profileDescription := "AT - New Britive Profile Permission Test Description"
 	associationValue := "QA"
 	permissionName := "Application Developer"
 	permissionType := "role"
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, profileDescription, associationValue, permissionName, permissionType),
@@ -52,19 +53,17 @@ func testAccCheckBritiveProfilePermissionConfig(applicationName, profileName, pr
 		permission_name = "%s"
 		permission_type = "%s"
 	}`, applicationName, profileName, profileDescription, associationValue, permissionName, permissionType)
-
 }
 
-func testAccCheckBritiveProfilePermissionExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveProfilePermissionExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

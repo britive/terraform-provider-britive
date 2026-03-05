@@ -5,12 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveConstraint(t *testing.T) {
+func TestAccBritiveConstraint(t *testing.T) {
 	applicationName := "DO NOT DELETE - GCP TF Plugin"
 	profileName := "AT - New Britive Constraint Test"
 	profileDescription := "AT - New Britive Constraint Test Description"
@@ -26,8 +25,9 @@ func TestBritiveConstraint(t *testing.T) {
 	constraintExpression := "request.time < timestamp('" + time.Now().AddDate(0, 0, 2).Format("2006-01-02T15:04:05Z07:00") + "')"
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDescription, associationValue, permissionName, permissionType, constraintType, constraintName, permissionConditionName, constraintConditionType, constraintTitle, constraintDescription, constraintExpression),
@@ -89,16 +89,15 @@ func testAccCheckBritiveConstraintConfig(applicationName, profileName, profileDe
 
 }
 
-func testAccCheckBritiveConstraintExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveConstraintExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

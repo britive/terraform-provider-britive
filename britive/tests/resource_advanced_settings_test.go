@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveAdvancedSettings(t *testing.T) {
+func TestAccBritiveAdvancedSettings(t *testing.T) {
 	// Skipping advanced settings acceptance test due to ongoing stabilization
 	t.Skip("TEMP: Skipping advanced settings acceptance test due to ongoing stabilization; will be re-enabled shortly")
 
@@ -17,9 +16,11 @@ func TestBritiveAdvancedSettings(t *testing.T) {
 	profileName := "AT - TF ADVANCED SETTINGS PROFILE"
 	profilePolicyName := "AT - TF ADVANCED SETTINGS PROFILE POLICY"
 	profilePolicyDescription := "AT - TF ADVANCED SETTINGS PROFILE POLICY DESCRIPTION"
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription),
@@ -184,16 +185,15 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 `, applicationName, profileName, profilePolicyName, profilePolicyDescription)
 }
 
-func testAccCheckBritiveAdvancedSettingsExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveAdvancedSettingsExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

@@ -3,280 +3,439 @@ package resources
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// ResourceEntityGroup - Terraform Resource for Application Entity Group
+var (
+	_ resource.Resource                = &ResourceEntityGroup{}
+	_ resource.ResourceWithConfigure   = &ResourceEntityGroup{}
+	_ resource.ResourceWithImportState = &ResourceEntityGroup{}
+)
+
 type ResourceEntityGroup struct {
-	Resource     *schema.Resource
+	client       *britive_client.Client
 	helper       *ResourceEntityGroupHelper
 	importHelper *imports.ImportHelper
 }
 
-// NewResourceEntityGroup - Initialization of new application entity group resource
-func NewResourceEntityGroup(importHelper *imports.ImportHelper) *ResourceEntityGroup {
-	reg := &ResourceEntityGroup{
-		helper:       NewResourceEntityGroupHelper(),
-		importHelper: importHelper,
-	}
-	reg.Resource = &schema.Resource{
-		CreateContext: reg.resourceCreate,
-		ReadContext:   reg.resourceRead,
-		UpdateContext: reg.resourceUpdate,
-		DeleteContext: reg.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: reg.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"entity_id": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				Computed:     true,
-				Description:  "The identity of the application entity of type environment group",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"application_id": {
-				Type:         schema.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				Description:  "The identity of the Britive application",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"entity_name": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The name of the entity",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"entity_description": {
-				Type:         schema.TypeString,
-				Required:     true, //Should be set to optional when PAB-20647 is fixed.
-				Description:  "The description of the entity",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"parent_id": {
-				Type:         schema.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				Description:  "The parent id under which the environment group will be created",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-		},
-	}
-	return reg
+type ResourceEntityGroupHelper struct{}
+
+func NewResourceEntityGroup() resource.Resource {
+	return &ResourceEntityGroup{}
 }
 
-//region Application Entity Group Resource Context Operations
-
-func (reg *ResourceEntityGroup) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
-
-	applicationEntity := britive.ApplicationEntityGroup{}
-
-	err := reg.helper.mapResourceToModel(d, m, &applicationEntity, false)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	log.Printf("[INFO] Creating new application entity group: %#v", applicationEntity)
-
-	applicationID := d.Get("application_id").(string)
-
-	ae, err := c.CreateEntityGroup(applicationEntity, applicationID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	log.Printf("[INFO] Submitted new application entity group: %#v", ae)
-	d.SetId(reg.helper.generateUniqueID(applicationID, ae.EntityID))
-	reg.resourceRead(ctx, d, m)
-	return diags
-}
-
-func (reg *ResourceEntityGroup) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	var diags diag.Diagnostics
-
-	err := reg.helper.getAndMapModelToResource(d, m)
-
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	return diags
-}
-
-func (reg *ResourceEntityGroup) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var hasChanges bool
-	if d.HasChange("application_id") || d.HasChange("entity_name") || d.HasChange("entity_description") || d.HasChange("parent_id") {
-		hasChanges = true
-		applicationID, _, err := reg.helper.parseUniqueID(d.Id())
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		applicationEntity := britive.ApplicationEntityGroup{}
-
-		err = reg.helper.mapResourceToModel(d, m, &applicationEntity, true)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		log.Printf("[INFO] Updating the entity group %#v for application %s", applicationEntity, applicationID)
-
-		ae, err := c.UpdateEntityGroup(applicationEntity, applicationID)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		log.Printf("[INFO] Submitted updated application entity group: %#v", ae)
-		d.SetId(reg.helper.generateUniqueID(applicationID, ae.EntityID))
-	}
-	if hasChanges {
-		return reg.resourceRead(ctx, d, m)
-	}
-	return nil
-}
-
-func (reg *ResourceEntityGroup) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-
-	applicationID, entityID, err := reg.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	log.Printf("[INFO] Deleting entity group %s for application %s", entityID, applicationID)
-	err = c.DeleteEntityGroup(applicationID, entityID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	log.Printf("[INFO] Deleted entity group %s for application %s", entityID, applicationID)
-	d.SetId("")
-
-	return diags
-}
-
-func (reg *ResourceEntityGroup) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-	var err error
-	if err := reg.importHelper.ParseImportID([]string{"apps/(?P<application_id>[^/]+)/root-environment-group/groups/(?P<entity_id>[^/]+)", "(?P<application_id>[^/]+)/groups/(?P<entity_id>[^/]+)"}, d); err != nil {
-		return nil, err
-	}
-
-	applicationID := d.Get("application_id").(string)
-	entityID := d.Get("entity_id").(string)
-	if strings.TrimSpace(applicationID) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("application_id")
-	}
-	if strings.TrimSpace(entityID) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("entity_id")
-	}
-
-	appEnvs := make([]britive.ApplicationEnvironment, 0)
-	appEnvs, err = c.GetAppEnvs(applicationID, "environmentGroups")
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf("[INFO] Importing entity group %s for application %s", entityID, applicationID)
-
-	envIdList, err := c.GetEnvDetails(appEnvs, "id")
-	if err != nil {
-		return nil, err
-	}
-
-	for _, id := range envIdList {
-		if id == entityID {
-			d.SetId(reg.helper.generateUniqueID(applicationID, entityID))
-
-			err = reg.helper.getAndMapModelToResource(d, m)
-			if err != nil {
-				return nil, err
-			}
-			log.Printf("[INFO] Imported entity group %s for application %s", entityID, applicationID)
-			return []*schema.ResourceData{d}, nil
-		}
-	}
-
-	return nil, errs.NewNotFoundErrorf("entity group %s for application %s", entityID, applicationID)
-
-}
-
-//endregion
-
-// ResourceEntityGroupHelper - Terraform Resource for Application Entity Group Helper
-type ResourceEntityGroupHelper struct {
-}
-
-// NewResourceEntityGroupHelper - Initialization of new application entity group resource helper
 func NewResourceEntityGroupHelper() *ResourceEntityGroupHelper {
 	return &ResourceEntityGroupHelper{}
 }
 
-//region EntityGroup Resource helper functions
-
-func (regh *ResourceEntityGroupHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, applicationEntity *britive.ApplicationEntityGroup, isUpdate bool) error {
-	applicationEntity.Name = d.Get("entity_name").(string)
-	applicationEntity.Description = d.Get("entity_description").(string)
-	applicationEntity.ParentID = d.Get("parent_id").(string)
-	applicationEntity.EntityID = d.Get("entity_id").(string)
-
-	return nil
+func (reg *ResourceEntityGroup) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_entity_group"
 }
 
-func (regh *ResourceEntityGroupHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+func (reg *ResourceEntityGroup) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 
-	applicationID, entityID, err := regh.parseUniqueID(d.Id())
-	if err != nil {
-		return err
+	tflog.Info(ctx, "Configuring the Britive Application Entity Group resource")
+
+	if req.ProviderData == nil {
+		return
 	}
 
-	log.Printf("[INFO] Reading entity group %s for application %s", entityID, applicationID)
+	reg.client = req.ProviderData.(*britive_client.Client)
+	if reg.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
 
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(applicationID)
+	tflog.Info(ctx, "Provider client configured for Resource Entity Group")
+	reg.helper = NewResourceEntityGroupHelper()
+}
+
+func (reg *ResourceEntityGroup) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for entity group resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"entity_id": schema.StringAttribute{
+				Computed:    true,
+				Description: "The identity of the application entity of type environment group",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"application_id": schema.StringAttribute{
+				Required:    true,
+				Description: "The identity of the Britive application",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					validate.StringFunc(
+						"applicationID",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"entity_name": schema.StringAttribute{
+				Required:    true,
+				Description: "The name of the entity",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"entityName",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"entity_description": schema.StringAttribute{
+				Required:    true,
+				Description: "The description of the entity",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"entityDescription",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"parent_id": schema.StringAttribute{
+				Required:    true,
+				Description: "The parent id under which the environment group will be created",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					validate.StringFunc(
+						"parentID",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+		},
+	}
+}
+
+func (reg *ResourceEntityGroup) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_entity_group")
+
+	var plan britive_client.EntityGroupPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during entity_group creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	applicationEntity := britive_client.ApplicationEntityGroup{}
+
+	reg.helper.mapResourceToModel(plan, &applicationEntity)
+
+	tflog.Info(ctx, fmt.Sprintf("Creating new application entity group: %#v", applicationEntity))
+
+	applicationID := plan.ApplicationID.ValueString()
+
+	ae, err := reg.client.CreateEntityGroup(ctx, applicationEntity, applicationID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create entity group", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to create entity group, error:%#v", err))
+		return
+	}
+
+	plan.ID = types.StringValue(reg.helper.generateUniqueID(applicationID, ae.EntityID))
+
+	planPtr, err := reg.helper.getAndMapModelToPlan(ctx, plan, *reg.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to set state after create",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map entity group model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"entity_group": planPtr,
+	})
+}
+
+func (reg *ResourceEntityGroup) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_entity_group")
+
+	if reg.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
+	}
+
+	var state britive_client.EntityGroupPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get entity group state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	planPtr, err := reg.helper.getAndMapModelToPlan(ctx, state, *reg.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get entity group",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map entity group model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Fetched entity group:  %#v", planPtr))
+}
+
+func (reg *ResourceEntityGroup) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_entity_group")
+
+	var plan, state britive_client.EntityGroupPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	var hasChanges bool
+	if !plan.ApplicationID.Equal(state.ApplicationID) || !plan.EntityName.Equal(state.EntityName) || !plan.EntityDescription.Equal(state.EntityDescription) || !plan.ParentID.Equal(state.ParentID) {
+		hasChanges = true
+		applicationID, _, err := reg.helper.parseUniqueID(plan.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update entity group", "ApplicationID or EntityID not found")
+			tflog.Error(ctx, fmt.Sprintf("Failed to parse application or entity id: %#v", err))
+			return
+		}
+
+		applicationEntity := britive_client.ApplicationEntityGroup{}
+
+		reg.helper.mapResourceToModel(plan, &applicationEntity)
+
+		tflog.Info(ctx, fmt.Sprintf("Updating the entity group %#v for application %s", applicationEntity, applicationID))
+
+		ae, err := reg.client.UpdateEntityGroup(ctx, applicationEntity, applicationID)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update entity group", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update entity group: %#v", err))
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Submitted updated application entity group: %#v", ae))
+		plan.ID = types.StringValue(reg.helper.generateUniqueID(applicationID, ae.EntityID))
+	}
+	if hasChanges {
+		planPtr, err := reg.helper.getAndMapModelToPlan(ctx, plan, *reg.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to set state after create",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map entity group model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Updated entity group: %#v", planPtr))
+	}
+}
+
+func (reg *ResourceEntityGroup) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_entity_group")
+
+	var state britive_client.EntityGroupPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	applicationID, entityID, err := reg.helper.parseUniqueID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete entity group", "appicationID or entityID not found")
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete entity group: %#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Deleting entity group %s for application %s", entityID, applicationID))
+	err = reg.client.DeleteEntityGroup(ctx, applicationID, entityID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete entity group", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete entity group: %#v", err))
+		return
+	}
+	tflog.Info(ctx, fmt.Sprintf("Deleted entity group %s for application %s", entityID, applicationID))
+	resp.State.RemoveResource(ctx)
+}
+
+func (reg *ResourceEntityGroup) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+	if err := reg.importHelper.ParseImportID([]string{"apps/(?P<application_id>[^/]+)/root-environment-group/groups/(?P<entity_id>[^/]+)", "(?P<application_id>[^/]+)/groups/(?P<entity_id>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import entity group", "Invalid importID")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse importID: %#v", err))
+		return
+	}
+
+	applicationID := importData.Fields["application_id"]
+	entityID := importData.Fields["entity_id"]
+	if strings.TrimSpace(applicationID) == "" {
+		resp.Diagnostics.AddError("Failed to import entitty group", "Invalid applicationID")
+		tflog.Error(ctx, "Failed to import entity group, Invalid applicationID")
+		return
+	}
+	if strings.TrimSpace(entityID) == "" {
+		resp.Diagnostics.AddError("Failed to import entitty group", "Invalid entityID")
+		tflog.Error(ctx, "Failed to import entity group, Invalid entityID")
+		return
+	}
+
+	appEnvs := make([]britive_client.ApplicationEnvironment, 0)
+	appEnvs, err := reg.client.GetAppEnvs(ctx, applicationID, "environmentGroups")
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import entity group", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import entity group: %#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Importing entity group %s for application %s", entityID, applicationID))
+
+	envIdList, err := reg.client.GetEnvDetails(appEnvs, "id")
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import entity group", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import entity group, %#v", err))
+		return
+	}
+
+	for _, id := range envIdList {
+		if id == entityID {
+			plan := &britive_client.EntityGroupPlan{
+				ID: types.StringValue(reg.helper.generateUniqueID(applicationID, entityID)),
+			}
+
+			planPtr, err := reg.helper.getAndMapModelToPlan(ctx, *plan, *reg.client)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Failed to import entity group",
+					fmt.Sprintf("Error: %v", err),
+				)
+				tflog.Error(ctx, "Failed import entity group model to plan", map[string]interface{}{
+					"error": err.Error(),
+				})
+				return
+			}
+			resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+			if resp.Diagnostics.HasError() {
+				tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+					"diagnostics": resp.Diagnostics,
+				})
+				return
+			}
+
+			tflog.Info(ctx, fmt.Sprintf("Imported entity group : %#v", planPtr))
+			return
+		}
+	}
+
+	resp.Diagnostics.AddError("Failed to import entity group", "Not found")
+}
+
+func (regh *ResourceEntityGroupHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.EntityGroupPlan, c britive_client.Client) (*britive_client.EntityGroupPlan, error) {
+	applicationID, entityID, err := regh.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		return nil, err
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Reading entity group %s for application %s", entityID, applicationID))
+
+	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(ctx, applicationID)
 	if err != nil || appRootEnvironmentGroup == nil {
-		return err
+		return nil, err
 	}
 
 	for _, association := range appRootEnvironmentGroup.EnvironmentGroups {
 		if association.ID == entityID {
-			log.Printf("[INFO] Received entity group: %#v", association)
+			tflog.Info(ctx, fmt.Sprintf("Received entity group: %#v", association))
 			// To not allow the import of root environment group
 			if association.ParentID == "" {
-				return fmt.Errorf("`parent_id` cannot be empty")
+				return nil, fmt.Errorf("`parent_id` cannot be empty")
 			}
-			if err := d.Set("entity_id", entityID); err != nil {
-				return err
-			}
-			if err := d.Set("entity_name", association.Name); err != nil {
-				return err
-			}
-			if err := d.Set("entity_description", association.Description); err != nil {
-				return err
-			}
-			if err := d.Set("parent_id", association.ParentID); err != nil {
-				return err
-			}
-			return nil
+			plan.EntityID = types.StringValue(entityID)
+			plan.EntityName = types.StringValue(association.Name)
+			plan.EntityDescription = types.StringValue(association.Description.(string))
+			plan.ParentID = types.StringValue(association.ParentID)
+			return &plan, nil
 		}
 	}
 
-	return errs.NewNotFoundErrorf("entity group %s for application %s", entityID, applicationID)
+	return nil, errs.NewNotFoundErrorf("entity group %s for application %s", entityID, applicationID)
+}
+
+func (regh *ResourceEntityGroupHelper) mapResourceToModel(plan britive_client.EntityGroupPlan, applicationEntity *britive_client.ApplicationEntityGroup) {
+	applicationEntity.Name = plan.EntityName.ValueString()
+	applicationEntity.Description = plan.EntityDescription.ValueString()
+	applicationEntity.ParentID = plan.ParentID.ValueString()
 }
 
 func (resourceEntityGroupHelper *ResourceEntityGroupHelper) generateUniqueID(applicationID, entityID string) string {
@@ -294,5 +453,3 @@ func (resourceEntityGroupHelper *ResourceEntityGroupHelper) parseUniqueID(ID str
 	entityID = applicationEntityParts[4]
 	return
 }
-
-//endregion

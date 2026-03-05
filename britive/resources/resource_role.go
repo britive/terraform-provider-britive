@@ -5,269 +5,425 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// ResourceRole - Terraform Resource for Role
+var (
+	_ resource.Resource                = &ResourceRole{}
+	_ resource.ResourceWithConfigure   = &ResourceRole{}
+	_ resource.ResourceWithImportState = &ResourceRole{}
+)
+
 type ResourceRole struct {
-	Resource     *schema.Resource
+	client       *britive_client.Client
 	helper       *ResourceRoleHelper
-	validation   *validate.Validation
 	importHelper *imports.ImportHelper
 }
 
-// NewResourceRole - Initializes new role resource
-func NewResourceRole(v *validate.Validation, importHelper *imports.ImportHelper) *ResourceRole {
-	rr := &ResourceRole{
-		helper:       NewResourceRoleHelper(),
-		validation:   v,
-		importHelper: importHelper,
-	}
-	rr.Resource = &schema.Resource{
-		CreateContext: rr.resourceCreate,
-		ReadContext:   rr.resourceRead,
-		UpdateContext: rr.resourceUpdate,
-		DeleteContext: rr.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rr.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The name of Britive role",
-			},
-			"description": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "The description of the Britive role",
-			},
-			"permissions": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "Permissions of the role",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-		},
-	}
-	return rr
+type ResourceRoleHelper struct{}
+
+func NewResourceRole() resource.Resource {
+	return &ResourceRole{}
 }
 
-//region Role Resource Context Operations
-
-func (rr *ResourceRole) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-
-	role := britive.Role{}
-
-	err := rr.helper.mapResourceToModel(d, m, &role, false)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	log.Printf("[INFO] Adding new role: %#v", role)
-
-	ro, err := c.AddRole(role)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	log.Printf("[INFO] Submitted new role: %#v", ro)
-	d.SetId(rr.helper.generateUniqueID(ro.RoleID))
-
-	rr.resourceRead(ctx, d, m)
-
-	return diags
-}
-
-func (rr *ResourceRole) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	var diags diag.Diagnostics
-
-	err := rr.helper.getAndMapModelToResource(d, m)
-
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	return diags
-}
-
-func (rr *ResourceRole) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	roleID, err := rr.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	var hasChanges bool
-	if d.HasChange("name") || d.HasChange("description") || d.HasChange("permissions") {
-		hasChanges = true
-		role := britive.Role{}
-
-		err := rr.helper.mapResourceToModel(d, m, &role, true)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		old_name, _ := d.GetChange("name")
-		oldPerm, _ := d.GetChange("permissions")
-		ur, err := c.UpdateRole(role, old_name.(string))
-		if err != nil {
-			if errState := d.Set("permissions", oldPerm.(string)); errState != nil {
-				return diag.FromErr(errState)
-			}
-			return diag.FromErr(err)
-		}
-
-		log.Printf("[INFO] Submitted updated role: %#v", ur)
-		d.SetId(rr.helper.generateUniqueID(roleID))
-	}
-	if hasChanges {
-		return rr.resourceRead(ctx, d, m)
-	}
-	return nil
-}
-
-func (rr *ResourceRole) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-
-	var diags diag.Diagnostics
-
-	roleID, err := rr.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	log.Printf("[INFO] Deleting role: %s", roleID)
-	err = c.DeleteRole(roleID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	log.Printf("[INFO] Role %s deleted", roleID)
-	d.SetId("")
-
-	return diags
-}
-
-func (rr *ResourceRole) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
-	if err := rr.importHelper.ParseImportID([]string{"roles/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
-		return nil, err
-	}
-	roleName := d.Get("name").(string)
-	if strings.TrimSpace(roleName) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("name")
-	}
-
-	log.Printf("[INFO] Importing role: %s", roleName)
-
-	role, err := c.GetRoleByName(roleName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("role %s", roleName)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	d.SetId(rr.helper.generateUniqueID(role.RoleID))
-
-	err = rr.helper.getAndMapModelToResource(d, m)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("[INFO] Imported role: %s", roleName)
-	return []*schema.ResourceData{d}, nil
-}
-
-//endregion
-
-// ResourceRoleHelper - Resource Role helper functions
-type ResourceRoleHelper struct {
-}
-
-// NewResourceRoleHelper - Initializes new role resource helper
 func NewResourceRoleHelper() *ResourceRoleHelper {
 	return &ResourceRoleHelper{}
 }
 
-//region Role Resource helper functions
-
-func (rrh *ResourceRoleHelper) mapResourceToModel(d *schema.ResourceData, m interface{}, role *britive.Role, isUpdate bool) error {
-	role.Name = d.Get("name").(string)
-	role.Description = d.Get("description").(string)
-	json.Unmarshal([]byte(d.Get("permissions").(string)), &role.Permissions)
-
-	return nil
+func (rr *ResourceRole) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_role"
 }
 
-func (rrh *ResourceRoleHelper) getAndMapModelToResource(d *schema.ResourceData, m interface{}) error {
-	c := m.(*britive.Client)
+func (rr *ResourceRole) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 
-	roleID, err := rrh.parseUniqueID(d.Id())
+	tflog.Info(ctx, "Configuring the Britive Role resource")
+
+	if req.ProviderData == nil {
+		return
+	}
+
+	rr.client = req.ProviderData.(*britive_client.Client)
+	if rr.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for ResourceTag")
+	rr.helper = NewResourceRoleHelper()
+}
+
+func (rr *ResourceRole) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for Britive Role resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: "The name of Britive Role",
+			},
+			"description": schema.StringAttribute{
+				Optional:    true,
+				Description: "The description of the Britive Role",
+			},
+			"permissions": schema.StringAttribute{
+				Required:    true,
+				Description: "permissions of role",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"Permissions",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+		},
+	}
+}
+
+func (rr *ResourceRole) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_role")
+
+	var plan britive_client.RolePlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during role creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+
+		return
+	}
+
+	role := britive_client.Role{}
+
+	err := rr.helper.mapResourceToModel(plan, &role)
 	if err != nil {
-		return err
+		resp.Diagnostics.AddError("Faied to create role", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to map role resource to model, error:%#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Reading role %s", roleID)
+	tflog.Info(ctx, fmt.Sprintf("Adding new role: %#v", role))
 
-	roleRes, err := c.GetRole(roleID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("role %s", roleID)
+	ro, err := rr.client.AddRole(ctx, role)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create role", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Dailed to create role, error:%#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Submitted new role: %#v", ro))
+	plan.ID = types.StringValue(rr.helper.generateUniqueID(ro.RoleID))
+
+	planPtr, err := rr.helper.getAndMapModelToPlan(ctx, plan, rr.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get role",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map role model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"role": planPtr,
+	})
+}
+
+func (rr *ResourceRole) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_role")
+
+	if rr.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
+	}
+
+	var state britive_client.RolePlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get role state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	planPtr, err := rr.helper.getAndMapModelToPlan(ctx, state, rr.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get role",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map role model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Read role:  %#v", planPtr))
+}
+
+func (rr *ResourceRole) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_role")
+
+	var plan, state britive_client.RolePlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	roleID, err := rr.helper.parseUniqueID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update role", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse role ID, error:%#v", err))
+		return
+	}
+
+	var hasChanges bool
+	if !plan.Name.Equal(state.Name) || !plan.Description.Equal(state.Description) || !plan.Permissions.Equal(state.Permissions) {
+		hasChanges = true
+		role := britive_client.Role{}
+
+		err := rr.helper.mapResourceToModel(plan, &role)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update role", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to map role resource to model, error:%#v", err))
+			return
+		}
+
+		old_name := state.Name.ValueString()
+		oldPerm := state.Permissions.ValueString()
+		ur, err := rr.client.UpdateRole(ctx, role, old_name)
+		if err != nil {
+			plan.Permissions = types.StringValue(oldPerm)
+			resp.Diagnostics.AddError("Failed to update role", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update role, error:%#v", err))
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Submitted updated role: %#v", ur))
+		plan.ID = types.StringValue(rr.helper.generateUniqueID(roleID))
+	}
+	if hasChanges {
+		planPtr, err := rr.helper.getAndMapModelToPlan(ctx, plan, rr.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to set state after update",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map role model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Updated role: %#v", planPtr))
+	}
+}
+
+func (rr *ResourceRole) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_role")
+
+	var state britive_client.RolePlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	roleID, err := rr.helper.parseUniqueID(state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete role", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse role ID, error:%#v", err))
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Deleting role: %s", roleID))
+	err = rr.client.DeleteRole(ctx, roleID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete role", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete role, error:%#v", err))
+		return
+	}
+	tflog.Info(ctx, fmt.Sprintf("Role %s deleted", roleID))
+	resp.State.RemoveResource(ctx)
+}
+
+func (rr *ResourceRole) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
+
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+
+	if err := rr.importHelper.ParseImportID([]string{"roles/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to parse import ID", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse import ID, error:%#v", err))
+		return
+	}
+	roleName := importData.Fields["name"]
+	if strings.TrimSpace(roleName) == "" {
+		resp.Diagnostics.AddError("Failed to import role", "Invalid name")
+		tflog.Error(ctx, "Failed to import role, Invalid name")
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Importing role: %s", roleName))
+
+	role, err := rr.client.GetRoleByName(ctx, roleName)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import role", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import role, error:%#v", err))
+		return
+	}
+
+	plan := britive_client.RolePlan{
+		ID: types.StringValue(rr.helper.generateUniqueID(role.RoleID)),
+	}
+
+	planPtr, err := rr.helper.getAndMapModelToPlan(ctx, plan, rr.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to set state after import",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map role model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported role: %#v", planPtr))
+}
+
+func (rrh *ResourceRoleHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.RolePlan, c *britive_client.Client) (*britive_client.RolePlan, error) {
+	roleID, err := rrh.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		return nil, err
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Reading role %s", roleID))
+
+	roleRes, err := c.GetRole(ctx, roleID)
+	if errors.Is(err, britive_client.ErrNotFound) {
+		return nil, errs.NewNotFoundErrorf("role %s", roleID)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	role, err := c.GetRoleByName(roleRes.Name)
-	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("role %s", roleRes.Name)
+	role, err := c.GetRoleByName(ctx, roleRes.Name)
+	if errors.Is(err, britive_client.ErrNotFound) {
+		return nil, errs.NewNotFoundErrorf("role %s", roleRes.Name)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	log.Printf("[INFO] Received role %#v", role)
+	tflog.Info(ctx, fmt.Sprintf("Received role %#v", role))
 
-	if err := d.Set("name", role.Name); err != nil {
-		return err
+	plan.Name = types.StringValue(role.Name)
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && role.Description == "" {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(role.Description)
 	}
-	if err := d.Set("description", role.Description); err != nil {
-		return err
-	}
+
 	perm, err := json.Marshal(role.Permissions)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	newPerm := d.Get("permissions")
-	if britive.ArrayOfMapsEqual(string(perm), newPerm.(string)) {
-		if err := d.Set("permissions", newPerm.(string)); err != nil {
-			return err
-		}
-	} else if err := d.Set("permissions", string(perm)); err != nil {
+	newPerm := plan.Permissions.ValueString()
+	if britive_client.ArrayOfMapsEqual(string(perm), newPerm) {
+		plan.Permissions = types.StringValue(newPerm)
+	} else {
+		plan.Permissions = types.StringValue(string(perm))
+	}
+
+	return &plan, nil
+}
+
+func (rrh *ResourceRoleHelper) mapResourceToModel(plan britive_client.RolePlan, role *britive_client.Role) error {
+	role.Name = plan.Name.ValueString()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		role.Description = plan.Description.ValueString()
+	}
+
+	if err := json.Unmarshal([]byte(plan.Permissions.ValueString()), &role.Permissions); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (resourceRoleHelper *ResourceRoleHelper) generateUniqueID(roleID string) string {
+func (rrh *ResourceRoleHelper) generateUniqueID(roleID string) string {
 	return fmt.Sprintf("roles/%s", roleID)
 }
 
-func (resourceRoleHelper *ResourceRoleHelper) parseUniqueID(ID string) (roleID string, err error) {
+func (rrh *ResourceRoleHelper) parseUniqueID(ID string) (roleID string, err error) {
 	roleParts := strings.Split(ID, "/")
 	if len(roleParts) < 2 {
 		err = errs.NewInvalidResourceIDError("role", ID)
@@ -277,5 +433,3 @@ func (resourceRoleHelper *ResourceRoleHelper) parseUniqueID(ID string) (roleID s
 	roleID = roleParts[1]
 	return
 }
-
-//endregion

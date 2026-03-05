@@ -4,25 +4,26 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func TestBritiveResourceTypePermission(t *testing.T) {
+func TestAccBritiveResourceManagerResourceTypePermission(t *testing.T) {
 	resourceTypeName := "AT-Britive_Resource_Manager_Tests_Resource_Type"
 	resourceTypeDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Description"
 	responseTemplateName := "AT-Britive_Resource_Manager_Tests_Response_Template"
 	responseTemplateDescription := "AT-Britive_Resource_Manager_Tests_Response_Template_Description"
 	permissionName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission"
 	permissionDescription := "At-Britive_Resource_Manager_Tests_ResourceType_Permision_Description"
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceTypePermissionConfig(resourceTypeName, resourceTypeDescription, responseTemplateName, responseTemplateDescription, permissionName, permissionDescription),
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckBritiveResourceTypePermissionExists("britive_resource_manager_resource_type.new_resource_type_1"),
 					testAccCheckBritiveResourceTypePermissionExists("britive_resource_manager_response_template.new_response_template_1"),
 					testAccCheckBritiveResourceTypePermissionExists("britive_resource_manager_resource_type_permission.new_resource_type_permission_1"),
@@ -91,16 +92,15 @@ func testAccCheckBritiveResourceTypePermissionConfig(resourceTypeName, resourceT
 	}`, resourceTypeName, resourceTypeDescription, responseTemplateName, responseTemplateDescription, permissionName, permissionDescription)
 }
 
-func testAccCheckBritiveResourceTypePermissionExists(n string) resource.TestCheckFunc {
+func testAccCheckBritiveResourceTypePermissionExists(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-
+		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			return errs.NewNotFoundErrorf("%s in state", n)
+			return fmt.Errorf("resource %s not found in state", resourceName)
 		}
 
 		if rs.Primary.ID == "" {
-			return errs.NewNotFoundErrorf("ID for %s in state", n)
+			return fmt.Errorf("resource %s ID is not set", resourceName)
 		}
 
 		return nil

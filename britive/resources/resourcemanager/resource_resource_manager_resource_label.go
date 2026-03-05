@@ -2,274 +2,493 @@ package resourcemanager
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
 	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// ResourceResourceLabel - Terraform Resource for Resource Label
-type ResourceResourceLabel struct {
-	Resource     *schema.Resource
-	helper       *ResourceResourceLabelHelper
-	validation   *validate.Validation
+var (
+	_ resource.Resource                = &ResourceResourceManagerResourceLabel{}
+	_ resource.ResourceWithConfigure   = &ResourceResourceManagerResourceLabel{}
+	_ resource.ResourceWithImportState = &ResourceResourceManagerResourceLabel{}
+)
+
+type ResourceResourceManagerResourceLabel struct {
+	client       *britive_client.Client
+	helper       *ResourceResourceManagerResourceLabelHelper
 	importHelper *imports.ImportHelper
 }
 
-// NewResourceResourceLabelHelper - Helper for Resource Label Resource
-type ResourceResourceLabelHelper struct{}
+type ResourceResourceManagerResourceLabelHelper struct{}
 
-func NewResourceResourceLabelHelper() *ResourceResourceLabelHelper {
-	return &ResourceResourceLabelHelper{}
+func NewResourceResourceManagerResourceLabel() resource.Resource {
+	return &ResourceResourceManagerResourceLabel{}
 }
 
-func NewResourceResourceLabel(v *validate.Validation, importHelper *imports.ImportHelper) *ResourceResourceLabel {
-	rl := &ResourceResourceLabel{
-		helper:       NewResourceResourceLabelHelper(),
-		validation:   v,
-		importHelper: importHelper,
+func NewResourceResourceManagerResourceLabelHelper() *ResourceResourceManagerResourceLabelHelper {
+	return &ResourceResourceManagerResourceLabelHelper{}
+}
+
+func (rrmrl *ResourceResourceManagerResourceLabel) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_resource_manager_resource_label"
+}
+
+func (rrmrl *ResourceResourceManagerResourceLabel) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Resource Manager Resource Label resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rl.Resource = &schema.Resource{
-		CreateContext: rl.resourceCreate,
-		UpdateContext: rl.resourceUpdate,
-		ReadContext:   rl.resourceRead,
-		DeleteContext: rl.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rl.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "Resource Label Name",
-				ValidateFunc: rl.validation.StringWithNoSpecialChar,
-			},
-			"description": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "Resource Label Description",
-			},
-			"internal": {
-				Type:        schema.TypeBool,
+
+	rrmrl.client = req.ProviderData.(*britive_client.Client)
+	if rrmrl.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for ResourceTag")
+	rrmrl.helper = NewResourceResourceManagerResourceLabelHelper()
+}
+
+type caseInsensitiveStringModifier struct{}
+
+func (m caseInsensitiveStringModifier) Description(ctx context.Context) string {
+	return "Suppress diff if values differ only by case"
+}
+
+func (m caseInsensitiveStringModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m caseInsensitiveStringModifier) PlanModifyString(
+	ctx context.Context,
+	req planmodifier.StringRequest,
+	resp *planmodifier.StringResponse,
+) {
+	if req.StateValue.IsNull() || req.PlanValue.IsNull() {
+		return
+	}
+
+	old := req.StateValue.ValueString()
+	new := req.PlanValue.ValueString()
+
+	if strings.EqualFold(old, new) {
+		resp.PlanValue = req.StateValue
+	}
+}
+
+func CaseInsensitiveString() planmodifier.String {
+	return caseInsensitiveStringModifier{}
+}
+
+func (rrmrl *ResourceResourceManagerResourceLabel) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for Britive Resource Label resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
 				Computed:    true,
-				Description: "Resource Label Internal",
-			},
-			"label_color": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "Resource Label Color",
-				DiffSuppressFunc: func(key, old, new string, d *schema.ResourceData) bool {
-					return strings.EqualFold(old, new)
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"values": {
-				Type:        schema.TypeSet,
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: "The name of Label",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"name",
+						validate.StringWithNoSpecialChar(),
+					),
+				},
+			},
+			"description": schema.StringAttribute{
 				Optional:    true,
-				Description: "Resource Label Values",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"value_id": {
-							Type:        schema.TypeString,
+				Description: "The description of the Resource label",
+			},
+			"internal": schema.BoolAttribute{
+				Computed:    true,
+				Description: "Resource Label internal",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"label_color": schema.StringAttribute{
+				Optional:    true,
+				Description: "Color of label",
+				PlanModifiers: []planmodifier.String{
+					CaseInsensitiveString(),
+				},
+			},
+		},
+		Blocks: map[string]schema.Block{
+			"values": schema.SetNestedBlock{
+				Description: "Resource label value",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"value_id": schema.StringAttribute{
 							Computed:    true,
-							Description: "Resource Label Value ID",
+							Description: "Resource label value ID",
 						},
-						"name": {
-							Type:        schema.TypeString,
+						"name": schema.StringAttribute{
 							Required:    true,
-							Description: "Resource Label Value Name",
+							Description: "Resource label value name",
 						},
-						"description": {
-							Type:        schema.TypeString,
+						"description": schema.StringAttribute{
 							Optional:    true,
-							Description: "Resource Label Value Description",
-						},
-						"created_by": {
-							Type:        schema.TypeInt,
-							Computed:    true,
-							Description: "Resource Label Value CreatedBy",
-						},
-						"updated_by": {
-							Type:        schema.TypeInt,
-							Computed:    true,
-							Description: "Resource Label Value CreatedBy",
-						},
-						"created_on": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "Resource Label Value CreatedBy",
-						},
-						"updated_on": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "Resource Label Value CreatedBy",
+							Description: "Resource label value description",
 						},
 					},
 				},
 			},
 		},
 	}
-	return rl
 }
 
-func (rl *ResourceResourceLabel) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rrmrl *ResourceResourceManagerResourceLabel) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_resource_manager_resource_label")
+	var plan britive_client.ResourceManagerResourceLabelPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during resource label creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
-	log.Printf("[INFO] Mapping Resource Label Resource to Model")
+	tflog.Info(ctx, "Mapping Resource Label Resource to Model")
 
-	resourceLabel := &britive.ResourceLabel{}
-	err := rl.helper.mapResourceToModel(d, resourceLabel)
+	resourceLabel := &britive_client.ResourceLabel{}
+	err := rrmrl.helper.mapResourceToModel(ctx, plan, resourceLabel)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create resource label", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to map resource label to model, error:%#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Creating Resource Label Resource")
-	resourceLabel, err = c.CreateUpdateResourceLabel(*resourceLabel, false)
-	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("Resource Label Resource"))
-	}
+	tflog.Info(ctx, "Creating Resource Label Resource")
+	resourceLabel, err = rrmrl.client.CreateUpdateResourceLabel(ctx, *resourceLabel, false)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create resource label", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to create resource label, error:%#v", err))
+		return
 	}
 
-	d.SetId(rl.helper.generateUniqueID(resourceLabel.LabelId))
-	log.Printf("[INFO] Created Resource Label Resource")
+	plan.ID = types.StringValue(rrmrl.helper.generateUniqueID(resourceLabel.LabelId))
 
-	return rl.resourceRead(ctx, d, m)
+	tflog.Info(ctx, "Created Resource Label Resource")
+
+	planPtr, err := rrmrl.helper.getAndMapModelToPlan(ctx, plan, rrmrl.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get resource label",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map resource label model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"resource_label": planPtr,
+	})
 }
 
-func (rl *ResourceResourceLabel) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
+func (rrmrl *ResourceResourceManagerResourceLabel) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_resource_manager_resource_label")
 
-	labelId, err := rl.helper.parseUniqueID(d.Id())
+	if rrmrl.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
+	}
+
+	var state britive_client.ResourceManagerResourceLabelPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get resource label state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	newPlan, err := rrmrl.helper.getAndMapModelToPlan(ctx, state, rrmrl.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get resource label",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "get and map resource label model to plan failed in Read", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	log.Printf("[INFO] Reading Resource Label Resource of %s", labelId)
-	resourceLabel, err := c.GetResourceLabel(labelId)
-	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("Resource Label Resource", labelId))
-	}
-	if err != nil {
-		return diag.FromErr(err)
+	diags = resp.State.Set(ctx, newPlan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state in Read", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	rl.helper.getAndMapModelToResource(d, *resourceLabel)
-	log.Printf("[INFO] Received Resource Label Resource")
-
-	return diags
+	tflog.Info(ctx, "Read completed for britive_resource_manager_resource_label")
 }
 
-func (rl *ResourceResourceLabel) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rrmrl *ResourceResourceManagerResourceLabel) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_resource_manager_resource_label")
 
-	labelId, err := rl.helper.parseUniqueID(d.Id())
-	if err != nil {
-		diag.FromErr(err)
+	var plan, state britive_client.ResourceManagerResourceLabelPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	if d.HasChange("name") || d.HasChange("description") || d.HasChange("label_color") || d.HasChange("values") {
-		resourceLabel := &britive.ResourceLabel{
+	labelId, err := rrmrl.helper.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update resource label", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse label id, error:%#v", err))
+		return
+	}
+
+	if !plan.Name.Equal(state.Name) || !plan.Description.Equal(state.Description) || !plan.LabelColor.Equal(state.LabelColor) || !plan.Values.Equal(state.Values) {
+		resourceLabel := &britive_client.ResourceLabel{
 			LabelId: labelId,
 		}
-		err := rl.helper.mapResourceToModel(d, resourceLabel)
+		err := rrmrl.helper.mapResourceToModel(ctx, plan, resourceLabel)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update resource label", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to map resource label to model, error:%#v", err))
+			return
 		}
 
-		resourceLabel, err = c.CreateUpdateResourceLabel(*resourceLabel, true)
-		if errors.Is(err, britive.ErrNotFound) {
-			return diag.FromErr(errs.NewNotFoundErrorf("Resource Label Resource", labelId))
-		}
+		resourceLabel, err = rrmrl.client.CreateUpdateResourceLabel(ctx, *resourceLabel, true)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update resource_label", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update resource_label, error:%#v", err))
+			return
 		}
+		plan.ID = types.StringValue(rrmrl.helper.generateUniqueID(resourceLabel.LabelId))
 	}
 
-	return rl.resourceRead(ctx, d, m)
+	planPtr, err := rrmrl.helper.getAndMapModelToPlan(ctx, plan, rrmrl.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get resource label",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map resource label model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Update completed and state set")
 }
 
-func (rl *ResourceResourceLabel) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
-	var diags diag.Diagnostics
+func (rrmrl *ResourceResourceManagerResourceLabel) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_resource_manager_resource_label")
 
-	labelId, err := rl.helper.parseUniqueID(d.Id())
-	if err != nil {
-		return diag.FromErr(err)
+	var state britive_client.ResourceManagerResourceLabelPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	log.Printf("[INFO] Deleting Resource Label Resource")
-	err = c.DeleteResourceLabel(labelId)
+	labelId, err := rrmrl.helper.parseUniqueID(state.ID.ValueString())
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to delete resource label", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse label id, error:%#v", err))
+		return
 	}
 
-	d.SetId("")
-	log.Printf("[INFO] Deleted Resource Label Resource")
+	tflog.Info(ctx, "Deleting Resource Label Resource")
+	err = rrmrl.client.DeleteResourceLabel(ctx, labelId)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete resource label", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete resource label, error:%#v", err))
+		return
+	}
 
-	return diags
+	resp.State.RemoveResource(ctx)
+	tflog.Info(ctx, "Deleted Resource Label Resource")
 }
 
-func (rl *ResourceResourceLabel) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+func (rrmrl *ResourceResourceManagerResourceLabel) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
 
-	if err := rl.importHelper.ParseImportID([]string{"resource-manager/resource-labels/(?P<id>[^/]+)"}, d); err != nil {
+	importData := &imports.ImportHelperData{
+		ID: importId,
+	}
+
+	if err := rrmrl.importHelper.ParseImportID([]string{"resource-manager/resource-labels/(?P<id>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Invalid importID", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Invalid importID, error:%#v", err))
+		return
+	}
+	labelId := importData.Fields["id"]
+	tflog.Info(ctx, fmt.Sprintf("Importing resource label: %s", labelId))
+
+	body, err := rrmrl.client.GetResourceLabel(ctx, labelId)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to import resource label", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import resource label, error:%#v", err))
+		return
+	}
+
+	plan := britive_client.ResourceManagerResourceLabelPlan{
+		ID: types.StringValue(rrmrl.helper.generateUniqueID(body.LabelId)),
+	}
+
+	planPtr, err := rrmrl.helper.getAndMapModelToPlan(ctx, plan, rrmrl.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to set state after import",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map resource label model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported resource label: %#v", planPtr))
+}
+
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.ResourceManagerResourceLabelPlan, c *britive_client.Client) (*britive_client.ResourceManagerResourceLabelPlan, error) {
+	labelId, err := rrmrlh.parseUniqueID(plan.ID.ValueString())
+	if err != nil {
 		return nil, err
 	}
-	labelId := d.Id()
-	log.Printf("[INFO] Importing resource label: %s", labelId)
 
-	resp, err := c.GetResourceLabel(labelId)
+	tflog.Info(ctx, fmt.Sprintf("Reading Resource Label Resource of %s", labelId))
+	resourceLabel, err := c.GetResourceLabel(ctx, labelId)
 	if err != nil {
 		return nil, err
 	}
 
-	d.SetId(rl.helper.generateUniqueID(resp.LabelId))
-	rl.helper.getAndMapModelToResource(d, *resp)
-	log.Printf("[INFO] Imported resource label: %s", labelId)
-	return []*schema.ResourceData{d}, nil
+	plan.Name = types.StringValue(resourceLabel.Name)
+
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && resourceLabel.Description == "" {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(resourceLabel.Description)
+	}
+
+	plan.Internal = types.BoolValue(resourceLabel.Internal)
+
+	if (plan.LabelColor.IsNull() || plan.LabelColor.IsUnknown()) && resourceLabel.LabelColor == "" {
+		plan.LabelColor = types.StringNull()
+	} else {
+		plan.LabelColor = types.StringValue(resourceLabel.LabelColor)
+	}
+
+	if (plan.Values.IsNull() || plan.Values.IsUnknown()) && len(resourceLabel.Values) == 0 {
+		plan.Values = types.SetNull(rrmrlh.getResourceLabelValueType())
+	} else {
+		userLabelValues, err := rrmrlh.getUserLabelValues(ctx, plan)
+		if err != nil {
+			return nil, err
+		}
+
+		var resourceLabelValues []britive_client.ResourceManagerResourceLabelValuePlan
+		for _, val := range resourceLabel.Values {
+			resourceLabelValue := britive_client.ResourceManagerResourceLabelValuePlan{
+				ValueID: types.StringValue(val.ValueId),
+				Name:    types.StringValue(val.Name),
+			}
+			if userLabelValues[val.Name] == nil && val.Description == "" {
+				resourceLabelValue.Description = types.StringNull()
+			} else {
+				resourceLabelValue.Description = types.StringValue(val.Description)
+			}
+
+			resourceLabelValues = append(resourceLabelValues, resourceLabelValue)
+		}
+		plan.Values, err = rrmrlh.mapValuesListToSet(ctx, resourceLabelValues)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &plan, nil
 }
 
-func (helper *ResourceResourceLabelHelper) mapResourceToModel(d *schema.ResourceData, resourceLabel *britive.ResourceLabel) error {
-	resourceLabel.Name = d.Get("name").(string)
-	if v, ok := d.GetOk("description"); ok {
-		resourceLabel.Description = v.(string)
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) mapResourceToModel(ctx context.Context, plan britive_client.ResourceManagerResourceLabelPlan, resourceLabel *britive_client.ResourceLabel) error {
+	resourceLabel.Name = plan.Name.ValueString()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		resourceLabel.Description = plan.Description.ValueString()
 	}
-	if v, ok := d.GetOk("label_color"); ok {
-		resourceLabel.LabelColor = v.(string)
+	if !plan.LabelColor.IsNull() && !plan.LabelColor.IsUnknown() {
+		resourceLabel.LabelColor = plan.LabelColor.ValueString()
 	}
-	var resourceLabelValues []interface{}
-	if v, ok := d.GetOk("values"); ok {
-		resourceLabelValuesSet := v.(*schema.Set)
-		resourceLabelValues = resourceLabelValuesSet.List()
+
+	var resourceLabelValues []britive_client.ResourceManagerResourceLabelValuePlan
+	if !plan.Values.IsNull() && !plan.Values.IsUnknown() {
+		var err error
+		resourceLabelValues, err = rrmrlh.mapValuesSetToList(ctx, plan)
+		if err != nil {
+			return err
+		}
 	}
 	for _, val := range resourceLabelValues {
-		value := val.(map[string]interface{})
-		resourceLabelValue := &britive.ResourceLabelValue{
-			Name: value["name"].(string),
+		resourceLabelValue := &britive_client.ResourceLabelValue{
+			Name:    val.Name.ValueString(),
+			ValueId: val.ValueID.ValueString(),
 		}
-		if desc, ok := value["description"]; ok {
-			resourceLabelValue.Description = desc.(string)
-		}
-		if createdBy, ok := value["created_by"]; ok {
-			resourceLabelValue.CreatedBy = createdBy.(int)
-		}
-		if updatedBy, ok := value["updated_by"]; ok {
-			resourceLabelValue.UpdatedBy = updatedBy.(int)
-		}
-		if createdOn, ok := value["created_on"]; ok {
-			resourceLabelValue.CreatedOn = createdOn.(string)
-		}
-		if updatedOn, ok := value["updated_on"]; ok {
-			resourceLabelValue.UpdatedOn = updatedOn.(string)
+		if !val.Description.IsNull() && !val.Description.IsUnknown() {
+			resourceLabelValue.Description = val.Description.ValueString()
 		}
 		resourceLabel.Values = append(resourceLabel.Values, *resourceLabelValue)
 	}
@@ -277,36 +496,73 @@ func (helper *ResourceResourceLabelHelper) mapResourceToModel(d *schema.Resource
 	return nil
 }
 
-func (helper *ResourceResourceLabelHelper) getAndMapModelToResource(d *schema.ResourceData, resourceLabel britive.ResourceLabel) {
-	d.Set("name", resourceLabel.Name)
-	d.Set("description", resourceLabel.Description)
-	d.Set("internal", resourceLabel.Internal)
-	d.Set("label_color", resourceLabel.LabelColor)
-	var resourceLabelValues []map[string]interface{}
-	for _, val := range resourceLabel.Values {
-		resourceLabelValue := make(map[string]interface{})
-		resourceLabelValue["value_id"] = val.ValueId
-		resourceLabelValue["name"] = val.Name
-		resourceLabelValue["description"] = val.Description
-		resourceLabelValue["created_by"] = val.CreatedBy
-		resourceLabelValue["updated_by"] = val.UpdatedBy
-		resourceLabelValue["created_on"] = val.CreatedOn
-		resourceLabelValue["updated_on"] = val.UpdatedOn
-
-		resourceLabelValues = append(resourceLabelValues, resourceLabelValue)
-	}
-	d.Set("values", resourceLabelValues)
-}
-
-func (helper *ResourceResourceLabelHelper) generateUniqueID(labelId string) string {
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) generateUniqueID(labelId string) string {
 	return fmt.Sprintf("resource-manager/resource-labels/%s", labelId)
 }
 
-func (helper *ResourceResourceLabelHelper) parseUniqueID(labelId string) (string, error) {
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) parseUniqueID(labelId string) (string, error) {
 	labelIdArr := strings.Split(labelId, "/")
 	if len(labelIdArr) != 3 {
 		return "", errs.NewNotFoundErrorf("Resource Label Id")
 	}
 	labelId = labelIdArr[len(labelIdArr)-1]
 	return labelId, nil
+}
+
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) mapValuesSetToList(ctx context.Context, plan britive_client.ResourceManagerResourceLabelPlan) ([]britive_client.ResourceManagerResourceLabelValuePlan, error) {
+	set := plan.Values
+
+	var valueList []britive_client.ResourceManagerResourceLabelValuePlan
+	diags := set.ElementsAs(ctx, &valueList, true)
+	if diags.HasError() {
+		return nil, fmt.Errorf("Failed to map values")
+	}
+
+	return valueList, nil
+}
+
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) getUserLabelValues(ctx context.Context, plan britive_client.ResourceManagerResourceLabelPlan) (map[string]interface{}, error) {
+	if plan.Values.IsNull() || plan.Values.IsUnknown() {
+		return map[string]interface{}{}, nil
+	}
+
+	userValues, err := rrmrlh.mapValuesSetToList(ctx, plan)
+	if err != nil {
+		return nil, err
+	}
+
+	mapUserValues := make(map[string]interface{})
+	for _, val := range userValues {
+		if val.Description.IsNull() || val.Description.IsUnknown() {
+			mapUserValues[val.Name.ValueString()] = nil
+		} else {
+			mapUserValues[val.Name.ValueString()] = val.Description.ValueString()
+		}
+	}
+
+	return mapUserValues, nil
+}
+
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) mapValuesListToSet(ctx context.Context, list []britive_client.ResourceManagerResourceLabelValuePlan) (types.Set, error) {
+	attrType := rrmrlh.getResourceLabelValueType()
+	set, diags := types.SetValueFrom(
+		ctx,
+		attrType,
+		list,
+	)
+	if diags.HasError() {
+		return types.Set{}, fmt.Errorf("Failed to map values")
+	}
+
+	return set, nil
+}
+
+func (rrmrlh *ResourceResourceManagerResourceLabelHelper) getResourceLabelValueType() attr.Type {
+	return types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"value_id":    types.StringType,
+			"name":        types.StringType,
+			"description": types.StringType,
+		},
+	}
 }

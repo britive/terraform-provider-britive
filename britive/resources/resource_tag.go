@@ -2,300 +2,467 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/imports"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-//ResourceTag - Terraform Resource for Tag
+var (
+	_ resource.Resource                = &ResourceTag{}
+	_ resource.ResourceWithConfigure   = &ResourceTag{}
+	_ resource.ResourceWithImportState = &ResourceTag{}
+)
+
 type ResourceTag struct {
-	Resource     *schema.Resource
+	client       *britive_client.Client
 	helper       *ResourceTagHelper
 	importHelper *imports.ImportHelper
 }
 
-//NewResourceTag - Initializes new tag resource
-func NewResourceTag(importHelper *imports.ImportHelper) *ResourceTag {
-	rt := &ResourceTag{
-		helper:       NewResourceTagHelper(),
-		importHelper: importHelper,
+type ResourceTagHelper struct{}
+
+func NewResourceTag() resource.Resource {
+	return &ResourceTag{}
+}
+
+func NewResourceTagHelper() *ResourceTagHelper {
+	return &ResourceTagHelper{}
+}
+
+func (rt *ResourceTag) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = "britive_tag"
+}
+
+func (rt *ResourceTag) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+
+	tflog.Info(ctx, "Configuring the Britive Tag resource")
+
+	if req.ProviderData == nil {
+		return
 	}
-	rt.Resource = &schema.Resource{
-		CreateContext: rt.resourceCreate,
-		ReadContext:   rt.resourceRead,
-		UpdateContext: rt.resourceUpdate,
-		DeleteContext: rt.resourceDelete,
-		Importer: &schema.ResourceImporter{
-			State: rt.resourceStateImporter,
-		},
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The name of Britive tag",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
+
+	rt.client = req.ProviderData.(*britive_client.Client)
+	if rt.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	tflog.Info(ctx, "Provider client configured for ResourceTag")
+	rt.helper = NewResourceTagHelper()
+}
+
+func (rt *ResourceTag) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Schema for Britive Tag resource",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "Unique identifier for the resource",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"description": {
-				Type:        schema.TypeString,
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: "The name of Britive Tag",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"name",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"description": schema.StringAttribute{
 				Optional:    true,
 				Description: "The description of the Britive tag",
 			},
-			"disabled": {
-				Type:        schema.TypeBool,
-				Optional:    true,
-				Default:     false,
-				Description: "To disable the Britive tag",
-			},
-			"identity_provider_id": {
-				Type:         schema.TypeString,
-				Required:     true,
-				Description:  "The unique identity of the identity provider associated with the Britive tag",
-				ValidateFunc: validation.StringIsNotWhiteSpace,
-			},
-			"external": {
-				Type:        schema.TypeBool,
+			"disabled": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: "To disable britive tag",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"identity_provider_id": schema.StringAttribute{
+				Required:    true,
+				Description: "The unique identity of the identity provider associated with the Britive tag",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"name",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
+			},
+			"external": schema.BoolAttribute{
+				Computed:    true,
 				Description: "The boolean attribute that indicates whether the tag is external or not",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
-	return rt
 }
 
-//region Tag Resource Context Operations
+func (rt *ResourceTag) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	tflog.Info(ctx, "Create called for britive_tag")
 
-func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+	var plan britive_client.TagPlan
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during tag creation", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
 
-	err := rt.helper.validateForExternalTag(d, m)
-	if err != nil {
-		return diag.FromErr(err)
+		return
 	}
 
-	tag := britive.Tag{}
-	tag.Name = d.Get("name").(string)
-	tag.Description = d.Get("description").(string)
-	if d.Get("disabled").(bool) {
+	err := rt.helper.validateForExternalTag(ctx, plan, rt.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to validate tag", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to validate tag, error:%#v", err))
+		return
+	}
+
+	tag := britive_client.Tag{}
+	tag.Name = plan.Name.ValueString()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		tag.Description = plan.Description.ValueString()
+	}
+
+	if plan.Disabled.ValueBool() {
 		tag.Status = "Inactive"
 	} else {
 		tag.Status = "Active"
 	}
 
-	tag.UserTagIdentityProviders = []britive.UserTagIdentityProvider{
+	tag.UserTagIdentityProviders = []britive_client.UserTagIdentityProvider{
 		{
-			IdentityProvider: britive.IdentityProvider{
-				ID: d.Get("identity_provider_id").(string),
+			IdentityProvider: britive_client.IdentityProvider{
+				ID: plan.IdentityProviderID.ValueString(),
 			},
 		},
 	}
-	log.Printf("[INFO] Creating new tag: %#v", tag)
-	ut, err := c.CreateTag(tag)
+
+	tflog.Info(ctx, fmt.Sprintf("Creating new tag: %#v", tag))
+	ut, err := rt.client.CreateTag(ctx, tag)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to create tag", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to create tag, error:%#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Submitted new tag: %#v", ut)
-	d.SetId(ut.ID)
+	tflog.Info(ctx, fmt.Sprintf("Submitted new tag: %#v", ut))
 
-	return rt.resourceRead(ctx, d, m)
+	plan.ID = types.StringValue(ut.ID)
+
+	planPtr, err := rt.helper.getAndMapModelToPlan(ctx, plan, rt.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get tag",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map tag model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Create completed and state set", map[string]interface{}{
+		"profile": planPtr,
+	})
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
-func (rt *ResourceTag) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rt *ResourceTag) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_tag")
 
-	var diags diag.Diagnostics
+	if rt.client == nil {
+		resp.Diagnostics.AddError("Client not found", "")
+		tflog.Error(ctx, "Read failed: client is nil")
+		return
+	}
 
-	err := rt.helper.validateForExternalTag(d, m)
+	var state britive_client.TagPlan
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Read failed to get tag state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	planPtr, err := rt.helper.getAndMapModelToPlan(ctx, state, rt.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError(
+			"Failed to get britive tag",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map britive tag model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	tagID := d.Id()
-
-	log.Printf("[INFO] Reading tag %s", tagID)
-	tag, err := c.GetTag(tagID)
-	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("tag %s", tagID))
-	}
-	if err != nil {
-		return diag.FromErr(err)
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after create", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	log.Printf("[INFO] Received tag: %#v", tag)
-	err = rt.helper.mapModelToResource(tag, d, m)
-
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	return diags
+	tflog.Info(ctx, fmt.Sprintf("Read britive tag:  %#v", planPtr))
 }
 
-func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rt *ResourceTag) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	tflog.Info(ctx, "Update called for britive_tag")
 
-	err := rt.helper.validateForExternalTag(d, m)
-	if err != nil {
-		return diag.FromErr(err)
+	var plan, state britive_client.TagPlan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Update failed to get plan/state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	tagID := d.Id()
+	err := rt.helper.validateForExternalTag(ctx, plan, rt.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to validate Tag", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to validate external tag or not, error:%#v", err))
+		return
+	}
+
+	tagID := plan.ID.ValueString()
 	var hasChanges bool
-	if d.HasChange("name") || d.HasChange("description") {
+	if !plan.Name.Equal(state.Name) || !plan.Description.Equal(state.Description) {
 		hasChanges = true
-		tag := britive.Tag{}
-		tag.Name = d.Get("name").(string)
-		tag.Description = d.Get("description").(string)
+		tag := britive_client.Tag{}
+		tag.Name = plan.Name.ValueString()
+		tag.Description = plan.Description.ValueString()
 
-		log.Printf("[INFO] Updating tag: %#v", tag)
-		ut, err := c.UpdateTag(tagID, tag)
+		tflog.Info(ctx, fmt.Sprintf("Updating tag: %#v", tag))
+		ut, err := rt.client.UpdateTag(ctx, tagID, tag)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update tag", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update tag, error:%#v", err))
+			return
 		}
 
-		log.Printf("[INFO] Submitted updated tag: %#v", ut)
-		d.SetId(ut.ID)
+		tflog.Info(ctx, fmt.Sprintf("Submitted updated tag: %#v", ut))
+		plan.ID = types.StringValue(ut.ID)
 	}
-	if d.HasChange("disabled") {
+	if !plan.Disabled.Equal(state.Disabled) {
 		hasChanges = true
-		disabled := d.Get("disabled").(bool)
+		disabled := plan.Disabled.ValueBool()
 
-		log.Printf("[INFO] Updating status disabled: %t of tag: %s", disabled, tagID)
-		ut, err := c.EnableOrDisableTag(tagID, disabled)
+		tflog.Info(ctx, fmt.Sprintf("Updating status disabled: %t of tag: %s", disabled, tagID))
+		ut, err := rt.client.EnableOrDisableTag(ctx, tagID, disabled)
 		if err != nil {
-			return diag.FromErr(err)
+			resp.Diagnostics.AddError("Failed to update tag", err.Error())
+			tflog.Error(ctx, fmt.Sprintf("Failed to update tag, error:%#v", err))
+			return
 		}
 
-		log.Printf("[INFO] Submitted updated status of tag: %#v", ut)
-		d.SetId(ut.ID)
+		tflog.Info(ctx, fmt.Sprintf("Submitted updated status of tag: %#v", ut))
+		plan.ID = types.StringValue(ut.ID)
 	}
 	if hasChanges {
-		return rt.resourceRead(ctx, d, m)
+		planPtr, err := rt.helper.getAndMapModelToPlan(ctx, plan, rt.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Failed to set state after update",
+				fmt.Sprintf("Error: %v", err),
+			)
+			tflog.Error(ctx, "Failed get and map tag model to plan", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+		if resp.Diagnostics.HasError() {
+			tflog.Error(ctx, "Failed to set state after update", map[string]interface{}{
+				"diagnostics": resp.Diagnostics,
+			})
+			return
+		}
+
+		tflog.Info(ctx, fmt.Sprintf("Updated tag: %#v", planPtr))
 	}
-	return nil
 }
 
-func (rt *ResourceTag) resourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (rt *ResourceTag) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	tflog.Info(ctx, "Delete called for britive_tag")
 
-	var diags diag.Diagnostics
-
-	err := rt.helper.validateForExternalTag(d, m)
-	if err != nil {
-		return diag.FromErr(err)
+	var state britive_client.TagPlan
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Delete failed to get state", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
 	}
 
-	tagID := d.Id()
-
-	log.Printf("[INFO] Deleting tag: %s", tagID)
-	err = c.DeleteTag(tagID)
+	err := rt.helper.validateForExternalTag(ctx, state, rt.client)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to validate Tag", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to validate external tag or not, error:%#v", err))
+		return
 	}
-	log.Printf("[INFO] Tag %s deleted", tagID)
-	d.SetId("")
 
-	return diags
+	tagID := state.ID.ValueString()
+
+	tflog.Info(ctx, fmt.Sprintf("Deleting tag: %s", tagID))
+	err = rt.client.DeleteTag(ctx, tagID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete tag", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to delete tag, error:%#v", err))
+		return
+	}
+	tflog.Info(ctx, fmt.Sprintf("Tag %s deleted", tagID))
+	resp.State.RemoveResource(ctx)
 }
 
-func (rt *ResourceTag) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
-	c := m.(*britive.Client)
+func (rt *ResourceTag) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	importId := req.ID
 
-	if err := rt.importHelper.ParseImportID([]string{"tags/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, d); err != nil {
-		return nil, err
+	importData := &imports.ImportHelperData{
+		ID: importId,
 	}
 
-	tagName := d.Get("name").(string)
+	if err := rt.importHelper.ParseImportID([]string{"tags/(?P<name>[^/]+)", "(?P<name>[^/]+)"}, importData); err != nil {
+		resp.Diagnostics.AddError("Failed to import tag", "Invalid importID")
+		tflog.Error(ctx, fmt.Sprintf("Failed to parse importID: %#v", err))
+		return
+	}
+
+	tagName := importData.Fields["name"]
 
 	if strings.TrimSpace(tagName) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("name")
+		resp.Diagnostics.AddError("Failed to import tag", "Invalid name")
+		tflog.Error(ctx, "Failed to import tag, Invalid name")
+		return
 	}
 
-	log.Printf("[INFO] Importing tag: %s", tagName)
+	tflog.Info(ctx, fmt.Sprintf("Importing tag: %s", tagName))
 
-	tag, err := c.GetTagByName(tagName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("tag %s", tagName)
-	}
+	tag, err := rt.client.GetTagByName(ctx, tagName)
 	if err != nil {
-		return nil, err
+		resp.Diagnostics.AddError("Failed to import tag", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to import tag, error:%#v", err))
+		return
 	}
 
-	log.Printf("[INFO] Imported tag: %#v", tag)
+	tflog.Info(ctx, fmt.Sprintf("Imported tag: %#v", tag))
 
 	if tag.External.(bool) {
-		return nil, fmt.Errorf("importing external tags is not supported. attempted to import tag '%s'", tagName)
+		resp.Diagnostics.AddError("Failed to import tag", fmt.Sprintf("importing external tags is not supported. attempted to import tag '%s'", tagName))
+		tflog.Error(ctx, fmt.Sprintf("importing external tags is not supported. attempted to import tag '%s'", tagName))
+		return
 	}
 
-	d.SetId(tag.ID)
+	plan := britive_client.TagPlan{
+		ID: types.StringValue(tag.ID),
+	}
 
-	err = rt.helper.mapModelToResource(tag, d, m)
+	planPtr, err := rt.helper.getAndMapModelToPlan(ctx, plan, rt.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to set state after import",
+			fmt.Sprintf("Error: %v", err),
+		)
+		tflog.Error(ctx, "Failed get and map tag model to plan", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, planPtr)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after import", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+
+	tflog.Info(ctx, fmt.Sprintf("Imported tag: %#v", planPtr))
+}
+
+func (rth *ResourceTagHelper) getAndMapModelToPlan(ctx context.Context, plan britive_client.TagPlan, c *britive_client.Client) (*britive_client.TagPlan, error) {
+	err := rth.validateForExternalTag(ctx, plan, c)
 	if err != nil {
 		return nil, err
 	}
 
-	return []*schema.ResourceData{d}, nil
-}
+	tagID := plan.ID.ValueString()
 
-//endregion
-
-//ResourceTagHelper - Resource Tag helper functions
-type ResourceTagHelper struct {
-}
-
-//NewResourceTagHelper - Initializes new tag resource helper
-func NewResourceTagHelper() *ResourceTagHelper {
-	return &ResourceTagHelper{}
-}
-
-//region Tag Resource helper functions
-
-func (rth *ResourceTagHelper) mapModelToResource(tag *britive.Tag, d *schema.ResourceData, m interface{}) error {
-	if err := d.Set("name", tag.Name); err != nil {
-		return err
+	tflog.Info(ctx, fmt.Sprintf("Reading tag %s", tagID))
+	tag, err := c.GetTag(ctx, tagID)
+	if err != nil {
+		return nil, err
 	}
-	if err := d.Set("description", tag.Description); err != nil {
-		return err
+
+	tflog.Info(ctx, fmt.Sprintf("Received tag: %#v", tag))
+	plan.Name = types.StringValue(tag.Name)
+	if (plan.Description.IsNull() || plan.Description.IsUnknown()) && (strings.EqualFold(tag.Description, "No Description") || tag.Description == britive_client.EmptyString) {
+		plan.Description = types.StringNull()
+	} else {
+		plan.Description = types.StringValue(tag.Description)
 	}
+
 	if len(tag.UserTagIdentityProviders) > 0 {
-		if err := d.Set("identity_provider_id", tag.UserTagIdentityProviders[0].IdentityProvider.ID); err != nil {
-			return err
-		}
+		plan.IdentityProviderID = types.StringValue(tag.UserTagIdentityProviders[0].IdentityProvider.ID)
 	}
-	if err := d.Set("disabled", strings.EqualFold(tag.Status, "Inactive")); err != nil {
-		return err
-	}
-	if err := d.Set("external", tag.External); err != nil {
-		return err
-	}
-	return nil
+	plan.Disabled = types.BoolValue(strings.EqualFold(tag.Status, "Inactive"))
+	plan.External = types.BoolValue(tag.External.(bool))
+	return &plan, nil
 }
 
-func (rth *ResourceTagHelper) validateForExternalTag(d *schema.ResourceData, m interface{}) error {
-	identityProviderID := d.Get("identity_provider_id").(string)
+func (rth *ResourceTagHelper) validateForExternalTag(ctx context.Context, plan britive_client.TagPlan, c *britive_client.Client) error {
+	identityProviderID := plan.IdentityProviderID.ValueString()
 	if identityProviderID == "" {
 		return nil
 	}
 
-	c := m.(*britive.Client)
-
-	identityProvider, err := c.GetIdentityProvider(identityProviderID)
+	identityProvider, err := c.GetIdentityProvider(ctx, identityProviderID)
 	if err != nil {
 		return err
 	}
 	if !strings.EqualFold(identityProvider.Type, "DEFAULT") {
-		return fmt.Errorf("managing external tags is not supported. attempted to manage tag '%s'", d.Get("name").(string))
+		return fmt.Errorf("managing external tags is not supported. attempted to manage tag '%s'", plan.Name.ValueString())
 	}
 	return nil
 }
-
-//endregion

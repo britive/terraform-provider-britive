@@ -6,73 +6,135 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/britive/terraform-provider-britive/britive-client-go"
-	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/britive/terraform-provider-britive/britive/helpers/validate"
+	"github.com/britive/terraform-provider-britive/britive_client"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+var (
+	_ datasource.DataSource              = &DataSourceConnection{}
+	_ datasource.DataSourceWithConfigure = &DataSourceConnection{}
 )
 
 type DataSourceConnection struct {
-	Resource *schema.Resource
+	client *britive_client.Client
 }
 
-func NewDataSourceConnection() *DataSourceConnection {
-	dataSourceConnection := &DataSourceConnection{}
-	dataSourceConnection.Resource = &schema.Resource{
-		ReadContext: dataSourceConnection.resourceRead,
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:        schema.TypeString,
+func NewDataSourceConnection() datasource.DataSource {
+	return &DataSourceConnection{}
+}
+
+func (dc *DataSourceConnection) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = "britive_connection"
+}
+
+func (dc *DataSourceConnection) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*britive_client.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Provider client error",
+			"REST API client is not configured",
+		)
+		tflog.Error(ctx, "Provider client is nil after Configure", map[string]interface{}{
+			"method": "Configure",
+		})
+		return
+	}
+
+	dc.client = client
+	tflog.Info(ctx, "Configured DataSourceConnections with Britive client")
+}
+
+func (dc *DataSourceConnection) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description: "Datasource for retrieving Britive connections.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:    true,
+				Description: "The unique identifier of connection",
+			},
+			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "Name of connection",
 			},
-			"setting_type": {
-				Type:        schema.TypeString,
+			"setting_type": schema.StringAttribute{
 				Optional:    true,
-				Default:     "ITSM",
 				Description: "Advanced Setting Type",
+				Validators: []validator.String{
+					validate.StringFunc(
+						"settingType",
+						validate.StringIsNotWhiteSpace(),
+					),
+				},
 			},
-			"type": {
-				Type:        schema.TypeString,
+			"type": schema.StringAttribute{
 				Computed:    true,
 				Description: "Type of connection",
 			},
-			"auth_type": {
-				Type:        schema.TypeString,
+			"auth_type": schema.StringAttribute{
 				Computed:    true,
-				Description: "Auth type of connection",
+				Description: "auth type of connection",
 			},
 		},
 	}
-	return dataSourceConnection
 }
 
-func (dataSourceConnections *DataSourceConnection) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*britive.Client)
+func (dc *DataSourceConnection) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	tflog.Info(ctx, "Read called for britive_connection datasource")
 
-	settingType := d.Get("setting_type").(string)
+	var plan britive_client.DataSourceSingleConnectionPlan
+	diags := req.Config.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to read plan during fetching connection", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
 
-	allConnections, err := c.GetAllConnections(settingType)
-	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("connections not found"))
-	} else if errors.Is(err, britive.ErrNotSupported) {
-		return diag.FromErr(errs.NewNotSupportedError(fmt.Sprintf("%s setting type is ", settingType)))
+	var settingType string
+	if plan.SettingType.IsNull() || plan.SettingType.IsUnknown() {
+		settingType = "ITSM"
+	} else {
+		settingType = plan.SettingType.ValueString()
+	}
+
+	allConnections, err := dc.client.GetAllConnections(ctx, settingType)
+	if errors.Is(err, britive_client.ErrNotFound) {
+		resp.Diagnostics.AddError("Failed to fetch connection", "connection not found")
+		tflog.Error(ctx, "connections not found")
+		return
+	} else if errors.Is(err, britive_client.ErrNotSupported) {
+		resp.Diagnostics.AddError("Failed to fetch connection", fmt.Sprintf("setting type is '%s'", settingType))
+		tflog.Error(ctx, fmt.Sprintf("%s setting type is ", settingType))
+		return
 	}
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Failed to fetch connection", err.Error())
+		tflog.Error(ctx, fmt.Sprintf("Failed to fetch all connections, error: %#v", err))
+		return
 	}
 
-	connectionName := d.Get("name").(string)
+	connectionName := plan.Name.ValueString()
 
 	isConnectionFound := false
 	allConnectionNames := make([]string, 0)
 	for _, conn := range allConnections {
 		if strings.EqualFold(conn.Name, connectionName) {
-			d.SetId(conn.ID)
-			d.Set("name", connectionName)
-			d.Set("type", conn.Type)
-			d.Set("auth_type", conn.AuthType)
-			d.Set("setting_type", settingType)
+			plan.ID = types.StringValue(conn.ID)
+			plan.Name = types.StringValue(conn.Name)
+			plan.Type = types.StringValue(conn.Type)
+			plan.AuthType = types.StringValue(conn.AuthType)
+			plan.SettingType = types.StringValue(settingType)
 			isConnectionFound = true
 		}
 		allConnectionNames = append(allConnectionNames, conn.Name+",")
@@ -87,8 +149,19 @@ func (dataSourceConnections *DataSourceConnection) resourceRead(ctx context.Cont
 		} else {
 			errMsg = fmt.Errorf("Invalid connection name.")
 		}
-		return diag.FromErr(errMsg)
+		resp.Diagnostics.AddError("Failed to fetch connection", errMsg.Error())
+		tflog.Error(ctx, errMsg.Error())
+		return
 	}
 
-	return nil
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to set state after read", map[string]interface{}{
+			"diagnostics": resp.Diagnostics,
+		})
+		return
+	}
+	tflog.Info(ctx, "Update completed and state set", map[string]interface{}{
+		"connection": plan,
+	})
 }
