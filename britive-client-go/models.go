@@ -477,6 +477,7 @@ type ResourceManagerProfile struct {
 	Associations          map[string][]string `json:"associations,omitempty"`
 	ResourceLabelColorMap map[string]string   `json:"resourceLabelColorMap,omitempty"`
 	DelegationEnabled     bool                `json:"delegationEnabled,omitempty"`
+	PolicyOrderingEnabled bool                `json:"policyOrderingEnabled,omitempty"`
 }
 
 // ResourceManagerProfilePolicy - godoc
@@ -493,6 +494,7 @@ type ResourceManagerProfilePolicy struct {
 	IsDraft        bool                `json:"isDraft"`
 	IsReadOnly     bool                `json:"isReadOnly"`
 	ResourceLabels map[string][]string `json:"resourceLabels"`
+	Order          int                 `json:"order,omitempty"`
 }
 
 // Resource Manager Profile Permission - godoc
