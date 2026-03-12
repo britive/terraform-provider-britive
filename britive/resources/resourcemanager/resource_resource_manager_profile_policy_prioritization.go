@@ -2,6 +2,7 @@ package resourcemanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -364,6 +365,10 @@ func (rpo *ResourceResourceManagerProfilePolicyPriority) resourceStateImporter(d
 	profile, err := c.GetResourceManagerProfile(profileId)
 	if err != nil {
 		return nil, err
+	}
+
+	if !profile.PolicyOrderingEnabled {
+		return nil, errors.New("Policy ordering is disabled. Cannot import resource.")
 	}
 
 	err = rpo.helper.getAndMapModelToResource(d, policies, profileId, profile.PolicyOrderingEnabled, true)
