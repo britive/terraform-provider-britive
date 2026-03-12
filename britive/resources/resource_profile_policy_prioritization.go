@@ -338,7 +338,7 @@ func (helper *ResourcePolicyPriorityHelper) mapResourceToModel(c *britive.Client
 	log.Printf("%v", resourcePolicyPriority.PolicyOrder)
 
 	resourcePolicyPriority.ProfileID = profileId
-	resourcePolicyPriority.Extendable = false
+	// resourcePolicyPriority.Extendable = false
 	resourcePolicyPriority.PolicyOrderingEnabled = policyOrderingEnabled
 
 	return resourcePolicyPriority, nil

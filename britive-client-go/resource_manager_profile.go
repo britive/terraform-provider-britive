@@ -71,6 +71,28 @@ func (c *Client) CreateUpdateResourceManagerProfileAssociations(resourceManagerP
 	return &resourceManagerProfile, nil
 }
 
+func (c *Client) EnableDisableResourceManagerPolicyPrioritization(profileId string, policyOrderingEnabled bool) error {
+	payload := map[string]bool{
+		"policyOrderingEnabled": policyOrderingEnabled,
+	}
+	policyOrderingEnabledPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/resource-manager/profiles/%s", c.APIBaseURL, profileId), strings.NewReader(string(policyOrderingEnabledPayload)))
+	if err != nil {
+		return err
+	}
+
+	_, err = c.DoWithLock(req, profileLockName)
+	if !(errors.Is(err, ErrNoContent)) && err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Client) GetResourceManagerProfile(profileId string) (*ResourceManagerProfile, error) {
 	apiMethod := "GET"
 	url := fmt.Sprintf("%s/resource-manager/profiles/%s", c.APIBaseURL, profileId)
