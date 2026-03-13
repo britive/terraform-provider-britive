@@ -18,13 +18,10 @@ func TestBritiveResourceManagerProfilePolicyPrioritization(t *testing.T) {
 	resourceProfileDescription := "AT-Britive_Resource_Manager_Test_Resource_Profile_1_Description"
 	profilePolicyName := "AT - New Britive Resource Manager Profile Policy for Prioritization Test"
 	profilePolicyDescription := "AT - New Britive Resource Manager Profile Policy for Prioritization Test Description"
-	profilePolicyNamePriority := 0
 	profilePolicyName1 := "AT - New Britive Resource Manager Profile Policy for Prioritization Test 1"
 	profilePolicyDescription1 := "AT - New Britive Resource Manager Profile Policy for Prioritization Test 1 Description"
-	profilePolicyName1Priority := 1
 	profilePolicyName2 := "AT - New Britive Resource Manager Profile Policy for Prioritization Test 2"
 	profilePolicyDescription2 := "AT - New Britive Resource Manager Profile Policy for Prioritization Test 2 Description"
-	profilePolicyName2Priority := 2
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
@@ -56,7 +53,7 @@ func TestBritiveResourceManagerProfilePolicyPrioritization(t *testing.T) {
 	})
 }
 
-func testAccCheckBritiveResourceManagerProfilePolicyPrioritizationConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2 string, profilePolicyNamePriority, profilePolicyName1Priority, profilePolicyName2Priority int) string {
+func testAccCheckBritiveResourceManagerProfilePolicyPrioritizationConfig(resourceLabelName1, resourceLabelDescription, resourceLabelName2, resourceLabelDescription2, resourceProfileName, resourceProfileDescription, profilePolicyName, profilePolicyDescription, profilePolicyName1, profilePolicyDescription1, profilePolicyName2, profilePolicyDescription2 string) string {
 	return fmt.Sprintf(`
 resource "britive_resource_manager_resource_label" "resource_label_1" {
 		name         = "%s"
