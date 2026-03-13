@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
@@ -56,7 +57,7 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 				Description: "Description of britive resource manager profile",
 			},
 			"expiration_duration": {
-				Type:        schema.TypeInt,
+				Type:        schema.TypeString,
 				Required:    true,
 				Description: "Expiration duration of resource manager profile",
 			},
@@ -118,12 +119,12 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 				Description: "The Boolean flag that indicates whether profile expiry is extendable or not",
 			},
 			"notification_prior_to_expiration": {
-				Type:        schema.TypeInt,
+				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The profile expiry notification as a time value",
 			},
 			"extension_duration": {
-				Type:        schema.TypeInt,
+				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The profile expiry extension as a time value",
 			},
@@ -327,7 +328,11 @@ func (helper *ResourceResourceManagerProfileHelper) mapResourceToModel(d *schema
 	if delegationEnabled, ok := d.GetOk("allow_impersonation"); ok {
 		resourceManagerProfile.DelegationEnabled = delegationEnabled.(bool)
 	}
-	resourceManagerProfile.ExpirationDuration = d.Get("expiration_duration").(int)
+	expirationDuration, err := time.ParseDuration(d.Get("expiration_duration").(string))
+	if err != nil {
+		return err
+	}
+	resourceManagerProfile.ExpirationDuration = int64(expirationDuration / time.Millisecond)
 
 	rawAssociations := d.Get("associations").(*schema.Set)
 	associationMap := make(map[string][]string)
@@ -346,8 +351,27 @@ func (helper *ResourceResourceManagerProfileHelper) mapResourceToModel(d *schema
 	extendable := d.Get("extendable").(bool)
 	resourceManagerProfile.Extendable = extendable
 	if extendable {
-		resourceManagerProfile.NotificationPriorToExpiration = d.Get("notification_prior_to_expiration").(int)
-		resourceManagerProfile.ExtensionDuration = d.Get("extension_duration").(int)
+		notificationPriorToExpirationString := d.Get("notification_prior_to_expiration").(string)
+		if notificationPriorToExpirationString == "" {
+			return errs.NewNotEmptyOrWhiteSpaceError("notification_prior_to_expiration")
+		}
+		notificationPriorToExpiration, err := time.ParseDuration(notificationPriorToExpirationString)
+		if err != nil {
+			return err
+		}
+		nullableNotificationPriorToExpiration := int64(notificationPriorToExpiration / time.Millisecond)
+		resourceManagerProfile.NotificationPriorToExpiration = &nullableNotificationPriorToExpiration
+
+		extensionDurationString := d.Get("extension_duration").(string)
+		if extensionDurationString == "" {
+			return errs.NewNotEmptyOrWhiteSpaceError("extension_duration")
+		}
+		extensionDuration, err := time.ParseDuration(extensionDurationString)
+		if err != nil {
+			return err
+		}
+		nullableExtensionDuration := int64(extensionDuration / time.Millisecond)
+		resourceManagerProfile.ExtensionDuration = &nullableExtensionDuration
 		resourceManagerProfile.ExtensionLimit = d.Get("extension_limit").(int)
 	}
 
@@ -361,18 +385,24 @@ func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *
 	if err := d.Set("description", resourceManagerProfile.Description); err != nil {
 		return britive.ErrNotSupported
 	}
-	if err := d.Set("expiration_duration", resourceManagerProfile.ExpirationDuration); err != nil {
+	if err := d.Set("expiration_duration", time.Duration(resourceManagerProfile.ExpirationDuration*int64(time.Millisecond)).String()); err != nil {
 		return err
 	}
 	if err := d.Set("extendable", resourceManagerProfile.Extendable); err != nil {
 		return err
 	}
 	if resourceManagerProfile.Extendable {
-		if err := d.Set("notification_prior_to_expiration", resourceManagerProfile.NotificationPriorToExpiration); err != nil {
-			return err
+		if resourceManagerProfile.NotificationPriorToExpiration != nil {
+			notificationPriorToExpiration := *resourceManagerProfile.NotificationPriorToExpiration
+			if err := d.Set("notification_prior_to_expiration", time.Duration(notificationPriorToExpiration*int64(time.Millisecond)).String()); err != nil {
+				return err
+			}
 		}
-		if err := d.Set("extension_duration", resourceManagerProfile.ExtensionDuration); err != nil {
-			return err
+		if resourceManagerProfile.ExtensionDuration != nil {
+			extensionDuration := *resourceManagerProfile.ExtensionDuration
+			if err := d.Set("extension_duration", time.Duration(extensionDuration*int64(time.Millisecond)).String()); err != nil {
+				return err
+			}
 		}
 		if err := d.Set("extension_limit", resourceManagerProfile.ExtensionLimit); err != nil {
 			return err
