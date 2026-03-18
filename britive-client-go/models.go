@@ -471,7 +471,7 @@ type ResourceManagerProfile struct {
 	ProfileId                     string              `json:"profileId,omitempty"`
 	Name                          string              `json:"name,omitempty"`
 	Description                   string              `json:"description,omitempty"`
-	ExpirationDuration            int64               `json:"expirationDuration,omitempty"`
+	ExpirationDuration            int                 `json:"expirationDuration,omitempty"`
 	Status                        string              `json:"status,omitempty"`
 	Associations                  map[string][]string `json:"associations,omitempty"`
 	ResourceLabelColorMap         map[string]string   `json:"resourceLabelColorMap,omitempty"`

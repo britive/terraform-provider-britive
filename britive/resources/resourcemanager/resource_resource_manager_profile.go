@@ -57,7 +57,7 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 				Description: "Description of britive resource manager profile",
 			},
 			"expiration_duration": {
-				Type:        schema.TypeString,
+				Type:        schema.TypeInt,
 				Required:    true,
 				Description: "Expiration duration of resource manager profile",
 			},
@@ -328,11 +328,7 @@ func (helper *ResourceResourceManagerProfileHelper) mapResourceToModel(d *schema
 	if delegationEnabled, ok := d.GetOk("allow_impersonation"); ok {
 		resourceManagerProfile.DelegationEnabled = delegationEnabled.(bool)
 	}
-	expirationDuration, err := time.ParseDuration(d.Get("expiration_duration").(string))
-	if err != nil {
-		return err
-	}
-	resourceManagerProfile.ExpirationDuration = int64(expirationDuration / time.Millisecond)
+	resourceManagerProfile.ExpirationDuration = d.Get("expiration_duration").(int)
 
 	rawAssociations := d.Get("associations").(*schema.Set)
 	associationMap := make(map[string][]string)
@@ -385,7 +381,7 @@ func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *
 	if err := d.Set("description", resourceManagerProfile.Description); err != nil {
 		return britive.ErrNotSupported
 	}
-	if err := d.Set("expiration_duration", time.Duration(resourceManagerProfile.ExpirationDuration*int64(time.Millisecond)).String()); err != nil {
+	if err := d.Set("expiration_duration", resourceManagerProfile.ExpirationDuration); err != nil {
 		return err
 	}
 	if err := d.Set("extendable", resourceManagerProfile.Extendable); err != nil {

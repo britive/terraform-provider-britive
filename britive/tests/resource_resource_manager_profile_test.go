@@ -67,7 +67,7 @@ func testAccCheckBritiveResourceManagerProfileConfig(resourceLabelName1, resourc
 	resource "britive_resource_manager_profile" "resource_profile_1" {
 		name                 = "%s"
 		description          = "%s"
-		expiration_duration  = "3h0m0s"
+		expiration_duration  = 10800000
 		extendable = true
 		notification_prior_to_expiration = "1h0m0s"
 		extension_duration               = "2h0m0s"

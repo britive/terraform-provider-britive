@@ -111,7 +111,7 @@ func testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName,
 	resource "britive_resource_manager_profile" "profile_1" {
 		name = "%s"
 		description = "%s"
-		expiration_duration = "3h0m0s"
+		expiration_duration = 10800000
 
 		associations {
 			label_key = "Resource-Type"

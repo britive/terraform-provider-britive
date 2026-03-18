@@ -71,7 +71,7 @@ func testAccCheckBritiveResourceManagerProfilePolicyConfig(resourceLabelName1, r
 	resource "britive_resource_manager_profile" "resource_profile_1" {
 		name                 = "%s"
 		description          = "%s"
-		expiration_duration  = "3h0m0s"
+		expiration_duration  = 10800000
 		allow_impersonation  = true
 
 		associations {
