@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
@@ -111,6 +112,27 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 					},
 				},
 			},
+			"extendable": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "The Boolean flag that indicates whether profile expiry is extendable or not",
+			},
+			"notification_prior_to_expiration": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The profile expiry notification as a time value",
+			},
+			"extension_duration": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The profile expiry extension as a time value",
+			},
+			"extension_limit": {
+				Type:        schema.TypeInt,
+				Optional:    true,
+				Description: "The repetition limit for extending the profile expiry",
+			},
 		},
 	}
 	return rrmp
@@ -213,7 +235,7 @@ func (rrmp *ResourceResourceManagerProfile) resourceRead(ctx context.Context, d 
 func (rrmp *ResourceResourceManagerProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") || d.HasChange("allow_impersonation") {
+	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") || d.HasChange("allow_impersonation") || d.HasChange("extendable") || d.HasChange("notification_prior_to_expiration") || d.HasChange("extension_duration") || d.HasChange("extension_limit") {
 		resourceManagerProfile := &britive.ResourceManagerProfile{}
 		err := rrmp.helper.mapResourceToModel(d, resourceManagerProfile)
 		if err != nil {
@@ -322,14 +344,69 @@ func (helper *ResourceResourceManagerProfileHelper) mapResourceToModel(d *schema
 	}
 	resourceManagerProfile.Associations = associationMap
 
+	extendable := d.Get("extendable").(bool)
+	resourceManagerProfile.Extendable = extendable
+	if extendable {
+		notificationPriorToExpirationString := d.Get("notification_prior_to_expiration").(string)
+		if notificationPriorToExpirationString == "" {
+			return errs.NewNotEmptyOrWhiteSpaceError("notification_prior_to_expiration")
+		}
+		notificationPriorToExpiration, err := time.ParseDuration(notificationPriorToExpirationString)
+		if err != nil {
+			return err
+		}
+		nullableNotificationPriorToExpiration := int64(notificationPriorToExpiration / time.Millisecond)
+		resourceManagerProfile.NotificationPriorToExpiration = &nullableNotificationPriorToExpiration
+
+		extensionDurationString := d.Get("extension_duration").(string)
+		if extensionDurationString == "" {
+			return errs.NewNotEmptyOrWhiteSpaceError("extension_duration")
+		}
+		extensionDuration, err := time.ParseDuration(extensionDurationString)
+		if err != nil {
+			return err
+		}
+		nullableExtensionDuration := int64(extensionDuration / time.Millisecond)
+		resourceManagerProfile.ExtensionDuration = &nullableExtensionDuration
+		resourceManagerProfile.ExtensionLimit = d.Get("extension_limit").(int)
+	}
+
 	return nil
 }
 
 func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *schema.ResourceData, resourceManagerProfile britive.ResourceManagerProfile) error {
-	d.Set("name", resourceManagerProfile.Name)
-	d.Set("description", resourceManagerProfile.Description)
-	d.Set("expiration_duration", resourceManagerProfile.ExpirationDuration)
-	d.Set("status", resourceManagerProfile.Status)
+	if err := d.Set("name", resourceManagerProfile.Name); err != nil {
+		return err
+	}
+	if err := d.Set("description", resourceManagerProfile.Description); err != nil {
+		return britive.ErrNotSupported
+	}
+	if err := d.Set("expiration_duration", resourceManagerProfile.ExpirationDuration); err != nil {
+		return err
+	}
+	if err := d.Set("extendable", resourceManagerProfile.Extendable); err != nil {
+		return err
+	}
+	if resourceManagerProfile.Extendable {
+		if resourceManagerProfile.NotificationPriorToExpiration != nil {
+			notificationPriorToExpiration := *resourceManagerProfile.NotificationPriorToExpiration
+			if err := d.Set("notification_prior_to_expiration", time.Duration(notificationPriorToExpiration*int64(time.Millisecond)).String()); err != nil {
+				return err
+			}
+		}
+		if resourceManagerProfile.ExtensionDuration != nil {
+			extensionDuration := *resourceManagerProfile.ExtensionDuration
+			if err := d.Set("extension_duration", time.Duration(extensionDuration*int64(time.Millisecond)).String()); err != nil {
+				return err
+			}
+		}
+		if err := d.Set("extension_limit", resourceManagerProfile.ExtensionLimit); err != nil {
+			return err
+		}
+	}
+	if err := d.Set("status", resourceManagerProfile.Status); err != nil {
+		return err
+	}
 	if err := d.Set("allow_impersonation", resourceManagerProfile.DelegationEnabled); err != nil {
 		return err
 	}
@@ -342,7 +419,9 @@ func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *
 		}
 		associationMapList = append(associationMapList, associationMap)
 	}
-	d.Set("associations", associationMapList)
+	if err := d.Set("associations", associationMapList); err != nil {
+		return err
+	}
 
 	var colorCodeMapList []map[string]interface{}
 	for name, color := range resourceManagerProfile.ResourceLabelColorMap {
@@ -352,7 +431,9 @@ func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *
 		}
 		colorCodeMapList = append(colorCodeMapList, colorCodeMap)
 	}
-	d.Set("resource_label_color_map", colorCodeMapList)
+	if err := d.Set("resource_label_color_map", colorCodeMapList); err != nil {
+		return err
+	}
 
 	return nil
 }

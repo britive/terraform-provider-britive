@@ -16,8 +16,12 @@ The `britive_resource_manager_profile` resource allows you to create, update, an
 resource "britive_resource_manager_profile" "example" {
     name                 = "example_profile"
     description          = "Profile for managing production resources"
-    expiration_duration  = 3600000
+    expiration_duration  = 3600000 # milliseconds
     allow_impersonation   = true
+    extendable                       = true
+    notification_prior_to_expiration = "0h10m0s"
+    extension_duration               = "1h12m30s"
+    extension_limit                  = 2
 
     associations {
         label_key   = "environment"
@@ -36,7 +40,12 @@ The following arguments are supported:
 
 * `name` - (Required) The name of the britive resource manager profile.
 * `description` - (Optional) Description of britive resource manager profile.
-* `expiration_duration` - (Required) Expiration duration of resource manager profile (in minutes).
+* `expiration_duration` - (Required) Expiration duration of resource manager profile (in milliseconds).
+* `extendable` - (Optional) The Boolean flag that indicates whether profile expiry is extendable or not. Default: `false`.
+* `notification_prior_to_expiration` - (Optional) The Britive profile expiry notification as a time value. For example, `0h10m0s`
+* `extension_duration` - (Optional) The Britive profile expiry extension duration as a time value. For example: `1h12m30s`
+* `extension_limit` - (Optional) The Britive profile expiry extension limit. For example: `2`
+
 * `allow_impersonation` - (Optional) Allow AI Identities to impersonate Users and Service Identities.
 * `associations` - (Optional) List of resource label associations. Each association block supports:
   * `label_key` - (Required) Resource label name for association.

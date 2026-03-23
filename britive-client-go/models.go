@@ -220,7 +220,6 @@ type ProfileSummary struct {
 type ProfilePolicyPriority struct {
 	ProfileID             string `json:"papId"`
 	PolicyOrderingEnabled bool   `json:"policyOrderingEnabled"`
-	Extendable            bool   `json:"extendable"`
 	PolicyOrder           []PolicyOrder
 }
 
@@ -469,14 +468,19 @@ type ResourceLabelValue struct {
 
 // ResourceManagerProfile - godoc
 type ResourceManagerProfile struct {
-	ProfileId             string              `json:"profileId,omitempty"`
-	Name                  string              `json:"name,omitempty"`
-	Description           string              `json:"description,omitempty"`
-	ExpirationDuration    int                 `json:"expirationDuration,omitempty"`
-	Status                string              `json:"status,omitempty"`
-	Associations          map[string][]string `json:"associations,omitempty"`
-	ResourceLabelColorMap map[string]string   `json:"resourceLabelColorMap,omitempty"`
-	DelegationEnabled     bool                `json:"delegationEnabled,omitempty"`
+	ProfileId                     string              `json:"profileId,omitempty"`
+	Name                          string              `json:"name,omitempty"`
+	Description                   string              `json:"description,omitempty"`
+	ExpirationDuration            int                 `json:"expirationDuration,omitempty"`
+	Status                        string              `json:"status,omitempty"`
+	Associations                  map[string][]string `json:"associations,omitempty"`
+	ResourceLabelColorMap         map[string]string   `json:"resourceLabelColorMap,omitempty"`
+	DelegationEnabled             bool                `json:"delegationEnabled,omitempty"`
+	PolicyOrderingEnabled         bool                `json:"policyOrderingEnabled,omitempty"`
+	Extendable                    bool                `json:"extendable"`
+	NotificationPriorToExpiration *int64              `json:"notificationPriorToExpiration,omitempty"`
+	ExtensionDuration             *int64              `json:"extensionDuration,omitempty"`
+	ExtensionLimit                interface{}         `json:"extensionLimit,omitempty"`
 }
 
 // ResourceManagerProfilePolicy - godoc
@@ -493,6 +497,7 @@ type ResourceManagerProfilePolicy struct {
 	IsDraft        bool                `json:"isDraft"`
 	IsReadOnly     bool                `json:"isReadOnly"`
 	ResourceLabels map[string][]string `json:"resourceLabels"`
+	Order          int                 `json:"order,omitempty"`
 }
 
 // Resource Manager Profile Permission - godoc

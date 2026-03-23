@@ -71,6 +71,28 @@ func (c *Client) CreateUpdateResourceManagerProfileAssociations(resourceManagerP
 	return &resourceManagerProfile, nil
 }
 
+func (c *Client) EnableDisableResourceManagerPolicyPrioritization(profileId string, policyOrderingEnabled bool) error {
+	payload := map[string]bool{
+		"policyOrderingEnabled": policyOrderingEnabled,
+	}
+	policyOrderingEnabledPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/resource-manager/profiles/%s", c.APIBaseURL, profileId), strings.NewReader(string(policyOrderingEnabledPayload)))
+	if err != nil {
+		return err
+	}
+
+	_, err = c.DoWithLock(req, profileLockName)
+	if !(errors.Is(err, ErrNoContent)) && err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Client) GetResourceManagerProfile(profileId string) (*ResourceManagerProfile, error) {
 	apiMethod := "GET"
 	url := fmt.Sprintf("%s/resource-manager/profiles/%s", c.APIBaseURL, profileId)
@@ -129,4 +151,50 @@ func (c *Client) DeleteResourceManagerProfile(profileId string) error {
 	}
 
 	return nil
+}
+
+// PrioritizePolicies - Order Policy
+func (c *Client) ResourceManagerPrioritizeProfilePolicies(resourcePolicyPriority ProfilePolicyPriority) (*ProfilePolicyPriority, error) {
+	policyOrder, err := json.Marshal(resourcePolicyPriority.PolicyOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/resource-manager/profiles/%s/policies/order", c.APIBaseURL, resourcePolicyPriority.ProfileID), strings.NewReader(string(policyOrder)))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, profileLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	var profilePolicyPriority ProfilePolicyPriority
+	err = json.Unmarshal(body, &profilePolicyPriority.PolicyOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	return &profilePolicyPriority, nil
+}
+
+func (c *Client) GetResourceManagerProfilePolicies(profileId string) ([]ResourceManagerProfilePolicy, error) {
+	url := fmt.Sprintf("%s/resource-manager/profiles/%s/policies", c.APIBaseURL, profileId)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(req, profileLockName)
+	if err != nil {
+		return nil, err
+	}
+	var policies []ResourceManagerProfilePolicy
+	err = json.Unmarshal(body, &policies)
+	if err != nil {
+		return nil, err
+	}
+
+	return policies, nil
 }

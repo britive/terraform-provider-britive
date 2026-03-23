@@ -1,8 +1,7 @@
-## 2.2.8
+## 2.2.9
+
+FEATURES:
+* **New Resource:**  `britive_resource_manager_profile_policy_prioritization` : Create, update, and manage resource manager profile policy prioritization
 
 ENHANCEMENTS:
-* `britive_resource_manager_resource_type` : Extended support for creating and managing dynamic resource types.
-
-BUG FIXES:
-* `britive_resource_manager_resource_type` : Fixed issues with resource type imports.
-* `britive_profile_policy`: Fixed read timeouts due to integrity checks.
+* `britive_resource_manager_profile` : Support for configuring session extensions, including the fields extendable, extension_duration, extension_limit and notification_prior_to_expiration.
