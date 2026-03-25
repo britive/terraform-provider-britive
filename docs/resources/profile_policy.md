@@ -198,6 +198,10 @@ The format of `associations` and `tag_associations` is documented below.
 
 * `values` - (Required) The list of tag values to match.
 
+* `tag_associations` - (Optional) One or more blocks defining scope tags for the Britive profile policy. Each block supports:
+  * `key` - (Required) The tag key.
+  * `values` - (Required) The tag values.
+
 ## Attribute Reference
 
 In addition to the above arguments, the following attribute is exported.

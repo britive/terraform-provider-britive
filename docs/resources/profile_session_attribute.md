@@ -57,9 +57,11 @@ The following arguments are supported:
 
 ## Attribute Reference
 
-In addition to the above arguments, the following attribute is exported.
+In addition to the above arguments, the following attributes are exported.
 
 * `id` - An identifier of the resource with the format `paps/{{profileID}}/session-attributes/{{sessionAttributeID}}`
+
+* `attribute_schema_id` - The identifier of the attribute associated with the profile.
 
 ## Import
 

@@ -54,9 +54,11 @@ Exactly one of the following arguments must be provided:
 
 ## Attribute Reference
 
-In addition to the above argument, the following attributes are exported:
+In addition to the above arguments, the following attributes are exported:
 
-* `id` - An identifier for the application.
+* `id` - An identifier for the application (same as `app_container_id`).
+
+* `app_container_id` - The unique identifier of the application.
 
 * `app_container_id` - The unique identifier for the application (same as `id`).
 

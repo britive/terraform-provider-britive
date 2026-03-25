@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveResourceManagerProfilePolicy(t *testing.T) {
@@ -20,8 +20,8 @@ func TestBritiveResourceManagerProfilePolicy(t *testing.T) {
 	timeOfAccessFrom := time.Now().AddDate(0, 0, 2).Format("2006-01-02 15:04:05")
 	timeOfAccessTo := time.Now().AddDate(0, 0, 7).Format("2006-01-02 15:04:05")
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceManagerProfilePolicyConfig(resourceLabelName1, resourceLabelDescription1, resourceLabelName2, resourceLabelDescription2, resourceProfileName, resourceProfileDescription, timeOfAccessFrom, timeOfAccessTo),
@@ -69,18 +69,22 @@ func testAccCheckBritiveResourceManagerProfilePolicyConfig(resourceLabelName1, r
 	}
 
 	resource "britive_resource_manager_profile" "resource_profile_1" {
-		name                 = "%s"
-		description          = "%s"
-		expiration_duration  = 10800000
-		allow_impersonation  = true
+		name                             = "%s"
+		description                      = "%s"
+		expiration_duration              = 10800000
+		extendable                       = true
+		notification_prior_to_expiration = "1h0m0s"
+		extension_duration               = "2h0m0s"
+		extension_limit                  = 2
+		allow_impersonation              = true
 
 		associations {
-			label_key   = britive_resource_manager_resource_label.resource_label_1.name
-			values = ["Production", "Development"]
+			label_key = britive_resource_manager_resource_label.resource_label_1.name
+			values    = ["Production", "Development"]
 		}
 		associations {
-			label_key   = britive_resource_manager_resource_label.resource_label_2.name
-			values = ["us-east-1", "eu-west-1"]
+			label_key = britive_resource_manager_resource_label.resource_label_2.name
+			values    = ["us-east-1", "eu-west-1"]
 		}
 	}
 

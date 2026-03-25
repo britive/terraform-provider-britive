@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveTagOwner(t *testing.T) {
@@ -18,11 +18,10 @@ func TestBritiveTagOwner(t *testing.T) {
 	ownerUsername := "britiveprovideracceptancetest"
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				// Step 1: create with a user owner (by name) and a tag owner (by name)
 				Config: testAccCheckBritiveTagOwnerConfig(identityProviderName, tagName, tagDescription, ownerTagName, ownerTagDescription, ownerUsername),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveTagOwnerExists("britive_tag_owner.new"),
@@ -68,15 +67,12 @@ func testAccCheckBritiveTagOwnerConfig(identityProviderName, tagName, tagDescrip
 func testAccCheckBritiveTagOwnerExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
-
 		if !ok {
 			return errs.NewNotFoundErrorf("%s in state", n)
 		}
-
 		if rs.Primary.ID == "" {
 			return errs.NewNotFoundErrorf("ID for %s in state", n)
 		}
-
 		return nil
 	}
 }
