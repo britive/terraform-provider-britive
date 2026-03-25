@@ -6,7 +6,7 @@ HOSTNAME	 := github.com
 NAMESPACE	 := britive
 NAME 		 := britive
 BINARY		 := terraform-provider-${NAME}
-VERSION      := 2.2
+VERSION      := 3.0
 OS_ARCH      := $(shell go env GOOS)_$(shell go env GOARCH)
 
 default: build
@@ -23,4 +23,4 @@ install: build
 .PHONY: build
 
 testacc:
-	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
+	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 180m

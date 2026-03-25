@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveResourceManagerProfile(t *testing.T) {
@@ -17,8 +17,8 @@ func TestBritiveResourceManagerProfile(t *testing.T) {
 	resourceProfileName := "AT-Britive_Resource_Manager_Test_Resource_Profile-_11"
 	resourceProfileDescription := "AT-Britive_Resource_Manager_Test_Resource_Profile_11_Description"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceManagerProfileConfig(resourceLabelName1, resourceLabelDescription1, resourceLabelName2, resourceLabelDescription2, resourceProfileName, resourceProfileDescription),

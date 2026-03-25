@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveAdvancedSettings(t *testing.T) {
@@ -18,8 +18,8 @@ func TestBritiveAdvancedSettings(t *testing.T) {
 	profilePolicyName := "AT - TF ADVANCED SETTINGS PROFILE POLICY"
 	profilePolicyDescription := "AT - TF ADVANCED SETTINGS PROFILE POLICY DESCRIPTION"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, profilePolicyName, profilePolicyDescription),

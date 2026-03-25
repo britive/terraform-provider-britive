@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveResourceManagerProfilePermission(t *testing.T) {
@@ -21,8 +21,8 @@ func TestBritiveResourceManagerProfilePermission(t *testing.T) {
 	resourceManagerProfileName := "AT-Britive_Resource_Manager_Test_Resource_Profile_Name_1"
 	resourceManagerProfileDescription := "AT-Britive_Resource_Manager_Test_Resource_Profile_1_Description"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription),
@@ -109,13 +109,17 @@ func testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName,
 	}
 
 	resource "britive_resource_manager_profile" "profile_1" {
-		name = "%s"
-		description = "%s"
-		expiration_duration = 10800000
+		name                             = "%s"
+		description                      = "%s"
+		expiration_duration              = 10800000
+		extendable                       = true
+		notification_prior_to_expiration = "1h0m0s"
+		extension_duration               = "2h0m0s"
+		extension_limit                  = 2
 
 		associations {
 			label_key = "Resource-Type"
-			values = [britive_resource_manager_resource_type.resource_type_1.name]
+			values    = [britive_resource_manager_resource_type.resource_type_1.name]
 		}
 	}
 	`, resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription)

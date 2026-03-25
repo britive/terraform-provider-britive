@@ -9,31 +9,28 @@ on:
 jobs:
   acceptance-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 200
     strategy:
       fail-fast: false
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      
-      - name: Unshallow
-        run: git fetch --prune --unshallow
-      
+        uses: actions/checkout@v4
+
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.16
+          go-version-file: go.mod
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.0.8
+          terraform_version: "1.10.3"
           terraform_wrapper: false
 
-      - name: Run test
+      - name: Run acceptance tests
         run: make testacc
         env:
-          GO_FLAGS: -mod=vendor
-          GO111MODULE: on
+          GOFLAGS: -mod=vendor
           BRITIVE_TENANT: ${{ secrets.BRITIVE_TENANT }}
           BRITIVE_TOKEN: ${{ secrets.BRITIVE_TOKEN }}
