@@ -161,11 +161,6 @@ func (r *RMProfilePolicyPrioritizationResource) Read(ctx context.Context, req re
 		return
 	}
 
-	// Normalize profile_id to full-path format so migration from v2.2.9
-	// (which stored bare profile ID) matches the config reference format.
-	profileID := parseRMPolicyPrioritizationID(state.ID.ValueString())
-	state.ProfileID = types.StringValue(fmt.Sprintf("resource-manager/profile/%s", profileID))
-
 	if err := r.populateState(ctx, &state, false); err != nil {
 		resp.Diagnostics.AddError("Error Reading Policy Prioritization", err.Error())
 		return
