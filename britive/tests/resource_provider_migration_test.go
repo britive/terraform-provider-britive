@@ -987,14 +987,6 @@ resource "britive_resource_manager_profile_policy" "migration" {
 }
 
 func TestBritiveResourceManagerProfilePolicyPrioritizationMigration(t *testing.T) {
-	// v2.2.9 bug: britive_resource_manager_profile_policy_prioritization stores profile_id as a bare ID
-	// in state, but the RM profile resource's .id evaluates to the full path "resource-manager/profile/{id}".
-	// This causes the post-apply refresh plan to be non-empty (bare ID vs full path drift) after step 1,
-	// which is a pre-existing v2.2.9 limitation that cannot be fixed in v3.0.0 code.
-	t.Skip("Skipping migration test: v2.2.9 profile_policy_prioritization stores profile_id as bare ID " +
-		"but config reference evaluates to full path, causing perpetual drift in v2.2.9 state that " +
-		"cannot be resolved without a fix in the v2.2.9 provider itself.")
-
 	// britive_resource_manager_profile_policy_prioritization was added in v2.2.9
 	// and is therefore eligible for v2.2.9 → v3.0.0 migration testing.
 	config := migrationProviderBlock() + `
