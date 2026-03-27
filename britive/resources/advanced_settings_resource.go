@@ -20,9 +20,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &AdvancedSettingsResource{}
-	_ resource.ResourceWithConfigure   = &AdvancedSettingsResource{}
-	_ resource.ResourceWithImportState = &AdvancedSettingsResource{}
+	_ resource.Resource                 = &AdvancedSettingsResource{}
+	_ resource.ResourceWithConfigure    = &AdvancedSettingsResource{}
+	_ resource.ResourceWithImportState  = &AdvancedSettingsResource{}
+	_ resource.ResourceWithUpgradeState = &AdvancedSettingsResource{}
 )
 
 func NewAdvancedSettingsResource() resource.Resource {
@@ -75,6 +76,7 @@ func (r *AdvancedSettingsResource) Metadata(_ context.Context, req resource.Meta
 
 func (r *AdvancedSettingsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "Manages a Britive advanced settings for resources.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -186,6 +188,124 @@ func (r *AdvancedSettingsResource) Schema(_ context.Context, _ resource.SchemaRe
 						Description: "IM Escalation Policies.",
 					},
 				},
+			},
+		},
+	}
+}
+
+// Legacy model types representing the SDKv2 state format.
+// In SDKv2, TypeList[MaxItems:1] fields were stored as JSON arrays;
+// in the Framework they are SingleNestedAttribute (JSON objects).
+type advancedSettingsLegacyState struct {
+	ID                    string                         `json:"id"`
+	ResourceID            string                         `json:"resource_id"`
+	ResourceType          string                         `json:"resource_type"`
+	JustificationSettings []legacyJustificationSettings  `json:"justification_settings"`
+	ITSM                  []legacyITSM                   `json:"itsm"`
+	IM                    []legacyIM                     `json:"im"`
+}
+
+type legacyJustificationSettings struct {
+	JustificationID         string `json:"justification_id"`
+	IsJustificationRequired bool   `json:"is_justification_required"`
+	JustificationRegex      string `json:"justification_regex"`
+}
+
+type legacyITSM struct {
+	ITSMID             string                     `json:"itsm_id"`
+	ConnectionID       string                     `json:"connection_id"`
+	ConnectionType     string                     `json:"connection_type"`
+	IsITSMEnabled      bool                       `json:"is_itsm_enabled"`
+	ITSMFilterCriteria []legacyITSMFilterCriteria `json:"itsm_filter_criteria"`
+}
+
+type legacyITSMFilterCriteria struct {
+	SupportedTicketType string `json:"supported_ticket_type"`
+	Filter              string `json:"filter"`
+}
+
+type legacyIM struct {
+	IMID                  string   `json:"im_id"`
+	ConnectionID          string   `json:"connection_id"`
+	ConnectionType        string   `json:"connection_type"`
+	IsAutoApprovalEnabled bool     `json:"is_auto_approval_enabled"`
+	EscalationPolicies    []string `json:"escalation_policies"`
+}
+
+// UpgradeState upgrades state from SDKv2 format (version 0) to Framework format (version 1).
+func (r *AdvancedSettingsResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		0: {
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var legacy advancedSettingsLegacyState
+				if err := json.Unmarshal(req.RawState.JSON, &legacy); err != nil {
+					resp.Diagnostics.AddError(
+						"State Upgrade Error",
+						fmt.Sprintf("Unable to parse prior state for britive_advanced_settings: %s", err.Error()),
+					)
+					return
+				}
+
+				newState := AdvancedSettingsResourceModel{
+					ID:           types.StringValue(legacy.ID),
+					ResourceID:   types.StringValue(legacy.ResourceID),
+					ResourceType: types.StringValue(legacy.ResourceType),
+				}
+
+				if len(legacy.JustificationSettings) > 0 {
+					js := legacy.JustificationSettings[0]
+					newState.JustificationSettings = &JustificationSettingsModel{
+						JustificationID:         types.StringValue(js.JustificationID),
+						IsJustificationRequired: types.BoolValue(js.IsJustificationRequired),
+						JustificationRegex:      types.StringValue(js.JustificationRegex),
+					}
+				}
+
+				if len(legacy.ITSM) > 0 {
+					itsm := legacy.ITSM[0]
+					var filterModels []ITSMFilterCriteriaModel
+					for _, fc := range itsm.ITSMFilterCriteria {
+						filterModels = append(filterModels, ITSMFilterCriteriaModel{
+							SupportedTicketType: types.StringValue(fc.SupportedTicketType),
+							Filter:              types.StringValue(fc.Filter),
+						})
+					}
+					filterSet, diags := types.SetValueFrom(ctx, types.ObjectType{
+						AttrTypes: map[string]attr.Type{
+							"supported_ticket_type": types.StringType,
+							"filter":                types.StringType,
+						},
+					}, filterModels)
+					resp.Diagnostics.Append(diags...)
+					if resp.Diagnostics.HasError() {
+						return
+					}
+					newState.ITSM = &ITSMModel{
+						ITSMID:             types.StringValue(itsm.ITSMID),
+						ConnectionID:       types.StringValue(itsm.ConnectionID),
+						ConnectionType:     types.StringValue(itsm.ConnectionType),
+						IsITSMEnabled:      types.BoolValue(itsm.IsITSMEnabled),
+						ITSMFilterCriteria: filterSet,
+					}
+				}
+
+				if len(legacy.IM) > 0 {
+					im := legacy.IM[0]
+					policiesSet, diags := types.SetValueFrom(ctx, types.StringType, im.EscalationPolicies)
+					resp.Diagnostics.Append(diags...)
+					if resp.Diagnostics.HasError() {
+						return
+					}
+					newState.IM = &IMModel{
+						IMID:                  types.StringValue(im.IMID),
+						ConnectionID:          types.StringValue(im.ConnectionID),
+						ConnectionType:        types.StringValue(im.ConnectionType),
+						IsAutoApprovalEnabled: types.BoolValue(im.IsAutoApprovalEnabled),
+						EscalationPolicies:    policiesSet,
+					}
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 			},
 		},
 	}
