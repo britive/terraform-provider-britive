@@ -68,6 +68,7 @@ func (r *ProfileAdditionalSettingsResource) Schema(_ context.Context, _ resource
 			},
 			"use_app_credential_type": schema.BoolAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Inherit the credential type settings from the application.",
 			},
 			"console_access": schema.BoolAttribute{
@@ -76,6 +77,7 @@ func (r *ProfileAdditionalSettingsResource) Schema(_ context.Context, _ resource
 			},
 			"programmatic_access": schema.BoolAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Provide the programmatic access for the profile, overridden if use_app_credential_type is set to true.",
 			},
 			"project_id_for_service_account": schema.StringAttribute{

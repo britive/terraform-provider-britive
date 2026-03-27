@@ -9,7 +9,6 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -35,12 +34,12 @@ type AdvancedSettingsResource struct {
 }
 
 type AdvancedSettingsResourceModel struct {
-	ID                    types.String                            `tfsdk:"id"`
-	ResourceID            types.String                            `tfsdk:"resource_id"`
-	ResourceType          types.String                            `tfsdk:"resource_type"`
-	JustificationSettings *JustificationSettingsModel             `tfsdk:"justification_settings"`
-	ITSM                  *ITSMModel                              `tfsdk:"itsm"`
-	IM                    *IMModel                                `tfsdk:"im"`
+	ID                    types.String                   `tfsdk:"id"`
+	ResourceID            types.String                   `tfsdk:"resource_id"`
+	ResourceType          types.String                   `tfsdk:"resource_type"`
+	JustificationSettings []JustificationSettingsModel   `tfsdk:"justification_settings"`
+	ITSM                  []ITSMModel                    `tfsdk:"itsm"`
+	IM                    []IMModel                      `tfsdk:"im"`
 }
 
 type JustificationSettingsModel struct {
@@ -50,11 +49,11 @@ type JustificationSettingsModel struct {
 }
 
 type ITSMModel struct {
-	ITSMID             types.String `tfsdk:"itsm_id"`
-	ConnectionID       types.String `tfsdk:"connection_id"`
-	ConnectionType     types.String `tfsdk:"connection_type"`
-	IsITSMEnabled      types.Bool   `tfsdk:"is_itsm_enabled"`
-	ITSMFilterCriteria types.Set    `tfsdk:"itsm_filter_criteria"`
+	ITSMID             types.String              `tfsdk:"itsm_id"`
+	ConnectionID       types.String              `tfsdk:"connection_id"`
+	ConnectionType     types.String              `tfsdk:"connection_type"`
+	IsITSMEnabled      types.Bool                `tfsdk:"is_itsm_enabled"`
+	ITSMFilterCriteria []ITSMFilterCriteriaModel `tfsdk:"itsm_filter_criteria"`
 }
 
 type ITSMFilterCriteriaModel struct {
@@ -63,11 +62,11 @@ type ITSMFilterCriteriaModel struct {
 }
 
 type IMModel struct {
-	IMID                   types.String `tfsdk:"im_id"`
-	ConnectionID           types.String `tfsdk:"connection_id"`
-	ConnectionType         types.String `tfsdk:"connection_type"`
-	IsAutoApprovalEnabled  types.Bool   `tfsdk:"is_auto_approval_enabled"`
-	EscalationPolicies     types.Set    `tfsdk:"escalation_policies"`
+	IMID                  types.String `tfsdk:"im_id"`
+	ConnectionID          types.String `tfsdk:"connection_id"`
+	ConnectionType        types.String `tfsdk:"connection_type"`
+	IsAutoApprovalEnabled types.Bool   `tfsdk:"is_auto_approval_enabled"`
+	EscalationPolicies    types.Set    `tfsdk:"escalation_policies"`
 }
 
 func (r *AdvancedSettingsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -97,64 +96,69 @@ func (r *AdvancedSettingsResource) Schema(_ context.Context, _ resource.SchemaRe
 				Required:    true,
 				Description: "Britive resource type.",
 				Validators: []validator.String{
-					stringvalidator.OneOf("APPLICATION", "PROFILE", "PROFILE_POLICY", "RESOURCE_MANAGER_PROFILE", "RESOURCE_MANAGER_PROFILE_POLICY"),
+					stringvalidator.OneOfCaseInsensitive("APPLICATION", "PROFILE", "PROFILE_POLICY", "RESOURCE_MANAGER_PROFILE", "RESOURCE_MANAGER_PROFILE_POLICY"),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"justification_settings": schema.SingleNestedAttribute{
-				Optional:    true,
+		},
+		Blocks: map[string]schema.Block{
+			"justification_settings": schema.SetNestedBlock{
 				Description: "Resource's Justification Settings.",
-				Attributes: map[string]schema.Attribute{
-					"justification_id": schema.StringAttribute{
-						Computed:    true,
-						Description: "Justification Setting ID.",
-					},
-					"is_justification_required": schema.BoolAttribute{
-						Required:    true,
-						Description: "Resource justification.",
-					},
-					"justification_regex": schema.StringAttribute{
-						Optional:    true,
-						Description: "Resource justification Regular Expression.",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"justification_id": schema.StringAttribute{
+							Computed:    true,
+							Description: "Justification Setting ID.",
+						},
+						"is_justification_required": schema.BoolAttribute{
+							Required:    true,
+							Description: "Resource justification.",
+						},
+						"justification_regex": schema.StringAttribute{
+							Optional:    true,
+							Description: "Resource justification Regular Expression.",
+						},
 					},
 				},
 			},
-			"itsm": schema.SingleNestedAttribute{
-				Optional:    true,
+			"itsm": schema.SetNestedBlock{
 				Description: "Resource ITSM Setting.",
-				Attributes: map[string]schema.Attribute{
-					"itsm_id": schema.StringAttribute{
-						Computed:    true,
-						Description: "ITSM Setting ID.",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"itsm_id": schema.StringAttribute{
+							Computed:    true,
+							Description: "ITSM Setting ID.",
+						},
+						"connection_id": schema.StringAttribute{
+							Required:    true,
+							Description: "ITSM Connection id.",
+						},
+						"connection_type": schema.StringAttribute{
+							Required:    true,
+							Description: "ITSM Connection type.",
+						},
+						"is_itsm_enabled": schema.BoolAttribute{
+							Required:    true,
+							Description: "ITSM enabled flag.",
+						},
 					},
-					"connection_id": schema.StringAttribute{
-						Required:    true,
-						Description: "ITSM Connection id.",
-					},
-					"connection_type": schema.StringAttribute{
-						Required:    true,
-						Description: "ITSM Connection type.",
-					},
-					"is_itsm_enabled": schema.BoolAttribute{
-						Required:    true,
-						Description: "ITSM enabled flag.",
-					},
-					"itsm_filter_criteria": schema.SetNestedAttribute{
-						Required:    true,
-						Description: "ITSM filter criteria.",
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"supported_ticket_type": schema.StringAttribute{
-									Required:    true,
-									Description: "Supported ticket type.",
-								},
-								"filter": schema.StringAttribute{
-									Required:    true,
-									Description: "Filter (JSON string).",
-									Validators: []validator.String{
-										stringvalidator.LengthAtLeast(1),
+					Blocks: map[string]schema.Block{
+						"itsm_filter_criteria": schema.SetNestedBlock{
+							Description: "ITSM filter criteria.",
+							NestedObject: schema.NestedBlockObject{
+								Attributes: map[string]schema.Attribute{
+									"supported_ticket_type": schema.StringAttribute{
+										Required:    true,
+										Description: "Supported ticket type.",
+									},
+									"filter": schema.StringAttribute{
+										Required:    true,
+										Description: "Filter (JSON string).",
+										Validators: []validator.String{
+											stringvalidator.LengthAtLeast(1),
+										},
 									},
 								},
 							},
@@ -162,30 +166,31 @@ func (r *AdvancedSettingsResource) Schema(_ context.Context, _ resource.SchemaRe
 					},
 				},
 			},
-			"im": schema.SingleNestedAttribute{
-				Optional:    true,
+			"im": schema.SetNestedBlock{
 				Description: "Resource IM Setting.",
-				Attributes: map[string]schema.Attribute{
-					"im_id": schema.StringAttribute{
-						Computed:    true,
-						Description: "IM Setting ID.",
-					},
-					"connection_id": schema.StringAttribute{
-						Required:    true,
-						Description: "IM Connection id.",
-					},
-					"connection_type": schema.StringAttribute{
-						Required:    true,
-						Description: "IM Connection type.",
-					},
-					"is_auto_approval_enabled": schema.BoolAttribute{
-						Required:    true,
-						Description: "IM auto approval toggle.",
-					},
-					"escalation_policies": schema.SetAttribute{
-						ElementType: types.StringType,
-						Required:    true,
-						Description: "IM Escalation Policies.",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"im_id": schema.StringAttribute{
+							Computed:    true,
+							Description: "IM Setting ID.",
+						},
+						"connection_id": schema.StringAttribute{
+							Required:    true,
+							Description: "IM Connection id.",
+						},
+						"connection_type": schema.StringAttribute{
+							Required:    true,
+							Description: "IM Connection type.",
+						},
+						"is_auto_approval_enabled": schema.BoolAttribute{
+							Required:    true,
+							Description: "IM auto approval toggle.",
+						},
+						"escalation_policies": schema.SetAttribute{
+							ElementType: types.StringType,
+							Required:    true,
+							Description: "IM Escalation Policies.",
+						},
 					},
 				},
 			},
@@ -195,14 +200,14 @@ func (r *AdvancedSettingsResource) Schema(_ context.Context, _ resource.SchemaRe
 
 // Legacy model types representing the SDKv2 state format.
 // In SDKv2, TypeList[MaxItems:1] fields were stored as JSON arrays;
-// in the Framework they are SingleNestedAttribute (JSON objects).
+// in the Framework they are SetNestedBlock (Go slices).
 type advancedSettingsLegacyState struct {
-	ID                    string                         `json:"id"`
-	ResourceID            string                         `json:"resource_id"`
-	ResourceType          string                         `json:"resource_type"`
-	JustificationSettings []legacyJustificationSettings  `json:"justification_settings"`
-	ITSM                  []legacyITSM                   `json:"itsm"`
-	IM                    []legacyIM                     `json:"im"`
+	ID                    string                        `json:"id"`
+	ResourceID            string                        `json:"resource_id"`
+	ResourceType          string                        `json:"resource_type"`
+	JustificationSettings []legacyJustificationSettings `json:"justification_settings"`
+	ITSM                  []legacyITSM                  `json:"itsm"`
+	IM                    []legacyIM                    `json:"im"`
 }
 
 type legacyJustificationSettings struct {
@@ -252,17 +257,15 @@ func (r *AdvancedSettingsResource) UpgradeState(_ context.Context) map[int64]res
 					ResourceType: types.StringValue(legacy.ResourceType),
 				}
 
-				if len(legacy.JustificationSettings) > 0 {
-					js := legacy.JustificationSettings[0]
-					newState.JustificationSettings = &JustificationSettingsModel{
+				for _, js := range legacy.JustificationSettings {
+					newState.JustificationSettings = append(newState.JustificationSettings, JustificationSettingsModel{
 						JustificationID:         types.StringValue(js.JustificationID),
 						IsJustificationRequired: types.BoolValue(js.IsJustificationRequired),
 						JustificationRegex:      types.StringValue(js.JustificationRegex),
-					}
+					})
 				}
 
-				if len(legacy.ITSM) > 0 {
-					itsm := legacy.ITSM[0]
+				for _, itsm := range legacy.ITSM {
 					var filterModels []ITSMFilterCriteriaModel
 					for _, fc := range itsm.ITSMFilterCriteria {
 						filterModels = append(filterModels, ITSMFilterCriteriaModel{
@@ -270,39 +273,28 @@ func (r *AdvancedSettingsResource) UpgradeState(_ context.Context) map[int64]res
 							Filter:              types.StringValue(fc.Filter),
 						})
 					}
-					filterSet, diags := types.SetValueFrom(ctx, types.ObjectType{
-						AttrTypes: map[string]attr.Type{
-							"supported_ticket_type": types.StringType,
-							"filter":                types.StringType,
-						},
-					}, filterModels)
-					resp.Diagnostics.Append(diags...)
-					if resp.Diagnostics.HasError() {
-						return
-					}
-					newState.ITSM = &ITSMModel{
+					newState.ITSM = append(newState.ITSM, ITSMModel{
 						ITSMID:             types.StringValue(itsm.ITSMID),
 						ConnectionID:       types.StringValue(itsm.ConnectionID),
 						ConnectionType:     types.StringValue(itsm.ConnectionType),
 						IsITSMEnabled:      types.BoolValue(itsm.IsITSMEnabled),
-						ITSMFilterCriteria: filterSet,
-					}
+						ITSMFilterCriteria: filterModels,
+					})
 				}
 
-				if len(legacy.IM) > 0 {
-					im := legacy.IM[0]
+				for _, im := range legacy.IM {
 					policiesSet, diags := types.SetValueFrom(ctx, types.StringType, im.EscalationPolicies)
 					resp.Diagnostics.Append(diags...)
 					if resp.Diagnostics.HasError() {
 						return
 					}
-					newState.IM = &IMModel{
+					newState.IM = append(newState.IM, IMModel{
 						IMID:                  types.StringValue(im.IMID),
 						ConnectionID:          types.StringValue(im.ConnectionID),
 						ConnectionType:        types.StringValue(im.ConnectionType),
 						IsAutoApprovalEnabled: types.BoolValue(im.IsAutoApprovalEnabled),
 						EscalationPolicies:    policiesSet,
-					}
+					})
 				}
 
 				resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
@@ -589,75 +581,68 @@ func (r *AdvancedSettingsResource) buildAdvancedSettings(ctx context.Context, pl
 	}
 
 	// Handle justification settings
-	if plan.JustificationSettings != nil {
+	if len(plan.JustificationSettings) > 0 {
+		js := plan.JustificationSettings[0]
 		justificationSetting := britive.Setting{
-			SettingsType:            "JUSTIFICATION",
-			EntityID:                entityID,
-			EntityType:              entityType,
-			IsInherited:             &isInherited,
-			ID:                      plan.JustificationSettings.JustificationID.ValueString(),
-			JustificationRegex:      plan.JustificationSettings.JustificationRegex.ValueString(),
+			SettingsType:       "JUSTIFICATION",
+			EntityID:           entityID,
+			EntityType:         entityType,
+			IsInherited:        &isInherited,
+			ID:                 js.JustificationID.ValueString(),
+			JustificationRegex: js.JustificationRegex.ValueString(),
 		}
-		isRequired := plan.JustificationSettings.IsJustificationRequired.ValueBool()
+		isRequired := js.IsJustificationRequired.ValueBool()
 		justificationSetting.IsJustificationRequired = &isRequired
 
 		advancedSettings.Settings = append(advancedSettings.Settings, justificationSetting)
 	}
 
 	// Handle ITSM settings
-	if plan.ITSM != nil {
+	if len(plan.ITSM) > 0 {
+		itsm := plan.ITSM[0]
 		itsmSetting := britive.Setting{
 			SettingsType:   "ITSM",
 			EntityID:       entityID,
 			EntityType:     entityType,
 			IsInherited:    &isInherited,
-			ID:             plan.ITSM.ITSMID.ValueString(),
-			ConnectionID:   plan.ITSM.ConnectionID.ValueString(),
-			ConnectionType: plan.ITSM.ConnectionType.ValueString(),
+			ID:             itsm.ITSMID.ValueString(),
+			ConnectionID:   itsm.ConnectionID.ValueString(),
+			ConnectionType: itsm.ConnectionType.ValueString(),
 		}
-		isEnabled := plan.ITSM.IsITSMEnabled.ValueBool()
+		isEnabled := itsm.IsITSMEnabled.ValueBool()
 		itsmSetting.IsITSMEnabled = &isEnabled
 
-		// Convert filter criteria
-		var filterCriteria []ITSMFilterCriteriaModel
-		diags := plan.ITSM.ITSMFilterCriteria.ElementsAs(ctx, &filterCriteria, false)
-		if diags.HasError() {
-			return nil, fmt.Errorf("error converting ITSM filter criteria")
-		}
-
-		for _, fc := range filterCriteria {
+		for _, fc := range itsm.ITSMFilterCriteria {
 			var filterMap map[string]interface{}
 			if err := json.Unmarshal([]byte(fc.Filter.ValueString()), &filterMap); err != nil {
 				return nil, fmt.Errorf("invalid JSON in filter: %w", err)
 			}
-
-			itsmFilter := britive.ItsmFilterCriteria{
+			itsmSetting.ItsmFilterCriterias = append(itsmSetting.ItsmFilterCriterias, britive.ItsmFilterCriteria{
 				SupportedTicketType: fc.SupportedTicketType.ValueString(),
 				Filter:              filterMap,
-			}
-			itsmSetting.ItsmFilterCriterias = append(itsmSetting.ItsmFilterCriterias, itsmFilter)
+			})
 		}
 
 		advancedSettings.Settings = append(advancedSettings.Settings, itsmSetting)
 	}
 
 	// Handle IM settings
-	if plan.IM != nil {
+	if len(plan.IM) > 0 {
+		im := plan.IM[0]
 		imSetting := britive.Setting{
 			SettingsType:   "IM",
 			EntityID:       entityID,
 			EntityType:     entityType,
 			IsInherited:    &isInherited,
-			ID:             plan.IM.IMID.ValueString(),
-			ConnectionID:   plan.IM.ConnectionID.ValueString(),
-			ConnectionType: plan.IM.ConnectionType.ValueString(),
+			ID:             im.IMID.ValueString(),
+			ConnectionID:   im.ConnectionID.ValueString(),
+			ConnectionType: im.ConnectionType.ValueString(),
 		}
-		isAutoApproval := plan.IM.IsAutoApprovalEnabled.ValueBool()
+		isAutoApproval := im.IsAutoApprovalEnabled.ValueBool()
 		imSetting.IsAutoApprovalEnabled = &isAutoApproval
 
-		// Convert escalation policies
 		var policies []string
-		diags := plan.IM.EscalationPolicies.ElementsAs(ctx, &policies, false)
+		diags := im.EscalationPolicies.ElementsAs(ctx, &policies, false)
 		if diags.HasError() {
 			return nil, fmt.Errorf("error converting escalation policies")
 		}
@@ -671,12 +656,20 @@ func (r *AdvancedSettingsResource) buildAdvancedSettings(ctx context.Context, pl
 
 // mapAPIToState maps API response to state model
 func (r *AdvancedSettingsResource) mapAPIToState(ctx context.Context, state *AdvancedSettingsResourceModel, advancedSettings *britive.AdvancedSettings) error {
-	// Reset nested attributes
+	// Reset nested blocks
 	state.JustificationSettings = nil
 	state.ITSM = nil
 	state.IM = nil
 
-	// Process each setting
+	// Capture user-provided connection types for case preservation
+	var userITSMConnType, userIMConnType string
+	if len(state.ITSM) > 0 {
+		userITSMConnType = state.ITSM[0].ConnectionType.ValueString()
+	}
+	if len(state.IM) > 0 {
+		userIMConnType = state.IM[0].ConnectionType.ValueString()
+	}
+
 	for _, setting := range advancedSettings.Settings {
 		// Skip inherited settings
 		if setting.IsInherited != nil && *setting.IsInherited {
@@ -685,86 +678,65 @@ func (r *AdvancedSettingsResource) mapAPIToState(ctx context.Context, state *Adv
 
 		switch strings.ToUpper(setting.SettingsType) {
 		case "JUSTIFICATION":
-			state.JustificationSettings = &JustificationSettingsModel{
-				JustificationID:         types.StringValue(setting.ID),
-				JustificationRegex:      types.StringValue(setting.JustificationRegex),
+			js := JustificationSettingsModel{
+				JustificationID:    types.StringValue(setting.ID),
+				JustificationRegex: types.StringValue(setting.JustificationRegex),
 			}
 			if setting.IsJustificationRequired != nil {
-				state.JustificationSettings.IsJustificationRequired = types.BoolValue(*setting.IsJustificationRequired)
+				js.IsJustificationRequired = types.BoolValue(*setting.IsJustificationRequired)
 			}
+			state.JustificationSettings = append(state.JustificationSettings, js)
 
 		case "ITSM":
-			itsmModel := &ITSMModel{
+			connType := setting.ConnectionType
+			if userITSMConnType != "" && strings.EqualFold(setting.ConnectionType, userITSMConnType) {
+				connType = userITSMConnType
+			}
+
+			itsmModel := ITSMModel{
 				ITSMID:         types.StringValue(setting.ID),
 				ConnectionID:   types.StringValue(setting.ConnectionID),
-				ConnectionType: types.StringValue(setting.ConnectionType),
+				ConnectionType: types.StringValue(connType),
 			}
 			if setting.IsITSMEnabled != nil {
 				itsmModel.IsITSMEnabled = types.BoolValue(*setting.IsITSMEnabled)
 			}
 
-			// Convert filter criteria
-			var filterCriteriaModels []ITSMFilterCriteriaModel
 			for _, fc := range setting.ItsmFilterCriterias {
 				filterJSON, err := json.Marshal(fc.Filter)
 				if err != nil {
 					return fmt.Errorf("error marshaling filter: %w", err)
 				}
-
-				filterCriteriaModels = append(filterCriteriaModels, ITSMFilterCriteriaModel{
+				itsmModel.ITSMFilterCriteria = append(itsmModel.ITSMFilterCriteria, ITSMFilterCriteriaModel{
 					SupportedTicketType: types.StringValue(fc.SupportedTicketType),
 					Filter:              types.StringValue(string(filterJSON)),
 				})
 			}
 
-			// Convert to Set
-			filterSet, diags := types.SetValueFrom(ctx, types.ObjectType{
-				AttrTypes: map[string]attr.Type{
-					"supported_ticket_type": types.StringType,
-					"filter":                types.StringType,
-				},
-			}, filterCriteriaModels)
-			if diags.HasError() {
-				return fmt.Errorf("error converting filter criteria to set")
-			}
-			itsmModel.ITSMFilterCriteria = filterSet
-
-			// Preserve user's connection_type case if it matches
-			if state.ITSM != nil {
-				userConnType := state.ITSM.ConnectionType.ValueString()
-				if strings.EqualFold(setting.ConnectionType, userConnType) {
-					itsmModel.ConnectionType = types.StringValue(userConnType)
-				}
-			}
-
-			state.ITSM = itsmModel
+			state.ITSM = append(state.ITSM, itsmModel)
 
 		case "IM":
-			imModel := &IMModel{
+			connType := setting.ConnectionType
+			if userIMConnType != "" && strings.EqualFold(setting.ConnectionType, userIMConnType) {
+				connType = userIMConnType
+			}
+
+			imModel := IMModel{
 				IMID:           types.StringValue(setting.ID),
 				ConnectionID:   types.StringValue(setting.ConnectionID),
-				ConnectionType: types.StringValue(setting.ConnectionType),
+				ConnectionType: types.StringValue(connType),
 			}
 			if setting.IsAutoApprovalEnabled != nil {
 				imModel.IsAutoApprovalEnabled = types.BoolValue(*setting.IsAutoApprovalEnabled)
 			}
 
-			// Convert escalation policies
 			policiesSet, diags := types.SetValueFrom(ctx, types.StringType, setting.EscalationPolicies)
 			if diags.HasError() {
 				return fmt.Errorf("error converting escalation policies to set")
 			}
 			imModel.EscalationPolicies = policiesSet
 
-			// Preserve user's connection_type case if it matches
-			if state.IM != nil {
-				userConnType := state.IM.ConnectionType.ValueString()
-				if strings.EqualFold(setting.ConnectionType, userConnType) {
-					imModel.ConnectionType = types.StringValue(userConnType)
-				}
-			}
-
-			state.IM = imModel
+			state.IM = append(state.IM, imModel)
 		}
 	}
 
@@ -803,3 +775,4 @@ func parseAdvancedSettingsID(id string) (resourceID, resourceType string, err er
 	resourceType = arr[0]
 	return
 }
+

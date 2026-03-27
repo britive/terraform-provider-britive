@@ -2,7 +2,7 @@ package resourcemanager
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -670,13 +670,13 @@ func (r *ResourceTypePermissionsResource) mapModelToResource(permission *britive
 	state.ResponseTemplates = templateNames
 }
 
-// hashFileContent computes MD5 hash of file content
+// hashFileContent computes SHA256 hash of file content
 func hashFileContent(filePath string) (string, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("error reading file %s: %w", filePath, err)
 	}
 
-	hash := md5.Sum(content)
+	hash := sha256.Sum256(content)
 	return hex.EncodeToString(hash[:]), nil
 }

@@ -57,6 +57,9 @@ func (r *EntityEnvironmentResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Computed:    true,
 				Description: "The identity of the application entity of type environment",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"application_id": schema.StringAttribute{
 				Required:    true,
@@ -101,6 +104,9 @@ func (r *EntityEnvironmentResource) Schema(_ context.Context, _ resource.SchemaR
 							Required:    true,
 							Sensitive:   true,
 							Description: "Britive application entity environment property value (stored as hash).",
+							PlanModifiers: []planmodifier.String{
+								planmodifiers.SensitiveHash(),
+							},
 						},
 					},
 				},
