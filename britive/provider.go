@@ -30,6 +30,7 @@ func Provider(v string) *schema.Provider {
 
 	resourceTag := resources.NewResourceTag(importHelper)
 	resourceTagMember := resources.NewResourceTagMember(importHelper)
+	resourceTagOwner := resources.NewResourceTagOwner(importHelper)
 	resourceProfile := resources.NewResourceProfile(validation, importHelper)
 	resourceProfilePermission := resources.NewResourceProfilePermission(importHelper)
 	resourceProfileSessionAttribute := resources.NewResourceProfileSessionAttribute(importHelper)
@@ -89,6 +90,7 @@ func Provider(v string) *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource{
 			"britive_tag":                                            resourceTag.Resource,
 			"britive_tag_member":                                     resourceTagMember.Resource,
+			"britive_tag_owner":                                      resourceTagOwner.Resource,
 			"britive_profile":                                        resourceProfile.Resource,
 			"britive_profile_permission":                             resourceProfilePermission.Resource,
 			"britive_profile_session_attribute":                      resourceProfileSessionAttribute.Resource,
