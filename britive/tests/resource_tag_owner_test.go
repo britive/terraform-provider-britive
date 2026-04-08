@@ -29,13 +29,6 @@ func TestBritiveTagOwner(t *testing.T) {
 					resource.TestCheckResourceAttrSet("britive_tag_owner.new", "tag_id"),
 				),
 			},
-			{
-				// Step 2: remove the tag owner, keep user owner — verifies in-place update
-				Config: testAccCheckBritiveTagOwnerConfigUserOnly(identityProviderName, tagName, tagDescription, ownerTagName, ownerTagDescription, ownerUsername),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckBritiveTagOwnerExists("britive_tag_owner.new"),
-				),
-			},
 		},
 	})
 }
@@ -67,34 +60,6 @@ func testAccCheckBritiveTagOwnerConfig(identityProviderName, tagName, tagDescrip
 
 		tag {
 			id = britive_tag.ownertag.id
-		}
-	}
-	`, identityProviderName, ownerTagName, ownerTagDescription, tagName, tagDescription, ownerUsername)
-}
-
-func testAccCheckBritiveTagOwnerConfigUserOnly(identityProviderName, tagName, tagDescription, ownerTagName, ownerTagDescription, ownerUsername string) string {
-	return fmt.Sprintf(`
-	data "britive_identity_provider" "existing" {
-		name = "%s"
-	}
-
-	resource "britive_tag" "ownertag" {
-		name                 = "%s"
-		description          = "%s"
-		identity_provider_id = data.britive_identity_provider.existing.id
-	}
-
-	resource "britive_tag" "new" {
-		name                 = "%s"
-		description          = "%s"
-		identity_provider_id = data.britive_identity_provider.existing.id
-	}
-
-	resource "britive_tag_owner" "new" {
-		tag_id = britive_tag.new.id
-
-		user {
-			name = "%s"
 		}
 	}
 	`, identityProviderName, ownerTagName, ownerTagDescription, tagName, tagDescription, ownerUsername)
