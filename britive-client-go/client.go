@@ -1,9 +1,13 @@
 package britive
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -12,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -21,25 +26,54 @@ var (
 
 // Client - Britive API client
 type Client struct {
-	APIBaseURL string
-	HTTPClient *http.Client
-	Token      string
-	Version    string
-	SyncMap    *sync.Map
+	APIBaseURL   string
+	HTTPClient   *http.Client
+	Token        string
+	Version      string
+	SyncMap      *sync.Map
+	Cache        *sync.Map
+	CacheEnabled bool
+	MaxRetries   int
 }
 
 // NewClient - Initializes new Britive API client
-func NewClient(apiBaseURL, token, version string) (*Client, error) {
+func NewClient(apiBaseURL, token, version string, cacheEnabled bool) (*Client, error) {
 	syncOnce.Do(func() {
 		client = &Client{
-			HTTPClient: &http.Client{Timeout: 0},
-			APIBaseURL: apiBaseURL,
-			Token:      token,
-			Version:    version,
-			SyncMap:    &sync.Map{},
+			HTTPClient:   &http.Client{Timeout: 0},
+			APIBaseURL:   apiBaseURL,
+			Token:        token,
+			Version:      version,
+			SyncMap:      &sync.Map{},
+			Cache:        &sync.Map{},
+			CacheEnabled: cacheEnabled,
+			MaxRetries:   5,
 		}
 	})
 	return client, nil
+}
+
+// cacheGet retrieves a cached value by key. Returns (nil, false) if caching is disabled or key not found.
+func (c *Client) cacheGet(key string) (interface{}, bool) {
+	if !c.CacheEnabled {
+		return nil, false
+	}
+	return c.Cache.Load(key)
+}
+
+// cacheSet stores a value in the cache. No-op if caching is disabled.
+func (c *Client) cacheSet(key string, value interface{}) {
+	if !c.CacheEnabled {
+		return
+	}
+	c.Cache.Store(key, value)
+}
+
+// CacheEvict removes the specified keys from the cache.
+func (c *Client) CacheEvict(keys ...string) {
+	for _, key := range keys {
+		c.Cache.Delete(key)
+	}
 }
 
 // QueryRequest - godoc
@@ -176,42 +210,89 @@ func (c *Client) DoWithLock(req *http.Request, key string) ([]byte, error) {
 	return c.Do(req)
 }
 
-// Do - Perform Britive API call
+// Do - Perform Britive API call with automatic retry on HTTP 429 (Too Many Requests)
 func (c *Client) Do(req *http.Request) ([]byte, error) {
+	// Buffer the request body so it can be replayed on retries
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
+		req.Body.Close()
+	}
+
 	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
 	req.Header.Set("Content-Type", "application/json")
 	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
 	req.Header.Add("User-Agent", userAgent)
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode == http.StatusNoContent {
-		return []byte(emptyString), ErrNoContent
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if res.StatusCode == http.StatusNotFound {
-		return body, ErrNotFound
-	}
-
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
-		var httpErrorResponse HTTPErrorResponse
-		err = json.Unmarshal(body, &httpErrorResponse)
-		if err == nil && httpErrorResponse.Message != emptyString {
-			return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+	for attempt := 0; ; attempt++ {
+		// Reset the request body for each attempt
+		if bodyBytes != nil {
+			req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
+		} else {
+			req.Body = nil
 		}
-		return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
-	}
 
-	return body, err
+		res, err := c.HTTPClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		body, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+
+		// Handle 429 Too Many Requests with retry
+		if res.StatusCode == http.StatusTooManyRequests {
+			if attempt >= c.MaxRetries {
+				return nil, fmt.Errorf("rate limited: max retries (%d) exceeded for request %s %s", c.MaxRetries, req.Method, req.URL)
+			}
+
+			wait := retryAfterDuration(res, attempt)
+			log.Printf("[WARN] Rate limited (HTTP 429) on %s %s, retrying in %v (attempt %d/%d)", req.Method, req.URL, wait, attempt+1, c.MaxRetries)
+			time.Sleep(wait)
+			continue
+		}
+
+		if res.StatusCode == http.StatusNoContent {
+			return []byte(emptyString), ErrNoContent
+		}
+
+		if res.StatusCode == http.StatusNotFound {
+			return body, ErrNotFound
+		}
+
+		if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
+			var httpErrorResponse HTTPErrorResponse
+			err = json.Unmarshal(body, &httpErrorResponse)
+			if err == nil && httpErrorResponse.Message != emptyString {
+				return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+			}
+			return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
+		}
+
+		return body, nil
+	}
+}
+
+// retryAfterDuration parses the Retry-After header from the response.
+// If the header is present and contains a valid number of seconds, that value is used.
+// Otherwise, falls back to exponential backoff: 2^attempt seconds (capped at 30s) with jitter.
+func retryAfterDuration(res *http.Response, attempt int) time.Duration {
+	if retryAfter := res.Header.Get("Retry-After"); retryAfter != emptyString {
+		if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
+			return time.Duration(seconds) * time.Second
+		}
+	}
+	// Exponential backoff with jitter as fallback
+	backoff := math.Min(float64(int(1)<<uint(attempt)), 30)
+	jitter := rand.Float64() * 0.5 * backoff
+	return time.Duration(backoff+jitter) * time.Second
 }
 
 // Lock to lock based on key

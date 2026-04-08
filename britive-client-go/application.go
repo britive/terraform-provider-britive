@@ -88,6 +88,14 @@ func (c *Client) GetApplicationByName(name string) (*Application, error) {
 }
 
 func (c *Client) GetAppEnvs(appId string, envType string) ([]ApplicationEnvironment, error) {
+	cacheKey := fmt.Sprintf("app-envs:%s:%s", appId, envType)
+	if cached, ok := c.cacheGet(cacheKey); ok {
+		original := cached.([]ApplicationEnvironment)
+		cp := make([]ApplicationEnvironment, len(original))
+		copy(cp, original)
+		return cp, nil
+	}
+
 	resourceURL := fmt.Sprintf("%s/apps/%s/root-environment-group?view=summary&type=%s", c.APIBaseURL, appId, envType)
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
@@ -114,6 +122,7 @@ func (c *Client) GetAppEnvs(appId string, envType string) ([]ApplicationEnvironm
 		return nil, ErrNotFound
 	}
 
+	c.cacheSet(cacheKey, appEnvs)
 	return appEnvs, nil
 }
 
@@ -242,6 +251,11 @@ func (c *Client) CreateRootEnvironmentGroup(applicationID string, catalogAppId i
 			return err
 		}
 
+		c.CacheEvict(
+			fmt.Sprintf("root-env-group:%s", applicationID),
+			fmt.Sprintf("app-envs:%s:environments", applicationID),
+			fmt.Sprintf("app-envs:%s:environmentGroups", applicationID),
+		)
 	}
 	return nil
 }
@@ -256,6 +270,12 @@ func (c *Client) DeleteApplication(applicationID string) error {
 
 	_, err = c.DoWithLock(req, applicationLockName)
 	if errors.Is(err, ErrNoContent) || err == nil {
+		c.CacheEvict(
+			fmt.Sprintf("root-env-group:%s", applicationID),
+			fmt.Sprintf("app-envs:%s:environments", applicationID),
+			fmt.Sprintf("app-envs:%s:environmentGroups", applicationID),
+			fmt.Sprintf("app-type:%s", applicationID),
+		)
 		return nil
 	}
 	return err
@@ -288,7 +308,7 @@ func (c *Client) GetRootEnvID(applicationID string) (string, error) {
 			return envGrp["id"], err
 		}
 	}
-	return "", errors.New("No root Environment Group ia available for application" + applicationID)
+	return "", errors.New("No root Environment Group is available for application " + applicationID)
 }
 
 // SystemAppPropertyType represents a property type in the system app catalog

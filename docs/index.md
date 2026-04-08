@@ -62,13 +62,20 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
 
 * `config_path` - (Optional) This is the file path for Britive provider configuration. The default configuration path is `~/.britive/tf.config`. It can also be sourced from the `BRITIVE_CONFIG` environment variable.
 
+* `enable_cache` - (Optional) Enable in-memory caching of API responses to reduce redundant API calls during plan/apply. This is particularly useful for configurations with many profiles, profile policies, or entity resources that share the same application, as it avoids repeated lookups of root environment group data. Defaults to `false`. It can also be sourced from the `BRITIVE_CACHE` environment variable.
+
   A sample Britive configuration file is given below.
   
   ```json
   {
     "tenant": "https://company.britive.com",
-    "token": "xxxx"
+    "token": "xxxx",
+    "enable_cache": true
   }
   ```
 
 ~> If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from the config file.
+
+## Rate Limit Handling
+
+The provider automatically retries API requests that receive an HTTP 429 (Too Many Requests) response from the Britive platform. When a 429 is received, the provider respects the `Retry-After` header returned by the API to determine how long to wait before retrying. Requests are retried up to 5 times before returning an error. This behavior is always enabled and requires no configuration.

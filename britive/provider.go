@@ -85,6 +85,12 @@ func Provider(v string) *schema.Provider {
 				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_CONFIG", "~/.britive/tf.config"),
 				Description: "This is the file path for Britive provider configuration. The default configuration path is ~/.britive/tf.config",
 			},
+			"enable_cache": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_CACHE", false),
+				Description: "Enable in-memory caching of API responses to reduce redundant API calls during plan/apply. Defaults to false.",
+			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"britive_tag":                                            resourceTag.Resource,
@@ -128,23 +134,23 @@ func Provider(v string) *schema.Provider {
 	}
 }
 
-func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, error) {
+func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, bool, error) {
 	log.Print("[DEBUG] Trying to load configuration from file")
 	if configPath, ok := d.GetOk("config_path"); ok && configPath.(string) != "" {
 		path, err := homedir.Expand(configPath.(string))
 		if err != nil {
 			log.Printf("[DEBUG] Failed to expand config file path %s, error %s", configPath, err)
-			return "", "", nil
+			return "", "", false, nil
 		}
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			log.Printf("[DEBUG] Terraform config file %s does not exist, error %s", path, err)
-			return "", "", nil
+			return "", "", false, nil
 		}
 		log.Printf("[DEBUG] Terraform configuration file is: %s", path)
 		configFile, err := os.Open(path)
 		if err != nil {
 			log.Printf("[DEBUG] Unable to open Terraform configuration file %s", path)
-			return "", "", fmt.Errorf("unable to open terraform configuration file. error %v", err)
+			return "", "", false, fmt.Errorf("unable to open terraform configuration file. error %v", err)
 		}
 		defer configFile.Close()
 
@@ -153,11 +159,11 @@ func getProviderConfigurationFromFile(d *schema.ResourceData) (string, string, e
 		err = json.Unmarshal(configBytes, &config)
 		if err != nil {
 			log.Printf("[DEBUG] Failed to parse config file %s", path)
-			return "", "", fmt.Errorf("invalid terraform configuration file format. error %v", err)
+			return "", "", false, fmt.Errorf("invalid terraform configuration file format. error %v", err)
 		}
-		return config.Tenant, config.Token, nil
+		return config.Tenant, config.Token, config.EnableCache, nil
 	}
-	return "", "", nil
+	return "", "", false, nil
 }
 
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
@@ -166,11 +172,17 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 
 	token := d.Get("token").(string)
 	tenant := d.Get("tenant").(string)
+	enableCache := d.Get("enable_cache").(bool)
 
 	if tenant == "" && token == "" {
-		tenant, token, err = getProviderConfigurationFromFile(d)
+		var fileCacheEnabled bool
+		tenant, token, fileCacheEnabled, err = getProviderConfigurationFromFile(d)
 		if err != nil {
 			return nil, diag.FromErr(err)
+		}
+		// Config file value is used only as a fallback; explicit provider attribute or env var takes precedence
+		if !enableCache {
+			enableCache = fileCacheEnabled
 		}
 	}
 	if tenant == "" {
@@ -190,7 +202,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	}
 
 	apiBaseURL := fmt.Sprintf("%s/api", strings.TrimSuffix(tenant, "/"))
-	c, err := britive.NewClient(apiBaseURL, token, version)
+	c, err := britive.NewClient(apiBaseURL, token, version, enableCache)
 	if err != nil {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,

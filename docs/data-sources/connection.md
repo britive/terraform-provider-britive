@@ -39,14 +39,14 @@ output "connection_auth_type" {
 
 The following argument is supported:
 
-- `name` (Required) – The name of the connection to retrieve.
-- `setting_type` (Optional) – The type of advanced setting. Defaults to 'ITSM' if not specified. Supported types are ITSM and IM.
+- `name` (Required) - The name of the connection to retrieve.
+- `setting_type` (Optional) - The type of advanced setting. Defaults to 'ITSM' if not specified. Supported types are ITSM and IM.
 
 ## Attribute Reference
 
 The following attributes are exported:
 
-- `id` – The unique identifier of the connection.
-- `name` – The name of the connection.
-- `type` – The type of the connection.
-- `auth_type` – The authentication type of the connection.
+- `id` - The unique identifier of the connection.
+- `name` - The name of the connection.
+- `type` - The type of the connection.
+- `auth_type` - The authentication type of the connection.
