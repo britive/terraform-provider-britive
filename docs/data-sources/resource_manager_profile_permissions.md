@@ -26,13 +26,13 @@ output "permissions" {
 
 The following argument is supported:
 
-- `profile_id` (Required) – The unique identifier of the profile.
+- `profile_id` (Required) - The unique identifier of the profile.
 
 ## Attribute Reference
 
 The following attributes are exported:
 
-- `permissions` – A list of permissions available for the specified profile.
-    - `name` – The name of the permission.
-    - `permission_id` – The unique identifier of the permission.
-    - `version` – A list of available versions of the permission.
+- `permissions` - A list of permissions available for the specified profile.
+    - `name` - The name of the permission.
+    - `permission_id` - The unique identifier of the permission.
+    - `version` - A list of available versions of the permission.

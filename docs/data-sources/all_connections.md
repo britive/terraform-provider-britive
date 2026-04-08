@@ -25,14 +25,14 @@ output "all_connections" {
 
 The following argument is supported:
 
-- `setting_type` (Optional) – The type of advanced setting. Defaults to 'ITSM' if not specified. Supported types are ITSM and IM.
+- `setting_type` (Optional) - The type of advanced setting. Defaults to 'ITSM' if not specified. Supported types are ITSM and IM.
 
 ## Attribute Reference
 
 The following attributes are exported:
 
-- `connections` – A set of all connections, each containing:
-  - `id` – The unique identifier of the connection.
-  - `name` – The name of the connection.
-  - `type` – The type of the connection.
-  - `auth_type` – The authentication type of the connection.
+- `connections` - A set of all connections, each containing:
+  - `id` - The unique identifier of the connection.
+  - `name` - The name of the connection.
+  - `type` - The type of the connection.
+  - `auth_type` - The authentication type of the connection.

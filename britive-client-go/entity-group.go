@@ -34,6 +34,11 @@ func (c *Client) CreateEntityGroup(applicationEntity ApplicationEntityGroup, app
 		return nil, err
 	}
 
+	c.CacheEvict(
+		fmt.Sprintf("root-env-group:%s", applicationID),
+		fmt.Sprintf("app-envs:%s:environmentGroups", applicationID),
+	)
+
 	return ae, nil
 }
 
@@ -63,6 +68,11 @@ func (c *Client) UpdateEntityGroup(applicationEntity ApplicationEntityGroup, app
 		return nil, err
 	}
 
+	c.CacheEvict(
+		fmt.Sprintf("root-env-group:%s", applicationID),
+		fmt.Sprintf("app-envs:%s:environmentGroups", applicationID),
+	)
+
 	return ae, nil
 }
 
@@ -76,6 +86,10 @@ func (c *Client) DeleteEntityGroup(applicationID, entityID string) error {
 
 	_, err = c.DoWithLock(req, applicationID)
 	if errors.Is(err, ErrNoContent) || err == nil {
+		c.CacheEvict(
+			fmt.Sprintf("root-env-group:%s", applicationID),
+			fmt.Sprintf("app-envs:%s:environmentGroups", applicationID),
+		)
 		return nil
 	}
 

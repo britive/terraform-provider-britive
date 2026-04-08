@@ -18,11 +18,11 @@ The `britive_advanced_settings` resource allows you to configure and manage adva
 
 This resource supports advanced settings for the following resource types:
 
-- `APPLICATION` – Britive application resource
-- `PROFILE` – Britive application profile resource
-- `PROFILE_POLICY` – Britive application profile policy resource
-- `RESOURCE_MANAGER_PROFILE` – Britive resource manager profile resource
-- `RESOURCE_MANAGER_PROFILE_POLICY` – Britive resource manager profile policy resource
+- `APPLICATION` - Britive application resource
+- `PROFILE` - Britive application profile resource
+- `PROFILE_POLICY` - Britive application profile policy resource
+- `RESOURCE_MANAGER_PROFILE` - Britive resource manager profile resource
+- `RESOURCE_MANAGER_PROFILE_POLICY` - Britive resource manager profile policy resource
 
 ## Example Usage
 
@@ -64,25 +64,25 @@ resource "britive_advanced_settings" "example" {
 
 The following arguments are supported:
 
-- `resource_id` (Required, ForceNew) – The unique identifier of the resource for which advanced settings are being managed.
-- `resource_type` (Required, ForceNew) – The type of resource. Must be one of: `APPLICATION`, `PROFILE`, `PROFILE_POLICY`, `RESOURCE_MANAGER_PROFILE` or `RESOURCE_MANAGER_PROFILE_POLICY`.
+- `resource_id` (Required, ForceNew) - The unique identifier of the resource for which advanced settings are being managed.
+- `resource_type` (Required, ForceNew) - The type of resource. Must be one of: `APPLICATION`, `PROFILE`, `PROFILE_POLICY`, `RESOURCE_MANAGER_PROFILE` or `RESOURCE_MANAGER_PROFILE_POLICY`.
 - `justification_settings` (Optional):
-  - `justification_id` (Computed) – The ID of the justification setting.
-  - `is_justification_required` (Required) – Whether justification is required for actions on the resource.
-  - `justification_regex` (Optional) – A regular expression to validate justification input.
+  - `justification_id` (Computed) - The ID of the justification setting.
+  - `is_justification_required` (Required) - Whether justification is required for actions on the resource.
+  - `justification_regex` (Optional) - A regular expression to validate justification input.
 - `itsm` (Optional):
-  - `itsm_id` (Computed) – The ID of the ITSM setting.
-  - `connection_id` (Required) – The ID of the ITSM connection.
-  - `connection_type` (Required) – The type of ITSM connection (e.g., Jira, ServiceNow).
-  - `is_itsm_enabled` (Required) – Whether ITSM integration is enabled.
+  - `itsm_id` (Computed) - The ID of the ITSM setting.
+  - `connection_id` (Required) - The ID of the ITSM connection.
+  - `connection_type` (Required) - The type of ITSM connection (e.g., Jira, ServiceNow).
+  - `is_itsm_enabled` (Required) - Whether ITSM integration is enabled.
   - `itsm_filter_criteria` (Required):
-      - `filter` (Required) – The filter definition (e.g., JQL for Jira).
-      - `supported_ticket_type` (Required) – The supported ticket type for the filter criteria. Example: `"issue"`, `"request"`.
+      - `filter` (Required) - The filter definition (e.g., JQL for Jira).
+      - `supported_ticket_type` (Required) - The supported ticket type for the filter criteria. Example: `"issue"`, `"request"`.
 - `im` (Optional):
-  - `connection_id` (Required) – The ID of the IM connection.
-  - `connection_type` (Required) – The type of IM connection (e.g., PagerDuty).
-  - `is_auto_approval_enabled` (Required) – Whether IM settings auto approval enabled.
-  - `escalation_policies` (Required) – Escalation policies of incident management setting.
+  - `connection_id` (Required) - The ID of the IM connection.
+  - `connection_type` (Required) - The type of IM connection (e.g., PagerDuty).
+  - `is_auto_approval_enabled` (Required) - Whether IM settings auto approval enabled.
+  - `escalation_policies` (Required) - Escalation policies of incident management setting.
 
 ## Resource Type Examples
 

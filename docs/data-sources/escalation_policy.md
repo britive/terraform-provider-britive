@@ -27,11 +27,11 @@ output "policy_id" {
 
 The following argument is supported:
 
-- `name` (Required) – The name of the escalation to retrieve.
-- `im_connection_id` (Required) – Id of IM connection.
+- `name` (Required) - The name of the escalation to retrieve.
+- `im_connection_id` (Required) - Id of IM connection.
 
 ## Attribute Reference
 
 The following attributes are exported:
 
-- `id` – The unique identifier of the escalation policy.
+- `id` - The unique identifier of the escalation policy.

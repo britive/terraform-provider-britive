@@ -2,8 +2,9 @@ package britive
 
 // Config - godoc
 type Config struct {
-	Tenant string `json:"tenant"`
-	Token  string `json:"token"`
+	Tenant      string `json:"tenant"`
+	Token       string `json:"token"`
+	EnableCache bool   `json:"enable_cache"`
 }
 
 // HTTPErrorResponse - godoc

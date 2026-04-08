@@ -90,6 +90,13 @@ func (c *Client) SaveProfileAssociationResourceScopes(profileID string, associat
 
 // Get the application type for a given application ID
 func (c *Client) GetApplicationType(appContainerID string) (*ApplicationType, error) {
+	cacheKey := fmt.Sprintf("app-type:%s", appContainerID)
+	if cached, ok := c.cacheGet(cacheKey); ok {
+		original := cached.(*ApplicationType)
+		cp := *original
+		return &cp, nil
+	}
+
 	resourceURL := fmt.Sprintf("%s/apps/%s", c.APIBaseURL, appContainerID)
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
@@ -111,6 +118,7 @@ func (c *Client) GetApplicationType(appContainerID string) (*ApplicationType, er
 		return nil, err
 	}
 
+	c.cacheSet(cacheKey, applicationType)
 	return applicationType, nil
 }
 
