@@ -73,31 +73,17 @@ func NewResourceTagOwner(importHelper *imports.ImportHelper) *ResourceTagOwner {
 				Optional:    true,
 				Description: "User owners of the tag",
 				Elem:        ownerEntitySchema,
-				// Set:         ownerEntityHash,
 			},
 			"tag": {
 				Type:        schema.TypeSet,
 				Optional:    true,
 				Description: "Tag owners of the tag",
 				Elem:        ownerEntitySchema,
-				// Set:         ownerEntityHash,
 			},
 		},
 	}
 
 	return rto
-}
-
-// ownerEntityHash - hash function for owner entity set items; uses id if set, else name
-func ownerEntityHash(v interface{}) int {
-	m := v.(map[string]interface{})
-	id := m["id"].(string)
-	name := m["name"].(string)
-	key := id
-	if key == "" {
-		key = name
-	}
-	return schema.HashString(key)
 }
 
 // validateOwnerBlocks - CustomizeDiff validator that rejects any user or tag block
@@ -210,43 +196,35 @@ func (rto *ResourceTagOwner) resourceStateImporter(d *schema.ResourceData, m int
 	importID := d.Id()
 
 	if strings.TrimSpace(importID) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("tag_id or tag_name")
+		return nil, errs.NewNotEmptyOrWhiteSpaceError("tag_id")
 	}
 
-	// Support importing by resource ID format "tags/{tagID}/owners"
+	// Accept both "tags/{tagID}/owners" and plain "{tagID}"
+	tagID := importID
 	if strings.HasPrefix(importID, "tags/") && strings.HasSuffix(importID, "/owners") {
-		tagID := strings.TrimSuffix(strings.TrimPrefix(importID, "tags/"), "/owners")
-		if tagID != "" {
-			d.SetId(rto.helper.generateUniqueID(tagID))
-			if err := d.Set("tag_id", tagID); err != nil {
-				return nil, err
-			}
-			log.Printf("[INFO] Imported tag owners for tag id: %s", tagID)
-			return []*schema.ResourceData{d}, nil
-		}
+		tagID = strings.TrimSuffix(strings.TrimPrefix(importID, "tags/"), "/owners")
 	}
 
-	// Otherwise treat as tag name
-	log.Printf("[INFO] Importing tag owners for tag name: %s", importID)
-	tag, err := c.GetTagByName(importID)
+	log.Printf("[INFO] Importing tag owners for tag id: %s", tagID)
+
+	_, err := c.GetTag(tagID)
 	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("tag %s", importID)
+		return nil, errs.NewNotFoundErrorf("tag %s", tagID)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	d.SetId(rto.helper.generateUniqueID(tag.ID))
-	if err := d.Set("tag_id", tag.ID); err != nil {
+	d.SetId(rto.helper.generateUniqueID(tagID))
+	if err := d.Set("tag_id", tagID); err != nil {
 		return nil, err
 	}
 
-	err = rto.helper.getAndMapModelToResource(d, m)
-	if err != nil {
+	if err := rto.helper.getAndMapModelToResource(d, m); err != nil {
 		return nil, err
 	}
 
-	log.Printf("[INFO] Imported tag owners for tag: %s (%s)", importID, tag.ID)
+	log.Printf("[INFO] Imported tag owners for tag id: %s", tagID)
 	return []*schema.ResourceData{d}, nil
 }
 
@@ -413,12 +391,4 @@ func resolveOwnerEntry(owner britive.TagOwnerEntity, stateByKey map[string]map[s
 	}
 	// External addition not in state — store with just id (stable identifier)
 	return map[string]interface{}{"id": owner.RelatedEntityID, "name": ""}
-}
-
-func toInterfaceSlice(items []map[string]interface{}) []interface{} {
-	result := make([]interface{}, len(items))
-	for i, item := range items {
-		result[i] = item
-	}
-	return result
 }
