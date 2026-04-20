@@ -30,6 +30,7 @@ func Provider(v string) *schema.Provider {
 
 	resourceTag := resources.NewResourceTag(importHelper)
 	resourceTagMember := resources.NewResourceTagMember(importHelper)
+	resourceTagOwner := resources.NewResourceTagOwner(importHelper)
 	resourceProfile := resources.NewResourceProfile(validation, importHelper)
 	resourceProfilePermission := resources.NewResourceProfilePermission(importHelper)
 	resourceProfileSessionAttribute := resources.NewResourceProfileSessionAttribute(importHelper)
@@ -63,6 +64,8 @@ func Provider(v string) *schema.Provider {
 	dataSourceAllConnections := datasources.NewDataSourceAllConnections()
 	dataSourceEscalationPolicy := datasources.NewDataSourceEscalationPolicy()
 	dataSourceResourceManagerProfilePermissions := datasources.NewDataSourceResourceManagerProfilePermissions()
+	dataSourceUser := datasources.NewDataSourceUser()
+	dataSourceTag := datasources.NewDataSourceTag()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -89,6 +92,7 @@ func Provider(v string) *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource{
 			"britive_tag":                                            resourceTag.Resource,
 			"britive_tag_member":                                     resourceTagMember.Resource,
+			"britive_tag_owner":                                      resourceTagOwner.Resource,
 			"britive_profile":                                        resourceProfile.Resource,
 			"britive_profile_permission":                             resourceProfilePermission.Resource,
 			"britive_profile_session_attribute":                      resourceProfileSessionAttribute.Resource,
@@ -123,6 +127,8 @@ func Provider(v string) *schema.Provider {
 			"britive_all_connections":                      dataSourceAllConnections.Resource,
 			"britive_escalation_policy":                    dataSourceEscalationPolicy.Resource,
 			"britive_resource_manager_profile_permissions": dataSourceResourceManagerProfilePermissions.Resource,
+			"britive_user":                                 dataSourceUser.Resource,
+			"britive_tag":                                  dataSourceTag.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
