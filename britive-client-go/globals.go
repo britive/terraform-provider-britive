@@ -5,6 +5,7 @@ import (
 )
 
 const (
+	maxRetries                       = 3
 	emptyString                      = ""
 	tagLockName                      = "tag"
 	profileLockName                  = "profile"
@@ -30,6 +31,7 @@ const (
 )
 
 var (
+	IsSleepWithContext = false
 	//ErrNotFound - godoc
 	ErrNotFound     = errors.New("could not find")
 	ErrNoContent    = errors.New("no content")
