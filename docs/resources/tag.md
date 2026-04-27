@@ -21,9 +21,42 @@ data "britive_identity_provider" "idp" {
 }
 
 resource "britive_tag" "new" {
-    name = "My Tag"
-    description = "My Tag Description"
+    name                 = "My Tag"
+    description          = "My Tag Description"
     identity_provider_id = data.britive_identity_provider.idp.id
+    requestable          = true
+
+    attributes {
+        attribute_name  = "Owner"
+        attribute_value = "alice"
+    }
+
+    attributes {
+        attribute_name  = "Environment"
+        attribute_value = "production"
+    }
+}
+```
+
+### Multi-valued attribute example
+
+A single attribute name can hold multiple values by repeating the `attributes` block with the same `attribute_name`:
+
+```hcl
+resource "britive_tag" "new" {
+    name                 = "My Tag"
+    description          = "My Tag Description"
+    identity_provider_id = data.britive_identity_provider.idp.id
+
+    attributes {
+        attribute_name  = "Region"
+        attribute_value = "us-east-1"
+    }
+
+    attributes {
+        attribute_name  = "Region"
+        attribute_value = "eu-west-1"
+    }
 }
 ```
 
@@ -38,6 +71,12 @@ The following arguments are supported:
 * `identity_provider_id` - (Required) The unique identity of the identity provider associated with the Britive tag.
 
 * `disabled` - (Optional) The status of the Britive tag. By default, the Britive tag is enabled. To disable a Britive tag, set `disabled = true`.
+
+* `requestable` - (Optional) Whether the Britive tag is requestable. Defaults to `true`.
+
+* `attributes` - (Optional) One or more attribute blocks to associate with the Britive tag. Multiple blocks with the same `attribute_name` are supported for multi-valued attributes. Each block supports:
+  * `attribute_name` - (Required) The name of the attribute.
+  * `attribute_value` - (Required) The value of the attribute.
 
 ## Attribute Reference
 
