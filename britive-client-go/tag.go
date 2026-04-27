@@ -144,6 +144,33 @@ func (c *Client) EnableOrDisableTag(tagID string, disabled bool) (*Tag, error) {
 	return &tag, nil
 }
 
+// UpdateTagAttributes - Update tag requestable flag and attributes via PATCH /user-tags (ID in body)
+func (c *Client) UpdateTagAttributes(tagID string, req TagAttributesUpdateRequest) (*Tag, error) {
+	req.UserTagID = tagID
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpReq, err := http.NewRequest("PATCH", fmt.Sprintf("%s/user-tags", c.APIBaseURL), strings.NewReader(string(reqBody)))
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.DoWithLock(httpReq, tagLockName)
+	if err != nil {
+		return nil, err
+	}
+
+	var tag Tag
+	err = json.Unmarshal(body, &tag)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tag, nil
+}
+
 // DeleteTag - Delete tag
 func (c *Client) DeleteTag(tagID string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/user-tags/%s", c.APIBaseURL, tagID), nil)

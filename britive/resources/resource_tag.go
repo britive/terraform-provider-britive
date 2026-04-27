@@ -66,6 +66,33 @@ func NewResourceTag(importHelper *imports.ImportHelper) *ResourceTag {
 				Computed:    true,
 				Description: "The boolean attribute that indicates whether the tag is external or not",
 			},
+			"requestable": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     true,
+				Description: "Whether the Britive tag is requestable",
+			},
+			"attributes": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "The attributes of the Britive tag",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"attribute_name": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The name of the attribute",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+						"attribute_value": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The value of the attribute",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+					},
+				},
+			},
 		},
 	}
 	return rt
@@ -105,6 +132,10 @@ func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceDat
 
 	log.Printf("[INFO] Submitted new tag: %#v", ut)
 	d.SetId(ut.ID)
+
+	if diags := rt.helper.updateTagAttributes(c, ut.ID, d); diags != nil {
+		return diags
+	}
 
 	return rt.resourceRead(ctx, d, m)
 }
@@ -177,6 +208,12 @@ func (rt *ResourceTag) resourceUpdate(ctx context.Context, d *schema.ResourceDat
 
 		log.Printf("[INFO] Submitted updated status of tag: %#v", ut)
 		d.SetId(ut.ID)
+	}
+	if d.HasChange("requestable") || d.HasChange("attributes") {
+		hasChanges = true
+		if diags := rt.helper.updateTagAttributes(c, tagID, d); diags != nil {
+			return diags
+		}
 	}
 	if hasChanges {
 		return rt.resourceRead(ctx, d, m)
@@ -277,7 +314,49 @@ func (rth *ResourceTagHelper) mapModelToResource(tag *britive.Tag, d *schema.Res
 	if err := d.Set("external", tag.External); err != nil {
 		return err
 	}
+	if err := d.Set("requestable", tag.Requestable); err != nil {
+		return err
+	}
+	attributes := make([]map[string]interface{}, len(tag.Attributes))
+	for i, attr := range tag.Attributes {
+		attributes[i] = map[string]interface{}{
+			"attribute_name":  attr.AttributeName,
+			"attribute_value": attr.AttributeValue,
+		}
+	}
+	if err := d.Set("attributes", attributes); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (rth *ResourceTagHelper) updateTagAttributes(c *britive.Client, tagID string, d *schema.ResourceData) diag.Diagnostics {
+	req := britive.TagAttributesUpdateRequest{
+		Name:        d.Get("name").(string),
+		Description: d.Get("description").(string),
+		Requestable: d.Get("requestable").(bool),
+		Attributes:  rth.buildTagAttributes(d),
+	}
+
+	log.Printf("[INFO] Updating tag attributes for tag %s: %#v", tagID, req)
+	_, err := c.UpdateTagAttributes(tagID, req)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	return nil
+}
+
+func (rth *ResourceTagHelper) buildTagAttributes(d *schema.ResourceData) []britive.TagAttribute {
+	attributesSet := d.Get("attributes").(*schema.Set)
+	attributes := make([]britive.TagAttribute, 0, attributesSet.Len())
+	for _, item := range attributesSet.List() {
+		attr := item.(map[string]interface{})
+		attributes = append(attributes, britive.TagAttribute{
+			AttributeName:  attr["attribute_name"].(string),
+			AttributeValue: attr["attribute_value"].(string),
+		})
+	}
+	return attributes
 }
 
 func (rth *ResourceTagHelper) validateForExternalTag(d *schema.ResourceData, m interface{}) error {
