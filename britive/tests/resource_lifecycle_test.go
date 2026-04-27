@@ -1552,6 +1552,111 @@ resource "britive_resource_manager_profile" "resource_profile_1" {
 // Resource Manager Profile Policy Prioritization — Lifecycle (v3.0.0)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// TestBritiveTagOwnerEditFields verifies that updating owner sets (adding/removing
+// a user owner or tag owner) plans as an in-place Update, not a Replace.
+func TestBritiveTagOwnerEditFields(t *testing.T) {
+	const (
+		identityProviderName = "Britive"
+		tagName              = "AT - Tag Owner Lifecycle Edit Test"
+		ownerTagName         = "AT - Tag Owner Lifecycle Owner Tag"
+		ownerUsername        = "britiveprovideracceptancetest"
+	)
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create with a user owner only
+			{
+				Config: testAccTagOwnerLifecycleConfig(identityProviderName, tagName, ownerTagName, ownerUsername, false),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveTagOwnerExists("britive_tag_owner.lifecycle"),
+					resource.TestCheckResourceAttrSet("britive_tag_owner.lifecycle", "tag_id"),
+				),
+			},
+			// Step 2: Add a tag owner — must be an in-place Update (not Replace)
+			{
+				Config: testAccTagOwnerLifecycleConfig(identityProviderName, tagName, ownerTagName, ownerUsername, true),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("britive_tag_owner.lifecycle", plancheck.ResourceActionUpdate),
+					},
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveTagOwnerExists("britive_tag_owner.lifecycle"),
+				),
+			},
+		},
+	})
+}
+
+// TestBritiveTagOwnerIdempotency verifies that applying britive_tag_owner produces
+// no drift on the second plan/apply cycle.
+func TestBritiveTagOwnerIdempotency(t *testing.T) {
+	const (
+		identityProviderName = "Britive"
+		tagName              = "AT - Tag Owner Idempotency Test"
+		ownerTagName         = "AT - Tag Owner Idempotency Owner Tag"
+		ownerUsername        = "britiveprovideracceptancetest"
+	)
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccTagOwnerLifecycleConfig(identityProviderName, tagName, ownerTagName, ownerUsername, true),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveTagOwnerExists("britive_tag_owner.lifecycle"),
+				),
+			},
+		},
+	})
+}
+
+func testAccTagOwnerLifecycleConfig(identityProviderName, tagName, ownerTagName, ownerUsername string, includeTagOwner bool) string {
+	tagOwnerBlock := ""
+	ownerTagResource := ""
+	if includeTagOwner {
+		ownerTagResource = fmt.Sprintf(`
+resource "britive_tag" "owner_tag" {
+  name                 = %q
+  description          = "Owner tag for lifecycle test"
+  identity_provider_id = data.britive_identity_provider.existing.id
+}`, ownerTagName)
+		tagOwnerBlock = `
+		tag {
+			id = britive_tag.owner_tag.id
+		}`
+	}
+	return fmt.Sprintf(`
+data "britive_identity_provider" "existing" {
+  name = %q
+}
+
+resource "britive_tag" "lifecycle_target" {
+  name                 = %q
+  description          = "Lifecycle test target tag"
+  identity_provider_id = data.britive_identity_provider.existing.id
+}
+%s
+resource "britive_tag_owner" "lifecycle" {
+  tag_id = britive_tag.lifecycle_target.id
+
+  user {
+    name = %q
+  }
+%s
+}
+`, identityProviderName, tagName, ownerTagResource, ownerUsername, tagOwnerBlock)
+}
+
 // TestBritiveResourceManagerProfilePolicyPrioritizationIdempotency verifies that
 // applying the prioritization resource produces no drift on second plan/apply.
 func TestBritiveResourceManagerProfilePolicyPrioritizationIdempotency(t *testing.T) {

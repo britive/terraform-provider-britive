@@ -556,3 +556,23 @@ type ResourceManagerResourcePolicy struct {
 	IsReadOnly     bool                `json:"isReadOnly"`
 	ResourceLabels map[string][]string `json:"resourceLabels"`
 }
+
+// TagOwnerEntity - an entity (user or tag) that owns a tag
+type TagOwnerEntity struct {
+	RelatedEntityID   string `json:"relatedEntityId,omitempty"`
+	RelatedEntityName string `json:"relatedEntityName,omitempty"`
+	RelatedEntityType string `json:"relatedEntityType"`
+}
+
+// TagOwnerRelationships - the relationships block containing owners
+type TagOwnerRelationships struct {
+	Owners []TagOwnerEntity `json:"owners"`
+}
+
+// TagWithOwners - tag with owner relationships; used for GET /api/user-tags/{id} and PATCH /api/user-tags
+type TagWithOwners struct {
+	TagID         string                `json:"userTagId"`
+	Name          string                `json:"name"`
+	Description   string                `json:"description"`
+	Relationships TagOwnerRelationships `json:"relationships"`
+}

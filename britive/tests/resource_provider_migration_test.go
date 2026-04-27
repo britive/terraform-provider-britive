@@ -1118,3 +1118,36 @@ resource "britive_resource_manager_resource_broker_pools" "migration" {
 `
 	runMigrationTest(t, config)
 }
+
+func TestBritiveTagOwnerMigration(t *testing.T) {
+	config := migrationProviderBlock() + `
+data "britive_identity_provider" "existing" {
+  name = "Britive"
+}
+
+resource "britive_tag" "migration_target" {
+  name                 = "AT - Tag Owner Migration Test Target"
+  description          = "Tag Owner Migration Test Target"
+  identity_provider_id = data.britive_identity_provider.existing.id
+}
+
+resource "britive_tag" "migration_owner" {
+  name                 = "AT - Tag Owner Migration Test Owner"
+  description          = "Tag Owner Migration Test Owner"
+  identity_provider_id = data.britive_identity_provider.existing.id
+}
+
+resource "britive_tag_owner" "migration" {
+  tag_id = britive_tag.migration_target.id
+
+  user {
+    name = "britiveprovideracceptancetest"
+  }
+
+  tag {
+    id = britive_tag.migration_owner.id
+  }
+}
+`
+	runMigrationTest(t, config)
+}

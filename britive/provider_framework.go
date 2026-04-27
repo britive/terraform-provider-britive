@@ -168,6 +168,8 @@ func (p *BritiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 		datasources.NewAllConnectionsDataSource,
 		datasources.NewEscalationPolicyDataSource,
 		datasources.NewResourceManagerProfilePermissionsDataSource,
+		datasources.NewTagDataSource,
+		datasources.NewUserDataSource,
 	}
 }
 
@@ -175,6 +177,7 @@ func (p *BritiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 func (p *BritiveProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		resources.NewTagResource,
+		resources.NewTagOwnerResource,
 		resources.NewConstraintResource,
 		resources.NewTagMemberResource,
 		resources.NewEntityGroupResource,
