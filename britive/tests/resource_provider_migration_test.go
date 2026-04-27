@@ -1,9 +1,9 @@
 package tests
 
-// resource_provider_migration_test.go — Provider migration tests (v2.2.9 → v3.0.0)
+// resource_provider_migration_test.go — Provider migration tests (v2.3.0 → v3.0.0)
 //
 // Each test follows the 2-step pattern:
-//   Step 1: Create the resource with v2.2.9 (SDKv2, Protocol v5) downloaded from the registry
+//   Step 1: Create the resource with v2.3.0 (SDKv2, Protocol v5) downloaded from the registry
 //   Step 2: Plan-only with v3.0.0 (Plugin Framework, Protocol v6) using the local build
 //
 // Terraform calls UpgradeResourceState automatically between steps to translate
@@ -14,15 +14,18 @@ package tests
 // Design notes:
 //   - britive_tag is already covered by TestBritiveTagProviderMigration in
 //     resource_lifecycle_test.go and is therefore excluded here.
-//   - britive_profile "associations" changed HCL syntax between v2.2.9 (SDKv2
-//     TypeSet assignment syntax) and v3.0.0 (SetNestedBlock syntax). All profiles
-//     in this file are created WITHOUT associations to remain HCL-compatible with
-//     both versions.
+//   - britive_profile "associations" uses block HCL syntax in both v2.3.0
+//     (SDKv2 TypeSet-of-Resource) and v3.0.0 (SetNestedBlock), so the same
+//     config works for both versions. Both versions require at least 1
+//     association. The migrationProfileNoAssocConfig helper includes a minimal
+//     EnvironmentGroup association for each known test application.
+//   - britive_tag_owner was added in v2.3.0 (commit d234f70) so it is eligible
+//     for migration testing.
 //   - britive_escalation_policy data source requires an IM-type connection that
 //     is not guaranteed in all test environments; it is excluded.
 //   - All configs are prefixed with migrationProviderBlock() (defined in
 //     resource_lifecycle_test.go) to supply a full https:// tenant URL required
-//     by v2.2.9.
+//     by v2.3.0.
 
 import (
 	"fmt"
@@ -37,19 +40,19 @@ import (
 var migrationExternalProviders = map[string]resource.ExternalProvider{
 	"britive": {
 		Source:            "britive/britive",
-		VersionConstraint: "= 2.2.9",
+		VersionConstraint: "= 2.3.0",
 	},
 }
 
 // runMigrationTest executes the canonical 2-step migration pattern:
-// Step 1 creates the resource(s) using the v2.2.9 registry binary;
+// Step 1 creates the resource(s) using the v2.3.0 registry binary;
 // Step 2 plans with the local v3.0.0 binary and asserts an empty plan.
 func runMigrationTest(t *testing.T, config string) {
 	t.Helper()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() { testAccPreCheckFramework(t) },
 		Steps: []resource.TestStep{
-			// Step 1 — create with v2.2.9 (SDKv2, Protocol v5)
+			// Step 1 — create with v2.3.0 (SDKv2, Protocol v5)
 			{
 				ExternalProviders: migrationExternalProviders,
 				Config:            config,
@@ -68,10 +71,25 @@ func runMigrationTest(t *testing.T, config string) {
 // Private config helpers used only in migration tests
 // ─────────────────────────────────────────────────────────────────────────────
 
-// migrationProfileNoAssocConfig produces a provider block + application data
-// source + profile resource WITHOUT the "associations" field. Both v2.2.9 and
-// v3.0.0 accept a profile with no associations; the HCL is identical in both.
+// appAssociations maps known "DO NOT DELETE" test application names to a
+// compatible EnvironmentGroup association value. Both v2.3.0 (SDKv2 TypeSet)
+// and v3.0.0 (SetNestedBlock) use the same block HCL syntax for associations,
+// so the same config is valid for both provider versions.
+var appAssociations = map[string]string{
+	"DO NOT DELETE - Azure TF Plugin": "QA",
+	"DO NOT DELETE - GCP TF Plugin":   "britive-gdev-cis.net",
+	"DO NOT DELETE - AWS TF Plugin":   "Root",
+}
+
+// migrationProfileConfig produces a provider block + application data source +
+// profile resource with a minimal EnvironmentGroup association. The association
+// HCL syntax is identical in v2.3.0 and v3.0.0, so the config is valid for
+// both provider versions in migration tests.
 func migrationProfileNoAssocConfig(appName, profileName string) string {
+	assocVal, ok := appAssociations[appName]
+	if !ok {
+		assocVal = "Root"
+	}
 	return migrationProviderBlock() + fmt.Sprintf(`
 data "britive_application" "app" {
   name = %q
@@ -81,8 +99,12 @@ resource "britive_profile" "migration" {
   app_container_id    = data.britive_application.app.id
   name                = %q
   expiration_duration = "25m0s"
+  associations {
+    type  = "EnvironmentGroup"
+    value = %q
+  }
 }
-`, appName, profileName)
+`, appName, profileName, assocVal)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -389,10 +411,10 @@ resource "britive_application" "migration" {
 	runMigrationTest(t, config)
 }
 
-// TestBritiveProfileMigration verifies that a profile created without
-// associations migrates cleanly. Profiles WITH associations are excluded
-// because the "associations" field changed HCL syntax between v2.2.9 and v3.0.0
-// (see comment at the top of this file and MIGRATION.md §16).
+// TestBritiveProfileMigration verifies that a profile with an EnvironmentGroup
+// association migrates cleanly from v2.3.0 to v3.0.0. The "associations" block
+// HCL syntax is identical in both versions (SetNestedBlock / TypeSet-of-Resource
+// both use block form), so a single config is valid for both.
 func TestBritiveProfileMigration(t *testing.T) {
 	config := migrationProviderBlock() + `
 data "britive_application" "migration" {
@@ -404,6 +426,10 @@ resource "britive_profile" "migration" {
   name                = "AT - Profile Migration Test"
   description         = "AT - Profile Migration Test Description"
   expiration_duration = "25m0s"
+  associations {
+    type  = "EnvironmentGroup"
+    value = "QA"
+  }
 }
 `
 	runMigrationTest(t, config)
@@ -471,8 +497,8 @@ resource "britive_constraint" "migration_condition" {
 
 func TestBritiveAdvancedSettingsMigration(t *testing.T) {
 	// Tests APPLICATION-level advanced settings with minimal fields only.
-	// Advanced settings schema changed significantly between v2.2.9 and v3.0.0
-	// (v2.2.9 had flat attributes; v3.0.0 uses nested blocks), so we use only
+	// Advanced settings schema changed significantly between v2.3.0 and v3.0.0
+	// (v2.3.0 had flat attributes; v3.0.0 uses nested blocks), so we use only
 	// the fields common to both: resource_type and resource_id.
 	config := migrationProviderBlock() + `
 data "britive_application" "migration" {
@@ -987,8 +1013,8 @@ resource "britive_resource_manager_profile_policy" "migration" {
 }
 
 func TestBritiveResourceManagerProfilePolicyPrioritizationMigration(t *testing.T) {
-	// britive_resource_manager_profile_policy_prioritization was added in v2.2.9
-	// and is therefore eligible for v2.2.9 → v3.0.0 migration testing.
+	// britive_resource_manager_profile_policy_prioritization was added in v2.3.0
+	// and is therefore eligible for v2.3.0 → v3.0.0 migration testing.
 	config := migrationProviderBlock() + `
 resource "britive_resource_manager_resource_label" "migration_1" {
   name        = "AT-Britive_Migration_RMPrio_Label_1"

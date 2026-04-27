@@ -4,14 +4,14 @@ package tests
 //
 //  1. Edit tests   — Create → edit fields → assert plan shows Update (not Replace) → apply → assert no drift
 //  2. Idempotency  — Create → assert PostApplyPostRefresh plan is empty (no perpetual drift)
-//  3. Migration    — Create with v2.2.9 (registry) → plan with v3.0.0 (local) → assert no drift
+//  3. Migration    — Create with v2.3.0 (registry) → plan with v3.0.0 (local) → assert no drift
 //
 // Prerequisites
 //   TF_ACC=1
 //   BRITIVE_TENANT and BRITIVE_TOKEN environment variables (or ~/.britive/tf.config)
 //
 // Migration tests additionally require:
-//   - Internet access to download the britive/britive v2.2.9 provider binary from the registry
+//   - Internet access to download the britive/britive v2.3.0 provider binary from the registry
 //   - Terraform CLI on PATH (terraform-plugin-testing will invoke it)
 
 import (
@@ -202,12 +202,12 @@ func TestBritiveApplicationIdempotency(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pattern 3 — Provider migration tests (v2.2.9 → v3.0.0)
+// Pattern 3 — Provider migration tests (v2.3.0 → v3.0.0)
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 1 uses ExternalProviders to download and run v2.2.9 from the Terraform
+// Step 1 uses ExternalProviders to download and run v2.3.0 from the Terraform
 // registry (SDKv2, Protocol v5). Step 2 uses the locally-built v3.0.0 binary
 // (Plugin Framework, Protocol v6) with PlanOnly to verify that the state
-// written by v2.2.9 produces no changes when read and planned by v3.0.0.
+// written by v2.3.0 produces no changes when read and planned by v3.0.0.
 //
 // Terraform automatically calls UpgradeResourceState on the new provider to
 // migrate the internal state format (SDKv2 flatmap → Framework JSON). The test
@@ -217,7 +217,7 @@ func TestBritiveApplicationIdempotency(t *testing.T) {
 // Note: No providers are set at the TestCase level so that each step's provider
 // configuration is used exclusively (step-level providers override TestCase
 // providers when the TestCase has none). This is required so that step 1 uses
-// only the registry v2.2.9 binary and step 2 uses only the local v3.0.0 binary.
+// only the registry v2.3.0 binary and step 2 uses only the local v3.0.0 binary.
 
 func TestBritiveTagProviderMigration(t *testing.T) {
 	const (
@@ -230,12 +230,12 @@ func TestBritiveTagProviderMigration(t *testing.T) {
 		PreCheck: func() { testAccPreCheckFramework(t) },
 		// No TestCase-level providers — each step specifies its own.
 		Steps: []resource.TestStep{
-			// Step 1: Create with v2.2.9 (SDKv2, Protocol v5)
+			// Step 1: Create with v2.3.0 (SDKv2, Protocol v5)
 			{
 				ExternalProviders: map[string]resource.ExternalProvider{
 					"britive": {
 						Source:            "britive/britive",
-						VersionConstraint: "= 2.2.9",
+						VersionConstraint: "= 2.3.0",
 					},
 				},
 				Config: config,
@@ -362,7 +362,7 @@ resource "britive_application" "idempotency" {
 
 // migrationProviderBlock returns a Terraform provider "britive" {} block that
 // explicitly sets tenant and token with a full https:// URL. This is required
-// for migration tests where step 1 runs v2.2.9 from the registry: that release
+// for migration tests where step 1 runs v2.3.0 from the registry: that release
 // (SDKv2) does not auto-prepend "https://" to the BRITIVE_TENANT environment
 // variable — the fix was added in v3.0.0. Including an explicit provider block
 // ensures both provider versions receive a valid scheme.
@@ -397,17 +397,10 @@ resource "britive_tag" "migration" {
 `, identityProviderName, name)
 }
 
-// Note: TestBritiveProfileProviderMigration is intentionally absent.
-//
-// The britive_profile "associations" field changed its HCL syntax between
-// v2.2.9 and v3.0.0:
-//
-//   v2.2.9 (SDKv2 TypeSet)  — assignment syntax:  associations = [{type = "...", value = "..."}]
-//   v3.0.0 (SetNestedBlock) — block syntax:        associations { type = "..." value = "..." }
-//
-// These two syntaxes are mutually exclusive; no single .tf configuration is
-// valid for both versions. Users migrating profiles must update their .tf files
-// alongside the provider upgrade. This is documented in MIGRATION.md §16.
+// Note: Profile migration tests live in resource_provider_migration_test.go.
+// Both v2.3.0 (SDKv2 TypeSet-of-Resource) and v3.0.0 (SetNestedBlock) use
+// the same block HCL syntax for "associations", so a single config is valid
+// for both versions.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core resources — Edit tests

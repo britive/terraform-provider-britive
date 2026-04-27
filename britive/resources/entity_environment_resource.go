@@ -134,6 +134,13 @@ func (r *EntityEnvironmentResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	// Read config to get plaintext sensitive values (plan has hashed values from SensitiveHash modifier)
+	var config EntityEnvironmentResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	applicationEntity, err := r.mapResourceToModel(&plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Resource", err.Error())
@@ -162,8 +169,12 @@ func (r *EntityEnvironmentResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	// Use plaintext sensitive values from config for the API call; plan retains hashes for state
+	planForAPI := plan
+	planForAPI.SensitiveProperties = config.SensitiveProperties
+
 	// Patch properties
-	properties, err := r.mapPropertiesResourceToModel(&plan, appEnvDetails)
+	properties, err := r.mapPropertiesResourceToModel(&planForAPI, appEnvDetails)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Properties", err.Error())
 		return
@@ -177,7 +188,7 @@ func (r *EntityEnvironmentResource) Create(ctx context.Context, req resource.Cre
 	}
 	log.Printf("[INFO] Updated application environment properties")
 
-	// Read back state
+	// Read back state (plan still has hashed sensitive values for correct state storage)
 	err = r.readAndMapState(applicationID, ae.EntityID, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Entity Environment", err.Error())
@@ -225,6 +236,13 @@ func (r *EntityEnvironmentResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	// Read config to get plaintext sensitive values (plan has hashed values from SensitiveHash modifier)
+	var config EntityEnvironmentResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	applicationID, entityID, err := r.parseUniqueID(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Parsing Resource ID", err.Error())
@@ -241,8 +259,12 @@ func (r *EntityEnvironmentResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	// Use plaintext sensitive values from config for the API call; plan retains hashes for state
+	planForAPI := plan
+	planForAPI.SensitiveProperties = config.SensitiveProperties
+
 	// Patch properties
-	properties, err := r.mapPropertiesResourceToModel(&plan, appEnvDetails)
+	properties, err := r.mapPropertiesResourceToModel(&planForAPI, appEnvDetails)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Properties", err.Error())
 		return
@@ -256,6 +278,7 @@ func (r *EntityEnvironmentResource) Update(ctx context.Context, req resource.Upd
 	}
 	log.Printf("[INFO] Updated application entity environment properties")
 
+	// Read back state (plan still has hashed sensitive values for correct state storage)
 	err = r.readAndMapState(applicationID, entityID, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Entity Environment", err.Error())

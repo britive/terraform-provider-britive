@@ -15,24 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// normalizeVersionPlanModifier lowercases "latest"/"local" version values in the plan,
-// matching the normalized form stored in state to prevent case-only drift after migration.
-type normalizeVersionPlanModifier struct{}
-
-func (m normalizeVersionPlanModifier) Description(_ context.Context) string {
-	return "Normalizes 'latest' and 'local' version values to lowercase."
-}
-
-func (m normalizeVersionPlanModifier) MarkdownDescription(_ context.Context) string {
-	return "Normalizes `latest` and `local` version values to lowercase."
-}
-
-func (m normalizeVersionPlanModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
-	v := req.PlanValue.ValueString()
-	if strings.EqualFold(v, "latest") || strings.EqualFold(v, "local") {
-		resp.PlanValue = types.StringValue(strings.ToLower(v))
-	}
-}
 
 type ProfilePermissionResource struct {
 	client *britive.Client
@@ -105,9 +87,6 @@ func (r *ProfilePermissionResource) Schema(_ context.Context, _ resource.SchemaR
 			"version": schema.StringAttribute{
 				Required:    true,
 				Description: "Version of the permission (case-insensitive: latest, local, or specific version)",
-				PlanModifiers: []planmodifier.String{
-					normalizeVersionPlanModifier{},
-				},
 			},
 			"resource_type_id": schema.StringAttribute{
 				Computed:    true,

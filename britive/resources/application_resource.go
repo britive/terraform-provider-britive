@@ -228,6 +228,13 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	// Read config to get plaintext sensitive values (plan has hashed values from SensitiveHash modifier)
+	var config ApplicationResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Validate and get app catalog details
 	appCatalogDetails, err := r.getAppCatalogDetails(ctx, &plan)
 	if err != nil {
@@ -266,8 +273,12 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 	plan.ID = types.StringValue(appResponse.AppContainerId)
 	plan.CatalogAppID = types.Int64Value(int64(appResponse.CatalogAppId))
 
+	// Use plaintext sensitive values from config for the API call; plan retains hashes for state
+	planForAPI := plan
+	planForAPI.SensitiveProperties = config.SensitiveProperties
+
 	// Patch properties
-	properties, err := r.buildPropertiesForAPI(ctx, &plan, appResponse, false)
+	properties, err := r.buildPropertiesForAPI(ctx, &planForAPI, appResponse, false)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Building Properties",
@@ -432,6 +443,13 @@ func (r *ApplicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	// Read config to get plaintext sensitive values (plan has hashed values from SensitiveHash modifier)
+	var config ApplicationResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	applicationID := plan.ID.ValueString()
 
 	// Validate properties against system apps
@@ -456,8 +474,12 @@ func (r *ApplicationResource) Update(ctx context.Context, req resource.UpdateReq
 
 	// Update properties if changed
 	if !propertySliceEqual(plan.Properties, state.Properties) || !propertySliceEqual(plan.SensitiveProperties, state.SensitiveProperties) {
+		// Use plaintext sensitive values from config for the API call; plan retains hashes for state
+		planForAPI := plan
+		planForAPI.SensitiveProperties = config.SensitiveProperties
+
 		// Build properties including removed ones
-		properties, err := r.buildPropertiesForUpdate(ctx, &plan, &state, application)
+		properties, err := r.buildPropertiesForUpdate(ctx, &planForAPI, &state, application)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Building Properties",
