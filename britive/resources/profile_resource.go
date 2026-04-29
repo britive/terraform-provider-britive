@@ -38,10 +38,10 @@ type ProfileResourceModel struct {
 	Description                    types.String            `tfsdk:"description"`
 	Disabled                       types.Bool              `tfsdk:"disabled"`
 	Associations                   []ProfileAssociationModel `tfsdk:"associations"`
-	ExpirationDuration             types.String            `tfsdk:"expiration_duration"`
-	Extendable                     types.Bool              `tfsdk:"extendable"`
-	NotificationPriorToExpiration  types.String            `tfsdk:"notification_prior_to_expiration"`
-	ExtensionDuration              types.String            `tfsdk:"extension_duration"`
+	ExpirationDuration             validators.DurationStringValue `tfsdk:"expiration_duration"`
+	Extendable                     types.Bool                     `tfsdk:"extendable"`
+	NotificationPriorToExpiration  validators.DurationStringValue `tfsdk:"notification_prior_to_expiration"`
+	ExtensionDuration              validators.DurationStringValue `tfsdk:"extension_duration"`
 	ExtensionLimit                 types.Int64             `tfsdk:"extension_limit"`
 	DestinationURL                 types.String            `tfsdk:"destination_url"`
 	AllowImpersonation             types.Bool              `tfsdk:"allow_impersonation"`
@@ -114,6 +114,7 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"expiration_duration": schema.StringAttribute{
 				Description: "The expiration time for the Britive profile",
 				Required:    true,
+				CustomType:  validators.DurationStringType{},
 				Validators: []validator.String{
 					validators.Duration(),
 				},
@@ -127,6 +128,7 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"notification_prior_to_expiration": schema.StringAttribute{
 				Description: "The profile expiry notification as a time value",
 				Optional:    true,
+				CustomType:  validators.DurationStringType{},
 				Validators: []validator.String{
 					validators.Duration(),
 				},
@@ -134,6 +136,7 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"extension_duration": schema.StringAttribute{
 				Description: "The profile expiry extension as a time value",
 				Optional:    true,
+				CustomType:  validators.DurationStringType{},
 				Validators: []validator.String{
 					validators.Duration(),
 				},
@@ -265,10 +268,10 @@ func (r *ProfileResource) UpgradeState(_ context.Context) map[int64]resource.Sta
 			"name":                            schema.StringAttribute{Required: true},
 			"description":                     schema.StringAttribute{Optional: true},
 			"disabled":                        schema.BoolAttribute{Optional: true, Computed: true},
-			"expiration_duration":             schema.StringAttribute{Required: true},
+			"expiration_duration":             schema.StringAttribute{Required: true, CustomType: validators.DurationStringType{}},
 			"extendable":                      schema.BoolAttribute{Optional: true, Computed: true},
-			"notification_prior_to_expiration": schema.StringAttribute{Optional: true},
-			"extension_duration":              schema.StringAttribute{Optional: true},
+			"notification_prior_to_expiration": schema.StringAttribute{Optional: true, CustomType: validators.DurationStringType{}},
+			"extension_duration":              schema.StringAttribute{Optional: true, CustomType: validators.DurationStringType{}},
 			"extension_limit":                 schema.Int64Attribute{Optional: true},
 			"destination_url":                 schema.StringAttribute{Optional: true},
 			"allow_impersonation":             schema.BoolAttribute{Optional: true, Computed: true},
@@ -663,16 +666,16 @@ func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *Pr
 		state.Description = types.StringNull()
 	}
 	state.Disabled = types.BoolValue(strings.EqualFold(profile.Status, "inactive"))
-	state.ExpirationDuration = preserveDurationFormat(state.ExpirationDuration, profile.ExpirationDuration)
+	state.ExpirationDuration = validators.NewDurationStringValue(time.Duration(profile.ExpirationDuration * int64(time.Millisecond)).String())
 	state.Extendable = types.BoolValue(profile.Extendable)
 	state.AllowImpersonation = types.BoolValue(profile.DelegationEnabled)
 
 	if profile.Extendable {
 		if profile.NotificationPriorToExpiration != nil {
-			state.NotificationPriorToExpiration = preserveDurationFormat(state.NotificationPriorToExpiration, *profile.NotificationPriorToExpiration)
+			state.NotificationPriorToExpiration = validators.NewDurationStringValue(time.Duration(*profile.NotificationPriorToExpiration * int64(time.Millisecond)).String())
 		}
 		if profile.ExtensionDuration != nil {
-			state.ExtensionDuration = preserveDurationFormat(state.ExtensionDuration, *profile.ExtensionDuration)
+			state.ExtensionDuration = validators.NewDurationStringValue(time.Duration(*profile.ExtensionDuration * int64(time.Millisecond)).String())
 		}
 		// Handle ExtensionLimit type conversion (interface{} could be int, float64, etc.)
 		if profile.ExtensionLimit != nil {
@@ -933,17 +936,4 @@ func associationsEqual(a, b []ProfileAssociationModel) bool {
 	}
 
 	return true
-}
-
-// preserveDurationFormat returns the state value unchanged when the API-returned millisecond
-// value is semantically equal (same time.Duration), preventing format drift between user-written
-// strings like "0h10m0s" and Go's canonical form "10m0s".
-func preserveDurationFormat(stateVal types.String, apiMillis int64) types.String {
-	apiDuration := time.Duration(apiMillis * int64(time.Millisecond))
-	if !stateVal.IsNull() && !stateVal.IsUnknown() {
-		if stateDuration, err := time.ParseDuration(stateVal.ValueString()); err == nil && stateDuration == apiDuration {
-			return stateVal
-		}
-	}
-	return types.StringValue(apiDuration.String())
 }
