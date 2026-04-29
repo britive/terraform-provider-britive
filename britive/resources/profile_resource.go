@@ -663,18 +663,16 @@ func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *Pr
 		state.Description = types.StringNull()
 	}
 	state.Disabled = types.BoolValue(strings.EqualFold(profile.Status, "inactive"))
-	state.ExpirationDuration = types.StringValue(time.Duration(profile.ExpirationDuration * int64(time.Millisecond)).String())
+	state.ExpirationDuration = preserveDurationFormat(state.ExpirationDuration, profile.ExpirationDuration)
 	state.Extendable = types.BoolValue(profile.Extendable)
 	state.AllowImpersonation = types.BoolValue(profile.DelegationEnabled)
 
 	if profile.Extendable {
 		if profile.NotificationPriorToExpiration != nil {
-			notificationPriorToExpiration := *profile.NotificationPriorToExpiration
-			state.NotificationPriorToExpiration = types.StringValue(time.Duration(notificationPriorToExpiration * int64(time.Millisecond)).String())
+			state.NotificationPriorToExpiration = preserveDurationFormat(state.NotificationPriorToExpiration, *profile.NotificationPriorToExpiration)
 		}
 		if profile.ExtensionDuration != nil {
-			extensionDuration := *profile.ExtensionDuration
-			state.ExtensionDuration = types.StringValue(time.Duration(extensionDuration * int64(time.Millisecond)).String())
+			state.ExtensionDuration = preserveDurationFormat(state.ExtensionDuration, *profile.ExtensionDuration)
 		}
 		// Handle ExtensionLimit type conversion (interface{} could be int, float64, etc.)
 		if profile.ExtensionLimit != nil {
@@ -935,4 +933,17 @@ func associationsEqual(a, b []ProfileAssociationModel) bool {
 	}
 
 	return true
+}
+
+// preserveDurationFormat returns the state value unchanged when the API-returned millisecond
+// value is semantically equal (same time.Duration), preventing format drift between user-written
+// strings like "0h10m0s" and Go's canonical form "10m0s".
+func preserveDurationFormat(stateVal types.String, apiMillis int64) types.String {
+	apiDuration := time.Duration(apiMillis * int64(time.Millisecond))
+	if !stateVal.IsNull() && !stateVal.IsUnknown() {
+		if stateDuration, err := time.ParseDuration(stateVal.ValueString()); err == nil && stateDuration == apiDuration {
+			return stateVal
+		}
+	}
+	return types.StringValue(apiDuration.String())
 }

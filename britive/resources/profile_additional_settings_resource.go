@@ -79,7 +79,6 @@ func (r *ProfileAdditionalSettingsResource) Schema(_ context.Context, _ resource
 			},
 			"programmatic_access": schema.BoolAttribute{
 				Optional:    true,
-				Computed:    true,
 				Description: "Provide the programmatic access for the profile, overridden if use_app_credential_type is set to true.",
 			},
 			"project_id_for_service_account": schema.StringAttribute{
@@ -117,7 +116,7 @@ func (r *ProfileAdditionalSettingsResource) UpgradeState(_ context.Context) map[
 			"profile_id":                     schema.StringAttribute{Required: true},
 			"use_app_credential_type":        schema.BoolAttribute{Optional: true, Computed: true},
 			"console_access":                 schema.BoolAttribute{Optional: true},
-			"programmatic_access":            schema.BoolAttribute{Optional: true, Computed: true},
+			"programmatic_access":            schema.BoolAttribute{Optional: true},
 			"project_id_for_service_account": schema.StringAttribute{Optional: true},
 		},
 	}
@@ -216,8 +215,12 @@ func (r *ProfileAdditionalSettingsResource) Read(ctx context.Context, req resour
 
 	state.ProfileID = types.StringValue(profileID)
 	state.UseAppCredentialType = types.BoolValue(profileAdditionalSettings.UseApplicationCredentialType)
-	state.ConsoleAccess = types.BoolValue(profileAdditionalSettings.ConsoleAccess)
-	state.ProgrammaticAccess = types.BoolValue(profileAdditionalSettings.ProgrammaticAccess)
+	if !state.ConsoleAccess.IsNull() {
+		state.ConsoleAccess = types.BoolValue(profileAdditionalSettings.ConsoleAccess)
+	}
+	if !state.ProgrammaticAccess.IsNull() {
+		state.ProgrammaticAccess = types.BoolValue(profileAdditionalSettings.ProgrammaticAccess)
+	}
 
 	// Only set ProjectIDForServiceAccount if it was configured or during import
 	if !state.ProjectIDForServiceAccount.IsNull() || profileAdditionalSettings.ProjectIdForServiceAccount != "" {
@@ -381,8 +384,14 @@ func (r *ProfileAdditionalSettingsResource) populateStateFromAPI(ctx context.Con
 	}
 
 	state.UseAppCredentialType = types.BoolValue(profileAdditionalSettings.UseApplicationCredentialType)
-	state.ConsoleAccess = types.BoolValue(profileAdditionalSettings.ConsoleAccess)
-	state.ProgrammaticAccess = types.BoolValue(profileAdditionalSettings.ProgrammaticAccess)
+	// console_access is Optional-only: only write from API if the field was explicitly configured.
+	// If null (not in config), keep null to match the plan and avoid "inconsistent result after apply".
+	if !state.ConsoleAccess.IsNull() {
+		state.ConsoleAccess = types.BoolValue(profileAdditionalSettings.ConsoleAccess)
+	}
+	if !state.ProgrammaticAccess.IsNull() {
+		state.ProgrammaticAccess = types.BoolValue(profileAdditionalSettings.ProgrammaticAccess)
+	}
 
 	// Only set ProjectIDForServiceAccount if it was configured or has a value from API
 	if !state.ProjectIDForServiceAccount.IsNull() || profileAdditionalSettings.ProjectIdForServiceAccount != "" {
