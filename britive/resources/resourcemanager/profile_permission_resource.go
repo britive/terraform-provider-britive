@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/validators"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -26,7 +27,7 @@ type ProfilePermissionResourceModel struct {
 	PermissionID     types.String               `tfsdk:"permission_id"`
 	Name             types.String               `tfsdk:"name"`
 	Description      types.String               `tfsdk:"description"`
-	Version          types.String               `tfsdk:"version"`
+	Version          validators.CaseInsensitiveStringValue `tfsdk:"version"`
 	ResourceTypeID   types.String               `tfsdk:"resource_type_id"`
 	ResourceTypeName types.String               `tfsdk:"resource_type_name"`
 	Variables        []PermissionVariableModel  `tfsdk:"variables"`
@@ -86,6 +87,7 @@ func (r *ProfilePermissionResource) Schema(_ context.Context, _ resource.SchemaR
 			},
 			"version": schema.StringAttribute{
 				Required:    true,
+				CustomType:  validators.CaseInsensitiveStringType{},
 				Description: "Version of the permission (case-insensitive: latest, local, or specific version)",
 			},
 			"resource_type_id": schema.StringAttribute{
@@ -138,6 +140,7 @@ func (r *ProfilePermissionResource) Configure(_ context.Context, req resource.Co
 	}
 	r.client = client
 }
+
 
 func (r *ProfilePermissionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan ProfilePermissionResourceModel
@@ -480,13 +483,7 @@ func (r *ProfilePermissionResource) mapModelToResource(ctx context.Context, reso
 		state.Description = types.StringValue(desc)
 	}
 	if version, ok := permission["version"].(string); ok {
-		// Preserve user-provided casing if the API version matches case-insensitively
-		// (e.g., user provides "LoCaL", API normalizes to "local" - keep "LoCaL")
-		if !state.Version.IsNull() && !state.Version.IsUnknown() && strings.EqualFold(version, state.Version.ValueString()) {
-			// Keep the existing state value (preserves user-provided casing)
-		} else {
-			state.Version = types.StringValue(version)
-		}
+		state.Version = validators.NewCaseInsensitiveStringValue(version)
 	}
 	if rtID, ok := permission["resourceTypeId"].(string); ok {
 		state.ResourceTypeID = types.StringValue(rtID)

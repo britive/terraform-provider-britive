@@ -60,6 +60,9 @@ func (r *ProfilePermissionResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Computed:    true,
 				Description: "The application name of the application the profile is associated with.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"profile_id": schema.StringAttribute{
 				Required:    true,
@@ -75,6 +78,9 @@ func (r *ProfilePermissionResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Computed:    true,
 				Description: "The name of the profile.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"permission_name": schema.StringAttribute{
 				Required:    true,

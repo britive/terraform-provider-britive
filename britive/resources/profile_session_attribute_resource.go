@@ -25,6 +25,7 @@ var (
 	_ resource.ResourceWithConfigure      = &ProfileSessionAttributeResource{}
 	_ resource.ResourceWithImportState    = &ProfileSessionAttributeResource{}
 	_ resource.ResourceWithValidateConfig = &ProfileSessionAttributeResource{}
+	_ resource.ResourceWithUpgradeState   = &ProfileSessionAttributeResource{}
 )
 
 func NewProfileSessionAttributeResource() resource.Resource {
@@ -53,6 +54,7 @@ func (r *ProfileSessionAttributeResource) Metadata(_ context.Context, req resour
 
 func (r *ProfileSessionAttributeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "Manages a Britive profile session attribute.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -66,6 +68,9 @@ func (r *ProfileSessionAttributeResource) Schema(_ context.Context, _ resource.S
 				Optional:    true,
 				Computed:    true,
 				Description: "The application name of the application the profile is associated with.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"profile_id": schema.StringAttribute{
 				Required:    true,
@@ -81,6 +86,9 @@ func (r *ProfileSessionAttributeResource) Schema(_ context.Context, _ resource.S
 				Optional:    true,
 				Computed:    true,
 				Description: "The name of the profile.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"attribute_name": schema.StringAttribute{
 				Optional:    true,
@@ -117,6 +125,44 @@ func (r *ProfileSessionAttributeResource) Schema(_ context.Context, _ resource.S
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 				Description: "The attribute transitive associated with the profile.",
+			},
+		},
+	}
+}
+
+// UpgradeState normalizes states from prior schema versions.
+// Version 0 (v2.x SDKv2): unset Optional-only string fields (attribute_value,
+// attribute_name) were stored as "" in the flatmap; normalize to null.
+func (r *ProfileSessionAttributeResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	priorSchema := schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id":              schema.StringAttribute{Computed: true},
+			"app_name":        schema.StringAttribute{Optional: true, Computed: true},
+			"profile_id":      schema.StringAttribute{Required: true},
+			"profile_name":    schema.StringAttribute{Optional: true, Computed: true},
+			"attribute_name":  schema.StringAttribute{Optional: true},
+			"attribute_type":  schema.StringAttribute{Optional: true, Computed: true},
+			"attribute_value": schema.StringAttribute{Optional: true},
+			"mapping_name":    schema.StringAttribute{Required: true},
+			"transitive":      schema.BoolAttribute{Optional: true, Computed: true},
+		},
+	}
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &priorSchema,
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorState ProfileSessionAttributeResourceModel
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				if !priorState.AttributeValue.IsNull() && priorState.AttributeValue.ValueString() == "" {
+					priorState.AttributeValue = types.StringNull()
+				}
+				if !priorState.AttributeName.IsNull() && priorState.AttributeName.ValueString() == "" {
+					priorState.AttributeName = types.StringNull()
+				}
+				resp.Diagnostics.Append(resp.State.Set(ctx, &priorState)...)
 			},
 		},
 	}

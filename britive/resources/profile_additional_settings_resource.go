@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &ProfileAdditionalSettingsResource{}
-	_ resource.ResourceWithConfigure   = &ProfileAdditionalSettingsResource{}
-	_ resource.ResourceWithImportState = &ProfileAdditionalSettingsResource{}
+	_ resource.Resource                    = &ProfileAdditionalSettingsResource{}
+	_ resource.ResourceWithConfigure       = &ProfileAdditionalSettingsResource{}
+	_ resource.ResourceWithImportState     = &ProfileAdditionalSettingsResource{}
+	_ resource.ResourceWithUpgradeState    = &ProfileAdditionalSettingsResource{}
 )
 
 func NewProfileAdditionalSettingsResource() resource.Resource {
@@ -47,6 +48,7 @@ func (r *ProfileAdditionalSettingsResource) Metadata(_ context.Context, req reso
 
 func (r *ProfileAdditionalSettingsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "Manages a Britive profile additional settings.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -103,6 +105,38 @@ func (r *ProfileAdditionalSettingsResource) Configure(_ context.Context, req res
 	}
 
 	r.client = client
+}
+
+// UpgradeState normalizes states from prior schema versions.
+// Version 0 (v2.x SDKv2): unset Optional-only string field project_id_for_service_account
+// was stored as "" in the flatmap; normalize to null so it matches config expectation.
+func (r *ProfileAdditionalSettingsResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	priorSchema := schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id":                             schema.StringAttribute{Computed: true},
+			"profile_id":                     schema.StringAttribute{Required: true},
+			"use_app_credential_type":        schema.BoolAttribute{Optional: true, Computed: true},
+			"console_access":                 schema.BoolAttribute{Optional: true},
+			"programmatic_access":            schema.BoolAttribute{Optional: true, Computed: true},
+			"project_id_for_service_account": schema.StringAttribute{Optional: true},
+		},
+	}
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &priorSchema,
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorState ProfileAdditionalSettingsResourceModel
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				if !priorState.ProjectIDForServiceAccount.IsNull() && priorState.ProjectIDForServiceAccount.ValueString() == "" {
+					priorState.ProjectIDForServiceAccount = types.StringNull()
+				}
+				resp.Diagnostics.Append(resp.State.Set(ctx, &priorState)...)
+			},
+		},
+	}
 }
 
 func (r *ProfileAdditionalSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

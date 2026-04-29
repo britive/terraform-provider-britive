@@ -66,6 +66,7 @@ func (r *ProfileResource) Metadata(_ context.Context, req resource.MetadataReque
 // Schema defines the schema for the resource.
 func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "Manages a Britive profile",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -89,6 +90,9 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: "The name of the Britive application",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "The name of the Britive profile",
@@ -177,6 +181,10 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						"parent_name": schema.StringAttribute{
 							Description: "The parent name of the resource. Required only if the association type is ApplicationResource",
 							Optional:    true,
+							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 					},
 				},
@@ -240,6 +248,61 @@ func (r *ProfileResource) ValidateConfig(ctx context.Context, req resource.Valid
 				)
 			}
 		}
+	}
+}
+
+// UpgradeState normalizes states from prior schema versions.
+// Version 0 (v2.x SDKv2): unset Optional-only string fields were stored as ""
+// in the flatmap; normalize them to null so they match the config expectation.
+func (r *ProfileResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	// PriorSchema describes the v0 state shape (same structure as v1, no validators/modifiers
+	// needed — the Framework uses it only for type-safe unmarshaling).
+	priorSchema := schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id":                              schema.StringAttribute{Computed: true},
+			"app_container_id":                schema.StringAttribute{Required: true},
+			"app_name":                        schema.StringAttribute{Optional: true, Computed: true},
+			"name":                            schema.StringAttribute{Required: true},
+			"description":                     schema.StringAttribute{Optional: true},
+			"disabled":                        schema.BoolAttribute{Optional: true, Computed: true},
+			"expiration_duration":             schema.StringAttribute{Required: true},
+			"extendable":                      schema.BoolAttribute{Optional: true, Computed: true},
+			"notification_prior_to_expiration": schema.StringAttribute{Optional: true},
+			"extension_duration":              schema.StringAttribute{Optional: true},
+			"extension_limit":                 schema.Int64Attribute{Optional: true},
+			"destination_url":                 schema.StringAttribute{Optional: true},
+			"allow_impersonation":             schema.BoolAttribute{Optional: true, Computed: true},
+		},
+		Blocks: map[string]schema.Block{
+			"associations": schema.SetNestedBlock{
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"type":        schema.StringAttribute{Required: true},
+						"value":       schema.StringAttribute{Required: true},
+						"parent_name": schema.StringAttribute{Optional: true, Computed: true},
+					},
+				},
+			},
+		},
+	}
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &priorSchema,
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorState ProfileResourceModel
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				if !priorState.Description.IsNull() && priorState.Description.ValueString() == "" {
+					priorState.Description = types.StringNull()
+				}
+				if !priorState.DestinationURL.IsNull() && priorState.DestinationURL.ValueString() == "" {
+					priorState.DestinationURL = types.StringNull()
+				}
+				resp.Diagnostics.Append(resp.State.Set(ctx, &priorState)...)
+			},
+		},
 	}
 }
 
@@ -586,9 +649,11 @@ func (r *ProfileResource) mapResourceToModel(plan *ProfileResourceModel, isUpdat
 
 func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *ProfileResourceModel) error {
 	state.AppContainerID = types.StringValue(profile.AppContainerID)
-	// app_name is not returned by the API; preserve existing value or default to null to avoid unknown state
-	if state.AppName.IsUnknown() {
-		state.AppName = types.StringNull()
+	// app_name is not returned by the API; preserve existing value.
+	// Use "" (not null) so UseStateForUnknown can copy it on subsequent plans,
+	// which is critical when migrating from v2.x where app_name was absent from state.
+	if state.AppName.IsUnknown() || state.AppName.IsNull() {
+		state.AppName = types.StringValue("")
 	}
 	state.Name = types.StringValue(profile.Name)
 	// Optional-only field: map empty API response to null (to avoid null vs "" mismatch in plan)
@@ -814,8 +879,9 @@ func (r *ProfileResource) mapProfileAssociationsModelToResource(appContainerID s
 			}
 
 			profileAssociations = append(profileAssociations, ProfileAssociationModel{
-				Type:  types.StringValue(association.Type),
-				Value: types.StringValue(associationValue),
+				Type:       types.StringValue(association.Type),
+				Value:      types.StringValue(associationValue),
+				ParentName: types.StringValue(""),
 			})
 
 		case "ApplicationResource":

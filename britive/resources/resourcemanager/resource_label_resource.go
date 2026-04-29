@@ -148,7 +148,7 @@ func (r *ResourceLabelResource) Create(ctx context.Context, req resource.CreateR
 		values = append(values, ResourceLabelValueModel{
 			ValueID:     types.StringValue(v.ValueId),
 			Name:        types.StringValue(v.Name),
-			Description: types.StringValue(v.Description),
+			Description: optionalStringValue(v.Description),
 		})
 	}
 	plan.Values = values
@@ -185,7 +185,7 @@ func (r *ResourceLabelResource) Read(ctx context.Context, req resource.ReadReque
 		values = append(values, ResourceLabelValueModel{
 			ValueID:     types.StringValue(v.ValueId),
 			Name:        types.StringValue(v.Name),
-			Description: types.StringValue(v.Description),
+			Description: optionalStringValue(v.Description),
 		})
 	}
 	state.Values = values
@@ -239,7 +239,7 @@ func (r *ResourceLabelResource) Update(ctx context.Context, req resource.UpdateR
 		values = append(values, ResourceLabelValueModel{
 			ValueID:     types.StringValue(v.ValueId),
 			Name:        types.StringValue(v.Name),
-			Description: types.StringValue(v.Description),
+			Description: optionalStringValue(v.Description),
 		})
 	}
 	plan.Values = values
@@ -305,7 +305,7 @@ func (r *ResourceLabelResource) ImportState(ctx context.Context, req resource.Im
 		values = append(values, ResourceLabelValueModel{
 			ValueID:     types.StringValue(v.ValueId),
 			Name:        types.StringValue(v.Name),
-			Description: types.StringValue(v.Description),
+			Description: optionalStringValue(v.Description),
 		})
 	}
 	state.Values = values
@@ -462,4 +462,14 @@ func (r *ResourceLabelResource) UpgradeState(_ context.Context) map[int64]resour
 			},
 		},
 	}
+}
+
+// optionalStringValue returns types.StringNull() for an empty string, or
+// types.StringValue(s) otherwise. Used for Optional-only string fields where
+// the API returns "" for an unset value but the plan expects null.
+func optionalStringValue(s string) types.String {
+	if s == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(s)
 }

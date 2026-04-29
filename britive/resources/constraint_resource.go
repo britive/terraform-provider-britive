@@ -20,10 +20,11 @@ import (
 )
 
 var (
-	_ resource.Resource                = &ConstraintResource{}
-	_ resource.ResourceWithConfigure   = &ConstraintResource{}
-	_ resource.ResourceWithImportState = &ConstraintResource{}
-	_ resource.ResourceWithValidateConfig = &ConstraintResource{}
+	_ resource.Resource                    = &ConstraintResource{}
+	_ resource.ResourceWithConfigure       = &ConstraintResource{}
+	_ resource.ResourceWithImportState     = &ConstraintResource{}
+	_ resource.ResourceWithValidateConfig  = &ConstraintResource{}
+	_ resource.ResourceWithUpgradeState    = &ConstraintResource{}
 )
 
 func NewConstraintResource() resource.Resource {
@@ -52,6 +53,7 @@ func (r *ConstraintResource) Metadata(_ context.Context, req resource.MetadataRe
 
 func (r *ConstraintResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "Manages a Britive profile permission constraint.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -172,6 +174,48 @@ func (r *ConstraintResource) ValidateConfig(ctx context.Context, req resource.Va
 			"Invalid Constraint Configuration",
 			"If 'name' is set, then 'title', 'expression', and 'description' cannot be set, and vice versa.",
 		)
+	}
+}
+
+// UpgradeState normalizes states from prior schema versions.
+// Version 0 (v2.x SDKv2): unset Optional-only string fields (name, title,
+// expression, description) were stored as "" in the flatmap; normalize to null.
+func (r *ConstraintResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	priorSchema := schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id":              schema.StringAttribute{Computed: true},
+			"profile_id":      schema.StringAttribute{Required: true},
+			"permission_name": schema.StringAttribute{Required: true},
+			"permission_type": schema.StringAttribute{Optional: true, Computed: true},
+			"constraint_type": schema.StringAttribute{Required: true},
+			"name":            schema.StringAttribute{Optional: true},
+			"title":           schema.StringAttribute{Optional: true},
+			"expression":      schema.StringAttribute{Optional: true},
+			"description":     schema.StringAttribute{Optional: true},
+		},
+	}
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &priorSchema,
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorState ConstraintResourceModel
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				nullIfEmpty := func(s types.String) types.String {
+					if !s.IsNull() && s.ValueString() == "" {
+						return types.StringNull()
+					}
+					return s
+				}
+				priorState.Name = nullIfEmpty(priorState.Name)
+				priorState.Title = nullIfEmpty(priorState.Title)
+				priorState.Expression = nullIfEmpty(priorState.Expression)
+				priorState.Description = nullIfEmpty(priorState.Description)
+				resp.Diagnostics.Append(resp.State.Set(ctx, &priorState)...)
+			},
+		},
 	}
 }
 
