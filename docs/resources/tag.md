@@ -72,7 +72,7 @@ The following arguments are supported:
 
 * `disabled` - (Optional) The status of the Britive tag. By default, the Britive tag is enabled. To disable a Britive tag, set `disabled = true`.
 
-* `requestable` - (Optional) Whether the Britive tag is requestable. Defaults to `true`.
+* `requestable` - (Optional, Computed) Whether the Britive tag is requestable. When omitted, the value is determined by the Britive backend and stored in state.
 
 * `attributes` - (Optional) One or more attribute blocks to associate with the Britive tag. Multiple blocks with the same `attribute_name` are supported for multi-valued attributes. Each block supports:
   * `attribute_name` - (Required) The name of the attribute.

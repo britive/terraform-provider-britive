@@ -69,7 +69,7 @@ func NewResourceTag(importHelper *imports.ImportHelper) *ResourceTag {
 			"requestable": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Default:     true,
+				Computed:    true,
 				Description: "Whether the Britive tag is requestable",
 			},
 			"attributes": {
@@ -133,8 +133,10 @@ func (rt *ResourceTag) resourceCreate(ctx context.Context, d *schema.ResourceDat
 	log.Printf("[INFO] Submitted new tag: %#v", ut)
 	d.SetId(ut.ID)
 
-	if diags := rt.helper.updateTagAttributes(c, ut.ID, d); diags != nil {
-		return diags
+	if rt.helper.hasAttributeConfig(d) {
+		if diags := rt.helper.updateTagAttributes(c, ut.ID, d); diags != nil {
+			return diags
+		}
 	}
 
 	return rt.resourceRead(ctx, d, m)
@@ -330,12 +332,28 @@ func (rth *ResourceTagHelper) mapModelToResource(tag *britive.Tag, d *schema.Res
 	return nil
 }
 
+// hasAttributeConfig reports whether the user explicitly configured requestable
+// or any attributes, meaning a PATCH to /user-tags is required.
+func (rth *ResourceTagHelper) hasAttributeConfig(d *schema.ResourceData) bool {
+	_, requestableSet := d.GetOkExists("requestable") //nolint:staticcheck
+	return requestableSet || d.Get("attributes").(*schema.Set).Len() > 0
+}
+
 func (rth *ResourceTagHelper) updateTagAttributes(c *britive.Client, tagID string, d *schema.ResourceData) diag.Diagnostics {
 	req := britive.TagAttributesUpdateRequest{
 		Name:        d.Get("name").(string),
 		Description: d.Get("description").(string),
-		Requestable: d.Get("requestable").(bool),
 		Attributes:  rth.buildTagAttributes(d),
+	}
+
+	// Only include requestable in the payload when the user explicitly configured it.
+	// GetOkExists is designed for exactly this: TypeBool Optional+Computed with no Default.
+	// It returns ok=false when the field is absent from config (r.Computed=true in the diff),
+	// and ok=true when the user wrote requestable=true or requestable=false — correctly
+	// handling the false case that HasChange misses during create (old=false, new=false).
+	if v, ok := d.GetOkExists("requestable"); ok { //nolint:staticcheck
+		b := v.(bool)
+		req.Requestable = &b
 	}
 
 	log.Printf("[INFO] Updating tag attributes for tag %s: %#v", tagID, req)

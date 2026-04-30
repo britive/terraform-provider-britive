@@ -22,7 +22,7 @@ type Tag struct {
 	Status                   string                    `json:"status,omitempty"`
 	UserTagIdentityProviders []UserTagIdentityProvider `json:"userTagIdentityProviders,omitempty"`
 	External                 interface{}               `json:"external,omitempty"`
-	Requestable              bool                      `json:"requestable"`
+	Requestable              bool                      `json:"requestable,omitempty"`
 	Attributes               []TagAttribute            `json:"attributes,omitempty"`
 }
 
@@ -38,7 +38,7 @@ type TagAttributesUpdateRequest struct {
 	UserTagID   string         `json:"userTagId"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
-	Requestable bool           `json:"requestable"`
+	Requestable *bool          `json:"requestable,omitempty"`
 	Attributes  []TagAttribute `json:"attributes"`
 }
 
