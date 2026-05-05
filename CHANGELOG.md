@@ -1,6 +1,5 @@
-## 2.3.0
+## 2.3.1
 
-FEATURES:
-* **New Resource:** `britive_tag_owner` : Create, update, and manage owners (users and tags) of a Britive tag
-* **New Data Source:** `britive_tag` : Look up a Britive tag by name or id
-* **New Data Source:** `britive_user` : Look up a Britive user by name or id
+ENHANCEMENTS:
+* **Resource:** `britive_tag` : Added `requestable` argument to control whether the tag is requestable
+* **Resource:** `britive_tag` : Added `attributes` argument to associate one or more name/value attribute pairs with a tag, with support for multi-valued attributes
