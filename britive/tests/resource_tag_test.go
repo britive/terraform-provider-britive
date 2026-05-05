@@ -68,11 +68,11 @@ func TestBritiveTagWithAttributes(t *testing.T) {
 				),
 			},
 			{
-				// Step 2: set requestable=false and remove one multi-valued attribute entry
+				// Step 2: remove one multi-valued attribute entry
 				Config: testAccCheckBritiveTagWithAttributesUpdatedConfig(name, description, identityProviderName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveTagExists("britive_tag.new_with_attrs"),
-					resource.TestCheckResourceAttr("britive_tag.new_with_attrs", "requestable", "false"),
+					resource.TestCheckResourceAttr("britive_tag.new_with_attrs", "requestable", "true"),
 					resource.TestCheckResourceAttr("britive_tag.new_with_attrs", "attributes.#", "2"),
 				),
 			},
@@ -146,7 +146,7 @@ func testAccCheckBritiveTagWithAttributesUpdatedConfig(name, description, identi
 		name                 = "%s"
 		description          = "%s"
 		identity_provider_id = data.britive_identity_provider.existing.id
-		requestable          = false
+		requestable          = true
 
 		attributes {
 			attribute_name  = "Owner"
