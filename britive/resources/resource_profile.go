@@ -270,28 +270,33 @@ func (rp *ResourceProfile) resourceDelete(ctx context.Context, d *schema.Resourc
 
 func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rp.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<name>[^/]+)", "(?P<app_name>[^/]+)/(?P<name>[^/]+)"}, d); err != nil {
+	if err := rp.importHelper.ParseImportID([]string{"apps/app-container-id/(?P<app_container_id>[^/]+)/paps/(?P<name>[^/]+)", "app-container-id/(?P<app_container_id>[^/]+)/(?P<name>[^/]+)", "apps/(?P<app_name>[^/]+)/paps/(?P<name>[^/]+)", "(?P<app_name>[^/]+)/(?P<name>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
+	appContainerID := d.Get("app_container_id").(string)
 	appName := d.Get("app_name").(string)
 	profileName := d.Get("name").(string)
-	if strings.TrimSpace(appName) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("app_name")
+	if strings.TrimSpace(appContainerID) == "" && strings.TrimSpace(appName) == "" {
+		return nil, errs.NewNotEmptyOrWhiteSpaceError("app_container_id or app_name")
 	}
 	if strings.TrimSpace(profileName) == "" {
 		return nil, errs.NewNotEmptyOrWhiteSpaceError("name")
 	}
-
-	log.Printf("[INFO] Importing profile: %s/%s", appName, profileName)
-
-	app, err := c.GetApplicationByName(appName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("application %s", appName)
+	if strings.TrimSpace(appContainerID) == "" {
+		log.Printf("[WARN] Deprecated behavior: resolving app_container_id from app_name for imported britive_profile %s/%s. Use import format with app_container_id to reduce API calls.", appName, profileName)
+		app, err := c.GetApplicationByName(appName)
+		if errors.Is(err, britive.ErrNotFound) {
+			return nil, errs.NewNotFoundErrorf("application %s", appName)
+		}
+		if err != nil {
+			return nil, err
+		}
+		appContainerID = app.AppContainerID
 	}
-	if err != nil {
-		return nil, err
-	}
-	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+
+	log.Printf("[INFO] Importing profile: %s/%s", appContainerID, profileName)
+
+	profile, err := c.GetProfileByName(appContainerID, profileName)
 	if errors.Is(err, britive.ErrNotFound) {
 		return nil, errs.NewNotFoundErrorf("profile %s", profileName)
 	}
@@ -300,6 +305,7 @@ func (rp *ResourceProfile) resourceStateImporter(d *schema.ResourceData, m inter
 	}
 
 	d.SetId(profile.ProfileID)
+	d.Set("app_container_id", appContainerID)
 	d.Set("app_name", "")
 
 	err = rp.helper.getAndMapModelToResource(d, m)
@@ -334,22 +340,32 @@ func (rph *ResourceProfileHelper) appendProfileAssociations(associations []briti
 
 func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string, profileID string, d *schema.ResourceData, m interface{}) error {
 	c := m.(*britive.Client)
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
-	if err != nil {
-		return err
-	}
-	if appRootEnvironmentGroup == nil {
+	var appRootEnvironmentGroup *britive.ApplicationRootEnvironmentGroup
+	appType := ""
+	loadAppContext := func() error {
+		if appRootEnvironmentGroup != nil {
+			return nil
+		}
+		var err error
+		appRootEnvironmentGroup, err = c.GetApplicationRootEnvironmentGroup(appContainerID)
+		if err != nil {
+			return err
+		}
+		if appRootEnvironmentGroup == nil {
+			return nil
+		}
+		applicationType, err := c.GetApplicationType(appContainerID)
+		if err != nil {
+			return err
+		}
+		appType = applicationType.ApplicationType
 		return nil
 	}
-	applicationType, err := c.GetApplicationType(appContainerID)
-	if err != nil {
-		return err
-	}
-	appType := applicationType.ApplicationType
 	associationScopes := make([]britive.ProfileAssociation, 0)
 	associationResources := make([]britive.ProfileAssociation, 0)
 	as := d.Get("associations").(*schema.Set)
 	unmatchedAssociations := make([]interface{}, 0)
+	envIDCache := make(map[string]string)
 	for _, a := range as.List() {
 		s := a.(map[string]interface{})
 		associationType := s["type"].(string)
@@ -358,6 +374,13 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 		isAssociationExists := false
 		switch associationType {
 		case "EnvironmentGroup", "Environment":
+			if err := loadAppContext(); err != nil {
+				return err
+			}
+			if appRootEnvironmentGroup == nil {
+				unmatchedAssociations = append(unmatchedAssociations, s)
+				continue
+			}
 			if associationType == "EnvironmentGroup" {
 				rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
 				if appType == "AWS" && strings.EqualFold("root", associationValue) {
@@ -374,7 +397,11 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 					associationScopes = rph.appendProfileAssociations(associationScopes, associationType, aeg.ID)
 					break
 				} else if associationType == "Environment" && appType == "AWS Standalone" {
-					newAssociationValue := c.GetEnvId(appContainerID, associationValue)
+					newAssociationValue, ok := envIDCache[associationValue]
+					if !ok {
+						newAssociationValue = c.GetEnvId(appContainerID, associationValue)
+						envIDCache[associationValue] = newAssociationValue
+					}
 					if aeg.ID == newAssociationValue {
 						isAssociationExists = true
 						associationScopes = rph.appendProfileAssociations(associationScopes, associationType, aeg.ID)
@@ -407,15 +434,13 @@ func (rph *ResourceProfileHelper) saveProfileAssociations(appContainerID string,
 		return errs.NewNotFoundErrorf("associations %v", unmatchedAssociations)
 	}
 	log.Printf("[INFO] Updating profile %s associations: %#v", profileID, associationScopes)
-	err = c.SaveProfileAssociationScopes(profileID, associationScopes)
-	if err != nil {
+	if err := c.SaveProfileAssociationScopes(profileID, associationScopes); err != nil {
 		return err
 	}
 	log.Printf("[INFO] Submitted Update profile %s associations: %#v", profileID, associationScopes)
 	if len(associationResources) > 0 {
 		log.Printf("[INFO] Updating profile %s association resources: %#v", profileID, associationResources)
-		err = c.SaveProfileAssociationResourceScopes(profileID, associationResources)
-		if err != nil {
+		if err := c.SaveProfileAssociationResourceScopes(profileID, associationResources); err != nil {
 			return err
 		}
 		log.Printf("[INFO] Submitted Update profile %s association resources: %#v", profileID, associationResources)
@@ -543,20 +568,36 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 
 func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appContainerID string, profileID string, associations []britive.ProfileAssociation, d *schema.ResourceData, m interface{}) ([]interface{}, error) {
 	c := m.(*britive.Client)
-	appRootEnvironmentGroup, err := c.GetApplicationRootEnvironmentGroup(appContainerID)
-	if err != nil {
-		return nil, err
-	}
-	if len(associations) == 0 || appRootEnvironmentGroup == nil {
+	if len(associations) == 0 {
 		return make([]interface{}, 0), nil
 	}
 	inputAssociations := d.Get("associations").(*schema.Set)
-	applicationType, err := c.GetApplicationType(appContainerID)
-	if err != nil {
-		return nil, err
+	hasScopeAssociations := false
+	for _, association := range associations {
+		if association.Type == "EnvironmentGroup" || association.Type == "Environment" {
+			hasScopeAssociations = true
+			break
+		}
 	}
-	appType := applicationType.ApplicationType
+	var appRootEnvironmentGroup *britive.ApplicationRootEnvironmentGroup
+	appType := ""
+	if hasScopeAssociations {
+		var err error
+		appRootEnvironmentGroup, err = c.GetApplicationRootEnvironmentGroup(appContainerID)
+		if err != nil {
+			return nil, err
+		}
+		if appRootEnvironmentGroup == nil {
+			return make([]interface{}, 0), nil
+		}
+		applicationType, err := c.GetApplicationType(appContainerID)
+		if err != nil {
+			return nil, err
+		}
+		appType = applicationType.ApplicationType
+	}
 	profileAssociations := make([]interface{}, 0)
+	envIDCache := make(map[string]string)
 	for _, association := range associations {
 		var rootAssociations []britive.Association
 		switch association.Type {
@@ -589,7 +630,11 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 					associationValue = a.ID
 					break
 				} else if association.Type == "Environment" && appType == "AWS Standalone" {
-					envId := c.GetEnvId(appContainerID, iav)
+					envId, ok := envIDCache[iav]
+					if !ok {
+						envId = c.GetEnvId(appContainerID, iav)
+						envIDCache[iav] = envId
+					}
 					if association.Type == iat && a.ID == envId {
 						associationValue = iav
 						break

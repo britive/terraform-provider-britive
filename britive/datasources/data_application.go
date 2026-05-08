@@ -24,9 +24,19 @@ func NewDataSourceApplication() *DataSourceApplication {
 		Schema: map[string]*schema.Schema{
 			"name": {
 				Type:         schema.TypeString,
-				Required:     true,
+				Optional:     true,
+				Computed:     true,
 				Description:  "The name of the application",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				ExactlyOneOf: []string{"name", "app_container_id"},
+			},
+			"app_container_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				Computed:     true,
+				Description:  "The unique identifier of the application",
+				ValidateFunc: validation.StringIsNotWhiteSpace,
+				ExactlyOneOf: []string{"name", "app_container_id"},
 			},
 			"environment_ids": {
 				Type:        schema.TypeSet,
@@ -94,19 +104,38 @@ func NewDataSourceApplication() *DataSourceApplication {
 func (dataSourceApplication *DataSourceApplication) resourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	applicationName := d.Get("name").(string)
-
-	application, err := c.GetApplicationByName(applicationName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("application %s", applicationName))
+	var applicationName string
+	var appContainerID string
+	var err error
+	if appContainerIDValue, ok := d.GetOk("app_container_id"); ok {
+		appContainerID = appContainerIDValue.(string)
+		application, err := c.GetApplication(appContainerID)
+		if errors.Is(err, britive.ErrNotFound) {
+			return diag.FromErr(errs.NewNotFoundErrorf("application with id %s", appContainerID))
+		}
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		applicationName = application.CatalogAppDisplayName
+	} else {
+		applicationNameValue := d.Get("name").(string)
+		application, err := c.GetApplicationByName(applicationNameValue)
+		if errors.Is(err, britive.ErrNotFound) {
+			return diag.FromErr(errs.NewNotFoundErrorf("application %s", applicationNameValue))
+		}
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		applicationName = application.CatalogAppDisplayName
+		appContainerID = application.AppContainerID
 	}
-	if err != nil {
+
+	d.SetId(appContainerID)
+
+	if err := d.Set("name", applicationName); err != nil {
 		return diag.FromErr(err)
 	}
-
-	d.SetId(application.AppContainerID)
-
-	if err := d.Set("name", application.CatalogAppDisplayName); err != nil {
+	if err := d.Set("app_container_id", appContainerID); err != nil {
 		return diag.FromErr(err)
 	}
 

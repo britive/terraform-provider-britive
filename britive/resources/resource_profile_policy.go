@@ -45,6 +45,12 @@ func NewResourceProfilePolicy(importHelper *imports.ImportHelper) *ResourceProfi
 				Description:  "The identifier of the profile",
 				ValidateFunc: validation.StringIsNotWhiteSpace,
 			},
+			"app_container_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The identity of the Britive application that owns the profile",
+			},
 			"policy_name": {
 				Type:         schema.TypeString,
 				Required:     true,
@@ -422,7 +428,7 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID 
 		return associationScopes, nil
 	}
 
-	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
+	appId, err := rpph.resolveAppContainerID(profileID, d, c)
 	if err != nil {
 		return associationScopes, err
 	}
@@ -440,6 +446,7 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID 
 	}
 	appType := applicationType.ApplicationType
 	unmatchedAssociations := make([]interface{}, 0)
+	envIDCache := make(map[string]string)
 	for _, a := range as.List() {
 		s := a.(map[string]interface{})
 		associationType := s["type"].(string)
@@ -462,7 +469,11 @@ func (rpph *ResourceProfilePolicyHelper) getProfilePolicyAssociations(profileID 
 				associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
 				break
 			} else if associationType == "Environment" && appType == "AWS Standalone" {
-				newAssociationValue := c.GetEnvId(appId, associationValue)
+				newAssociationValue, ok := envIDCache[associationValue]
+				if !ok {
+					newAssociationValue = c.GetEnvId(appId, associationValue)
+					envIDCache[associationValue] = newAssociationValue
+				}
 				if aeg.ID == newAssociationValue {
 					isAssociationExists = true
 					associationScopes = rpph.appendProfilePolicyAssociations(associationScopes, associationType, aeg.ID)
@@ -489,7 +500,12 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 		return profilePolicyAssociations, nil
 	}
 
-	appId, err := c.RetrieveAppIdGivenProfileId(profileID)
+	hasAssociations := len(associations) > 0
+	if !hasAssociations {
+		return profilePolicyAssociations, nil
+	}
+
+	appId, err := rpph.resolveAppContainerID(profileID, d, c)
 	if err != nil {
 		return profilePolicyAssociations, err
 	}
@@ -498,7 +514,7 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 	if err != nil {
 		return profilePolicyAssociations, err
 	}
-	if len(associations) == 0 || appRootEnvironmentGroup == nil {
+	if appRootEnvironmentGroup == nil {
 		return profilePolicyAssociations, nil
 	}
 	applicationType, err := c.GetApplicationType(appId)
@@ -506,6 +522,7 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 		return profilePolicyAssociations, err
 	}
 	appType := applicationType.ApplicationType
+	envIDCache := make(map[string]string)
 	for _, association := range associations {
 		var rootAssociations []britive.Association
 		if association.Type == "EnvironmentGroup" {
@@ -536,7 +553,11 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 				associationValue = a.ID
 				break
 			} else if association.Type == "Environment" && appType == "AWS Standalone" {
-				envId := c.GetEnvId(appId, iav)
+				envId, ok := envIDCache[iav]
+				if !ok {
+					envId = c.GetEnvId(appId, iav)
+					envIDCache[iav] = envId
+				}
 				if association.Type == iat && a.ID == envId {
 					associationValue = iav
 					break
@@ -550,4 +571,24 @@ func (rpph *ResourceProfilePolicyHelper) mapProfilePolicyAssociationsModelToReso
 	}
 	return profilePolicyAssociations, nil
 
+}
+
+func (rpph *ResourceProfilePolicyHelper) resolveAppContainerID(profileID string, d *schema.ResourceData, c *britive.Client) (string, error) {
+	if appID, ok := d.GetOk("app_container_id"); ok {
+		appIDString := strings.TrimSpace(appID.(string))
+		if appIDString != "" {
+			return appIDString, nil
+		}
+	}
+
+	log.Printf("[WARN] Deprecated behavior: resolving app_container_id from profile_id for britive_profile_policy %s. Set app_container_id explicitly to reduce API calls and avoid this fallback in a future release.", profileID)
+
+	appID, err := c.RetrieveAppIdGivenProfileId(profileID)
+	if err != nil {
+		return "", err
+	}
+	if err := d.Set("app_container_id", appID); err != nil {
+		return "", err
+	}
+	return appID, nil
 }
