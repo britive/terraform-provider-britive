@@ -54,6 +54,9 @@ func (r *ResponseTemplateResource) Schema(_ context.Context, _ resource.SchemaRe
 			"template_id": schema.StringAttribute{
 				Description: "The unique identifier of the response template",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "The name of the response template",
@@ -170,10 +173,18 @@ func (r *ResponseTemplateResource) Read(ctx context.Context, req resource.ReadRe
 
 	state.TemplateID = types.StringValue(template.TemplateID)
 	state.Name = types.StringValue(template.Name)
-	state.Description = types.StringValue(template.Description)
+	if template.Description != "" {
+		state.Description = types.StringValue(template.Description)
+	} else {
+		state.Description = types.StringNull()
+	}
 	state.IsConsoleAccessEnabled = types.BoolValue(template.IsConsoleAccessEnabled)
 	state.ShowOnUI = types.BoolValue(template.ShowOnUI)
-	state.TemplateData = types.StringValue(template.TemplateData)
+	if template.TemplateData != "" {
+		state.TemplateData = types.StringValue(template.TemplateData)
+	} else {
+		state.TemplateData = types.StringNull()
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -273,10 +284,18 @@ func (r *ResponseTemplateResource) ImportState(ctx context.Context, req resource
 	state.ID = types.StringValue(fmt.Sprintf("resource-manager/response-templates/%s", template.TemplateID))
 	state.TemplateID = types.StringValue(template.TemplateID)
 	state.Name = types.StringValue(template.Name)
-	state.Description = types.StringValue(template.Description)
+	if template.Description != "" {
+		state.Description = types.StringValue(template.Description)
+	} else {
+		state.Description = types.StringNull()
+	}
 	state.IsConsoleAccessEnabled = types.BoolValue(template.IsConsoleAccessEnabled)
 	state.ShowOnUI = types.BoolValue(template.ShowOnUI)
-	state.TemplateData = types.StringValue(template.TemplateData)
+	if template.TemplateData != "" {
+		state.TemplateData = types.StringValue(template.TemplateData)
+	} else {
+		state.TemplateData = types.StringNull()
+	}
 
 	log.Printf("[INFO] Imported response template: %s", templateID)
 
