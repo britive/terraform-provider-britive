@@ -144,6 +144,7 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"extension_limit": schema.Int64Attribute{
 				Description: "The repetition limit for extending the profile expiry",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -687,7 +688,11 @@ func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *Pr
 			case float64:
 				state.ExtensionLimit = types.Int64Value(int64(v))
 			}
+		} else {
+			state.ExtensionLimit = types.Int64Null()
 		}
+	} else {
+		state.ExtensionLimit = types.Int64Null()
 	}
 
 	// Optional-only field: map empty API response to null (to avoid null vs "" mismatch in plan)
