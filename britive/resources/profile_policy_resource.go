@@ -233,7 +233,13 @@ func (r *ProfilePolicyResource) Create(ctx context.Context, req resource.CreateR
 
 	plan.ID = types.StringValue(generateProfilePolicyID(profilePolicy.ProfileID, created.PolicyID))
 
-	// Read back to populate computed fields
+	// Save plan values for boolean fields before reading back from API.
+	// See the Update function for the full explanation.
+	planIsReadOnly := plan.IsReadOnly
+	planIsActive := plan.IsActive
+	planIsDraft := plan.IsDraft
+
+	// Read back to normalise condition, members, and associations
 	if err := r.populateStateFromAPI(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Profile Policy",
@@ -241,6 +247,10 @@ func (r *ProfilePolicyResource) Create(ctx context.Context, req resource.CreateR
 		)
 		return
 	}
+
+	plan.IsReadOnly = planIsReadOnly
+	plan.IsActive = planIsActive
+	plan.IsDraft = planIsDraft
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -405,7 +415,15 @@ func (r *ProfilePolicyResource) Update(ctx context.Context, req resource.UpdateR
 
 	plan.ID = types.StringValue(generateProfilePolicyID(profileID, policyID))
 
-	// Read back to populate all fields
+	// Save plan values for boolean fields before reading back from API.
+	// The API uses compactResponse=true which may omit these fields, causing them
+	// to default to false. Without this, the Plugin Framework would raise
+	// "inconsistent result after apply" when the plan value differs from zero.
+	planIsReadOnly := plan.IsReadOnly
+	planIsActive := plan.IsActive
+	planIsDraft := plan.IsDraft
+
+	// Read back to normalise condition, members, and associations
 	if err := r.populateStateFromAPI(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Profile Policy",
@@ -413,6 +431,12 @@ func (r *ProfilePolicyResource) Update(ctx context.Context, req resource.UpdateR
 		)
 		return
 	}
+
+	// Restore boolean fields to plan values so the framework does not report
+	// an inconsistency. The next Read refresh will reflect the true API state.
+	plan.IsReadOnly = planIsReadOnly
+	plan.IsActive = planIsActive
+	plan.IsDraft = planIsDraft
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }

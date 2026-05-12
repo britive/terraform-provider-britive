@@ -60,7 +60,11 @@ func (r *PermissionResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
-				Description: "The description of the Britive permission.",
+				Computed:    true,
+				Description: "The description of the Britive permission. Once set, the API does not support clearing this field.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"consumer": schema.StringAttribute{
 				Required:    true,
@@ -127,9 +131,15 @@ func (r *PermissionResource) Create(ctx context.Context, req resource.CreateRequ
 		actions[i] = v
 	}
 
+	var createDesc *string
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		d := plan.Description.ValueString()
+		createDesc = &d
+	}
+
 	permission := britive.Permission{
 		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
+		Description: createDesc,
 		Consumer:    plan.Consumer.ValueString(),
 		Resources:   resources,
 		Actions:     actions,
@@ -204,7 +214,11 @@ func (r *PermissionResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	state.Name = types.StringValue(permission.Name)
-	state.Description = types.StringValue(permission.Description)
+	if permission.Description == nil || *permission.Description == "" {
+		state.Description = types.StringNull()
+	} else {
+		state.Description = types.StringValue(*permission.Description)
+	}
 	state.Consumer = types.StringValue(permission.Consumer)
 
 	// Convert []interface{} resources to []string for Framework
@@ -273,9 +287,18 @@ func (r *PermissionResource) Update(ctx context.Context, req resource.UpdateRequ
 		actions[i] = v
 	}
 
+	var updateDesc *string
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		d := plan.Description.ValueString()
+		updateDesc = &d
+	} else {
+		empty := ""
+		updateDesc = &empty
+	}
+
 	permission := britive.Permission{
 		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
+		Description: updateDesc,
 		Consumer:    plan.Consumer.ValueString(),
 		Resources:   resources,
 		Actions:     actions,
@@ -441,7 +464,11 @@ func (r *PermissionResource) populateStateFromAPI(ctx context.Context, state *Pe
 	}
 
 	state.Name = types.StringValue(permission.Name)
-	state.Description = types.StringValue(permission.Description)
+	if permission.Description == nil || *permission.Description == "" {
+		state.Description = types.StringNull()
+	} else {
+		state.Description = types.StringValue(*permission.Description)
+	}
 	state.Consumer = types.StringValue(permission.Consumer)
 
 	// Convert []interface{} resources to []string for Framework

@@ -271,7 +271,7 @@ type ProfileAdditionalSettings struct {
 type Permission struct {
 	PermissionID string        `json:"id,omitempty"`
 	Name         string        `json:"name"`
-	Description  string        `json:"description,omitempty"`
+	Description  *string       `json:"description,omitempty"`
 	Consumer     string        `json:"consumer"`
 	Resources    []interface{} `json:"resources"`
 	Actions      []interface{} `json:"actions"`
