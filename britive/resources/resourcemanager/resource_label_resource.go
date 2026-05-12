@@ -176,9 +176,9 @@ func (r *ResourceLabelResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	state.Name = types.StringValue(label.Name)
-	state.Description = types.StringValue(label.Description)
+	state.Description = optionalStringValue(label.Description)
 	state.Internal = types.BoolValue(label.Internal)
-	state.LabelColor = types.StringValue(label.LabelColor)
+	state.LabelColor = optionalStringValue(label.LabelColor)
 
 	var values []ResourceLabelValueModel
 	for _, v := range label.Values {
@@ -296,9 +296,9 @@ func (r *ResourceLabelResource) ImportState(ctx context.Context, req resource.Im
 	var state ResourceLabelResourceModel
 	state.ID = types.StringValue(fmt.Sprintf("resource-manager/labels/%s", label.LabelId))
 	state.Name = types.StringValue(label.Name)
-	state.Description = types.StringValue(label.Description)
+	state.Description = optionalStringValue(label.Description)
 	state.Internal = types.BoolValue(label.Internal)
-	state.LabelColor = types.StringValue(label.LabelColor)
+	state.LabelColor = optionalStringValue(label.LabelColor)
 
 	var values []ResourceLabelValueModel
 	for _, v := range label.Values {
@@ -445,16 +445,16 @@ func (r *ResourceLabelResource) UpgradeState(_ context.Context) map[int64]resour
 					newValues = append(newValues, ResourceLabelValueModel{
 						ValueID:     types.StringValue(v.ValueID),
 						Name:        types.StringValue(v.Name),
-						Description: types.StringValue(v.Description),
+						Description: optionalStringValue(v.Description),
 					})
 				}
 
 				newState := ResourceLabelResourceModel{
 					ID:          types.StringValue(getString("id")),
 					Name:        types.StringValue(getString("name")),
-					Description: types.StringValue(getString("description")),
+					Description: optionalStringValue(getString("description")),
 					Internal:    types.BoolValue(getBool("internal")),
-					LabelColor:  types.StringValue(getString("label_color")),
+					LabelColor:  optionalStringValue(getString("label_color")),
 					Values:      newValues,
 				}
 
