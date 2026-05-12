@@ -848,21 +848,25 @@ func (r *ApplicationResource) buildPropertiesForUpdate(ctx context.Context, plan
 		newPropertyNames[prop.Name.ValueString()] = true
 	}
 
-	// Build property type map from application
+	// Build property type map from system catalog defaults (mirrors main branch getRemovedProperties).
+	// Using catalog defaults instead of current application values ensures removed properties are
+	// reset to their true defaults, so mapPropertiesFromAPI correctly excludes them from state.
 	propertyTypeMap := make(map[string]interface{})
-	for _, foundProp := range application.Properties.PropertyTypes {
-		propertyTypeMap[foundProp.Name] = map[string]interface{}{
-			"value": foundProp.Value,
-			"type":  foundProp.Type,
+	if appCatalogDetails != nil {
+		for _, foundProp := range appCatalogDetails.PropertyTypes {
+			propertyTypeMap[foundProp.Name] = map[string]interface{}{
+				"value": foundProp.Value,
+				"type":  foundProp.Type,
+			}
 		}
 	}
 
-	// Add removed properties back to their default values
+	// Add removed properties back to their catalog default values
 	allOldProps := append(state.Properties, state.SensitiveProperties...)
 	for _, prop := range allOldProps {
 		propName := prop.Name.ValueString()
 		if !newPropertyNames[propName] {
-			// Property was removed, reset to default
+			// Property was removed; reset to catalog default so it is excluded from state on read-back
 			if valueAndType, ok := propertyTypeMap[propName]; ok {
 				propValue := valueAndType.(map[string]interface{})["value"]
 				properties.PropertyTypes = append(properties.PropertyTypes, britive.PropertyTypes{
@@ -879,9 +883,6 @@ func (r *ApplicationResource) buildPropertiesForUpdate(ctx context.Context, plan
 		return nil, err
 	}
 	properties.PropertyTypes = append(properties.PropertyTypes, newProps.PropertyTypes...)
-
-	// Suppress unused variable warning
-	_ = appCatalogDetails
 
 	return properties, nil
 }
