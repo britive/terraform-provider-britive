@@ -60,11 +60,7 @@ func (r *PermissionResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
-				Computed:    true,
-				Description: "The description of the Britive permission. Once set, the API does not support clearing this field.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Description: "The description of the Britive permission.",
 			},
 			"consumer": schema.StringAttribute{
 				Required:    true,
@@ -291,9 +287,6 @@ func (r *PermissionResource) Update(ctx context.Context, req resource.UpdateRequ
 	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
 		d := plan.Description.ValueString()
 		updateDesc = &d
-	} else {
-		empty := ""
-		updateDesc = &empty
 	}
 
 	permission := britive.Permission{
@@ -318,6 +311,11 @@ func (r *PermissionResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	plan.ID = types.StringValue(generatePermissionID(permissionID))
 
+	// Preserve the planned description before populateStateFromAPI overwrites it,
+	// so the API's inability to clear description does not cause an "inconsistent
+	// result" error from Terraform core.
+	plannedDescription := plan.Description
+
 	// Read back to populate all fields
 	if err := r.populateStateFromAPI(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
@@ -326,6 +324,11 @@ func (r *PermissionResource) Update(ctx context.Context, req resource.UpdateRequ
 		)
 		return
 	}
+
+	// Honour the planned value for description so that state matches the plan
+	// exactly. If the API ignored the clear request the drift will surface on
+	// the next refresh rather than as an apply-time inconsistency error.
+	plan.Description = plannedDescription
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
