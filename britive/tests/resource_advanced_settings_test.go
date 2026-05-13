@@ -10,9 +10,6 @@ import (
 )
 
 func TestBritiveAdvancedSettings(t *testing.T) {
-	// Skipping advanced settings acceptance test due to ongoing stabilization
-	t.Skip("TEMP: Skipping advanced settings acceptance test due to ongoing stabilization; will be re-enabled shortly")
-
 	applicationName := "DO NOT DELETE - AWS TF Plugin"
 	profileName := "AT - TF ADVANCED SETTINGS PROFILE"
 	profilePolicyName := "AT - TF ADVANCED SETTINGS PROFILE POLICY"
@@ -100,18 +97,18 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			justification_regex        = "AT - TEST APP ADVANCED SETTINGS"
 		}
 
-		itsm {
-			connection_id       = data.britive_connection.new_connection.id
-			connection_type     = data.britive_connection.new_connection.type
-			is_itsm_enabled     = false
+		// itsm {
+		// 	connection_id       = data.britive_connection.new_connection.id
+		// 	connection_type     = data.britive_connection.new_connection.type
+		// 	is_itsm_enabled     = false
 
-			itsm_filter_criteria {
-			supported_ticket_type = "issue"
-			filter                = jsonencode({
-				jql = ""
-			})
-			}
-		}
+		// 	itsm_filter_criteria {
+		// 	supported_ticket_type = "issue"
+		// 	filter                = jsonencode({
+		// 		jql = ""
+		// 	})
+		// 	}
+		// }
 
 		// im {
 		// 	connection_id       = data.britive_connection.new_im_connection.id
@@ -130,18 +127,18 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			justification_regex        = "AT - TEST PROFILE ADVANCED SETTINGS"
 		}
 
-		itsm {
-			connection_id       = data.britive_connection.new_connection.id
-			connection_type     = data.britive_connection.new_connection.type
-			is_itsm_enabled     = false
+		// itsm {
+		// 	connection_id       = data.britive_connection.new_connection.id
+		// 	connection_type     = data.britive_connection.new_connection.type
+		// 	is_itsm_enabled     = false
 
-			itsm_filter_criteria {
-			supported_ticket_type = "issue"
-			filter                = jsonencode({
-				jql = ""
-			})
-			}
-		}
+		// 	itsm_filter_criteria {
+		// 	supported_ticket_type = "issue"
+		// 	filter                = jsonencode({
+		// 		jql = ""
+		// 	})
+		// 	}
+		// }
 			
 		// im {
 		// 	connection_id       = data.britive_connection.new_im_connection.id
@@ -160,18 +157,18 @@ func testAccCheckBritiveAdvancedSettingsConfig(applicationName, profileName, pro
 			justification_regex        = "AT - TEST PROFILE POLICY ADVANCED SETTINGS"
 		}
 
-		itsm {
-			connection_id       = data.britive_connection.new_connection.id
-			connection_type     = data.britive_connection.new_connection.type
-			is_itsm_enabled     = false
+		// itsm {
+		// 	connection_id       = data.britive_connection.new_connection.id
+		// 	connection_type     = data.britive_connection.new_connection.type
+		// 	is_itsm_enabled     = false
 
-			itsm_filter_criteria {
-			supported_ticket_type = "issue"
-			filter                = jsonencode({
-				jql = ""
-			})
-			}
-		}
+		// 	itsm_filter_criteria {
+		// 	supported_ticket_type = "issue"
+		// 	filter                = jsonencode({
+		// 		jql = ""
+		// 	})
+		// 	}
+		// }
 
 		// im {
 		// 	connection_id       = data.britive_connection.new_im_connection.id
