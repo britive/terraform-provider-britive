@@ -243,6 +243,13 @@ func (rph *ResourcePermissionHelper) getAndMapModelToResource(d *schema.Resource
 	if err != nil {
 		return err
 	}
+	permission, err = c.GetPermissionByName(permission.Name)
+	if errors.Is(err, britive.ErrNotFound) {
+		return errs.NewNotFoundErrorf("role %s", permission.Name)
+	}
+	if err != nil {
+		return err
+	}
 
 	log.Printf("[INFO] Received permission %#v", permission)
 

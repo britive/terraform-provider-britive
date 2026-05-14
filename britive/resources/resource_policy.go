@@ -293,6 +293,13 @@ func (rph *ResourcePolicyHelper) getAndMapModelToResource(d *schema.ResourceData
 	if err != nil {
 		return err
 	}
+	policy, err = c.GetPolicyByName(policy.Name)
+	if errors.Is(err, britive.ErrNotFound) {
+		return errs.NewNotFoundErrorf("Policy %s ", policy.Name)
+	}
+	if err != nil {
+		return err
+	}
 
 	log.Printf("[INFO] Received Policy: %#v", policy)
 

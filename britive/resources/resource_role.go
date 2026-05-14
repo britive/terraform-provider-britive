@@ -229,6 +229,14 @@ func (rrh *ResourceRoleHelper) getAndMapModelToResource(d *schema.ResourceData, 
 		return err
 	}
 
+	role, err = c.GetRoleByName(role.Name)
+	if errors.Is(err, britive.ErrNotFound) {
+		return errs.NewNotFoundErrorf("role %s", role.Name)
+	}
+	if err != nil {
+		return err
+	}
+
 	log.Printf("[INFO] Received role %#v", role)
 
 	if err := d.Set("name", role.Name); err != nil {
