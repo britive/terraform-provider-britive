@@ -6,6 +6,16 @@ The Britive provider is used to interact with the resources supported by Britive
 
 Use the navigation to the left to read about the available resources.
 
+## Migration Notes
+
+To reduce API calls during plan/apply, prefer ID-first configuration where supported:
+
+- Use `data.britive_application.<name>.app_container_id` and pass it to resources that accept `app_container_id`.
+- Use `data.britive_user.<name>.user_id` and pass it to resources that accept `user_id`.
+- Use `data.britive_user_attribute.<name>.attribute_schema_id` and pass it to resources that accept `attribute_schema_id`.
+
+Name-based fallback behavior is still supported for backward compatibility, but emits deprecation warnings and may be removed in a future major release.
+
 ## Example Usage
 
 Terraform 0.13.7 and later:

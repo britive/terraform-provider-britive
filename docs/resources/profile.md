@@ -86,6 +86,8 @@ In addition to the above arguments, the following attribute is exported.
 You can import a profile using any of these accepted formats:
 
 ```sh
+terraform import britive_profile.new apps/app-container-id/{{app_container_id}}/paps/{{name}}
+terraform import britive_profile.new app-container-id/{{app_container_id}}/{{name}}
 terraform import britive_profile.new apps/{{app_name}}/paps/{{name}}
 terraform import britive_profile.new {{app_name}}/{{name}}
 ```

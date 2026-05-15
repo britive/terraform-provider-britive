@@ -41,6 +41,8 @@ In addition to the above arguments, the following attribute is exported.
 You can import a Britive profile using any of these accepted formats:
 
 ```sh
+terraform import britive_profile_permission.new paps/{{profile_id}}/permissions/{{permission_name}}/type/{{permission_type}}
+terraform import britive_profile_permission.new {{profile_id}}/{{permission_name}}/{{permission_type}}
 terraform import britive_profile_permission.new apps/{{app_name}}/paps/{{profile_name}}/permissions/{{permission_name}}/type/{{permission_type}}
 terraform import britive_profile_permission.new {{app_name}}/{{profile_name}}/{{permission_name}}/{{permission_type}}
 ```

@@ -17,6 +17,8 @@ This resource allows you to create and configure the policy associated to a prof
 ```hcl
 resource "britive_profile_policy" "new" {
     profile_id   = "kbcnp7zk3gp2ddlj232"
+    # Optional but recommended to avoid profile->app lookup API call:
+    # app_container_id = data.britive_application.app.app_container_id
     policy_name  = "New_Policy"
     description  = "New_Policy Description"
     members      = jsonencode(
@@ -141,6 +143,8 @@ resource "britive_profile_policy" "new" {
 The following arguments are supported:
 
 * `profile_id` - (Required, ForceNew) The identifier of the profile.
+
+* `app_container_id` - (Optional) The identifier of the Britive application that owns the profile. If omitted, the provider resolves it from `profile_id`.
 
 * `policy_name` - (Required) The name of the profile-policy.
 
