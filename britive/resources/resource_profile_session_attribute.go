@@ -72,6 +72,13 @@ func NewResourceProfileSessionAttribute(importHelper *imports.ImportHelper) *Res
 				ForceNew:    true,
 				Description: "The attribute name associate with the profile",
 			},
+			"attribute_schema_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				ForceNew:    true,
+				Description: "The identifier of the attribute associated with the profile",
+			},
 			"attribute_type": {
 				Type:         schema.TypeString,
 				Optional:     true,
@@ -299,8 +306,14 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 		log.Printf("[INFO] Received attribute: %#v", attribute)
 
 		attributeName = attribute.Name
+		if err := d.Set("attribute_schema_id", pt.AttributeSchemaID); err != nil {
+			return err
+		}
 	} else {
 		attributeValue = pt.AttributeValue
+		if err := d.Set("attribute_schema_id", ""); err != nil {
+			return err
+		}
 	}
 	d.Set("profile_id", profileID)
 	d.Set("attribute_name", attributeName)
@@ -315,6 +328,7 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelper) getAndMapResourceToModel(d *schema.ResourceData, m interface{}) (*britive.SessionAttribute, error) {
 	c := m.(*britive.Client)
 	attributeName := d.Get("attribute_name").(string)
+	attributeSchemaID := strings.TrimSpace(d.Get("attribute_schema_id").(string))
 	mappingName := d.Get("mapping_name").(string)
 	attributeType := d.Get("attribute_type").(string)
 	attributeValuePassed := d.Get("attribute_value").(string)
@@ -325,20 +339,25 @@ func (resourceProfileSessionAttributeHelper *ResourceProfileSessionAttributeHelp
 	var attributeSchemaId string
 	var attributeValue string
 	if strings.EqualFold(attributeType, string(SessionAttributeTypeIdentity)) {
-		if attributeName == "" {
-			return nil, errs.NewNotEmptyOrWhiteSpaceError("attribute_name")
-		}
 		if attributeValuePassed != "" {
 			return nil, fmt.Errorf("expected attribute_value should be empty when attribute_type is %s", attributeType)
 		}
-		attribute, err := c.GetAttributeByName(attributeName)
-		if errors.Is(err, britive.ErrNotFound) {
-			return nil, errs.NewNotFoundErrorf("session attribute %s", attributeName)
+		if attributeSchemaID != "" {
+			attributeSchemaId = attributeSchemaID
+		} else {
+			if attributeName == "" {
+				return nil, errs.NewNotEmptyOrWhiteSpaceError("attribute_name")
+			}
+			log.Printf("[WARN] Deprecated behavior: resolving attribute_schema_id from attribute_name for britive_profile_session_attribute %s. Set attribute_schema_id explicitly to reduce API calls and avoid this fallback in a future release.", mappingName)
+			attribute, err := c.GetAttributeByName(attributeName)
+			if errors.Is(err, britive.ErrNotFound) {
+				return nil, errs.NewNotFoundErrorf("session attribute %s", attributeName)
+			}
+			if err != nil {
+				return nil, err
+			}
+			attributeSchemaId = attribute.ID
 		}
-		if err != nil {
-			return nil, err
-		}
-		attributeSchemaId = attribute.ID
 	} else {
 		if attributeValuePassed == "" {
 			return nil, errs.NewNotEmptyOrWhiteSpaceError("attribute_value")

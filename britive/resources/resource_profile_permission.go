@@ -160,18 +160,21 @@ func (rpp *ResourceProfilePermission) resourceDelete(ctx context.Context, d *sch
 
 func (rpp *ResourceProfilePermission) resourceStateImporter(d *schema.ResourceData, m interface{}) ([]*schema.ResourceData, error) {
 	c := m.(*britive.Client)
-	if err := rpp.importHelper.ParseImportID([]string{"apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/permissions/(?P<permission_name>.+)/type/(?P<permission_type>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<permission_name>.+)/(?P<permission_type>[^/]+)"}, d); err != nil {
+	if err := rpp.importHelper.ParseImportID([]string{"paps/(?P<profile_id>[^/]+)/permissions/(?P<permission_name>.+)/type/(?P<permission_type>[^/]+)", "(?P<profile_id>[^/]+)/(?P<permission_name>.+)/(?P<permission_type>[^/]+)", "apps/(?P<app_name>[^/]+)/paps/(?P<profile_name>[^/]+)/permissions/(?P<permission_name>.+)/type/(?P<permission_type>[^/]+)", "(?P<app_name>[^/]+)/(?P<profile_name>[^/]+)/(?P<permission_name>.+)/(?P<permission_type>[^/]+)"}, d); err != nil {
 		return nil, err
 	}
+	profileID := d.Get("profile_id").(string)
 	appName := d.Get("app_name").(string)
 	profileName := d.Get("profile_name").(string)
 	permissionName := d.Get("permission_name").(string)
 	permissionType := d.Get("permission_type").(string)
-	if strings.TrimSpace(appName) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("app_name")
-	}
-	if strings.TrimSpace(profileName) == "" {
-		return nil, errs.NewNotEmptyOrWhiteSpaceError("profile_name")
+	if strings.TrimSpace(profileID) == "" {
+		if strings.TrimSpace(appName) == "" {
+			return nil, errs.NewNotEmptyOrWhiteSpaceError("app_name")
+		}
+		if strings.TrimSpace(profileName) == "" {
+			return nil, errs.NewNotEmptyOrWhiteSpaceError("profile_name")
+		}
 	}
 	if strings.TrimSpace(permissionName) == "" {
 		return nil, errs.NewNotEmptyOrWhiteSpaceError("permission_name")
@@ -180,33 +183,37 @@ func (rpp *ResourceProfilePermission) resourceStateImporter(d *schema.ResourceDa
 		return nil, errs.NewNotEmptyOrWhiteSpaceError("permission_type")
 	}
 
-	log.Printf("[INFO] Importing profile permission: %s/%s/%s/%s", appName, profileName, permissionName, permissionType)
+	if strings.TrimSpace(profileID) == "" {
+		log.Printf("[WARN] Deprecated behavior: resolving profile_id from app_name/profile_name for imported britive_profile_permission %s/%s/%s. Use import format with profile_id to reduce API calls.", appName, profileName, permissionName)
+		app, err := c.GetApplicationByName(appName)
+		if errors.Is(err, britive.ErrNotFound) {
+			return nil, errs.NewNotFoundErrorf("application %s", appName)
+		}
+		if err != nil {
+			return nil, err
+		}
+		profile, err := c.GetProfileByName(app.AppContainerID, profileName)
+		if errors.Is(err, britive.ErrNotFound) {
+			return nil, errs.NewNotFoundErrorf("profile %s", profileName)
+		}
+		if err != nil {
+			return nil, err
+		}
+		profileID = profile.ProfileID
+	}
 
-	app, err := c.GetApplicationByName(appName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("application %s", appName)
-	}
-	if err != nil {
-		return nil, err
-	}
-	profile, err := c.GetProfileByName(app.AppContainerID, profileName)
-	if errors.Is(err, britive.ErrNotFound) {
-		return nil, errs.NewNotFoundErrorf("profile %s", profileName)
-	}
-	if err != nil {
-		return nil, err
-	}
+	log.Printf("[INFO] Importing profile permission: %s/%s/%s", profileID, permissionName, permissionType)
 
-	profilePermission, err := c.GetProfilePermission(profile.ProfileID, britive.ProfilePermission{Name: permissionName, Type: permissionType})
+	profilePermission, err := c.GetProfilePermission(profileID, britive.ProfilePermission{Name: permissionName, Type: permissionType})
 	if errors.Is(err, britive.ErrNotFound) {
 		return nil, errs.NewNotFoundErrorf("permission %s of type %s in profile %s", permissionName, permissionType, profileName)
 	}
 	if err != nil {
 		return nil, err
 	}
-	profilePermission.ProfileID = profile.ProfileID
+	profilePermission.ProfileID = profileID
 	d.SetId(rpp.helper.generateUniqueID(*profilePermission))
-	d.Set("profile_id", profile.ProfileID)
+	d.Set("profile_id", profileID)
 
 	d.Set("app_name", "")
 	d.Set("profile_name", "")

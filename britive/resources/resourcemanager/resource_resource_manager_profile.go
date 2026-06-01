@@ -288,7 +288,7 @@ func (rrmp *ResourceResourceManagerProfile) resourceDelete(ctx context.Context, 
 
 	err = c.DeleteResourceManagerProfile(profileId)
 	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("resource-manager profile", profileId))
+		return diag.FromErr(errs.NewNotFoundErrorf("resource-manager profile %s", profileId))
 	}
 	if err != nil {
 		return diag.FromErr(err)

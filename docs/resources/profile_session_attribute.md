@@ -30,6 +30,8 @@ resource "britive_profile_session_attribute" "user_new" {
   profile_id = britive_profile.new.id
   attribute_type = "Identity"  
   attribute_name = "Date Of Birth"
+  # Optional but recommended to avoid attribute-name lookup API call:
+  # attribute_schema_id = data.britive_user_attribute.dob.attribute_schema_id
   mapping_name = "dob"
   transitive = false
 }
@@ -44,6 +46,8 @@ The following arguments are supported:
 * `attribute_type` - (Optional, ForceNew) The type of attribute, should be one of [Static, Identity]. Default: `"Identity"`.
 
 * `attribute_name` - (Optional, Required when `attribute_type` is Identity, ForceNew) The name of attribute.
+
+* `attribute_schema_id` - (Optional, ForceNew) The identifier of the user attribute. When `attribute_type` is `Identity`, this is recommended to avoid name-based lookup calls.
 
 * `attribute_value` - (Optional, Required when `attribute_type` is Static) The value of attribute.
 

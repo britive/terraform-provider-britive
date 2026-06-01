@@ -86,8 +86,6 @@ func (rr *ResourceRole) resourceCreate(ctx context.Context, d *schema.ResourceDa
 	log.Printf("[INFO] Submitted new role: %#v", ro)
 	d.SetId(rr.helper.generateUniqueID(ro.RoleID))
 
-	rr.resourceRead(ctx, d, m)
-
 	return diags
 }
 
@@ -223,7 +221,7 @@ func (rrh *ResourceRoleHelper) getAndMapModelToResource(d *schema.ResourceData, 
 
 	log.Printf("[INFO] Reading role %s", roleID)
 
-	roleRes, err := c.GetRole(roleID)
+	role, err := c.GetRole(roleID)
 	if errors.Is(err, britive.ErrNotFound) {
 		return errs.NewNotFoundErrorf("role %s", roleID)
 	}
@@ -231,9 +229,9 @@ func (rrh *ResourceRoleHelper) getAndMapModelToResource(d *schema.ResourceData, 
 		return err
 	}
 
-	role, err := c.GetRoleByName(roleRes.Name)
+	role, err = c.GetRoleByName(role.Name)
 	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("role %s", roleRes.Name)
+		return errs.NewNotFoundErrorf("role %s", role.Name)
 	}
 	if err != nil {
 		return err

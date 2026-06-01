@@ -19,6 +19,10 @@ data "britive_application" "my_app" {
     name = "My Application"
 }
 
+data "britive_application" "my_app_by_id" {
+    app_container_id = "g9f2s7h1example"
+}
+
 output "britive_application_my_app" {
     value = data.britive_application.my_app.id
 }
@@ -42,15 +46,19 @@ output "britive_application_my_app_env_group_ids_names" {
 
 ## Argument Reference
 
-The following argument is supported:
+Exactly one of the following arguments must be provided:
 
-* `name` - (Required) The name of the application.
+* `name` - (Optional) The name of the application.
+
+* `app_container_id` - (Optional) The unique identifier of the application.
 
 ## Attribute Reference
 
 In addition to the above argument, the following attributes are exported:
 
 * `id` - An identifier for the application.
+
+* `app_container_id` - The unique identifier for the application (same as `id`).
 
 * `environment_ids` - A set of environment ids for the application.
 

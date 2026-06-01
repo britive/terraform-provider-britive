@@ -66,6 +66,7 @@ func Provider(v string) *schema.Provider {
 	dataSourceResourceManagerProfilePermissions := datasources.NewDataSourceResourceManagerProfilePermissions()
 	dataSourceUser := datasources.NewDataSourceUser()
 	dataSourceTag := datasources.NewDataSourceTag()
+	dataSourceUserAttribute := datasources.NewDataSourceUserAttribute()
 
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -129,6 +130,7 @@ func Provider(v string) *schema.Provider {
 			"britive_resource_manager_profile_permissions": dataSourceResourceManagerProfilePermissions.Resource,
 			"britive_user":                                 dataSourceUser.Resource,
 			"britive_tag":                                  dataSourceTag.Resource,
+			"britive_user_attribute":                       dataSourceUserAttribute.Resource,
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

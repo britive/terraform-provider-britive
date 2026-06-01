@@ -129,7 +129,6 @@ func (rp *ResourcePolicy) resourceCreate(ctx context.Context, d *schema.Resource
 
 	log.Printf("[INFO] Submitted new policy: %#v", po)
 	d.SetId(rp.helper.generateUniqueID(po.PolicyID))
-	rp.resourceRead(ctx, d, m)
 	return diags
 }
 
@@ -287,16 +286,16 @@ func (rph *ResourcePolicyHelper) getAndMapModelToResource(d *schema.ResourceData
 
 	log.Printf("[INFO] Reading Policy: %s", policyID)
 
-	policyId, err := c.GetPolicy(policyID)
+	policy, err := c.GetPolicy(policyID)
 	if errors.Is(err, britive.ErrNotFound) {
 		return errs.NewNotFoundErrorf("Policy %s ", policyID)
 	}
 	if err != nil {
 		return err
 	}
-	policy, err := c.GetPolicyByName(policyId.Name)
+	policy, err = c.GetPolicyByName(policy.Name)
 	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("Policy %s ", policyId.Name)
+		return errs.NewNotFoundErrorf("Policy %s ", policy.Name)
 	}
 	if err != nil {
 		return err

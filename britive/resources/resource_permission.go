@@ -99,8 +99,6 @@ func (rp *ResourcePermission) resourceCreate(ctx context.Context, d *schema.Reso
 	log.Printf("[INFO] Submitted new permission: %#v", pm)
 	d.SetId(rp.helper.generateUniqueID(pm.PermissionID))
 
-	rp.resourceRead(ctx, d, m)
-
 	return diags
 }
 
@@ -238,16 +236,16 @@ func (rph *ResourcePermissionHelper) getAndMapModelToResource(d *schema.Resource
 
 	log.Printf("[INFO] Reading permission %s", permissionID)
 
-	permissionRes, err := c.GetPermission(permissionID)
+	permission, err := c.GetPermission(permissionID)
 	if errors.Is(err, britive.ErrNotFound) {
 		return errs.NewNotFoundErrorf("permission %s", permissionID)
 	}
 	if err != nil {
 		return err
 	}
-	permission, err := c.GetPermissionByName(permissionRes.Name)
+	permission, err = c.GetPermissionByName(permission.Name)
 	if errors.Is(err, britive.ErrNotFound) {
-		return errs.NewNotFoundErrorf("role %s", permissionRes.Name)
+		return errs.NewNotFoundErrorf("role %s", permission.Name)
 	}
 	if err != nil {
 		return err

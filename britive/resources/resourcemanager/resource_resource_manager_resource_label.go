@@ -156,7 +156,7 @@ func (rl *ResourceResourceLabel) resourceRead(ctx context.Context, d *schema.Res
 	log.Printf("[INFO] Reading Resource Label Resource of %s", labelId)
 	resourceLabel, err := c.GetResourceLabel(labelId)
 	if errors.Is(err, britive.ErrNotFound) {
-		return diag.FromErr(errs.NewNotFoundErrorf("Resource Label Resource", labelId))
+		return diag.FromErr(errs.NewNotFoundErrorf("Resource Label Resource %s", labelId))
 	}
 	if err != nil {
 		return diag.FromErr(err)
@@ -187,7 +187,7 @@ func (rl *ResourceResourceLabel) resourceUpdate(ctx context.Context, d *schema.R
 
 		resourceLabel, err = c.CreateUpdateResourceLabel(*resourceLabel, true)
 		if errors.Is(err, britive.ErrNotFound) {
-			return diag.FromErr(errs.NewNotFoundErrorf("Resource Label Resource", labelId))
+			return diag.FromErr(errs.NewNotFoundErrorf("Resource Label Resource %s", labelId))
 		}
 		if err != nil {
 			return diag.FromErr(err)
