@@ -89,6 +89,12 @@ func Provider(v string) *schema.Provider {
 				DefaultFunc: schema.EnvDefaultFunc("BRITIVE_CONFIG", "~/.britive/tf.config"),
 				Description: "This is the file path for Britive provider configuration. The default configuration path is ~/.britive/tf.config",
 			},
+			"max_retries": {
+				Type:        schema.TypeInt,
+				Optional:    true,
+				Default:     10,
+				Description: "Maximum number of retries for rate limited (HTTP 429) API requests. Defaults to 10.",
+			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"britive_tag":                                            resourceTag.Resource,
@@ -197,8 +203,9 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		return nil, diags
 	}
 
+	maxRetries := d.Get("max_retries").(int)
 	apiBaseURL := fmt.Sprintf("%s/api", strings.TrimSuffix(tenant, "/"))
-	c, err := britive.NewClient(apiBaseURL, token, version)
+	c, err := britive.NewClient(apiBaseURL, token, version, maxRetries)
 	if err != nil {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
