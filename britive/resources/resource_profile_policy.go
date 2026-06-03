@@ -128,6 +128,30 @@ func NewResourceProfilePolicy(importHelper *imports.ImportHelper) *ResourceProfi
 					},
 				},
 			},
+			"tag_associations": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "The list of scope tags for the Britive profile policy",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"key": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The tag key",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+						"values": {
+							Type:        schema.TypeList,
+							Required:    true,
+							Description: "The tag values",
+							Elem: &schema.Schema{
+								Type:         schema.TypeString,
+								ValidateFunc: validation.StringIsNotWhiteSpace,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	return rpp
@@ -176,7 +200,7 @@ func (rpp *ResourceProfilePolicy) resourceUpdate(ctx context.Context, d *schema.
 	c := m.(*britive.Client)
 
 	var hasChanges bool
-	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("members") || d.HasChange("condition") || d.HasChange("associations") {
+	if d.HasChange("profile_id") || d.HasChange("policy_name") || d.HasChange("description") || d.HasChange("is_active") || d.HasChange("is_draft") || d.HasChange("is_read_only") || d.HasChange("consumer") || d.HasChange("access_type") || d.HasChange("members") || d.HasChange("condition") || d.HasChange("associations") || d.HasChange("tag_associations") {
 		hasChanges = true
 		profileID, policyID, err := rpp.helper.parseUniqueID(d.Id())
 		if err != nil {
@@ -302,6 +326,7 @@ func (rpph *ResourceProfilePolicyHelper) mapResourceToModel(d *schema.ResourceDa
 		return err
 	}
 	profilePolicy.Associations = associations
+	profilePolicy.ScopeTags = rpph.mapTagAssociationsToModel(d)
 
 	return nil
 }
@@ -388,6 +413,9 @@ func (rpph *ResourceProfilePolicyHelper) getAndMapModelToResource(d *schema.Reso
 		return err
 	}
 	if err := d.Set("associations", associations); err != nil {
+		return err
+	}
+	if err := d.Set("tag_associations", rpph.mapTagAssociationsModelToResource(profilePolicy.ScopeTags)); err != nil {
 		return err
 	}
 
@@ -591,4 +619,33 @@ func (rpph *ResourceProfilePolicyHelper) resolveAppContainerID(profileID string,
 		return "", err
 	}
 	return appID, nil
+}
+
+func (rpph *ResourceProfilePolicyHelper) mapTagAssociationsToModel(d *schema.ResourceData) []britive.ScopeTag {
+	st := d.Get("tag_associations").(*schema.Set)
+	scopeTags := make([]britive.ScopeTag, 0)
+	for _, item := range st.List() {
+		s := item.(map[string]interface{})
+		rawValues := s["values"].([]interface{})
+		values := make([]string, len(rawValues))
+		for i, v := range rawValues {
+			values[i] = v.(string)
+		}
+		scopeTags = append(scopeTags, britive.ScopeTag{
+			TagKey:    s["key"].(string),
+			TagValues: values,
+		})
+	}
+	return scopeTags
+}
+
+func (rpph *ResourceProfilePolicyHelper) mapTagAssociationsModelToResource(scopeTags []britive.ScopeTag) []interface{} {
+	result := make([]interface{}, 0, len(scopeTags))
+	for _, st := range scopeTags {
+		result = append(result, map[string]interface{}{
+			"key":    st.TagKey,
+			"values": st.TagValues,
+		})
+	}
+	return result
 }
