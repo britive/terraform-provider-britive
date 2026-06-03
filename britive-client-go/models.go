@@ -212,12 +212,19 @@ type ProfilePolicy struct {
 	IsDraft      bool                       `json:"isDraft"`
 	IsReadOnly   bool                       `json:"isReadOnly"`
 	Associations []ProfilePolicyAssociation `json:"scopes"`
+	ScopeTags    []ScopeTag                 `json:"scopeTags,omitempty"`
 	Order        int                        `json:"order,omitempty"`
 }
 
 type ProfilePolicyAssociation struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
+}
+
+// ScopeTag - represents a tag-based scope filter
+type ScopeTag struct {
+	TagKey    string   `json:"tagKey"`
+	TagValues []string `json:"tagValues"`
 }
 
 type ProfileSummary struct {

@@ -97,6 +97,30 @@ func NewResourceProfile(v *validate.Validation, importHelper *imports.ImportHelp
 					},
 				},
 			},
+			"tag_associations": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "The list of scope tags for the Britive profile",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"key": {
+							Type:         schema.TypeString,
+							Required:     true,
+							Description:  "The tag key",
+							ValidateFunc: validation.StringIsNotWhiteSpace,
+						},
+						"values": {
+							Type:        schema.TypeList,
+							Required:    true,
+							Description: "The tag values",
+							Elem: &schema.Schema{
+								Type:         schema.TypeString,
+								ValidateFunc: validation.StringIsNotWhiteSpace,
+							},
+						},
+					},
+				},
+			},
 			"expiration_duration": {
 				Type:         schema.TypeString,
 				Required:     true,
@@ -171,6 +195,11 @@ func (rp *ResourceProfile) resourceCreate(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
+	err = rp.helper.saveProfileScopeTags(p.ProfileID, d, m)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	rp.resourceRead(ctx, d, m)
 
 	return diags
@@ -196,6 +225,12 @@ func (rp *ResourceProfile) resourceUpdate(ctx context.Context, d *schema.Resourc
 	appContainerID := d.Get("app_container_id").(string)
 
 	var hasChanges bool
+	if d.HasChange("tag_associations") {
+		hasChanges = true
+		if err := rp.helper.saveProfileScopeTags(profileID, d, m); err != nil {
+			return diag.FromErr(err)
+		}
+	}
 	if d.HasChange("name") ||
 		d.HasChange("description") ||
 		d.HasChange("associations") ||
@@ -563,6 +598,13 @@ func (rph *ResourceProfileHelper) getAndMapModelToResource(d *schema.ResourceDat
 	if err := d.Set("associations", associations); err != nil {
 		return err
 	}
+	scopeTags, err := c.GetProfileScopeTags(profile.ProfileID)
+	if err != nil {
+		return err
+	}
+	if err := d.Set("tag_associations", rph.mapScopeTagsModelToResource(scopeTags)); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -663,6 +705,36 @@ func (rph *ResourceProfileHelper) mapProfileAssociationsModelToResource(appConta
 	}
 	return profileAssociations, nil
 
+}
+
+func (rph *ResourceProfileHelper) saveProfileScopeTags(profileID string, d *schema.ResourceData, m interface{}) error {
+	c := m.(*britive.Client)
+	st := d.Get("tag_associations").(*schema.Set)
+	scopeTags := make([]britive.ScopeTag, 0)
+	for _, item := range st.List() {
+		s := item.(map[string]interface{})
+		rawValues := s["values"].([]interface{})
+		values := make([]string, len(rawValues))
+		for i, v := range rawValues {
+			values[i] = v.(string)
+		}
+		scopeTags = append(scopeTags, britive.ScopeTag{
+			TagKey:    s["key"].(string),
+			TagValues: values,
+		})
+	}
+	return c.SaveProfileScopeTags(profileID, scopeTags)
+}
+
+func (rph *ResourceProfileHelper) mapScopeTagsModelToResource(scopeTags []britive.ScopeTag) []interface{} {
+	result := make([]interface{}, 0, len(scopeTags))
+	for _, st := range scopeTags {
+		result = append(result, map[string]interface{}{
+			"key":    st.TagKey,
+			"values": st.TagValues,
+		})
+	}
+	return result
 }
 
 //endregion
