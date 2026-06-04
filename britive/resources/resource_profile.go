@@ -71,9 +71,10 @@ func NewResourceProfile(v *validate.Validation, importHelper *imports.ImportHelp
 				Description: "To disable the Britive profile",
 			},
 			"associations": {
-				Type:        schema.TypeSet,
-				Required:    true,
-				Description: "The list of associations for the Britive profile",
+				Type:         schema.TypeSet,
+				Optional:     true,
+				AtLeastOneOf: []string{"associations", "tag_associations"},
+				Description:  "The list of associations for the Britive profile",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"type": {
@@ -98,9 +99,10 @@ func NewResourceProfile(v *validate.Validation, importHelper *imports.ImportHelp
 				},
 			},
 			"tag_associations": {
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Description: "The list of scope tags for the Britive profile",
+				Type:         schema.TypeSet,
+				Optional:     true,
+				AtLeastOneOf: []string{"associations", "tag_associations"},
+				Description:  "The list of scope tags for the Britive profile",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"key": {
