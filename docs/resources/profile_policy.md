@@ -135,6 +135,10 @@ resource "britive_profile_policy" "new" {
       type  = "EnvironmentGroup"
       value = "Development"
     }
+    tag_associations {
+      key    = "team"
+      values = ["engineering", "finance"]
+    }
 }
 ```
 
@@ -176,7 +180,23 @@ The following arguments are supported:
 
 * `is_read_only` - (Optional) Indicates if a policy is read only. Boolean value accepts true/false. Default: `false`.
 
-* `associations` - (Optional) The set of associations for the Britive profile policy.
+* `associations` - (Optional) The set of environment/environment-group associations for the Britive profile policy.
+
+* `tag_associations` - (Optional) The list of tag-based scope filters for the Britive profile policy.
+
+The format of `associations` and `tag_associations` is documented below.
+
+### `associations` block supports
+
+* `type` - (Required) The type of association, should be one of [Environment, EnvironmentGroup].
+
+* `value` - (Required) The association value.
+
+### `tag_associations` block supports
+
+* `key` - (Required) The tag key to filter on.
+
+* `values` - (Required) The list of tag values to match.
 
 ## Attribute Reference
 

@@ -30,7 +30,11 @@ resource "britive_profile" "new" {
     associations {
       type  = "Environment"
       value = "QA Subscription"
-    },
+    }
+    tag_associations {
+      key    = "team"
+      values = ["engineering", "finance"]
+    }
     destination_url                  = "https://console.aws.amazon.com"
 }
 ```
@@ -51,7 +55,9 @@ The following arguments are supported:
 
 * `destination_url` - (Optional) The console URL where the user will be redirected upon checking out the profile. For example: `https://console.aws.amazon.com`
 
-* `associations` - (Required) The list of associations for the Britive profile.
+* `associations` - (Optional) The list of environment/environment-group associations for the Britive profile. At least one of `associations` or `tag_associations` must be specified.
+
+* `tag_associations` - (Optional) The list of tag-based scope filters for the Britive profile. At least one of `associations` or `tag_associations` must be specified.
 
 The following arguments are supported, except for AWS profiles:
 
@@ -65,7 +71,7 @@ The following arguments are supported, except for AWS profiles:
 
 * `extension_limit` - (Optional) The Britive profile expiry extension limit. For example: `2`
 
-The format of `associations` is documented below.
+The format of `associations` and `tag_associations` is documented below.
 
 ### `associations` block supports
 
@@ -74,6 +80,12 @@ The format of `associations` is documented below.
 * `value` - (Required) The association value. For AWS applications, one of the following should be used: EnvironmentID, EnvironmentName, or AccountID.
 
 * `parent_name` - (Optional) The parent name of the resource. Required only if the association type is ApplicationResource.
+
+### `tag_associations` block supports
+
+* `key` - (Required) The tag key to filter on.
+
+* `values` - (Required) The list of tag values to match.
 
 ## Attribute Reference
 
