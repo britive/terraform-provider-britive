@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	retryWaitMin = time.Second      // minimum wait between retries
-	retryWaitMax = 30 * time.Second // maximum wait between retries
+	retryWaitMin = time.Second       // minimum wait between retries
+	retryWaitMax = 600 * time.Second // maximum wait between retries
 )
 
 var (
@@ -42,10 +42,18 @@ type Client struct {
 }
 
 // NewClient - Initializes new Britive API client
-func NewClient(apiBaseURL, token, version string, maxRetries int) (*Client, error) {
+func NewClient(apiBaseURL, token, version string, maxRetries, retryWaitMinSecs, retryWaitMaxSecs int) (*Client, error) {
 	syncOnce.Do(func() {
 		if maxRetries <= 0 {
 			maxRetries = defaultMaxRetries
+		}
+		waitMin := retryWaitMin
+		if retryWaitMinSecs > 0 {
+			waitMin = time.Duration(retryWaitMinSecs) * time.Second
+		}
+		waitMax := retryWaitMax
+		if retryWaitMaxSecs > 0 {
+			waitMax = time.Duration(retryWaitMaxSecs) * time.Second
 		}
 		client = &Client{
 			HTTPClient:   &http.Client{Timeout: 0},
@@ -54,8 +62,8 @@ func NewClient(apiBaseURL, token, version string, maxRetries int) (*Client, erro
 			Version:      version,
 			SyncMap:      &sync.Map{},
 			MaxRetries:   maxRetries,
-			RetryWaitMin: retryWaitMin,
-			RetryWaitMax: retryWaitMax,
+			RetryWaitMin: waitMin,
+			RetryWaitMax: waitMax,
 		}
 	})
 	return client, nil
@@ -219,33 +227,43 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 		req.ContentLength = int64(len(bodyBytes))
 	}
 
+	log.Printf("[DEBUG] britive-retry: %s %s (max_retries=%d)", req.Method, req.URL, c.MaxRetries)
+
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
 		if attempt > 0 && bodyBytes != nil {
 			req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
 			req.ContentLength = int64(len(bodyBytes))
 		}
 
+		log.Printf("[DEBUG] britive-retry: sending request (attempt %d/%d) %s %s", attempt+1, c.MaxRetries+1, req.Method, req.URL)
+
 		res, err := c.HTTPClient.Do(req)
 		if err != nil {
+			log.Printf("[DEBUG] britive-retry: request error on attempt %d/%d: %s", attempt+1, c.MaxRetries+1, err)
 			return nil, err
 		}
+
+		log.Printf("[DEBUG] britive-retry: response status %d on attempt %d/%d for %s %s", res.StatusCode, attempt+1, c.MaxRetries+1, req.Method, req.URL)
 
 		if res.StatusCode == http.StatusTooManyRequests {
 			retryAfter := res.Header.Get("Retry-After")
 			ioutil.ReadAll(res.Body) //nolint:errcheck
 			res.Body.Close()
 			if attempt >= c.MaxRetries {
+				log.Printf("[WARN] britive-retry: rate limited, exhausted all %d retries for %s %s", c.MaxRetries, req.Method, req.URL)
 				break
 			}
 			wait := calculateBackoff(attempt, c.RetryWaitMin, c.RetryWaitMax, retryAfter)
-			log.Printf("[WARN] Britive API rate limited (attempt %d/%d), retrying in %s", attempt+1, c.MaxRetries, wait)
+			log.Printf("[WARN] britive-retry: rate limited (HTTP 429) on attempt %d/%d, waiting %s before retry (Retry-After header: %q)", attempt+1, c.MaxRetries+1, wait, retryAfter)
 			time.Sleep(wait)
+			log.Printf("[DEBUG] britive-retry: resuming after wait, next attempt %d/%d", attempt+2, c.MaxRetries+1)
 			continue
 		}
 
 		defer res.Body.Close()
 
 		if res.StatusCode == http.StatusNoContent {
+			log.Printf("[DEBUG] britive-retry: success (204 No Content) on attempt %d/%d", attempt+1, c.MaxRetries+1)
 			return []byte(emptyString), ErrNoContent
 		}
 
@@ -255,6 +273,7 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 		}
 
 		if res.StatusCode == http.StatusNotFound {
+			log.Printf("[DEBUG] britive-retry: not found (404) on attempt %d/%d for %s %s", attempt+1, c.MaxRetries+1, req.Method, req.URL)
 			return body, ErrNotFound
 		}
 
@@ -262,11 +281,14 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 			var httpErrorResponse HTTPErrorResponse
 			err = json.Unmarshal(body, &httpErrorResponse)
 			if err == nil && httpErrorResponse.Message != emptyString {
+				log.Printf("[DEBUG] britive-retry: failed (status %d) on attempt %d/%d: %s: %s", res.StatusCode, attempt+1, c.MaxRetries+1, httpErrorResponse.ErrorCode, httpErrorResponse.Message)
 				return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
 			}
+			log.Printf("[DEBUG] britive-retry: failed (status %d) on attempt %d/%d for %s %s", res.StatusCode, attempt+1, c.MaxRetries+1, req.Method, req.URL)
 			return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
 		}
 
+		log.Printf("[DEBUG] britive-retry: success (status %d) on attempt %d/%d for %s %s", res.StatusCode, attempt+1, c.MaxRetries+1, req.Method, req.URL)
 		return body, nil
 	}
 
