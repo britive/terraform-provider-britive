@@ -27,6 +27,7 @@ func TestBritiveApplication(t *testing.T) {
 					testAccCheckBritiveApplicationExists("britive_application.aws_standalone_new"),
 					testAccCheckBritiveApplicationExists("britive_application.azure_new"),
 					testAccCheckBritiveApplicationExists("britive_application.okta_new"),
+					testAccCheckBritiveApplicationExists("britive_application.britive_new"),
 				),
 			},
 		},
@@ -685,6 +686,26 @@ func testAccCheckBritiveApplicationConfig() string {
     properties {
       name = "maxSessionDurationForProfiles"
       value = 1000
+    }
+	}
+
+	resource "britive_application" "britive_new" {
+    application_type = "Britive"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - Britive APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - Britive APP DESC"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 604800
     }
 	}
 	`)

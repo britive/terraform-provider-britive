@@ -54,6 +54,10 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 			type  = "Environment"
 			value = "Sigma Corporate"
 		}
+		tag_associations {
+			key    = "team"
+			values = ["engineering"]
+		}
 	}
 
 	resource "britive_profile_policy" "new" {
@@ -148,8 +152,105 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 			type  = "Environment"
 			value = "Sigma Corporate"
 		}
+		tag_associations {
+			key    = "team"
+			values = ["engineering"]
+		}
 	}`, applicationName, profileName, profilePolicyName, profilePolicyDescription, timeOfAccessFrom, timeOfAccessTo)
 
+}
+
+func TestBritiveProfilePolicyTagAssociations(t *testing.T) {
+	applicationName := "DO NOT DELETE - AWS TF Plugin"
+	profileName := "AT - New Britive Profile Policy Tag Association Test"
+	profilePolicyName := "AT - New Britive Profile Policy Tag Association Test"
+	profilePolicyDescription := "AT - New Britive Profile Policy Tag Association Test Description"
+	tagKey := "team"
+	tagValue := "engineering"
+	resourceName := "britive_profile_policy.new"
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveProfilePolicyConfigWithTagAssociations(applicationName, profileName, profilePolicyName, profilePolicyDescription, tagKey, tagValue),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveProfilePolicyExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName, "policy_name", profilePolicyName),
+					resource.TestCheckResourceAttr(resourceName, "tag_associations.#", "1"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveProfilePolicyConfigWithTagAssociations(applicationName, profileName, profilePolicyName, profilePolicyDescription, tagKey, tagValue string) string {
+	return fmt.Sprintf(`
+	data "britive_application" "app" {
+		name = "%s"
+	}
+
+	resource "britive_profile" "new" {
+		app_container_id    = data.britive_application.app.id
+		name                = "%s"
+		expiration_duration = "25m0s"
+		associations {
+			type  = "EnvironmentGroup"
+			value = "Development"
+		}
+		tag_associations {
+			key    = "team"
+			values = ["engineering"]
+		}
+	}
+
+	resource "britive_profile_policy" "new" {
+		policy_name  = "%s"
+		description  = "%s"
+		profile_id   = britive_profile.new.id
+		access_type  = "Allow"
+		consumer     = "papservice"
+		is_active    = false
+		is_draft     = false
+		is_read_only = false
+		members      = jsonencode(
+			{
+				serviceIdentities = [
+					{
+						name = "britiveProviderAcceptanceTestSI"
+					},
+					{
+						name = "britiveProviderAcceptanceTestSI1"
+					},
+				]
+				tags              = [
+					{
+						name = "britiveProviderAcceptanceTestTag"
+					},
+					{
+						name = "britiveProviderAcceptanceTestTag1"
+					},
+				]
+				users             = [
+					{
+						name = "britiveprovideracceptancetest"
+					},
+					{
+						name = "britiveprovideracceptancetest1"
+					},
+				]
+				aiIdentities      = [
+        			{
+          				name : "DO_NOT_DELETE_AI_IDENTITY"
+        			},
+      			]
+			}
+		)
+		tag_associations {
+			key    = "%s"
+			values = ["%s"]
+		}
+	}`, applicationName, profileName, profilePolicyName, profilePolicyDescription, tagKey, tagValue)
 }
 
 func testAccCheckBritiveProfilePolicyExists(n string) resource.TestCheckFunc {

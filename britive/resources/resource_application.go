@@ -46,8 +46,8 @@ func NewResourceApplication(v *validate.Validation, importHelper *imports.Import
 			"application_type": {
 				Type:         schema.TypeString,
 				Required:     true,
-				Description:  "Britive application type. Suppotted types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure' and 'Okta'",
-				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta"}, true),
+				Description:  "Britive application type. Supported types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta' and 'Britive'",
+				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta", "Britive"}, true),
 			},
 			"version": {
 				Type:        schema.TypeString,
@@ -63,7 +63,7 @@ func NewResourceApplication(v *validate.Validation, importHelper *imports.Import
 			"entity_root_environment_group_id": {
 				Type:        schema.TypeString,
 				Computed:    true,
-				Description: "Britive application root environment ID for Snowflake Standalone applications.",
+				Description: "Britive application root environment ID for AWS Standalone, Okta, Snowflake Standalone and Britive applications.",
 			},
 			"properties": {
 				Type:        schema.TypeSet,
@@ -199,9 +199,10 @@ func (rt *ResourceApplication) resourceCreate(ctx context.Context, d *schema.Res
 
 	//The root environment group creation can be skipped when PAB-20648 is fixed
 	allowedEnvGroupApps := map[int]string{
-		2: "AWS Standalone",
-		8: "Okta",
-		9: "Snowflake Standalone",
+		2:  "AWS Standalone",
+		8:  "Okta",
+		9:  "Snowflake Standalone",
+		12: "Britive",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		log.Printf("[INFO] Creating root environment group")
@@ -546,9 +547,10 @@ func (rrth *ResourceApplicationHelper) getAndMapModelToResource(d *schema.Resour
 	}
 
 	allowedEnvGroupApps := map[int]string{
-		2: "AWS Standalone",
-		8: "Okta",
-		9: "Snowflake Standalone",
+		2:  "AWS Standalone",
+		8:  "Okta",
+		9:  "Snowflake Standalone",
+		12: "Britive",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupId := ""
