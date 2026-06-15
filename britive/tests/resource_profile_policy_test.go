@@ -213,12 +213,39 @@ func testAccCheckBritiveProfilePolicyConfigWithTagAssociations(applicationName, 
 		is_active    = false
 		is_draft     = false
 		is_read_only = false
-		members      = jsonencode({
-			serviceIdentities = []
-			tags              = []
-			users             = []
-			aiIdentities      = []
-		})
+		members      = jsonencode(
+			{
+				serviceIdentities = [
+					{
+						name = "britiveProviderAcceptanceTestSI"
+					},
+					{
+						name = "britiveProviderAcceptanceTestSI1"
+					},
+				]
+				tags              = [
+					{
+						name = "britiveProviderAcceptanceTestTag"
+					},
+					{
+						name = "britiveProviderAcceptanceTestTag1"
+					},
+				]
+				users             = [
+					{
+						name = "britiveprovideracceptancetest"
+					},
+					{
+						name = "britiveprovideracceptancetest1"
+					},
+				]
+				aiIdentities      = [
+        			{
+          				name : "DO_NOT_DELETE_AI_IDENTITY"
+        			},
+      			]
+			}
+		)
 		tag_associations {
 			key    = "%s"
 			values = ["%s"]
