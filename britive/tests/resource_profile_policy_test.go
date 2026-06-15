@@ -54,6 +54,10 @@ func testAccCheckBritiveProfilePolicyConfig(applicationName, profileName, profil
 			type  = "Environment"
 			value = "Sigma Corporate"
 		}
+		tag_associations {
+			key    = "team"
+			values = ["engineering"]
+		}
 	}
 
 	resource "britive_profile_policy" "new" {
