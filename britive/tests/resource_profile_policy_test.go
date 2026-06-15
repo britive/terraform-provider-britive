@@ -210,7 +210,7 @@ func testAccCheckBritiveProfilePolicyConfigWithTagAssociations(applicationName, 
 		profile_id   = britive_profile.new.id
 		access_type  = "Allow"
 		consumer     = "papservice"
-		is_active    = true
+		is_active    = false
 		is_draft     = false
 		is_read_only = false
 		members      = jsonencode({
