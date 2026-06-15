@@ -4,6 +4,7 @@
 ENHANCEMENTS:
 * **Resource:** `britive_profile` : Added `tag_associations` argument to associate tag-based scope filters with a profile. At least one of `associations` or `tag_associations` must be specified (previously `associations` was required).
 * **Resource:** `britive_profile_policy` : Added `tag_associations` argument to associate tag-based scope filters with a profile policy.
+* **Resource:** `britive_application` : Added support for `Britive` as a new `application_type`.
 
 =======
 
