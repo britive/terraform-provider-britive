@@ -198,6 +198,10 @@ func testAccCheckBritiveProfilePolicyConfigWithTagAssociations(applicationName, 
 			type  = "EnvironmentGroup"
 			value = "Development"
 		}
+		tag_associations {
+			key    = "team"
+			values = ["engineering"]
+		}
 	}
 
 	resource "britive_profile_policy" "new" {
