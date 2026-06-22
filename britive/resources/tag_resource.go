@@ -198,7 +198,7 @@ func (r *TagResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 
 	state.Name = types.StringValue(tag.Name)
-	state.Description = types.StringValue(tag.Description)
+	normalizeTagDescription(tag.Description, &state.Description)
 	state.Disabled = types.BoolValue(strings.EqualFold(tag.Status, "Inactive"))
 	state.External = types.BoolValue(tag.External.(bool))
 
@@ -223,7 +223,13 @@ func (r *TagResource) populateStateFromAPI(ctx context.Context, state *TagResour
 	}
 
 	state.Name = types.StringValue(tag.Name)
-	state.Description = types.StringValue(tag.Description)
+	// After Create/Update: preserve the plan's null when the API sets a default
+	// (e.g. "No Description"). Returning a non-null value here when the plan was
+	// null would cause an "inconsistent result after apply" error. Read will
+	// surface the actual API value as drift on the next plan/apply cycle.
+	if !state.Description.IsNull() {
+		state.Description = types.StringValue(tag.Description)
+	}
 	state.Disabled = types.BoolValue(strings.EqualFold(tag.Status, "Inactive"))
 	state.External = types.BoolValue(tag.External.(bool))
 
@@ -391,6 +397,24 @@ func (r *TagResource) ImportState(ctx context.Context, req resource.ImportStateR
 
 	if len(tag.UserTagIdentityProviders) > 0 {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("identity_provider_id"), tag.UserTagIdentityProviders[0].IdentityProvider.ID)...)
+	}
+}
+
+// normalizeTagDescription is used in Read to map the API value back to state.
+// The API stores "no description" as ""; the framework treats null (not in config)
+// and "" (explicit empty) differently. When the API returns "" we preserve the
+// prior state value so null stays null and "" stays "".
+// Non-empty API values (including defaults like "No Description") are returned
+// as-is so that drift is visible on the next plan/apply cycle.
+func normalizeTagDescription(apiDescription string, current *types.String) {
+	if apiDescription != "" {
+		*current = types.StringValue(apiDescription)
+		return
+	}
+	if current.IsNull() {
+		*current = types.StringNull()
+	} else {
+		*current = types.StringValue("")
 	}
 }
 

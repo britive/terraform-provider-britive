@@ -498,8 +498,9 @@ func (r *ProfilePolicyPrioritizationResource) mapResourceToModel(ctx context.Con
 func (r *ProfilePolicyPrioritizationResource) mapPoliciesToState(ctx context.Context, state *ProfilePolicyPrioritizationResourceModel, policies []britive.ProfilePolicy, imported bool) error {
 	var userPolicyPriorities []PolicyPriorityModel
 
-	// During import or when no existing priorities, return all policies
-	if imported || len(state.PolicyPriority) == 0 {
+	// During import, return all policies so state reflects what exists in Britive.
+	// During normal operation, only include policies the user explicitly specified.
+	if imported {
 		for _, policy := range policies {
 			userPolicyPriorities = append(userPolicyPriorities, PolicyPriorityModel{
 				ID:       types.StringValue(policy.PolicyID),

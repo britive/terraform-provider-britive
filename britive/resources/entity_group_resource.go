@@ -233,7 +233,7 @@ func (r *EntityGroupResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	applicationID, _, err := parseEntityGroupID(plan.ID.ValueString())
+	applicationID, entityID, err := parseEntityGroupID(plan.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Parsing Entity Group ID",
@@ -243,7 +243,7 @@ func (r *EntityGroupResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	entityGroup := britive.ApplicationEntityGroup{
-		EntityID:    plan.EntityID.ValueString(),
+		EntityID:    entityID,
 		Name:        plan.EntityName.ValueString(),
 		Description: plan.EntityDescription.ValueString(),
 		ParentID:    plan.ParentID.ValueString(),

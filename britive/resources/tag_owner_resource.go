@@ -351,18 +351,26 @@ func buildTagOwnerKeyMap(entities []TagOwnerEntityModel) map[string]TagOwnerEnti
 
 func resolveTagOwnerEntry(owner britive.TagOwnerEntity, stateByKey map[string]TagOwnerEntityModel) TagOwnerEntityModel {
 	if si, ok := stateByKey[owner.RelatedEntityID]; ok {
-		// Configured by id — return id only (preserve user intent)
-		return TagOwnerEntityModel{
-			ID:   si.ID,
-			Name: types.StringNull(),
+		// Keyed by id — always return id; also return name if the plan carried it
+		// (e.g. when Terraform correlated a prior state element that had name set).
+		// Returning both keeps the actual element hash equal to the planned hash.
+		entry := TagOwnerEntityModel{ID: si.ID}
+		if !si.Name.IsNull() && !si.Name.IsUnknown() {
+			entry.Name = types.StringValue(owner.RelatedEntityName)
+		} else {
+			entry.Name = types.StringNull()
 		}
+		return entry
 	}
 	if si, ok := stateByKey[owner.RelatedEntityName]; ok {
-		// Configured by name — return name only
-		return TagOwnerEntityModel{
-			ID:   types.StringNull(),
-			Name: si.Name,
+		// Keyed by name — always return name; also return id if the plan carried it.
+		entry := TagOwnerEntityModel{Name: si.Name}
+		if !si.ID.IsNull() && !si.ID.IsUnknown() {
+			entry.ID = types.StringValue(owner.RelatedEntityID)
+		} else {
+			entry.ID = types.StringNull()
 		}
+		return entry
 	}
 	// External addition not in state — store by id
 	return TagOwnerEntityModel{

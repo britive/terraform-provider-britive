@@ -656,12 +656,12 @@ func (r *AdvancedSettingsResource) buildAdvancedSettings(ctx context.Context, pl
 
 // mapAPIToState maps API response to state model
 func (r *AdvancedSettingsResource) mapAPIToState(ctx context.Context, state *AdvancedSettingsResourceModel, advancedSettings *britive.AdvancedSettings) error {
-	// Reset nested blocks
-	state.JustificationSettings = nil
-	state.ITSM = nil
-	state.IM = nil
-
-	// Capture user-provided connection types for case preservation
+	// Capture user-provided values BEFORE resetting — needed for null vs ""
+	// preservation on Optional fields and for connection-type case preservation.
+	var userJustificationRegex types.String
+	if len(state.JustificationSettings) > 0 {
+		userJustificationRegex = state.JustificationSettings[0].JustificationRegex
+	}
 	var userITSMConnType, userIMConnType string
 	if len(state.ITSM) > 0 {
 		userITSMConnType = state.ITSM[0].ConnectionType.ValueString()
@@ -669,6 +669,11 @@ func (r *AdvancedSettingsResource) mapAPIToState(ctx context.Context, state *Adv
 	if len(state.IM) > 0 {
 		userIMConnType = state.IM[0].ConnectionType.ValueString()
 	}
+
+	// Reset nested blocks
+	state.JustificationSettings = nil
+	state.ITSM = nil
+	state.IM = nil
 
 	for _, setting := range advancedSettings.Settings {
 		// Skip inherited settings
@@ -679,11 +684,21 @@ func (r *AdvancedSettingsResource) mapAPIToState(ctx context.Context, state *Adv
 		switch strings.ToUpper(setting.SettingsType) {
 		case "JUSTIFICATION":
 			js := JustificationSettingsModel{
-				JustificationID:    types.StringValue(setting.ID),
-				JustificationRegex: types.StringValue(setting.JustificationRegex),
+				JustificationID: types.StringValue(setting.ID),
 			}
 			if setting.IsJustificationRequired != nil {
 				js.IsJustificationRequired = types.BoolValue(*setting.IsJustificationRequired)
+			}
+			// Preserve null vs "" for the Optional justification_regex field.
+			// The plan has null when the user omits the attribute; writing "" would
+			// cause the set-element hash to differ and trigger the "does not
+			// correlate with any element in actual" plan inconsistency error.
+			if setting.JustificationRegex != "" {
+				js.JustificationRegex = types.StringValue(setting.JustificationRegex)
+			} else if !userJustificationRegex.IsNull() && !userJustificationRegex.IsUnknown() {
+				js.JustificationRegex = types.StringValue("")
+			} else {
+				js.JustificationRegex = types.StringNull()
 			}
 			state.JustificationSettings = append(state.JustificationSettings, js)
 

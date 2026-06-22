@@ -53,6 +53,8 @@ type ProfileAssociationModel struct {
 	ParentName types.String `tfsdk:"parent_name"`
 }
 
+var _ resource.ResourceWithModifyPlan = &ProfileResource{}
+
 // NewProfileResource is a helper function to simplify the provider implementation.
 func NewProfileResource() resource.Resource {
 	return &ProfileResource{}
@@ -307,6 +309,25 @@ func (r *ProfileResource) UpgradeState(_ context.Context) map[int64]resource.Sta
 				resp.Diagnostics.Append(resp.State.Set(ctx, &priorState)...)
 			},
 		},
+	}
+}
+
+// ModifyPlan nulls out extension_limit when extendable is false, preventing a
+// plan/state inconsistency caused by UseStateForUnknown copying the prior value.
+func (r *ProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan ProfileResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.Extendable.IsUnknown() && !plan.Extendable.ValueBool() {
+		plan.ExtensionLimit = types.Int64Null()
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 	}
 }
 
@@ -660,9 +681,11 @@ func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *Pr
 		state.AppName = types.StringValue("")
 	}
 	state.Name = types.StringValue(profile.Name)
-	// Optional-only field: map empty API response to null (to avoid null vs "" mismatch in plan)
+	// Preserve null vs "" distinction: if API returns empty, keep whatever the plan/state had.
 	if profile.Description != "" {
 		state.Description = types.StringValue(profile.Description)
+	} else if !state.Description.IsNull() && !state.Description.IsUnknown() {
+		state.Description = types.StringValue("")
 	} else {
 		state.Description = types.StringNull()
 	}
@@ -695,9 +718,11 @@ func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *Pr
 		state.ExtensionLimit = types.Int64Null()
 	}
 
-	// Optional-only field: map empty API response to null (to avoid null vs "" mismatch in plan)
+	// Preserve null vs "" distinction: if API returns empty, keep whatever the plan/state had.
 	if profile.DestinationUrl != "" {
 		state.DestinationURL = types.StringValue(profile.DestinationUrl)
+	} else if !state.DestinationURL.IsNull() && !state.DestinationURL.IsUnknown() {
+		state.DestinationURL = types.StringValue("")
 	} else {
 		state.DestinationURL = types.StringNull()
 	}

@@ -182,7 +182,13 @@ func (r *RoleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	state.Name = types.StringValue(role.Name)
-	state.Description = types.StringValue(role.Description)
+	if role.Description != "" {
+		state.Description = types.StringValue(role.Description)
+	} else if !state.Description.IsNull() && !state.Description.IsUnknown() {
+		state.Description = types.StringValue("")
+	} else {
+		state.Description = types.StringNull()
+	}
 
 	// Handle permissions with comparison
 	permissionsJSON, err := json.Marshal(role.Permissions)
@@ -377,7 +383,13 @@ func (r *RoleResource) populateStateFromAPI(ctx context.Context, state *RoleReso
 	}
 
 	state.Name = types.StringValue(role.Name)
-	state.Description = types.StringValue(role.Description)
+	if role.Description != "" {
+		state.Description = types.StringValue(role.Description)
+	} else if !state.Description.IsNull() && !state.Description.IsUnknown() {
+		state.Description = types.StringValue("")
+	} else {
+		state.Description = types.StringNull()
+	}
 
 	// Handle permissions with comparison
 	permissionsJSON, err := json.Marshal(role.Permissions)

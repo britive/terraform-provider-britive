@@ -270,7 +270,13 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	state.Name = types.StringValue(policy.Name)
-	state.Description = types.StringValue(policy.Description)
+	if policy.Description != "" {
+		state.Description = types.StringValue(policy.Description)
+	} else if !state.Description.IsNull() && !state.Description.IsUnknown() {
+		state.Description = types.StringValue("")
+	} else {
+		state.Description = types.StringNull()
+	}
 	state.AccessType = types.StringValue(policy.AccessType)
 	state.IsActive = types.BoolValue(policy.IsActive)
 	state.IsDraft = types.BoolValue(policy.IsDraft)
@@ -539,7 +545,13 @@ func (r *PolicyResource) populateStateFromAPI(ctx context.Context, state *Policy
 	}
 
 	state.Name = types.StringValue(policy.Name)
-	state.Description = types.StringValue(policy.Description)
+	if policy.Description != "" {
+		state.Description = types.StringValue(policy.Description)
+	} else if !state.Description.IsNull() && !state.Description.IsUnknown() {
+		state.Description = types.StringValue("")
+	} else {
+		state.Description = types.StringNull()
+	}
 	state.AccessType = types.StringValue(policy.AccessType)
 	state.IsActive = types.BoolValue(policy.IsActive)
 	state.IsDraft = types.BoolValue(policy.IsDraft)
