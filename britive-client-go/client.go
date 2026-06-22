@@ -260,14 +260,14 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 			continue
 		}
 
-		defer res.Body.Close()
-
 		if res.StatusCode == http.StatusNoContent {
+			res.Body.Close()
 			log.Printf("[DEBUG] britive-retry: success (204 No Content) on attempt %d/%d", attempt+1, c.MaxRetries+1)
 			return []byte(emptyString), ErrNoContent
 		}
 
 		body, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
 		if err != nil {
 			return nil, err
 		}
