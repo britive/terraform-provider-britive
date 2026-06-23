@@ -351,7 +351,7 @@ func (r *RMProfilePolicyPrioritizationResource) populateState(_ context.Context,
 
 	state.PolicyPriorityEnabled = types.BoolValue(profile.PolicyOrderingEnabled)
 
-	if imported || len(state.PolicyPriority) == 0 {
+	if imported {
 		var result []RMPolicyPriorityModel
 		for _, p := range policies {
 			result = append(result, RMPolicyPriorityModel{

@@ -371,7 +371,10 @@ func (r *ResourceTypeResource) mapResourceToModel(plan *ResourceTypeResourceMode
 
 func (r *ResourceTypeResource) mapModelToResource(resourceType *britive.ResourceType, state *ResourceTypeResourceModel, imported bool) {
 	state.Name = types.StringValue(resourceType.Name)
-	state.Description = types.StringValue(resourceType.Description)
+	// Use prior state as fallback when API returns "": if the prior state was null (user never
+	// set description), keep null; if it was "" or non-empty, preserve that intent. This avoids
+	// the "was '' but now null" inconsistency when the plan had "" for an Optional-only field.
+	state.Description = preserveOptionalString(resourceType.Description, state.Description)
 
 	// Build map of user's param types to preserve case (unless imported)
 	paramMap := make(map[string]string)

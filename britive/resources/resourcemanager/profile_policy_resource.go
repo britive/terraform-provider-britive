@@ -365,17 +365,16 @@ func (r *ProfilePolicyResource) mapResourceToModel(ctx context.Context, plan *Pr
 		policy.Members = members
 	}
 
-	// Parse resource labels directly (slice, no ElementsAs needed)
-	if len(plan.ResourceLabels) > 0 {
-		policy.ResourceLabels = make(map[string][]string)
-		for _, label := range plan.ResourceLabels {
-			var values []string
-			diagsVals := label.Values.ElementsAs(ctx, &values, false)
-			if diagsVals.HasError() {
-				return policy, fmt.Errorf("error parsing resource label values")
-			}
-			policy.ResourceLabels[label.LabelKey.ValueString()] = values
+	// Always initialize the map so that removing all labels sends {} (not null) to the API.
+	// A nil map marshals as JSON null, which the API treats as "no change" rather than "clear".
+	policy.ResourceLabels = make(map[string][]string)
+	for _, label := range plan.ResourceLabels {
+		var values []string
+		diagsVals := label.Values.ElementsAs(ctx, &values, false)
+		if diagsVals.HasError() {
+			return policy, fmt.Errorf("error parsing resource label values")
 		}
+		policy.ResourceLabels[label.LabelKey.ValueString()] = values
 	}
 
 	return policy, nil
@@ -421,8 +420,9 @@ func (r *ProfilePolicyResource) mapModelToResource(ctx context.Context, policy *
 		}
 	}
 
-	// Map resource labels directly as a slice (SetNestedBlock)
-	var resourceLabelsList []ProfilePolicyLabelModel
+	// Map resource labels — use an empty (non-nil) slice when there are no labels so the
+	// framework sees an empty set rather than null, avoiding plan/state inconsistencies.
+	resourceLabelsList := make([]ProfilePolicyLabelModel, 0, len(policy.ResourceLabels))
 	for labelKey, values := range policy.ResourceLabels {
 		valuesSet, diagsSet := types.SetValueFrom(ctx, types.StringType, values)
 		if diagsSet.HasError() {

@@ -470,7 +470,7 @@ type ResourceLabelValue struct {
 type ResourceManagerProfile struct {
 	ProfileId                     string              `json:"profileId,omitempty"`
 	Name                          string              `json:"name,omitempty"`
-	Description                   string              `json:"description,omitempty"`
+	Description                   *string             `json:"description,omitempty"`
 	ExpirationDuration            int                 `json:"expirationDuration,omitempty"`
 	Status                        string              `json:"status,omitempty"`
 	Associations                  map[string][]string `json:"associations,omitempty"`

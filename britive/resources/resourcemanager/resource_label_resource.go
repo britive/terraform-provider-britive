@@ -48,7 +48,7 @@ func (r *ResourceLabelResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *ResourceLabelResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version:     1,
+		Version:     2,
 		Description: "Manages a Britive resource manager resource label",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -65,6 +65,7 @@ func (r *ResourceLabelResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"description": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"internal": schema.BoolAttribute{
 				Computed: true,
@@ -74,23 +75,22 @@ func (r *ResourceLabelResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"label_color": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 		},
 		Blocks: map[string]schema.Block{
-			"values": schema.SetNestedBlock{
+			"values": schema.ListNestedBlock{
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"value_id": schema.StringAttribute{
 							Computed: true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 						"name": schema.StringAttribute{
 							Required: true,
 						},
 						"description": schema.StringAttribute{
 							Optional: true,
+							Computed: true,
 						},
 					},
 				},
@@ -143,15 +143,7 @@ func (r *ResourceLabelResource) Create(ctx context.Context, req resource.CreateR
 	plan.ID = types.StringValue(fmt.Sprintf("resource-manager/labels/%s", created.LabelId))
 	plan.Internal = types.BoolValue(created.Internal)
 
-	var values []ResourceLabelValueModel
-	for _, v := range created.Values {
-		values = append(values, ResourceLabelValueModel{
-			ValueID:     types.StringValue(v.ValueId),
-			Name:        types.StringValue(v.Name),
-			Description: optionalStringValue(v.Description),
-		})
-	}
-	plan.Values = values
+	plan.Values = buildValuesInOrder(created.Values, plan.Values)
 
 	log.Printf("[INFO] Created resource label: %s", created.LabelId)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -176,19 +168,12 @@ func (r *ResourceLabelResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	state.Name = types.StringValue(label.Name)
-	state.Description = optionalStringValue(label.Description)
+	state.Description = preserveOptionalString(label.Description, state.Description)
 	state.Internal = types.BoolValue(label.Internal)
-	state.LabelColor = optionalStringValue(label.LabelColor)
+	state.LabelColor = preserveOptionalString(label.LabelColor, state.LabelColor)
 
-	var values []ResourceLabelValueModel
-	for _, v := range label.Values {
-		values = append(values, ResourceLabelValueModel{
-			ValueID:     types.StringValue(v.ValueId),
-			Name:        types.StringValue(v.Name),
-			Description: optionalStringValue(v.Description),
-		})
-	}
-	state.Values = values
+	// Reorder API values to match prior state order to avoid spurious list-ordering diffs.
+	state.Values = buildValuesInOrder(label.Values, state.Values)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -218,7 +203,7 @@ func (r *ResourceLabelResource) Update(ctx context.Context, req resource.UpdateR
 			Name:        v.Name.ValueString(),
 			Description: v.Description.ValueString(),
 		}
-		if !v.ValueID.IsNull() {
+		if !v.ValueID.IsNull() && !v.ValueID.IsUnknown() {
 			labelValue.ValueId = v.ValueID.ValueString()
 		}
 		label.Values = append(label.Values, labelValue)
@@ -234,15 +219,7 @@ func (r *ResourceLabelResource) Update(ctx context.Context, req resource.UpdateR
 
 	plan.Internal = types.BoolValue(updated.Internal)
 
-	var values []ResourceLabelValueModel
-	for _, v := range updated.Values {
-		values = append(values, ResourceLabelValueModel{
-			ValueID:     types.StringValue(v.ValueId),
-			Name:        types.StringValue(v.Name),
-			Description: optionalStringValue(v.Description),
-		})
-	}
-	plan.Values = values
+	plan.Values = buildValuesInOrder(updated.Values, plan.Values)
 
 	log.Printf("[INFO] Updated resource label: %s", labelID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -321,58 +298,83 @@ func parseLabelID(id string) string {
 	return id
 }
 
-// ModifyPlan copies value_id from state to plan by matching on `name`, bypassing the set element
-// hashing problem: UseStateForUnknown can't match elements when value_id (computed) is unknown.
+// ModifyPlan normalizes Optional+Computed fields (null/empty config → null plan) and copies
+// value_id from state by name-matching to handle reordering and additions safely.
 func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	// Skip create and delete
-	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+	if req.Plan.Raw.IsNull() {
 		return
 	}
 
-	var state, plan ResourceLabelResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	var plan ResourceLabelResourceModel
+	var config ResourceLabelResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Build name → state value map
-	type stateVal struct {
-		valueID     string
-		description types.String
+	modified := false
+
+	// Normalize top-level description and label_color: null config → null plan.
+	// Needed because Optional+Computed carries prior state when config is null; this resets it.
+	// When config is explicitly "" (user wants to clear the field), keep plan as "" — do NOT
+	// normalize to null, as that would violate the framework rule that planned values must match
+	// non-null config values.
+	if config.Description.IsNull() {
+		if !plan.Description.IsNull() {
+			plan.Description = types.StringNull()
+			modified = true
+		}
 	}
-	stateValues := make(map[string]stateVal)
-	for _, sv := range state.Values {
-		if !sv.Name.IsNull() && !sv.Name.IsUnknown() {
-			stateValues[sv.Name.ValueString()] = stateVal{
-				valueID:     sv.ValueID.ValueString(),
-				description: sv.Description,
+	if config.LabelColor.IsNull() {
+		if !plan.LabelColor.IsNull() {
+			plan.LabelColor = types.StringNull()
+			modified = true
+		}
+	}
+
+	// Normalize value descriptions: null config → null plan.
+	for i, pv := range plan.Values {
+		if i >= len(config.Values) {
+			break
+		}
+		cv := config.Values[i]
+		if cv.Description.IsNull() {
+			if !pv.Description.IsNull() {
+				plan.Values[i].Description = types.StringNull()
+				modified = true
 			}
 		}
 	}
 
-	// Fix plan values by matching on name:
-	// 1. Always copy value_id from state (it's purely Computed; UseStateForUnknown can assign
-	//    the wrong ID when set element hashes mismatch due to description="" vs null).
-	// 2. When plan description is null and state description is "" (SDKv2 empty string),
-	//    treat them as equivalent to prevent spurious set element churn.
-	modified := false
-	for i, pv := range plan.Values {
-		if pv.Name.IsUnknown() || pv.Name.IsNull() {
-			continue
+	// On Update (state exists): copy value_id from state by name to correctly handle
+	// additions, removals, and reordering (index-based UseStateForUnknown is insufficient).
+	if !req.State.Raw.IsNull() {
+		var state ResourceLabelResourceModel
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
-		sv, ok := stateValues[pv.Name.ValueString()]
-		if !ok {
-			continue
+
+		stateValueMap := make(map[string]types.String)
+		for _, sv := range state.Values {
+			if !sv.Name.IsNull() && !sv.Name.IsUnknown() {
+				stateValueMap[sv.Name.ValueString()] = sv.ValueID
+			}
 		}
-		if pv.ValueID.ValueString() != sv.valueID {
-			plan.Values[i].ValueID = types.StringValue(sv.valueID)
-			modified = true
-		}
-		// Normalize: null in plan vs "" in state are equivalent for Optional description
-		if plan.Values[i].Description.IsNull() && !sv.description.IsNull() && sv.description.ValueString() == "" {
-			plan.Values[i].Description = sv.description
-			modified = true
+
+		for i, pv := range plan.Values {
+			if pv.Name.IsUnknown() || pv.Name.IsNull() {
+				continue
+			}
+			stateID, ok := stateValueMap[pv.Name.ValueString()]
+			if !ok || stateID.IsNull() || stateID.IsUnknown() {
+				continue
+			}
+			if pv.ValueID.IsUnknown() || pv.ValueID.ValueString() != stateID.ValueString() {
+				plan.Values[i].ValueID = stateID
+				modified = true
+			}
 		}
 	}
 
@@ -381,86 +383,84 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 	}
 }
 
-// UpgradeState handles migration from SDKv2 state (version 0) to Plugin Framework state (version 1).
-// SDKv2 stored extra fields in each `values` set element: created_by (int), updated_by (int),
-// created_on (string), updated_on (string). The Framework's automatic upgrade cannot handle the
-// TypeInt → missing field mapping, causing set element matching to scramble. This upgrader
-// explicitly drops those extra fields.
+// UpgradeState handles state migrations:
+//   - v0 (SDKv2): had extra fields per value (created_by, updated_by, etc.) and values as a set.
+//   - v1 (Framework): values as SetNestedBlock, description/label_color Optional only.
+//   - v2 (current): values as ListNestedBlock, description/label_color/value-description Optional+Computed.
 func (r *ResourceLabelResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	// rawLabelUpgrader parses the raw JSON and builds a ResourceLabelResourceModel.
+	// Used by both v0→v2 and v1→v2 paths since the JSON wire format is compatible
+	// (both SetNestedBlock and ListNestedBlock are stored as JSON arrays).
+	rawLabelUpgrader := func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+		var rawState map[string]json.RawMessage
+		if err := json.Unmarshal(req.RawState.JSON, &rawState); err != nil {
+			resp.Diagnostics.AddError("Error upgrading resource label state", fmt.Sprintf("Could not parse raw state JSON: %s", err))
+			return
+		}
+
+		type rawValue struct {
+			ValueID     string   `json:"value_id"`
+			Name        string   `json:"name"`
+			Description string   `json:"description"`
+			CreatedBy   *float64 `json:"created_by,omitempty"`
+			UpdatedBy   *float64 `json:"updated_by,omitempty"`
+			CreatedOn   *string  `json:"created_on,omitempty"`
+			UpdatedOn   *string  `json:"updated_on,omitempty"`
+		}
+
+		var rawValues []rawValue
+		if rawVals, ok := rawState["values"]; ok {
+			if err := json.Unmarshal(rawVals, &rawValues); err != nil {
+				resp.Diagnostics.AddError("Error upgrading resource label state", fmt.Sprintf("Could not parse values: %s", err))
+				return
+			}
+		}
+
+		getString := func(key string) string {
+			if raw, ok := rawState[key]; ok {
+				var s string
+				if err := json.Unmarshal(raw, &s); err == nil {
+					return s
+				}
+			}
+			return ""
+		}
+		getBool := func(key string) bool {
+			if raw, ok := rawState[key]; ok {
+				var b bool
+				if err := json.Unmarshal(raw, &b); err == nil {
+					return b
+				}
+			}
+			return false
+		}
+
+		newValues := make([]ResourceLabelValueModel, 0, len(rawValues))
+		for _, v := range rawValues {
+			newValues = append(newValues, ResourceLabelValueModel{
+				ValueID:     types.StringValue(v.ValueID),
+				Name:        types.StringValue(v.Name),
+				Description: optionalStringValue(v.Description),
+			})
+		}
+
+		newState := ResourceLabelResourceModel{
+			ID:          types.StringValue(getString("id")),
+			Name:        types.StringValue(getString("name")),
+			Description: optionalStringValue(getString("description")),
+			Internal:    types.BoolValue(getBool("internal")),
+			LabelColor:  optionalStringValue(getString("label_color")),
+			Values:      newValues,
+		}
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
+	}
+
 	return map[int64]resource.StateUpgrader{
-		// Version 0 = SDKv2 state format
-		0: {
-			PriorSchema: nil, // use raw JSON upgrade
-			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-				// Parse raw JSON from SDKv2 state
-				var rawState map[string]json.RawMessage
-				if err := json.Unmarshal(req.RawState.JSON, &rawState); err != nil {
-					resp.Diagnostics.AddError("Error upgrading resource label state", fmt.Sprintf("Could not parse raw state JSON: %s", err))
-					return
-				}
-
-				// Parse the values array — each element may have extra SDKv2 fields
-				type sdkV2LabelValue struct {
-					ValueID     string  `json:"value_id"`
-					Name        string  `json:"name"`
-					Description string  `json:"description"`
-					// Extra SDKv2 fields we drop
-					CreatedBy  *float64 `json:"created_by,omitempty"`
-					UpdatedBy  *float64 `json:"updated_by,omitempty"`
-					CreatedOn  *string  `json:"created_on,omitempty"`
-					UpdatedOn  *string  `json:"updated_on,omitempty"`
-				}
-
-				var sdkValues []sdkV2LabelValue
-				if rawValues, ok := rawState["values"]; ok {
-					if err := json.Unmarshal(rawValues, &sdkValues); err != nil {
-						resp.Diagnostics.AddError("Error upgrading resource label state", fmt.Sprintf("Could not parse values: %s", err))
-						return
-					}
-				}
-
-				// Helper to extract string field from raw state
-				getString := func(key string) string {
-					if raw, ok := rawState[key]; ok {
-						var s string
-						if err := json.Unmarshal(raw, &s); err == nil {
-							return s
-						}
-					}
-					return ""
-				}
-				getBool := func(key string) bool {
-					if raw, ok := rawState[key]; ok {
-						var b bool
-						if err := json.Unmarshal(raw, &b); err == nil {
-							return b
-						}
-					}
-					return false
-				}
-
-				// Build new state with only the fields the Framework schema expects
-				newValues := make([]ResourceLabelValueModel, 0, len(sdkValues))
-				for _, v := range sdkValues {
-					newValues = append(newValues, ResourceLabelValueModel{
-						ValueID:     types.StringValue(v.ValueID),
-						Name:        types.StringValue(v.Name),
-						Description: optionalStringValue(v.Description),
-					})
-				}
-
-				newState := ResourceLabelResourceModel{
-					ID:          types.StringValue(getString("id")),
-					Name:        types.StringValue(getString("name")),
-					Description: optionalStringValue(getString("description")),
-					Internal:    types.BoolValue(getBool("internal")),
-					LabelColor:  optionalStringValue(getString("label_color")),
-					Values:      newValues,
-				}
-
-				resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
-			},
-		},
+		// v0: SDKv2 state — values set had extra int fields (created_by, updated_by, etc.)
+		0: {StateUpgrader: rawLabelUpgrader},
+		// v1: Framework state with SetNestedBlock — JSON array format is identical to ListNestedBlock
+		1: {StateUpgrader: rawLabelUpgrader},
 	}
 }
 
@@ -472,4 +472,66 @@ func optionalStringValue(s string) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(s)
+}
+
+// preserveOptionalString handles the case where the API returns "" for an
+// Optional+Computed string field. When the API value is empty:
+//   - if the prior state was null (user never set it), keep null
+//   - if the prior state was non-null (user explicitly set "" or a value that was cleared), return ""
+//
+// This prevents a persistent plan diff when the user has explicitly set the
+// field to "" while still correctly returning null when the user never touched it.
+func preserveOptionalString(apiValue string, priorState types.String) types.String {
+	if apiValue == "" {
+		if priorState.IsNull() {
+			return types.StringNull()
+		}
+		return types.StringValue("")
+	}
+	return types.StringValue(apiValue)
+}
+
+// buildValuesInOrder builds a []ResourceLabelValueModel from the API response, ordered to
+// match referenceOrder (prior state in Read; plan in Create/Update). This prevents spurious
+// list-ordering diffs when the API returns values in a different sequence than the config.
+//
+//   - Values present in referenceOrder are emitted first, in referenceOrder sequence.
+//   - Values returned by the API but absent from referenceOrder (newly added) are appended.
+//   - Values in referenceOrder that the API no longer returns (deleted externally) are omitted.
+//   - description uses preserveOptionalString so an explicit "" is kept as "" rather than null.
+func buildValuesInOrder(apiValues []britive.ResourceLabelValue, referenceOrder []ResourceLabelValueModel) []ResourceLabelValueModel {
+	apiByName := make(map[string]britive.ResourceLabelValue, len(apiValues))
+	for _, v := range apiValues {
+		apiByName[v.Name] = v
+	}
+
+	seen := make(map[string]bool, len(referenceOrder))
+	result := make([]ResourceLabelValueModel, 0, len(apiValues))
+
+	for _, ref := range referenceOrder {
+		name := ref.Name.ValueString()
+		v, ok := apiByName[name]
+		if !ok {
+			continue // value was removed externally; omit from state
+		}
+		result = append(result, ResourceLabelValueModel{
+			ValueID:     types.StringValue(v.ValueId),
+			Name:        types.StringValue(v.Name),
+			Description: preserveOptionalString(v.Description, ref.Description),
+		})
+		seen[name] = true
+	}
+
+	// Append values returned by API that were not in referenceOrder (newly created).
+	for _, v := range apiValues {
+		if !seen[v.Name] {
+			result = append(result, ResourceLabelValueModel{
+				ValueID:     types.StringValue(v.ValueId),
+				Name:        types.StringValue(v.Name),
+				Description: preserveOptionalString(v.Description, types.StringNull()),
+			})
+		}
+	}
+
+	return result
 }

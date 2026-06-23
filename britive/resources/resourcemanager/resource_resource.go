@@ -201,6 +201,7 @@ func (r *ResourceResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 	serverAccessResource.ResourceID = resourceID
+	serverAccessResource.ResourceType.ResourceTypeID = state.ResourceTypeID.ValueString()
 
 	log.Printf("[INFO] Updating server access resource: %s", resourceID)
 

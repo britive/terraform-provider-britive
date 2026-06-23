@@ -425,11 +425,18 @@ func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportSt
 func (r *ProfileResource) mapResourceToModel(ctx context.Context, plan *ProfileResourceModel) (britive.ResourceManagerProfile, error) {
 	profile := britive.ResourceManagerProfile{
 		Name:               plan.Name.ValueString(),
-		Description:        plan.Description.ValueString(),
 		ExpirationDuration: int(plan.ExpirationDuration.ValueInt64()),
 		DelegationEnabled:  plan.AllowImpersonation.ValueBool(),
 		Extendable:         plan.Extendable.ValueBool(),
 		Associations:       make(map[string][]string),
+	}
+
+	// Only include description in the PATCH payload when the user explicitly set it (even to "").
+	// A nil *string is omitted by omitempty, so the API preserves the existing description.
+	// A non-nil pointer (including &"") is always included, allowing the API to clear the field.
+	if !plan.Description.IsNull() {
+		desc := plan.Description.ValueString()
+		profile.Description = &desc
 	}
 
 	if profile.Extendable {
@@ -470,7 +477,17 @@ func (r *ProfileResource) mapResourceToModel(ctx context.Context, plan *ProfileR
 
 func (r *ProfileResource) mapModelToResource(ctx context.Context, profile *britive.ResourceManagerProfile, state *ProfileResourceModel, diags *diag.Diagnostics) {
 	state.Name = types.StringValue(profile.Name)
-	state.Description = types.StringValue(profile.Description)
+	apiDesc := ""
+	if profile.Description != nil {
+		apiDesc = *profile.Description
+	}
+	// When state is null the user is not managing description; don't overwrite with the API
+	// value — the PATCH omitted the field so the API may still hold a stale value we
+	// intentionally didn't touch. Only update state when the user was already tracking it
+	// (non-null prior state) or when the API confirms the field is empty.
+	if !state.Description.IsNull() || apiDesc == "" {
+		state.Description = preserveOptionalString(apiDesc, state.Description)
+	}
 	state.ExpirationDuration = types.Int64Value(int64(profile.ExpirationDuration))
 	state.Status = types.StringValue(profile.Status)
 	state.AllowImpersonation = types.BoolValue(profile.DelegationEnabled)

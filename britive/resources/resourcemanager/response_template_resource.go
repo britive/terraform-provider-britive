@@ -68,6 +68,7 @@ func (r *ResponseTemplateResource) Schema(_ context.Context, _ resource.SchemaRe
 			"description": schema.StringAttribute{
 				Description: "A description of the response template",
 				Optional:    true,
+				Computed:    true,
 			},
 			"is_console_access_enabled": schema.BoolAttribute{
 				Description: "Boolean flag to enable console access",
@@ -116,6 +117,29 @@ func (r *ResponseTemplateResource) ValidateConfig(ctx context.Context, req resou
 			"Invalid Configuration",
 			"Both 'is_console_access_enabled' and 'show_on_ui' cannot be true at the same time",
 		)
+	}
+}
+
+func (r *ResponseTemplateResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	var plan ResponseTemplateResourceModel
+	var config ResponseTemplateResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	modified := false
+	if config.Description.IsNull() {
+		if !plan.Description.IsNull() {
+			plan.Description = types.StringNull()
+			modified = true
+		}
+	}
+	if modified {
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 	}
 }
 
@@ -173,18 +197,12 @@ func (r *ResponseTemplateResource) Read(ctx context.Context, req resource.ReadRe
 
 	state.TemplateID = types.StringValue(template.TemplateID)
 	state.Name = types.StringValue(template.Name)
-	if template.Description != "" {
-		state.Description = types.StringValue(template.Description)
-	} else {
-		state.Description = types.StringNull()
-	}
+	// Use prior state as fallback when API returns "": preserves the user's explicit "" in state
+	// rather than flipping to null, which would cause a persistent plan diff.
+	state.Description = preserveOptionalString(template.Description, state.Description)
 	state.IsConsoleAccessEnabled = types.BoolValue(template.IsConsoleAccessEnabled)
 	state.ShowOnUI = types.BoolValue(template.ShowOnUI)
-	if template.TemplateData != "" {
-		state.TemplateData = types.StringValue(template.TemplateData)
-	} else {
-		state.TemplateData = types.StringNull()
-	}
+	state.TemplateData = preserveOptionalString(template.TemplateData, state.TemplateData)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -284,18 +302,12 @@ func (r *ResponseTemplateResource) ImportState(ctx context.Context, req resource
 	state.ID = types.StringValue(fmt.Sprintf("resource-manager/response-templates/%s", template.TemplateID))
 	state.TemplateID = types.StringValue(template.TemplateID)
 	state.Name = types.StringValue(template.Name)
-	if template.Description != "" {
-		state.Description = types.StringValue(template.Description)
-	} else {
-		state.Description = types.StringNull()
-	}
+	// On import there is no prior state; use null for empty API strings (consistent with
+	// the "never set" baseline a freshly imported resource starts from).
+	state.Description = optionalStringValue(template.Description)
 	state.IsConsoleAccessEnabled = types.BoolValue(template.IsConsoleAccessEnabled)
 	state.ShowOnUI = types.BoolValue(template.ShowOnUI)
-	if template.TemplateData != "" {
-		state.TemplateData = types.StringValue(template.TemplateData)
-	} else {
-		state.TemplateData = types.StringNull()
-	}
+	state.TemplateData = optionalStringValue(template.TemplateData)
 
 	log.Printf("[INFO] Imported response template: %s", templateID)
 

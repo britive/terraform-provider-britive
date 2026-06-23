@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/defaults"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -103,16 +104,19 @@ func (r *ResourceTypePermissionsResource) Schema(_ context.Context, _ resource.S
 			"description": schema.StringAttribute{
 				Description: "The description of the permission",
 				Optional:    true,
+				Computed:    true,
 			},
 			"checkin_time_limit": schema.Int64Attribute{
 				Description: "The check-in time limit in minutes",
 				Optional:    true,
 				Computed:    true,
+				Default:     staticInt64Default{60},
 			},
 			"checkout_time_limit": schema.Int64Attribute{
 				Description: "The check-out time limit in minutes",
 				Optional:    true,
 				Computed:    true,
+				Default:     staticInt64Default{60},
 			},
 			"is_draft": schema.BoolAttribute{
 				Description: "Indicates if the permission is a draft",
@@ -269,7 +273,7 @@ func (r *ResourceTypePermissionsResource) ValidateConfig(ctx context.Context, re
 	}
 }
 
-// ModifyPlan handles plan modification for file hash computation.
+// ModifyPlan handles plan modification for file hash computation and description normalization.
 func (r *ResourceTypePermissionsResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	// Only compute hashes during planning
 	if req.Plan.Raw.IsNull() {
@@ -281,6 +285,18 @@ func (r *ResourceTypePermissionsResource) ModifyPlan(ctx context.Context, req re
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	var config ResourceTypePermissionsResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// When description is absent from config (null), force plan to null so that a
+	// Computed+Optional field does not carry forward a prior-state value.
+	if config.Description.IsNull() && !plan.Description.IsNull() {
+		plan.Description = types.StringNull()
 	}
 
 	var state ResourceTypePermissionsResourceModel
@@ -648,7 +664,7 @@ func (r *ResourceTypePermissionsResource) mapResourceToModel(plan *ResourceTypeP
 func (r *ResourceTypePermissionsResource) mapModelToResource(permission *britive.ResourceTypePermission, state *ResourceTypePermissionsResourceModel) {
 	state.PermissionID = types.StringValue(permission.PermissionID)
 	state.Name = types.StringValue(permission.Name)
-	state.Description = types.StringValue(permission.Description)
+	state.Description = preserveOptionalString(permission.Description, state.Description)
 	state.Version = types.StringValue(permission.Version)
 	state.IsDraft = types.BoolValue(permission.IsDraft)
 	state.CheckinTimeLimit = types.Int64Value(int64(permission.CheckinTimeLimit))
@@ -659,7 +675,7 @@ func (r *ResourceTypePermissionsResource) mapModelToResource(permission *britive
 	state.CheckoutFileName = types.StringValue(permission.CheckoutFileName)
 
 	// Map response templates
-	var templateNames []types.String
+	templateNames := make([]types.String, 0)
 	for _, rt := range permission.ResponseTemplates {
 		if rtMap, ok := rt.(map[string]interface{}); ok {
 			if name, ok := rtMap["name"].(string); ok {
@@ -668,6 +684,19 @@ func (r *ResourceTypePermissionsResource) mapModelToResource(permission *britive
 		}
 	}
 	state.ResponseTemplates = templateNames
+}
+
+// staticInt64Default implements defaults.Int64 for a static integer value.
+type staticInt64Default struct{ val int64 }
+
+func (d staticInt64Default) Description(_ context.Context) string {
+	return fmt.Sprintf("value defaults to %d", d.val)
+}
+func (d staticInt64Default) MarkdownDescription(_ context.Context) string {
+	return fmt.Sprintf("value defaults to `%d`", d.val)
+}
+func (d staticInt64Default) DefaultInt64(_ context.Context, _ defaults.Int64Request, resp *defaults.Int64Response) {
+	resp.PlanValue = types.Int64Value(d.val)
 }
 
 // hashFileContent computes SHA256 hash of file content
