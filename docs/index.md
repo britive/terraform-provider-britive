@@ -82,25 +82,3 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
   ```
 
 ~> If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from the config file.
-
-### Rate Limiting
-
-The provider automatically retries requests that are rate-limited by the Britive API (HTTP 429). The following arguments control retry behavior:
-
-* `max_retries` - (Optional) Maximum number of retry attempts for rate-limited requests. Defaults to `10`.
-
-* `retry_wait_min` - (Optional) Minimum wait time in seconds between retries. Defaults to `1`.
-
-* `retry_wait_max` - (Optional) Maximum wait time in seconds between retries. Defaults to `600`.
-
-The provider uses exponential backoff with full jitter between retries. If the API response includes a `Retry-After` header, that value is used as the wait time (clamped to `retry_wait_min`/`retry_wait_max`).
-
-```hcl
-provider "britive" {
-  tenant         = "https://company.britive.com"
-  token          = "xxxx"
-  max_retries    = 5
-  retry_wait_min = 2
-  retry_wait_max = 120
-}
-```
