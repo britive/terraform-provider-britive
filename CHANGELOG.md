@@ -1,4 +1,12 @@
 
+## 2.3.4
+
+ENHANCEMENTS:
+* **Resource/Data Source:** `britive_application`, `britive_profile`, `britive_profile_policy`, `britive_profile_permission`, `britive_profile_session_attribute`, `britive_entity_group`, `britive_entity_environment` : Application API calls now use `?view=minimized` for smaller response payloads. Environment and root group data is now fetched from the main application response, eliminating separate calls to the `/root-environment-group` endpoint.
+* **Provider:** Added client-side handling for API rate limiting (HTTP 429): retry with backoff, honoring `Retry-After`, configurable via `max_retries` / `retry_wait_min` / `retry_wait_max`. Dormant until rate limiting is enabled server-side by Britive; no behavioral change on upgrade.
+
+=======
+
 ## 2.3.3
 
 ENHANCEMENTS:

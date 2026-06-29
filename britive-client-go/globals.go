@@ -5,6 +5,7 @@ import (
 )
 
 const (
+	defaultMaxRetries                = 10
 	emptyString                      = ""
 	tagLockName                      = "tag"
 	profileLockName                  = "profile"
