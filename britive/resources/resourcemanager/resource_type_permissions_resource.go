@@ -307,21 +307,20 @@ func (r *ResourceTypePermissionsResource) ModifyPlan(ctx context.Context, req re
 		}
 	}
 
-	// Compute file hashes if files are specified; set to empty when not using files
+	// Compute file hashes if files are specified; clear to null when not using files.
+	// Using a plain else (not else-if IsUnknown) ensures the hash is cleared even
+	// when removing a previously-set file — in that case the prior-state hash is a
+	// real string (not unknown), so the IsUnknown guard would silently skip clearing.
 	if !plan.CheckinCodeFile.IsNull() && plan.CheckinCodeFile.ValueString() != "" {
 		newHash, err := hashFileContent(plan.CheckinCodeFile.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Error Hashing Check-in File", err.Error())
 			return
 		}
-
-		// Update hash if changed
-		if plan.CheckinCodeFileHash.IsNull() || plan.CheckinCodeFileHash.ValueString() != newHash {
-			plan.CheckinCodeFileHash = types.StringValue(newHash)
-		}
-	} else if plan.CheckinCodeFileHash.IsUnknown() {
-		// Not using file upload; hash is not applicable
-		plan.CheckinCodeFileHash = types.StringValue("")
+		plan.CheckinCodeFileHash = types.StringValue(newHash)
+	} else {
+		// No checkin file in config: clear the hash so state does not retain a stale value.
+		plan.CheckinCodeFileHash = types.StringNull()
 	}
 
 	if !plan.CheckoutCodeFile.IsNull() && plan.CheckoutCodeFile.ValueString() != "" {
@@ -330,14 +329,10 @@ func (r *ResourceTypePermissionsResource) ModifyPlan(ctx context.Context, req re
 			resp.Diagnostics.AddError("Error Hashing Check-out File", err.Error())
 			return
 		}
-
-		// Update hash if changed
-		if plan.CheckoutCodeFileHash.IsNull() || plan.CheckoutCodeFileHash.ValueString() != newHash {
-			plan.CheckoutCodeFileHash = types.StringValue(newHash)
-		}
-	} else if plan.CheckoutCodeFileHash.IsUnknown() {
-		// Not using file upload; hash is not applicable
-		plan.CheckoutCodeFileHash = types.StringValue("")
+		plan.CheckoutCodeFileHash = types.StringValue(newHash)
+	} else {
+		// No checkout file in config: clear the hash so state does not retain a stale value.
+		plan.CheckoutCodeFileHash = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)

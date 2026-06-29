@@ -77,7 +77,9 @@ type Profile struct {
 	ExtensionLimit                interface{}          `json:"extensionLimit,omitempty"`
 	DestinationUrl                string               `json:"destinationUrl,omitempty"`
 	PolicyOrderingEnabled         bool                 `json:"policyOrderingEnabled,omitempty"`
-	DelegationEnabled             bool                 `json:"delegationEnabled,omitempty"`
+	// DelegationEnabled must NOT use omitempty: Go omits false for bool with omitempty,
+	// which would prevent the PATCH from ever setting delegation to false.
+	DelegationEnabled             bool                 `json:"delegationEnabled"`
 }
 
 // Application - godoc
@@ -460,7 +462,7 @@ type ResourceLabelValue struct {
 	ValueId     string `json:"valueId,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
-	CreatedBy   int    `json:"createdBy,omiempty"`
+	CreatedBy   int    `json:"createdBy,omitempty"`
 	UpdatedBy   int    `json:"updatedBy,omitempty"`
 	CreatedOn   string `json:"createdOn,omitempty"`
 	UpdatedOn   string `json:"updatedOn,omitempty"`
@@ -475,7 +477,9 @@ type ResourceManagerProfile struct {
 	Status                        string              `json:"status,omitempty"`
 	Associations                  map[string][]string `json:"associations,omitempty"`
 	ResourceLabelColorMap         map[string]string   `json:"resourceLabelColorMap,omitempty"`
-	DelegationEnabled             bool                `json:"delegationEnabled,omitempty"`
+	// DelegationEnabled must NOT use omitempty: Go omits false for bool with omitempty,
+	// which would prevent the PATCH from ever setting delegation to false.
+	DelegationEnabled             bool                `json:"delegationEnabled"`
 	PolicyOrderingEnabled         bool                `json:"policyOrderingEnabled,omitempty"`
 	Extendable                    bool                `json:"extendable"`
 	NotificationPriorToExpiration *int64              `json:"notificationPriorToExpiration,omitempty"`

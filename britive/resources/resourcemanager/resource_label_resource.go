@@ -36,6 +36,10 @@ type ResourceLabelValueModel struct {
 	ValueID     types.String `tfsdk:"value_id"`
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
+	CreatedBy   types.Int64  `tfsdk:"created_by"`
+	UpdatedBy   types.Int64  `tfsdk:"updated_by"`
+	CreatedOn   types.String `tfsdk:"created_on"`
+	UpdatedOn   types.String `tfsdk:"updated_on"`
 }
 
 func NewResourceLabelResource() resource.Resource {
@@ -92,6 +96,18 @@ func (r *ResourceLabelResource) Schema(_ context.Context, _ resource.SchemaReque
 							Optional: true,
 							Computed: true,
 						},
+						"created_by": schema.Int64Attribute{
+							Computed: true,
+						},
+						"updated_by": schema.Int64Attribute{
+							Computed: true,
+						},
+						"created_on": schema.StringAttribute{
+							Computed: true,
+						},
+						"updated_on": schema.StringAttribute{
+							Computed: true,
+						},
 					},
 				},
 			},
@@ -143,7 +159,14 @@ func (r *ResourceLabelResource) Create(ctx context.Context, req resource.CreateR
 	plan.ID = types.StringValue(fmt.Sprintf("resource-manager/labels/%s", created.LabelId))
 	plan.Internal = types.BoolValue(created.Internal)
 
-	plan.Values = buildValuesInOrder(created.Values, plan.Values)
+	// GET after POST: the POST response omits server-computed audit fields.
+	// A GET returns the full record so state reflects all computed values.
+	createdFull, err := r.client.GetResourceLabel(created.LabelId)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Resource Label After Create", err.Error())
+		return
+	}
+	plan.Values = buildValuesInOrder(createdFull.Values, plan.Values)
 
 	log.Printf("[INFO] Created resource label: %s", created.LabelId)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -219,7 +242,16 @@ func (r *ResourceLabelResource) Update(ctx context.Context, req resource.UpdateR
 
 	plan.Internal = types.BoolValue(updated.Internal)
 
-	plan.Values = buildValuesInOrder(updated.Values, plan.Values)
+	// GET after PUT: the PUT response omits server-computed audit fields
+	// (updated_by, updated_on). A GET returns the full record so state
+	// reflects the real post-update values rather than nulls.
+	updatedFull, err := r.client.GetResourceLabel(labelID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Resource Label After Update", err.Error())
+		return
+	}
+
+	plan.Values = buildValuesInOrder(updatedFull.Values, plan.Values)
 
 	log.Printf("[INFO] Updated resource label: %s", labelID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -283,6 +315,10 @@ func (r *ResourceLabelResource) ImportState(ctx context.Context, req resource.Im
 			ValueID:     types.StringValue(v.ValueId),
 			Name:        types.StringValue(v.Name),
 			Description: optionalStringValue(v.Description),
+			CreatedBy:   optionalInt64Value(v.CreatedBy),
+			UpdatedBy:   optionalInt64Value(v.UpdatedBy),
+			CreatedOn:   optionalStringValue(v.CreatedOn),
+			UpdatedOn:   optionalStringValue(v.UpdatedOn),
 		})
 	}
 	state.Values = values
@@ -298,8 +334,10 @@ func parseLabelID(id string) string {
 	return id
 }
 
-// ModifyPlan normalizes Optional+Computed fields (null/empty config → null plan) and copies
-// value_id from state by name-matching to handle reordering and additions safely.
+// ModifyPlan normalizes Optional+Computed fields and manages computed audit fields for
+// list values. TPF enforces strict plan-vs-actual consistency for Computed attributes in
+// ListNestedBlock (unlike SDKv2), so audit fields must be explicitly set to unknown when
+// the API will change them, and copied from state by name (not index) otherwise.
 func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return
@@ -316,10 +354,6 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 	modified := false
 
 	// Normalize top-level description and label_color: null config → null plan.
-	// Needed because Optional+Computed carries prior state when config is null; this resets it.
-	// When config is explicitly "" (user wants to clear the field), keep plan as "" — do NOT
-	// normalize to null, as that would violate the framework rule that planned values must match
-	// non-null config values.
 	if config.Description.IsNull() {
 		if !plan.Description.IsNull() {
 			plan.Description = types.StringNull()
@@ -338,44 +372,119 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 		if i >= len(config.Values) {
 			break
 		}
-		cv := config.Values[i]
-		if cv.Description.IsNull() {
-			if !pv.Description.IsNull() {
-				plan.Values[i].Description = types.StringNull()
-				modified = true
-			}
+		if config.Values[i].Description.IsNull() && !pv.Description.IsNull() {
+			plan.Values[i].Description = types.StringNull()
+			modified = true
 		}
 	}
 
-	// On Update (state exists): copy value_id from state by name to correctly handle
-	// additions, removals, and reordering (index-based UseStateForUnknown is insufficient).
+	// Build a name-keyed map of the prior state values.
+	type stateValueEntry struct {
+		valueID     types.String
+		createdBy   types.Int64
+		updatedBy   types.Int64
+		createdOn   types.String
+		updatedOn   types.String
+		description types.String
+	}
+	var state ResourceLabelResourceModel
+	stateValueMap := make(map[string]stateValueEntry)
 	if !req.State.Raw.IsNull() {
-		var state ResourceLabelResourceModel
 		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-
-		stateValueMap := make(map[string]types.String)
 		for _, sv := range state.Values {
 			if !sv.Name.IsNull() && !sv.Name.IsUnknown() {
-				stateValueMap[sv.Name.ValueString()] = sv.ValueID
+				stateValueMap[sv.Name.ValueString()] = stateValueEntry{
+					valueID:     sv.ValueID,
+					createdBy:   sv.CreatedBy,
+					updatedBy:   sv.UpdatedBy,
+					createdOn:   sv.CreatedOn,
+					updatedOn:   sv.UpdatedOn,
+					description: sv.Description,
+				}
 			}
 		}
+	}
 
-		for i, pv := range plan.Values {
-			if pv.Name.IsUnknown() || pv.Name.IsNull() {
-				continue
-			}
-			stateID, ok := stateValueMap[pv.Name.ValueString()]
-			if !ok || stateID.IsNull() || stateID.IsUnknown() {
-				continue
-			}
-			if pv.ValueID.IsUnknown() || pv.ValueID.ValueString() != stateID.ValueString() {
-				plan.Values[i].ValueID = stateID
-				modified = true
+	// Detect whether any user-controlled attribute is changing.
+	// When true, updated_by/updated_on are set to unknown because the Britive API
+	// always stamps them on every write, regardless of which field changed.
+	isModification := false
+	if !req.State.Raw.IsNull() {
+		switch {
+		case plan.Name.ValueString() != state.Name.ValueString():
+			isModification = true
+		case plan.Description.IsNull() != state.Description.IsNull() ||
+			plan.Description.ValueString() != state.Description.ValueString():
+			isModification = true
+		case plan.LabelColor.IsNull() != state.LabelColor.IsNull() ||
+			plan.LabelColor.ValueString() != state.LabelColor.ValueString():
+			isModification = true
+		case len(plan.Values) != len(state.Values):
+			isModification = true
+		default:
+			for _, pv := range plan.Values {
+				sv, ok := stateValueMap[pv.Name.ValueString()]
+				if !ok {
+					isModification = true
+					break
+				}
+				if pv.Description.IsNull() != sv.description.IsNull() ||
+					pv.Description.ValueString() != sv.description.ValueString() {
+					isModification = true
+					break
+				}
 			}
 		}
+	}
+
+	// Set computed audit fields for every planned value element.
+	// TPF sets new list-element Computed attributes to null (not unknown), so we must
+	// explicitly override them here to avoid "was null, but now <value>" apply errors.
+	for i, pv := range plan.Values {
+		if pv.Name.IsNull() || pv.Name.IsUnknown() {
+			continue
+		}
+		sv, inState := stateValueMap[pv.Name.ValueString()]
+
+		if !inState {
+			// New element: the API will set all these; plan them as unknown.
+			plan.Values[i].ValueID = types.StringUnknown()
+			plan.Values[i].CreatedBy = types.Int64Unknown()
+			plan.Values[i].UpdatedBy = types.Int64Unknown()
+			plan.Values[i].CreatedOn = types.StringUnknown()
+			plan.Values[i].UpdatedOn = types.StringUnknown()
+		} else {
+			// Existing element: copy value_id and immutable audit fields by name.
+			if !sv.valueID.IsNull() && !sv.valueID.IsUnknown() {
+				plan.Values[i].ValueID = sv.valueID
+			} else {
+				plan.Values[i].ValueID = types.StringUnknown()
+			}
+			if !sv.createdBy.IsNull() && !sv.createdBy.IsUnknown() {
+				plan.Values[i].CreatedBy = sv.createdBy
+			} else {
+				plan.Values[i].CreatedBy = types.Int64Unknown()
+			}
+			if !sv.createdOn.IsNull() && !sv.createdOn.IsUnknown() {
+				plan.Values[i].CreatedOn = sv.createdOn
+			} else {
+				plan.Values[i].CreatedOn = types.StringUnknown()
+			}
+
+			if isModification {
+				// The API stamps updated_by/updated_on on every write; plan as unknown.
+				plan.Values[i].UpdatedBy = types.Int64Unknown()
+				plan.Values[i].UpdatedOn = types.StringUnknown()
+			} else {
+				// No-op plan: preserve state values to avoid spurious drift.
+				plan.Values[i].UpdatedBy = sv.updatedBy
+				plan.Values[i].UpdatedOn = sv.updatedOn
+			}
+		}
+		modified = true
 	}
 
 	if modified {
@@ -437,10 +546,30 @@ func (r *ResourceLabelResource) UpgradeState(_ context.Context) map[int64]resour
 
 		newValues := make([]ResourceLabelValueModel, 0, len(rawValues))
 		for _, v := range rawValues {
+			createdBy := types.Int64Null()
+			if v.CreatedBy != nil {
+				createdBy = types.Int64Value(int64(*v.CreatedBy))
+			}
+			updatedBy := types.Int64Null()
+			if v.UpdatedBy != nil {
+				updatedBy = types.Int64Value(int64(*v.UpdatedBy))
+			}
+			createdOn := types.StringNull()
+			if v.CreatedOn != nil {
+				createdOn = types.StringValue(*v.CreatedOn)
+			}
+			updatedOn := types.StringNull()
+			if v.UpdatedOn != nil {
+				updatedOn = types.StringValue(*v.UpdatedOn)
+			}
 			newValues = append(newValues, ResourceLabelValueModel{
 				ValueID:     types.StringValue(v.ValueID),
 				Name:        types.StringValue(v.Name),
 				Description: optionalStringValue(v.Description),
+				CreatedBy:   createdBy,
+				UpdatedBy:   updatedBy,
+				CreatedOn:   createdOn,
+				UpdatedOn:   updatedOn,
 			})
 		}
 
@@ -472,6 +601,15 @@ func optionalStringValue(s string) types.String {
 		return types.StringNull()
 	}
 	return types.StringValue(s)
+}
+
+// optionalInt64Value returns types.Int64Null() when n is 0 (API not set), or
+// types.Int64Value(n) otherwise. Used for computed integer audit fields.
+func optionalInt64Value(n int) types.Int64 {
+	if n == 0 {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(n))
 }
 
 // preserveOptionalString handles the case where the API returns "" for an
@@ -514,10 +652,35 @@ func buildValuesInOrder(apiValues []britive.ResourceLabelValue, referenceOrder [
 		if !ok {
 			continue // value was removed externally; omit from state
 		}
+		// Audit fields (created_by, updated_by, created_on, updated_on) are often
+		// omitted from Create/Update API responses (returned as 0/""). Fall back to
+		// the ref (plan or prior state) value so the state stays consistent with
+		// the plan. The GET response used by Read always returns them, so real
+		// changes surface on the next refresh.
+		createdBy := optionalInt64Value(v.CreatedBy)
+		if createdBy.IsNull() && !ref.CreatedBy.IsNull() && !ref.CreatedBy.IsUnknown() {
+			createdBy = ref.CreatedBy
+		}
+		updatedBy := optionalInt64Value(v.UpdatedBy)
+		if updatedBy.IsNull() && !ref.UpdatedBy.IsNull() && !ref.UpdatedBy.IsUnknown() {
+			updatedBy = ref.UpdatedBy
+		}
+		createdOn := optionalStringValue(v.CreatedOn)
+		if createdOn.IsNull() && !ref.CreatedOn.IsNull() && !ref.CreatedOn.IsUnknown() {
+			createdOn = ref.CreatedOn
+		}
+		updatedOn := optionalStringValue(v.UpdatedOn)
+		if updatedOn.IsNull() && !ref.UpdatedOn.IsNull() && !ref.UpdatedOn.IsUnknown() {
+			updatedOn = ref.UpdatedOn
+		}
 		result = append(result, ResourceLabelValueModel{
 			ValueID:     types.StringValue(v.ValueId),
 			Name:        types.StringValue(v.Name),
 			Description: preserveOptionalString(v.Description, ref.Description),
+			CreatedBy:   createdBy,
+			UpdatedBy:   updatedBy,
+			CreatedOn:   createdOn,
+			UpdatedOn:   updatedOn,
 		})
 		seen[name] = true
 	}
@@ -529,6 +692,10 @@ func buildValuesInOrder(apiValues []britive.ResourceLabelValue, referenceOrder [
 				ValueID:     types.StringValue(v.ValueId),
 				Name:        types.StringValue(v.Name),
 				Description: preserveOptionalString(v.Description, types.StringNull()),
+				CreatedBy:   optionalInt64Value(v.CreatedBy),
+				UpdatedBy:   optionalInt64Value(v.UpdatedBy),
+				CreatedOn:   optionalStringValue(v.CreatedOn),
+				UpdatedOn:   optionalStringValue(v.UpdatedOn),
 			})
 		}
 	}

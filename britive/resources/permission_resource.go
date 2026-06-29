@@ -217,6 +217,10 @@ func (r *PermissionResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 	state.Consumer = types.StringValue(permission.Consumer)
 
+	// Save prior-state resource strings for normalization matching below.
+	var priorResourceStrs []string
+	state.Resources.ElementsAs(ctx, &priorResourceStrs, false)
+
 	// Convert []interface{} resources to []string for Framework
 	resourceStrs := make([]string, 0, len(permission.Resources))
 	for _, r := range permission.Resources {
@@ -224,6 +228,9 @@ func (r *PermissionResource) Read(ctx context.Context, req resource.ReadRequest,
 			resourceStrs = append(resourceStrs, s)
 		}
 	}
+	// The API may normalize values (e.g. "apps.*" → "apps"). Map them back to the
+	// prior-state originals so subsequent plans don't show spurious drift.
+	resourceStrs = preserveKnownResourceStrings(resourceStrs, priorResourceStrs)
 	resourcesSet, diags := types.SetValueFrom(ctx, types.StringType, resourceStrs)
 	resp.Diagnostics.Append(diags...)
 	state.Resources = resourcesSet
@@ -311,10 +318,12 @@ func (r *PermissionResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	plan.ID = types.StringValue(generatePermissionID(permissionID))
 
-	// Preserve the planned description before populateStateFromAPI overwrites it,
-	// so the API's inability to clear description does not cause an "inconsistent
-	// result" error from Terraform core.
+	// Save planned values before populateStateFromAPI overwrites them.
+	// The API may normalize or drop resource strings (e.g. "apps.*" → "apps")
+	// which would cause a "planned set element does not correlate with any
+	// element in actual" error from Terraform core without this preservation step.
 	plannedDescription := plan.Description
+	plannedResources := plan.Resources
 
 	// Read back to populate all fields
 	if err := r.populateStateFromAPI(ctx, &plan); err != nil {
@@ -325,9 +334,10 @@ func (r *PermissionResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// Honour the planned value for description so that state matches the plan
-	// exactly. If the API ignored the clear request the drift will surface on
-	// the next refresh rather than as an apply-time inconsistency error.
+	// Restore planned values so that state exactly matches the plan.
+	// Any real drift introduced by the API will surface on the next refresh
+	// rather than as an apply-time inconsistency error.
+	plan.Resources = plannedResources
 	plan.Description = plannedDescription
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -501,6 +511,35 @@ func (r *PermissionResource) populateStateFromAPI(ctx context.Context, state *Pe
 	state.Actions = actionsSet
 
 	return nil
+}
+
+// normalizeResource strips a trailing ".*" wildcard suffix.
+// The Britive API accepts "foo.*" but stores and returns it as "foo", so
+// normalizing both sides lets us treat them as equivalent.
+func normalizeResource(r string) string {
+	return strings.TrimSuffix(r, ".*")
+}
+
+// preserveKnownResourceStrings maps each API-returned resource string back to
+// its original form from the known (planned or prior-state) list when the two
+// normalize to the same base string.  This prevents "inconsistent result after
+// apply" errors and spurious plan drift caused by the API stripping ".*"
+// wildcards (e.g. "apps.*" → "apps").
+// Resources present in apiResources but absent in knownResources are kept as-is.
+func preserveKnownResourceStrings(apiResources, knownResources []string) []string {
+	knownByNorm := make(map[string]string, len(knownResources))
+	for _, k := range knownResources {
+		knownByNorm[normalizeResource(k)] = k
+	}
+	result := make([]string, 0, len(apiResources))
+	for _, a := range apiResources {
+		if k, ok := knownByNorm[normalizeResource(a)]; ok {
+			result = append(result, k)
+		} else {
+			result = append(result, a)
+		}
+	}
+	return result
 }
 
 // Helper functions
