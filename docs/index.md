@@ -82,3 +82,20 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
   ```
 
 ~> If you have **both** valid configurations in a config file and provider config, then the provider config will override its counterpart loaded from the config file.
+
+### Rate Limiting (Not Yet Enabled)
+ 
+The provider automatically handles rate-limited responses (HTTP 429) from the Britive API, retrying with exponential backoff and full jitter. When a response includes a `Retry-After` header, that value is used as the wait time (clamped to `retry_wait_min`/`retry_wait_max`). The built-in defaults are tuned for normal usage and require no configuration.
+ 
+~> Rate limiting is enforced server-side by Britive and is **not yet enabled**. Until it is enabled on your tenant, this retry behavior is inactive and there is nothing to configure.
+ 
+The following advanced arguments are available but are **not** intended for general use:
+ 
+* `max_retries` - (Optional) Maximum number of retry attempts for rate-limited requests. Defaults to `10`.
+
+* `retry_wait_min` - (Optional) Minimum wait time in seconds between retries. Defaults to `1`.
+
+* `retry_wait_max` - (Optional) Maximum wait time in seconds between retries. Also caps the value honored from a server `Retry-After` header. Defaults to `600`.
+ 
+~> These arguments are provided for advanced tuning and are rarely needed. The defaults are recommended for most use cases; consider adjusting them only if advised by Britive support, as lowering `max_retries` or the wait bounds may cause applies to fail under heavy throttling.
+ 
