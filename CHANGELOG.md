@@ -1,4 +1,12 @@
 
+## 2.3.4
+
+ENHANCEMENTS:
+* **Client:** Application API calls now use `?view=minimized` to reduce response payload size. `GetApplicationRootEnvironmentGroup` and environment lookups are consolidated into a single `GetApplication` call, reducing unnecessary API round trips.
+* **Provider:** Added `max_retries` (default: `10`), `retry_wait_min` (default: `1` s), and `retry_wait_max` (default: `600` s) arguments to configure client-side retry behavior for rate-limited (HTTP 429) API requests. The client retries with exponential backoff and full jitter, honoring the `Retry-After` response header when present.
+
+=======
+
 ## 2.3.3
 
 ENHANCEMENTS:
