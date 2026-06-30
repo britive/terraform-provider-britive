@@ -837,7 +837,7 @@ resource "britive_application" "azure_1" {
 > - `clientId`: Client ID.
 > - `userFilter`: User filter.
 > - `groupFilter`: Group filter.
-> - `scanMethod`: Scan method(collectUsersMembership/collectUsersGroups/collectGroupsMemberships).
+> - `scanMethod`: Scan method — one of `collectUsersGroups`, `collectGroupsMemberships`, or `collectUsersMembership`.
 > - `scanMgmtGroupsAndSubscriptions`: Scan management group and subscription.
 > - `scanSubscriptionsOnly`: Scan subscription Only.
 > - `scanResources`: Scan resources.
@@ -948,7 +948,7 @@ resource "britive_application" "azure_wif" {
 > - `programmaticAccess`: Programmatic Access.
 > - `consoleAccess`: Console Access.
 > - `appAccessMethod_static_loginUrl`: Login URL.
-> - `britiveIssuerUrl`: Britive Issuer URL (auto-populated; used as the OIDC issuer for Workload Identity Federation).
+> - `britiveIssuerUrl`: Britive Issuer URL (used as the OIDC issuer for Workload Identity Federation).
 > - `tenantId`: Azure Tenant ID.
 > - `clientId`: Azure Application (Client) ID.
 > - `azureWifAudience`: Federated credential audience value configured in Azure (e.g. `api://AzureADTokenExchange`).
@@ -1018,7 +1018,7 @@ resource "britive_application" "oracle_wif" {
 > - `description`: Application Description.
 > - `tenancy`: OCI OCID of the tenancy.
 > - `tenantName`: Name of the Britive tenant.
-> - `britiveIssuerUrl`: Britive Issuer URL (auto-populated; used as the OIDC issuer for Workload Identity Federation).
+> - `britiveIssuerUrl`: Britive Issuer URL (used as the OIDC issuer for Workload Identity Federation).
 > - `clientId`: Client ID of the OCI confidential application.
 > - `region`: Oracle Cloud region (e.g. `us-phoenix-1`).
 > - `domainUrl`: Oracle Identity Domain URL.
