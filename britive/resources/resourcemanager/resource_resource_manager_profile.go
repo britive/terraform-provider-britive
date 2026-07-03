@@ -72,6 +72,12 @@ func NewResourceResourceManagerProfile(v *validate.Validation, importHelper *imp
 				Default:     false,
 				Description: "Enable or disable delegation",
 			},
+			"exclusive_checkout": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "Enable or disable exclusive checkout for the resource manager profile",
+			},
 			"associations": {
 				Type:        schema.TypeSet,
 				Optional:    true,
@@ -235,7 +241,7 @@ func (rrmp *ResourceResourceManagerProfile) resourceRead(ctx context.Context, d 
 func (rrmp *ResourceResourceManagerProfile) resourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*britive.Client)
 
-	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") || d.HasChange("allow_impersonation") || d.HasChange("extendable") || d.HasChange("notification_prior_to_expiration") || d.HasChange("extension_duration") || d.HasChange("extension_limit") {
+	if d.HasChange("name") || d.HasChange("description") || d.HasChange("expiration_duration") || d.HasChange("associations") || d.HasChange("allow_impersonation") || d.HasChange("exclusive_checkout") || d.HasChange("extendable") || d.HasChange("notification_prior_to_expiration") || d.HasChange("extension_duration") || d.HasChange("extension_limit") {
 		resourceManagerProfile := &britive.ResourceManagerProfile{}
 		err := rrmp.helper.mapResourceToModel(d, resourceManagerProfile)
 		if err != nil {
@@ -328,6 +334,7 @@ func (helper *ResourceResourceManagerProfileHelper) mapResourceToModel(d *schema
 	if delegationEnabled, ok := d.GetOk("allow_impersonation"); ok {
 		resourceManagerProfile.DelegationEnabled = delegationEnabled.(bool)
 	}
+	resourceManagerProfile.ExclusiveCheckout = d.Get("exclusive_checkout").(bool)
 	resourceManagerProfile.ExpirationDuration = d.Get("expiration_duration").(int)
 
 	rawAssociations := d.Get("associations").(*schema.Set)
@@ -408,6 +415,9 @@ func (helper *ResourceResourceManagerProfileHelper) getAndMapModelToResource(d *
 		return err
 	}
 	if err := d.Set("allow_impersonation", resourceManagerProfile.DelegationEnabled); err != nil {
+		return err
+	}
+	if err := d.Set("exclusive_checkout", resourceManagerProfile.ExclusiveCheckout); err != nil {
 		return err
 	}
 

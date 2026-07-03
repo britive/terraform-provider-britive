@@ -18,6 +18,7 @@ resource "britive_resource_manager_profile" "example" {
     description          = "Profile for managing production resources"
     expiration_duration  = 3600000 # milliseconds
     allow_impersonation   = true
+    exclusive_checkout    = false
     extendable                       = true
     notification_prior_to_expiration = "0h10m0s"
     extension_duration               = "1h12m30s"
@@ -47,6 +48,7 @@ The following arguments are supported:
 * `extension_limit` - (Optional) The Britive profile expiry extension limit. For example: `2`
 
 * `allow_impersonation` - (Optional) Allow AI Identities to impersonate Users and Service Identities.
+* `exclusive_checkout` - (Optional) Enable or disable exclusive checkout for the resource manager profile. When enabled, only one checkout is allowed at a time. Default: `false`.
 * `associations` - (Optional) List of resource label associations. Each association block supports:
   * `label_key` - (Required) Resource label name for association.
   * `values` - (Required) List of values for the associated resource label. Must contain at least one value.
