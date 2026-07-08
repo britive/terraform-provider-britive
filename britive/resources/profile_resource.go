@@ -11,7 +11,6 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/validators"
-	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -38,6 +37,7 @@ type ProfileResourceModel struct {
 	Description                    types.String            `tfsdk:"description"`
 	Disabled                       types.Bool              `tfsdk:"disabled"`
 	Associations                   []ProfileAssociationModel `tfsdk:"associations"`
+	TagAssociations                []ProfileTagAssociationModel `tfsdk:"tag_associations"`
 	ExpirationDuration             validators.DurationStringValue `tfsdk:"expiration_duration"`
 	Extendable                     types.Bool                     `tfsdk:"extendable"`
 	NotificationPriorToExpiration  validators.DurationStringValue `tfsdk:"notification_prior_to_expiration"`
@@ -51,6 +51,11 @@ type ProfileAssociationModel struct {
 	Type       types.String `tfsdk:"type"`
 	Value      types.String `tfsdk:"value"`
 	ParentName types.String `tfsdk:"parent_name"`
+}
+
+type ProfileTagAssociationModel struct {
+	Key    types.String   `tfsdk:"key"`
+	Values []types.String `tfsdk:"values"`
 }
 
 var _ resource.ResourceWithModifyPlan = &ProfileResource{}
@@ -165,9 +170,6 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		Blocks: map[string]schema.Block{
 			"associations": schema.SetNestedBlock{
 				Description: "The list of associations for the Britive profile",
-				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
-				},
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -191,6 +193,25 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
 							},
+						},
+					},
+				},
+			},
+			"tag_associations": schema.SetNestedBlock{
+				Description: "The list of scope tags for the Britive profile",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"key": schema.StringAttribute{
+							Required:    true,
+							Description: "The tag key",
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
+						},
+						"values": schema.ListAttribute{
+							Required:    true,
+							ElementType: types.StringType,
+							Description: "The tag values",
 						},
 					},
 				},
@@ -289,6 +310,14 @@ func (r *ProfileResource) UpgradeState(_ context.Context) map[int64]resource.Sta
 					},
 				},
 			},
+			"tag_associations": schema.SetNestedBlock{
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"key":    schema.StringAttribute{Required: true},
+						"values": schema.ListAttribute{Required: true, ElementType: types.StringType},
+					},
+				},
+			},
 		},
 	}
 	return map[int64]resource.StateUpgrader{
@@ -365,6 +394,11 @@ func (r *ProfileResource) Create(ctx context.Context, req resource.CreateRequest
 			log.Printf("[WARN] Failed to delete profile %s after association error: %s", p.ProfileID, deleteErr)
 		}
 		resp.Diagnostics.AddError("Error Saving Profile Associations", err.Error())
+		return
+	}
+
+	if err := r.saveProfileScopeTags(p.ProfileID, plan.TagAssociations); err != nil {
+		resp.Diagnostics.AddError("Error Saving Tag Associations", err.Error())
 		return
 	}
 
@@ -467,6 +501,11 @@ func (r *ProfileResource) Update(ctx context.Context, req resource.UpdateRequest
 		err = r.saveProfileAssociations(appContainerID, profileID, &plan)
 		if err != nil {
 			resp.Diagnostics.AddError("Error Saving Profile Associations", err.Error())
+			return
+		}
+
+		if err := r.saveProfileScopeTags(profileID, plan.TagAssociations); err != nil {
+			resp.Diagnostics.AddError("Error Saving Tag Associations", err.Error())
 			return
 		}
 	}
@@ -734,6 +773,13 @@ func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *Pr
 	}
 	state.Associations = associations
 
+	// Map scope tag associations
+	scopeTags, err := r.client.GetProfileScopeTags(profile.ProfileID)
+	if err != nil {
+		return err
+	}
+	state.TagAssociations = mapScopeTagsToModel(scopeTags)
+
 	return nil
 }
 
@@ -934,6 +980,36 @@ func (r *ProfileResource) mapProfileAssociationsModelToResource(appContainerID s
 	}
 
 	return profileAssociations, nil
+}
+
+func (r *ProfileResource) saveProfileScopeTags(profileID string, tagAssociations []ProfileTagAssociationModel) error {
+	scopeTags := make([]britive.ScopeTag, 0, len(tagAssociations))
+	for _, ta := range tagAssociations {
+		values := make([]string, 0, len(ta.Values))
+		for _, v := range ta.Values {
+			values = append(values, v.ValueString())
+		}
+		scopeTags = append(scopeTags, britive.ScopeTag{
+			TagKey:    ta.Key.ValueString(),
+			TagValues: values,
+		})
+	}
+	return r.client.SaveProfileScopeTags(profileID, scopeTags)
+}
+
+func mapScopeTagsToModel(scopeTags []britive.ScopeTag) []ProfileTagAssociationModel {
+	result := make([]ProfileTagAssociationModel, 0, len(scopeTags))
+	for _, st := range scopeTags {
+		values := make([]types.String, 0, len(st.TagValues))
+		for _, v := range st.TagValues {
+			values = append(values, types.StringValue(v))
+		}
+		result = append(result, ProfileTagAssociationModel{
+			Key:    types.StringValue(st.TagKey),
+			Values: values,
+		})
+	}
+	return result
 }
 
 // associationsEqual compares two slices of ProfileAssociationModel for equality

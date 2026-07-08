@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -34,6 +35,7 @@ type ApplicationDataSource struct {
 type ApplicationDataSourceModel struct {
 	ID                       types.String `tfsdk:"id"`
 	Name                     types.String `tfsdk:"name"`
+	AppContainerID           types.String `tfsdk:"app_container_id"`
 	EnvironmentIDs           types.Set    `tfsdk:"environment_ids"`
 	EnvironmentGroupIDs      types.Set    `tfsdk:"environment_group_ids"`
 	EnvironmentIDsNames      types.Set    `tfsdk:"environment_ids_names"`
@@ -61,10 +63,27 @@ func (d *ApplicationDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 				Description: "The unique identifier of the application.",
 			},
 			"name": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 				Description: "The name of the application.",
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("name"),
+						path.MatchRoot("app_container_id"),
+					),
+				},
+			},
+			"app_container_id": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "The unique identifier of the application.",
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("name"),
+						path.MatchRoot("app_container_id"),
+					),
 				},
 			},
 			"environment_ids": schema.SetAttribute{
@@ -141,30 +160,56 @@ func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	// Get application from API
-	applicationName := data.Name.ValueString()
-	application, err := d.client.GetApplicationByName(applicationName)
-	if errors.Is(err, britive.ErrNotFound) {
-		resp.Diagnostics.AddError(
-			"Application Not Found",
-			fmt.Sprintf("Application '%s' was not found.", applicationName),
-		)
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Application",
-			fmt.Sprintf("Could not read application '%s': %s", applicationName, err.Error()),
-		)
-		return
+	// Get application from API — support lookup by app_container_id or name
+	var appContainerID string
+	var applicationName string
+
+	if !data.AppContainerID.IsNull() && !data.AppContainerID.IsUnknown() && data.AppContainerID.ValueString() != "" {
+		appContainerID = data.AppContainerID.ValueString()
+		appResp, err := d.client.GetApplication(appContainerID)
+		if errors.Is(err, britive.ErrNotFound) {
+			resp.Diagnostics.AddError(
+				"Application Not Found",
+				fmt.Sprintf("Application with id '%s' was not found.", appContainerID),
+			)
+			return
+		}
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Application",
+				fmt.Sprintf("Could not read application with id '%s': %s", appContainerID, err.Error()),
+			)
+			return
+		}
+		applicationName = appResp.CatalogAppDisplayName
+	} else {
+		applicationName = data.Name.ValueString()
+		application, err := d.client.GetApplicationByName(applicationName)
+		if errors.Is(err, britive.ErrNotFound) {
+			resp.Diagnostics.AddError(
+				"Application Not Found",
+				fmt.Sprintf("Application '%s' was not found.", applicationName),
+			)
+			return
+		}
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Application",
+				fmt.Sprintf("Could not read application '%s': %s", applicationName, err.Error()),
+			)
+			return
+		}
+		appContainerID = application.AppContainerID
+		applicationName = application.CatalogAppDisplayName
 	}
 
-	// Set ID and name
-	data.ID = types.StringValue(application.AppContainerID)
-	data.Name = types.StringValue(application.CatalogAppDisplayName)
+	// Set ID, name, and app_container_id
+	data.ID = types.StringValue(appContainerID)
+	data.Name = types.StringValue(applicationName)
+	data.AppContainerID = types.StringValue(appContainerID)
 
 	// Get environments
-	appEnvs, err := d.client.GetAppEnvs(data.ID.ValueString(), "environments")
+	appEnvs, err := d.client.GetAppEnvs(appContainerID, "environments")
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Application Environments",
@@ -174,7 +219,7 @@ func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 	}
 
 	// Get environment groups
-	appEnvGroups, err := d.client.GetAppEnvs(data.ID.ValueString(), "environmentGroups")
+	appEnvGroups, err := d.client.GetAppEnvs(appContainerID, "environmentGroups")
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Application Environment Groups",

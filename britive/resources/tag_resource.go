@@ -33,13 +33,20 @@ type TagResource struct {
 	client *britive.Client
 }
 
+type TagAttributeModel struct {
+	AttributeName  types.String `tfsdk:"attribute_name"`
+	AttributeValue types.String `tfsdk:"attribute_value"`
+}
+
 type TagResourceModel struct {
-	ID                 types.String `tfsdk:"id"`
-	Name               types.String `tfsdk:"name"`
-	Description        types.String `tfsdk:"description"`
-	Disabled           types.Bool   `tfsdk:"disabled"`
-	IdentityProviderID types.String `tfsdk:"identity_provider_id"`
-	External           types.Bool   `tfsdk:"external"`
+	ID                 types.String         `tfsdk:"id"`
+	Name               types.String         `tfsdk:"name"`
+	Description        types.String         `tfsdk:"description"`
+	Disabled           types.Bool           `tfsdk:"disabled"`
+	IdentityProviderID types.String         `tfsdk:"identity_provider_id"`
+	External           types.Bool           `tfsdk:"external"`
+	Requestable        types.Bool           `tfsdk:"requestable"`
+	Attributes         []TagAttributeModel  `tfsdk:"attributes"`
 }
 
 func (r *TagResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -84,6 +91,34 @@ func (r *TagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"external": schema.BoolAttribute{
 				Computed:    true,
 				Description: "The boolean attribute that indicates whether the tag is external or not.",
+			},
+			"requestable": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Whether the Britive tag is requestable.",
+			},
+		},
+		Blocks: map[string]schema.Block{
+			"attributes": schema.SetNestedBlock{
+				Description: "The attributes of the Britive tag.",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"attribute_name": schema.StringAttribute{
+							Required:    true,
+							Description: "The name of the attribute.",
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
+						},
+						"attribute_value": schema.StringAttribute{
+							Required:    true,
+							Description: "The value of the attribute.",
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -154,6 +189,17 @@ func (r *TagResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	plan.ID = types.StringValue(createdTag.ID)
 
+	// Update requestable and attributes if configured
+	if r.hasAttributeConfig(&plan) {
+		if err := r.updateTagAttributes(createdTag.ID, &plan); err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating Tag Attributes",
+				fmt.Sprintf("Could not update tag attributes after creation: %s", err.Error()),
+			)
+			return
+		}
+	}
+
 	// Read back to populate computed fields
 	if err := r.populateStateFromAPI(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
@@ -201,6 +247,8 @@ func (r *TagResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	normalizeTagDescription(tag.Description, &state.Description)
 	state.Disabled = types.BoolValue(strings.EqualFold(tag.Status, "Inactive"))
 	state.External = types.BoolValue(tag.External.(bool))
+	state.Requestable = types.BoolValue(tag.Requestable)
+	state.Attributes = mapTagAttributesToModel(tag.Attributes)
 
 	if len(tag.UserTagIdentityProviders) > 0 {
 		state.IdentityProviderID = types.StringValue(tag.UserTagIdentityProviders[0].IdentityProvider.ID)
@@ -232,6 +280,8 @@ func (r *TagResource) populateStateFromAPI(ctx context.Context, state *TagResour
 	}
 	state.Disabled = types.BoolValue(strings.EqualFold(tag.Status, "Inactive"))
 	state.External = types.BoolValue(tag.External.(bool))
+	state.Requestable = types.BoolValue(tag.Requestable)
+	state.Attributes = mapTagAttributesToModel(tag.Attributes)
 
 	if len(tag.UserTagIdentityProviders) > 0 {
 		state.IdentityProviderID = types.StringValue(tag.UserTagIdentityProviders[0].IdentityProvider.ID)
@@ -283,6 +333,15 @@ func (r *TagResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		resp.Diagnostics.AddError(
 			"Error Updating Tag Status",
 			fmt.Sprintf("Could not update status for tag %s: %s", tagID, err.Error()),
+		)
+		return
+	}
+
+	// Update requestable and attributes
+	if err := r.updateTagAttributes(tagID, &plan); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Updating Tag Attributes",
+			fmt.Sprintf("Could not update tag attributes for %s: %s", tagID, err.Error()),
 		)
 		return
 	}
@@ -416,6 +475,46 @@ func normalizeTagDescription(apiDescription string, current *types.String) {
 	} else {
 		*current = types.StringValue("")
 	}
+}
+
+func (r *TagResource) hasAttributeConfig(plan *TagResourceModel) bool {
+	return !plan.Requestable.IsNull() || len(plan.Attributes) > 0
+}
+
+func (r *TagResource) updateTagAttributes(tagID string, plan *TagResourceModel) error {
+	req := britive.TagAttributesUpdateRequest{
+		Name:        plan.Name.ValueString(),
+		Description: plan.Description.ValueString(),
+		Attributes:  buildTagAttributes(plan.Attributes),
+	}
+	if !plan.Requestable.IsNull() && !plan.Requestable.IsUnknown() {
+		b := plan.Requestable.ValueBool()
+		req.Requestable = &b
+	}
+	_, err := r.client.UpdateTagAttributes(tagID, req)
+	return err
+}
+
+func buildTagAttributes(attrs []TagAttributeModel) []britive.TagAttribute {
+	result := make([]britive.TagAttribute, 0, len(attrs))
+	for _, a := range attrs {
+		result = append(result, britive.TagAttribute{
+			AttributeName:  a.AttributeName.ValueString(),
+			AttributeValue: a.AttributeValue.ValueString(),
+		})
+	}
+	return result
+}
+
+func mapTagAttributesToModel(attrs []britive.TagAttribute) []TagAttributeModel {
+	result := make([]TagAttributeModel, 0, len(attrs))
+	for _, a := range attrs {
+		result = append(result, TagAttributeModel{
+			AttributeName:  types.StringValue(a.AttributeName),
+			AttributeValue: types.StringValue(a.AttributeValue),
+		})
+	}
+	return result
 }
 
 func (r *TagResource) validateForExternalTag(identityProviderID, tagName string) error {

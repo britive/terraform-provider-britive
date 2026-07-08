@@ -32,7 +32,7 @@ func (c *Client) GetApplications() (*[]Application, error) {
 
 // GetApplication - Returns application by id
 func (c *Client) GetApplication(appContainerID string) (*ApplicationResponse, error) {
-	resourceURL := fmt.Sprintf("%s/apps/%s", c.APIBaseURL, appContainerID)
+	resourceURL := fmt.Sprintf("%s/apps/%s?view=minimized", c.APIBaseURL, appContainerID)
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (c *Client) GetApplication(appContainerID string) (*ApplicationResponse, er
 // GetApplicationByName - Returns application by name
 func (c *Client) GetApplicationByName(name string) (*Application, error) {
 	filter := fmt.Sprintf(`name eq "%s"`, name)
-	resourceURL := fmt.Sprintf(`%s/apps?filter=%s`, c.APIBaseURL, url.QueryEscape(filter))
+	resourceURL := fmt.Sprintf(`%s/apps?view=minimized&filter=%s`, c.APIBaseURL, url.QueryEscape(filter))
 	req, err := http.NewRequest("GET", resourceURL, nil)
 	if err != nil {
 		return nil, err
@@ -88,30 +88,32 @@ func (c *Client) GetApplicationByName(name string) (*Application, error) {
 }
 
 func (c *Client) GetAppEnvs(appId string, envType string) ([]ApplicationEnvironment, error) {
-	resourceURL := fmt.Sprintf("%s/apps/%s/root-environment-group?view=summary&type=%s", c.APIBaseURL, appId, envType)
-	req, err := http.NewRequest("GET", resourceURL, nil)
+	application, err := c.GetApplication(appId)
 	if err != nil {
 		return nil, err
 	}
 
-	body, err := c.Do(req)
-	if err != nil {
-		return nil, err
+	if application.RootEnvironmentGroup == nil {
+		return []ApplicationEnvironment{}, nil
 	}
 
-	if string(body) == emptyString {
+	var associations []Association
+	switch envType {
+	case "environments":
+		associations = application.RootEnvironmentGroup.Environments
+	case "environmentGroups":
+		associations = application.RootEnvironmentGroup.EnvironmentGroups
+	default:
 		return nil, ErrNotFound
 	}
 
-	appEnvs := make([]ApplicationEnvironment, 0)
-
-	err = json.Unmarshal(body, &appEnvs)
-	if err != nil {
-		return nil, err
-	}
-
-	if appEnvs == nil {
-		return nil, ErrNotFound
+	appEnvs := make([]ApplicationEnvironment, len(associations))
+	for i, assoc := range associations {
+		appEnvs[i] = ApplicationEnvironment{
+			EnvironmentID:   assoc.ID,
+			EnvironmentName: assoc.Name,
+			EnvironmentType: assoc.Type,
+		}
 	}
 
 	return appEnvs, nil

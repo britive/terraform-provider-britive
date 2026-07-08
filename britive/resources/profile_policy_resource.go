@@ -36,23 +36,29 @@ type ProfilePolicyResource struct {
 }
 
 type ProfilePolicyResourceModel struct {
-	ID           types.String                   `tfsdk:"id"`
-	ProfileID    types.String                   `tfsdk:"profile_id"`
-	PolicyName   types.String                   `tfsdk:"policy_name"`
-	Description  types.String                   `tfsdk:"description"`
-	IsActive     types.Bool                     `tfsdk:"is_active"`
-	IsDraft      types.Bool                     `tfsdk:"is_draft"`
-	IsReadOnly   types.Bool                     `tfsdk:"is_read_only"`
-	Consumer     types.String                   `tfsdk:"consumer"`
-	AccessType   types.String                   `tfsdk:"access_type"`
-	Members      types.String                   `tfsdk:"members"`
-	Condition    types.String                   `tfsdk:"condition"`
-	Associations []ProfilePolicyAssociationModel `tfsdk:"associations"`
+	ID              types.String                      `tfsdk:"id"`
+	ProfileID       types.String                      `tfsdk:"profile_id"`
+	PolicyName      types.String                      `tfsdk:"policy_name"`
+	Description     types.String                      `tfsdk:"description"`
+	IsActive        types.Bool                        `tfsdk:"is_active"`
+	IsDraft         types.Bool                        `tfsdk:"is_draft"`
+	IsReadOnly      types.Bool                        `tfsdk:"is_read_only"`
+	Consumer        types.String                      `tfsdk:"consumer"`
+	AccessType      types.String                      `tfsdk:"access_type"`
+	Members         types.String                      `tfsdk:"members"`
+	Condition       types.String                      `tfsdk:"condition"`
+	Associations    []ProfilePolicyAssociationModel   `tfsdk:"associations"`
+	TagAssociations []ProfilePolicyTagAssociationModel `tfsdk:"tag_associations"`
 }
 
 type ProfilePolicyAssociationModel struct {
 	Type  types.String `tfsdk:"type"`
 	Value types.String `tfsdk:"value"`
+}
+
+type ProfilePolicyTagAssociationModel struct {
+	Key    types.String   `tfsdk:"key"`
+	Values []types.String `tfsdk:"values"`
 }
 
 func (r *ProfilePolicyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -161,6 +167,25 @@ func (r *ProfilePolicyResource) Schema(_ context.Context, _ resource.SchemaReque
 					},
 				},
 			},
+			"tag_associations": schema.SetNestedBlock{
+				Description: "The list of scope tags for the Britive profile policy",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"key": schema.StringAttribute{
+							Required:    true,
+							Description: "The tag key",
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
+						},
+						"values": schema.ListAttribute{
+							Required:    true,
+							ElementType: types.StringType,
+							Description: "The tag values",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -200,6 +225,7 @@ func (r *ProfilePolicyResource) Create(ctx context.Context, req resource.CreateR
 		IsDraft:     plan.IsDraft.ValueBool(),
 		IsReadOnly:  plan.IsReadOnly.ValueBool(),
 		Condition:   plan.Condition.ValueString(),
+		ScopeTags:   buildScopeTagsFromModel(plan.TagAssociations),
 	}
 
 	// Unmarshal members
@@ -345,6 +371,7 @@ func (r *ProfilePolicyResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	state.Associations = associations
+	state.TagAssociations = mapScopeTagsToProfilePolicyModel(profilePolicy.ScopeTags)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -379,6 +406,7 @@ func (r *ProfilePolicyResource) Update(ctx context.Context, req resource.UpdateR
 		IsDraft:     plan.IsDraft.ValueBool(),
 		IsReadOnly:  plan.IsReadOnly.ValueBool(),
 		Condition:   plan.Condition.ValueString(),
+		ScopeTags:   buildScopeTagsFromModel(plan.TagAssociations),
 	}
 
 	// Unmarshal members
@@ -788,8 +816,39 @@ func (r *ProfilePolicyResource) populateStateFromAPI(ctx context.Context, state 
 		return err
 	}
 	state.Associations = associations
+	state.TagAssociations = mapScopeTagsToProfilePolicyModel(profilePolicy.ScopeTags)
 
 	return nil
+}
+
+func buildScopeTagsFromModel(tagAssociations []ProfilePolicyTagAssociationModel) []britive.ScopeTag {
+	result := make([]britive.ScopeTag, 0, len(tagAssociations))
+	for _, ta := range tagAssociations {
+		values := make([]string, 0, len(ta.Values))
+		for _, v := range ta.Values {
+			values = append(values, v.ValueString())
+		}
+		result = append(result, britive.ScopeTag{
+			TagKey:    ta.Key.ValueString(),
+			TagValues: values,
+		})
+	}
+	return result
+}
+
+func mapScopeTagsToProfilePolicyModel(scopeTags []britive.ScopeTag) []ProfilePolicyTagAssociationModel {
+	result := make([]ProfilePolicyTagAssociationModel, 0, len(scopeTags))
+	for _, st := range scopeTags {
+		values := make([]types.String, 0, len(st.TagValues))
+		for _, v := range st.TagValues {
+			values = append(values, types.StringValue(v))
+		}
+		result = append(result, ProfilePolicyTagAssociationModel{
+			Key:    types.StringValue(st.TagKey),
+			Values: values,
+		})
+	}
+	return result
 }
 
 // Helper functions

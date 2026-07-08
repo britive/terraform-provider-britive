@@ -243,7 +243,49 @@ func (r *ProfilePermissionResource) Delete(ctx context.Context, req resource.Del
 }
 
 func (r *ProfilePermissionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Support two import formats:
+	// Support three import formats:
+	// 1. paps/{profile_id}/permissions/{permission_name}/type/{permission_type}  — ID-first (no name resolution)
+	// 2. apps/{app_name}/paps/{profile_name}/permissions/{permission_name}/type/{permission_type}
+	// 3. {app_name}/{profile_name}/{permission_name}/{permission_type}
+
+	// Try ID-first format: paps/{profile_id}/permissions/{permission_name}/type/{permission_type}
+	idFirstRegex := regexp.MustCompile(`^paps/(?P<profile_id>[^/]+)/permissions/(?P<permission_name>.+)/type/(?P<permission_type>[^/]+)$`)
+	if matches := idFirstRegex.FindStringSubmatch(req.ID); matches != nil {
+		profileID := matches[idFirstRegex.SubexpIndex("profile_id")]
+		permissionName := matches[idFirstRegex.SubexpIndex("permission_name")]
+		permissionType := matches[idFirstRegex.SubexpIndex("permission_type")]
+
+		if strings.TrimSpace(profileID) != "" && strings.TrimSpace(permissionName) != "" && strings.TrimSpace(permissionType) != "" {
+			profilePermission, err := r.client.GetProfilePermission(profileID, britive.ProfilePermission{
+				Name: permissionName,
+				Type: permissionType,
+			})
+			if errors.Is(err, britive.ErrNotFound) {
+				resp.Diagnostics.AddError(
+					"Profile Permission Not Found",
+					fmt.Sprintf("Permission '%s' of type '%s' not found in profile '%s'.", permissionName, permissionType, profileID),
+				)
+				return
+			}
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error Importing Profile Permission",
+					fmt.Sprintf("Could not get profile permission: %s", err.Error()),
+				)
+				return
+			}
+
+			profilePermission.ProfileID = profileID
+
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), generateProfilePermissionID(*profilePermission))...)
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("profile_id"), profileID)...)
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("permission_name"), permissionName)...)
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("permission_type"), permissionType)...)
+			return
+		}
+	}
+
+	// Name-based import formats:
 	// 1. apps/{app_name}/paps/{profile_name}/permissions/{permission_name}/type/{permission_type}
 	// 2. {app_name}/{profile_name}/{permission_name}/{permission_type}
 	idRegexes := []string{

@@ -37,6 +37,7 @@ type TagMemberResourceModel struct {
 	TagID    types.String `tfsdk:"tag_id"`
 	TagName  types.String `tfsdk:"tag_name"`
 	Username types.String `tfsdk:"username"`
+	UserID   types.String `tfsdk:"user_id"`
 }
 
 func (r *TagMemberResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -79,6 +80,14 @@ func (r *TagMemberResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"user_id": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "The identifier of the user added to the Britive tag",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
@@ -111,18 +120,25 @@ func (r *TagMemberResource) Create(ctx context.Context, req resource.CreateReque
 	tagID := plan.TagID.ValueString()
 	username := plan.Username.ValueString()
 
-	// Get user by username to retrieve user ID
-	user, err := r.client.GetUserByName(username)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Getting User",
-			fmt.Sprintf("Could not get user '%s': %s", username, err.Error()),
-		)
-		return
+	var userID string
+
+	// Use user_id directly if provided; otherwise look up by username
+	if !plan.UserID.IsNull() && !plan.UserID.IsUnknown() && plan.UserID.ValueString() != "" {
+		userID = plan.UserID.ValueString()
+	} else {
+		user, err := r.client.GetUserByName(username)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Getting User",
+				fmt.Sprintf("Could not get user '%s': %s", username, err.Error()),
+			)
+			return
+		}
+		userID = user.UserID
 	}
 
 	// Create tag member
-	err = r.client.CreateTagMember(tagID, user.UserID)
+	err := r.client.CreateTagMember(tagID, userID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Tag Member",
@@ -131,10 +147,11 @@ func (r *TagMemberResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	plan.ID = types.StringValue(generateTagMemberID(tagID, user.UserID))
+	plan.ID = types.StringValue(generateTagMemberID(tagID, userID))
+	plan.UserID = types.StringValue(userID)
 
 	// Read back to populate computed fields
-	if err := r.populateStateFromAPI(ctx, &plan, tagID, user.UserID); err != nil {
+	if err := r.populateStateFromAPI(ctx, &plan, tagID, userID); err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Tag Member",
 			fmt.Sprintf("Could not read tag member after creation: %s", err.Error()),
@@ -184,6 +201,7 @@ func (r *TagMemberResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	state.TagID = types.StringValue(tagID)
 	state.Username = types.StringValue(user.Username)
+	state.UserID = types.StringValue(userID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -224,19 +242,44 @@ func (r *TagMemberResource) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 func (r *TagMemberResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Support two import formats:
-	// 1. tags/{tag_name}/users/{username}
-	// 2. {tag_name}/{username}
-	idRegexes := []string{
+	// Support three import formats:
+	// 1. tags/{tag_id}/users/{user_id}  — ID-first (no name resolution needed)
+	// 2. tags/{tag_name}/users/{username}
+	// 3. {tag_name}/{username}
+
+	importID := req.ID
+
+	// Check for ID-first format: tags/{tag_id}/users/{user_id} where both look like UUIDs/numeric IDs
+	// We detect this by trying to parse the format and checking if the tag/user IDs exist directly.
+	idFirstRegex := regexp.MustCompile(`^tags/(?P<tag_id>[^/]+)/users/(?P<user_id>[^/]+)$`)
+	nameRegexes := []string{
 		`^tags/(?P<tag_name>[^/]+)/users/(?P<username>[^/]+)$`,
 		`^(?P<tag_name>[^/]+)/(?P<username>[^/]+)$`,
 	}
 
+	// Try ID-first format — attempt direct lookup without name resolution
+	if matches := idFirstRegex.FindStringSubmatch(importID); matches != nil {
+		tagID := matches[idFirstRegex.SubexpIndex("tag_id")]
+		userID := matches[idFirstRegex.SubexpIndex("user_id")]
+
+		// Try to verify the member exists using these as IDs
+		_, err := r.client.GetTagMember(tagID, userID)
+		if err == nil {
+			// Successfully resolved as IDs — set state directly
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), generateTagMemberID(tagID, userID))...)
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_id"), tagID)...)
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_id"), userID)...)
+			// username will be populated on the next Read
+			return
+		}
+		// Fall through to name-based resolution
+	}
+
 	var tagName, username string
 
-	for _, pattern := range idRegexes {
+	for _, pattern := range nameRegexes {
 		re := regexp.MustCompile(pattern)
-		if matches := re.FindStringSubmatch(req.ID); matches != nil {
+		if matches := re.FindStringSubmatch(importID); matches != nil {
 			for i, matchName := range re.SubexpNames() {
 				if matchName == "tag_name" && i < len(matches) {
 					tagName = matches[i]
@@ -254,7 +297,7 @@ func (r *TagMemberResource) ImportState(ctx context.Context, req resource.Import
 	if tagName == "" || username == "" {
 		resp.Diagnostics.AddError(
 			"Invalid Import ID",
-			fmt.Sprintf("Import ID %q doesn't match expected formats: 'tags/{tag_name}/users/{username}' or '{tag_name}/{username}'", req.ID),
+			fmt.Sprintf("Import ID %q doesn't match expected formats: 'tags/{tag_id}/users/{user_id}', 'tags/{tag_name}/users/{username}', or '{tag_name}/{username}'", req.ID),
 		)
 		return
 	}
@@ -330,6 +373,7 @@ func (r *TagMemberResource) ImportState(ctx context.Context, req resource.Import
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), generateTagMemberID(tag.ID, user.UserID))...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_id"), tag.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("username"), username)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_id"), user.UserID)...)
 	// Note: tag_name is not set in import (cleared like in SDKv2 version)
 }
 

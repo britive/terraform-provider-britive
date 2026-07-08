@@ -72,6 +72,35 @@ func (c *Client) SaveProfileAssociationScopes(profileID string, associations []P
 	return err
 }
 
+// SaveProfileScopeTags - Save scope tags for a profile
+func (c *Client) SaveProfileScopeTags(profileID string, scopeTags []ScopeTag) error {
+	body, err := json.Marshal(scopeTags)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/paps/%s/scope-tags", c.APIBaseURL, profileID), strings.NewReader(string(body)))
+	if err != nil {
+		return err
+	}
+	_, err = c.DoWithLock(req, profileID)
+	return err
+}
+
+// GetProfileScopeTags - Get scope tags for a profile
+func (c *Client) GetProfileScopeTags(profileID string) ([]ScopeTag, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/paps/%s/scope-tags", c.APIBaseURL, profileID), nil)
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.DoWithLock(req, profileID)
+	if err != nil {
+		return nil, err
+	}
+	var scopeTags []ScopeTag
+	err = json.Unmarshal(body, &scopeTags)
+	return scopeTags, err
+}
+
 // SaveProfileAssociationResourceScopes - Save profile associations
 func (c *Client) SaveProfileAssociationResourceScopes(profileID string, associations []ProfileAssociation) error {
 	utb, err := json.Marshal(associations)

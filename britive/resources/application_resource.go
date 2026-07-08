@@ -76,9 +76,9 @@ func (r *ApplicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"application_type": schema.StringAttribute{
 				Required:    true,
-				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta'.",
+				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta', 'Britive'.",
 				Validators: []validator.String{
-					stringvalidator.OneOfCaseInsensitive("Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta"),
+					stringvalidator.OneOfCaseInsensitive("Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta", "Britive"),
 				},
 			},
 			"version": schema.StringAttribute{
@@ -317,9 +317,10 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 
 	// Create root environment group for certain app types
 	allowedEnvGroupApps := map[int]string{
-		2: "AWS Standalone",
-		8: "Okta",
-		9: "Snowflake Standalone",
+		2:  "AWS Standalone",
+		8:  "Okta",
+		9:  "Snowflake Standalone",
+		12: "Britive",
 	}
 	if _, ok := allowedEnvGroupApps[appResponse.CatalogAppId]; ok {
 		err = r.client.CreateRootEnvironmentGroup(appResponse.AppContainerId, appResponse.CatalogAppId)
@@ -386,9 +387,10 @@ func (r *ApplicationResource) Read(ctx context.Context, req resource.ReadRequest
 
 	// Handle root environment group ID for certain app types
 	allowedEnvGroupApps := map[int]string{
-		2: "AWS Standalone",
-		8: "Okta",
-		9: "Snowflake Standalone",
+		2:  "AWS Standalone",
+		8:  "Okta",
+		9:  "Snowflake Standalone",
+		12: "Britive",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupID := ""
@@ -602,9 +604,10 @@ func (r *ApplicationResource) ImportState(ctx context.Context, req resource.Impo
 
 	// Handle root environment group ID
 	allowedEnvGroupApps := map[int]string{
-		2: "AWS Standalone",
-		8: "Okta",
-		9: "Snowflake Standalone",
+		2:  "AWS Standalone",
+		8:  "Okta",
+		9:  "Snowflake Standalone",
+		12: "Britive",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupID := ""
@@ -1013,9 +1016,10 @@ func (r *ApplicationResource) populateStateFromAPI(ctx context.Context, state *A
 
 	// Handle root environment group ID
 	allowedEnvGroupApps := map[int]string{
-		2: "AWS Standalone",
-		8: "Okta",
-		9: "Snowflake Standalone",
+		2:  "AWS Standalone",
+		8:  "Okta",
+		9:  "Snowflake Standalone",
+		12: "Britive",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupID := ""

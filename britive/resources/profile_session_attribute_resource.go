@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
@@ -37,15 +38,16 @@ type ProfileSessionAttributeResource struct {
 }
 
 type ProfileSessionAttributeResourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	AppName        types.String `tfsdk:"app_name"`
-	ProfileID      types.String `tfsdk:"profile_id"`
-	ProfileName    types.String `tfsdk:"profile_name"`
-	AttributeName  types.String `tfsdk:"attribute_name"`
-	AttributeType  types.String `tfsdk:"attribute_type"`
-	AttributeValue types.String `tfsdk:"attribute_value"`
-	MappingName    types.String `tfsdk:"mapping_name"`
-	Transitive     types.Bool   `tfsdk:"transitive"`
+	ID                types.String `tfsdk:"id"`
+	AppName           types.String `tfsdk:"app_name"`
+	ProfileID         types.String `tfsdk:"profile_id"`
+	ProfileName       types.String `tfsdk:"profile_name"`
+	AttributeName     types.String `tfsdk:"attribute_name"`
+	AttributeSchemaID types.String `tfsdk:"attribute_schema_id"`
+	AttributeType     types.String `tfsdk:"attribute_type"`
+	AttributeValue    types.String `tfsdk:"attribute_value"`
+	MappingName       types.String `tfsdk:"mapping_name"`
+	Transitive        types.Bool   `tfsdk:"transitive"`
 }
 
 func (r *ProfileSessionAttributeResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -97,6 +99,11 @@ func (r *ProfileSessionAttributeResource) Schema(_ context.Context, _ resource.S
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"attribute_schema_id": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "The identifier of the attribute associated with the profile",
+			},
 			"attribute_type": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
@@ -136,15 +143,16 @@ func (r *ProfileSessionAttributeResource) Schema(_ context.Context, _ resource.S
 func (r *ProfileSessionAttributeResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
 	priorSchema := schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"id":              schema.StringAttribute{Computed: true},
-			"app_name":        schema.StringAttribute{Optional: true, Computed: true},
-			"profile_id":      schema.StringAttribute{Required: true},
-			"profile_name":    schema.StringAttribute{Optional: true, Computed: true},
-			"attribute_name":  schema.StringAttribute{Optional: true},
-			"attribute_type":  schema.StringAttribute{Optional: true, Computed: true},
-			"attribute_value": schema.StringAttribute{Optional: true},
-			"mapping_name":    schema.StringAttribute{Required: true},
-			"transitive":      schema.BoolAttribute{Optional: true, Computed: true},
+			"id":                  schema.StringAttribute{Computed: true},
+			"app_name":            schema.StringAttribute{Optional: true, Computed: true},
+			"profile_id":          schema.StringAttribute{Required: true},
+			"profile_name":        schema.StringAttribute{Optional: true, Computed: true},
+			"attribute_name":      schema.StringAttribute{Optional: true},
+			"attribute_schema_id": schema.StringAttribute{Optional: true, Computed: true},
+			"attribute_type":      schema.StringAttribute{Optional: true, Computed: true},
+			"attribute_value":     schema.StringAttribute{Optional: true},
+			"mapping_name":        schema.StringAttribute{Required: true},
+			"transitive":          schema.BoolAttribute{Optional: true, Computed: true},
 		},
 	}
 	return map[int64]resource.StateUpgrader{
@@ -497,8 +505,9 @@ func (r *ProfileSessionAttributeResource) ImportState(ctx context.Context, req r
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("attribute_type"), attributeType)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("transitive"), sessionAttribute.Transitive)...)
 
-	// Handle attribute_name and attribute_value based on type
+	// Handle attribute_name, attribute_schema_id, and attribute_value based on type
 	if strings.EqualFold(attributeType, "Identity") && sessionAttribute.AttributeSchemaID != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("attribute_schema_id"), sessionAttribute.AttributeSchemaID)...)
 		attribute, err := r.client.GetAttribute(sessionAttribute.AttributeSchemaID)
 		if err == nil {
 			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("attribute_name"), attribute.Name)...)
@@ -525,18 +534,24 @@ func (r *ProfileSessionAttributeResource) buildSessionAttribute(plan ProfileSess
 	var attrValue string
 
 	if strings.EqualFold(attributeType, "Identity") {
-		if attributeName == "" {
-			return nil, fmt.Errorf("attribute_name is required when attribute_type is Identity")
-		}
 		if attributeValue != "" {
 			return nil, fmt.Errorf("attribute_value must be empty when attribute_type is Identity")
 		}
 
-		attribute, err := r.client.GetAttributeByName(attributeName)
-		if err != nil {
-			return nil, fmt.Errorf("could not get attribute '%s': %w", attributeName, err)
+		// Prefer attribute_schema_id if set; otherwise look up by attribute_name
+		if !plan.AttributeSchemaID.IsNull() && plan.AttributeSchemaID.ValueString() != "" {
+			attributeSchemaID = plan.AttributeSchemaID.ValueString()
+		} else {
+			if attributeName == "" {
+				return nil, fmt.Errorf("attribute_name is required when attribute_type is Identity and attribute_schema_id is not set")
+			}
+			log.Printf("[WARN] attribute_schema_id not set; falling back to lookup by attribute_name '%s'", attributeName)
+			attribute, err := r.client.GetAttributeByName(attributeName)
+			if err != nil {
+				return nil, fmt.Errorf("could not get attribute '%s': %w", attributeName, err)
+			}
+			attributeSchemaID = attribute.ID
 		}
-		attributeSchemaID = attribute.ID
 	} else {
 		if attributeValue == "" {
 			return nil, fmt.Errorf("attribute_value is required when attribute_type is Static")
@@ -572,8 +587,9 @@ func (r *ProfileSessionAttributeResource) populateStateFromAPI(ctx context.Conte
 	state.MappingName = types.StringValue(sessionAttr.MappingName)
 	state.Transitive = types.BoolValue(sessionAttr.Transitive)
 
-	// Handle attribute_name and attribute_value based on type
+	// Handle attribute_name, attribute_schema_id, and attribute_value based on type
 	if strings.EqualFold(sessionAttr.SessionAttributeType, "Identity") || sessionAttr.AttributeSchemaID != "" {
+		state.AttributeSchemaID = types.StringValue(sessionAttr.AttributeSchemaID)
 		attribute, err := r.client.GetAttribute(sessionAttr.AttributeSchemaID)
 		if err != nil {
 			return err
@@ -581,6 +597,7 @@ func (r *ProfileSessionAttributeResource) populateStateFromAPI(ctx context.Conte
 		state.AttributeName = types.StringValue(attribute.Name)
 		state.AttributeValue = types.StringNull() // Clear value for Identity type
 	} else {
+		state.AttributeSchemaID = types.StringNull()
 		state.AttributeValue = types.StringValue(sessionAttr.AttributeValue)
 		state.AttributeName = types.StringNull() // Clear name for Static type
 	}

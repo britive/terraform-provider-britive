@@ -22,6 +22,24 @@ type Tag struct {
 	Status                   string                    `json:"status,omitempty"`
 	UserTagIdentityProviders []UserTagIdentityProvider `json:"userTagIdentityProviders,omitempty"`
 	External                 interface{}               `json:"external,omitempty"`
+	Requestable              bool                      `json:"requestable,omitempty"`
+	Attributes               []TagAttribute            `json:"attributes,omitempty"`
+}
+
+// TagAttribute - godoc
+type TagAttribute struct {
+	AttributeName  string `json:"attributeName"`
+	AttributeValue string `json:"attributeValue"`
+	AttributeID    string `json:"attributeId,omitempty"`
+}
+
+// TagAttributesUpdateRequest - Request body for PATCH /user-tags (attributes + requestable update)
+type TagAttributesUpdateRequest struct {
+	UserTagID   string         `json:"userTagId"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Requestable *bool          `json:"requestable,omitempty"`
+	Attributes  []TagAttribute `json:"attributes"`
 }
 
 // UserTagIdentityProvider - godoc
@@ -196,12 +214,19 @@ type ProfilePolicy struct {
 	IsDraft      bool                       `json:"isDraft"`
 	IsReadOnly   bool                       `json:"isReadOnly"`
 	Associations []ProfilePolicyAssociation `json:"scopes"`
+	ScopeTags    []ScopeTag                 `json:"scopeTags,omitempty"`
 	Order        int                        `json:"order,omitempty"`
 }
 
 type ProfilePolicyAssociation struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
+}
+
+// ScopeTag - represents a tag-based scope filter
+type ScopeTag struct {
+	TagKey    string   `json:"tagKey"`
+	TagValues []string `json:"tagValues"`
 }
 
 type ProfileSummary struct {
