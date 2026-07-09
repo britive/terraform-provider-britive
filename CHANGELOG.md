@@ -1,4 +1,12 @@
 
+## 2.3.5
+
+ENHANCEMENTS:
+* **Resource:** `britive_application` : Added support for `Azure WIF` and `Oracle WIF`, enabling Workload Identity Federation app management for Azure and Oracle Cloud environments.
+* **Resource:** `britive_resource_manager_profile` : Added `exclusive_checkout` argument to control exclusive checkout behavior for resource manager profiles.
+
+=======
+
 ## 2.3.4
 
 ENHANCEMENTS:
