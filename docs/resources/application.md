@@ -10,7 +10,7 @@ description: |-
 
 This resource allows you to create and manage applications in Britive.
 
--> This resource is supported only on Snowflake, Snowflake Standalone, GCP, GCP Standalone, GCP WIF, Google Workspace, AWS, AWS Standalone, Azure, Okta, and Britive applications.
+-> This resource is supported only on Snowflake, Snowflake Standalone, GCP, GCP Standalone, GCP WIF, Google Workspace, AWS, AWS Standalone, Azure, Azure WIF, Okta, Britive, and Oracle WIF applications.
 
 ## Example Usage
 
@@ -837,7 +837,7 @@ resource "britive_application" "azure_1" {
 > - `clientId`: Client ID.
 > - `userFilter`: User filter.
 > - `groupFilter`: Group filter.
-> - `scanMethod`: Scan method.
+> - `scanMethod`: Scan method — one of `collectUsersGroups`, `collectGroupsMemberships`, or `collectUsersMembership`.
 > - `scanMgmtGroupsAndSubscriptions`: Scan management group and subscription.
 > - `scanSubscriptionsOnly`: Scan subscription Only.
 > - `scanResources`: Scan resources.
@@ -848,6 +848,181 @@ resource "britive_application" "azure_1" {
 
 >**Sensitive Properties:**
 > - `clientSecret`: Client secret.
+
+### Azure WIF Application
+
+```hcl
+resource "britive_application" "azure_wif" {
+  provider         = britive.courage
+  application_type = "Azure wif"
+  user_account_mappings {
+    name        = "Mobile"
+    description = "Mobile"
+  }
+  properties {
+    name  = "displayName"
+    value = "Azure WIF"
+  }
+  properties {
+    name  = "description"
+    value = "Azure WIF Desc"
+  }
+  properties {
+    name  = "programmaticAccess"
+    value = false
+  }
+  properties {
+    name  = "consoleAccess"
+    value = true
+  }
+  properties {
+    name  = "appAccessMethod_static_loginUrl"
+    value = "https://portal.azure.com"
+  }
+  properties {
+    name  = "britiveIssuerUrl"
+    value = "https://test.britive-test-app.com/api/auth/sso/oauth2"
+  }
+  properties {
+    name  = "tenantId"
+    value = "<Azure-Tenant-ID>"
+  }
+  properties {
+    name  = "clientId"
+    value = "<Azure-Client-ID>"
+  }
+  properties {
+    name  = "azureWifAudience"
+    value = "api://AzureADTokenExchange"
+  }
+  properties {
+    name  = "userFilter"
+    value = ""
+  }
+  properties {
+    name  = "groupFilter"
+    value = ""
+  }
+  properties {
+    name  = "scanMethod"
+    value = "collectUsersGroups"
+  }
+  properties {
+    name  = "scanMgmtGroupsAndSubscriptions"
+    value = false
+  }
+  properties {
+    name  = "scanSubscriptionsOnly"
+    value = false
+  }
+  properties {
+    name  = "scanResources"
+    value = false
+  }
+  properties {
+    name  = "scanGroupsMemberships"
+    value = true
+  }
+  properties {
+    name  = "scanServicePrincipals"
+    value = false
+  }
+  properties {
+    name  = "scanAiIdentities"
+    value = false
+  }
+  properties {
+    name  = "maxSessionDurationForProfiles"
+    value = "604800"
+  }
+  properties {
+    name  = "displayProgrammaticKeys"
+    value = false
+  }
+}
+```
+
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `programmaticAccess`: Programmatic Access.
+> - `consoleAccess`: Console Access.
+> - `appAccessMethod_static_loginUrl`: Login URL.
+> - `britiveIssuerUrl`: Britive Issuer URL (used as the OIDC issuer for Workload Identity Federation).
+> - `tenantId`: Azure Tenant ID.
+> - `clientId`: Azure Application (Client) ID.
+> - `azureWifAudience`: Federated credential audience value configured in Azure (e.g. `api://AzureADTokenExchange`).
+> - `userFilter`: Filter for users.
+> - `groupFilter`: Filter for groups.
+> - `scanMethod`: Scan method — one of `collectUsersGroups`, `collectGroupsMemberships`, or `collectUsersMembership`.
+> - `scanMgmtGroupsAndSubscriptions`: Scan management groups and subscriptions.
+> - `scanSubscriptionsOnly`: Scan subscriptions only.
+> - `scanResources`: Scan Azure resource groups and resources.
+> - `scanGroupsMemberships`: Scan user group memberships.
+> - `scanServicePrincipals`: Scan Azure service principals.
+> - `scanAiIdentities`: Scan AI identities.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+> - `displayProgrammaticKeys`: Display programmatic access keys.
+
+### Oracle WIF Application
+
+```hcl
+resource "britive_application" "oracle_wif" {
+  provider         = britive
+  application_type = "Oracle wif"
+  user_account_mappings {
+    name        = "Mobile"
+    description = "Mobile"
+  }
+  properties {
+    name  = "displayName"
+    value = "Oracle WIF App"
+  }
+  properties {
+    name  = "description"
+    value = "YGS Oracle WIF Desc"
+  }
+  properties {
+    name  = "tenancy"
+    value = "ocid.tenancy.oc1.nnnnnbbbbbtttttjgjgwdwcwcwwcee"
+  }
+  properties {
+    name  = "tenantName"
+    value = "Britive"
+  }
+  properties {
+    name  = "britiveIssuerUrl"
+    value = "https://test.britive-test-app.com/api/auth/sso/oauth2"
+  }
+  properties {
+    name  = "clientId"
+    value = "7hbhjb7bvg2hbb3jjbbg4kjknn1hhh"
+  }
+  properties {
+    name  = "region"
+    value = "us-phoenix-1"
+  }
+  properties {
+    name  = "domainUrl"
+    value = "https://idcs-uunb75fcc322ghbbb322hggg1vg.identity.oraclecloud.com"
+  }
+  properties {
+    name  = "maxSessionDurationForProfiles"
+    value = "604800"
+  }
+}
+```
+
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `tenancy`: OCI OCID of the tenancy.
+> - `tenantName`: Name of the Britive tenant.
+> - `britiveIssuerUrl`: Britive Issuer URL (used as the OIDC issuer for Workload Identity Federation).
+> - `clientId`: Client ID of the OCI confidential application.
+> - `region`: Oracle Cloud region (e.g. `us-phoenix-1`).
+> - `domainUrl`: Oracle Identity Domain URL.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 
 ### Okta Application
 
@@ -911,7 +1086,7 @@ resource "britive_application" "britive_1" {
 
 The following arguments are supported:
 
-* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone`, `GCP WIF`, `Google Workspace`, `AWS`, `AWS Standalone`, `Azure`, `Okta` and `Britive`.
+* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone`, `GCP WIF`, `Google Workspace`, `AWS`, `AWS Standalone`, `Azure`, `Azure WIF`, `Okta`, `Britive` and `Oracle WIF`.
 
 * `version` - (Optional) The version of the application resource.  
   If specified, it must match a supported version for the selected `application_type`.  
@@ -1054,8 +1229,35 @@ When a property is deleted from the configuration, its value will revert to the 
     'appAccessMethod_static_loginUrl': 'https://azure.test.com',
     'clientId': '<Client-ID>',
     'clientSecret': '<Client-Secret>',
-    'scanMethod': 'scanMethod',
+    'scanMethod': 'collectUsersGroups',
     'scanGroupsMemberships': 'true',
+    'maxSessionDurationForProfiles': '604800'
+}
+```
+
+### Azure WIF
+```sh
+{
+    'displayName': 'Azure WIF',
+    'consoleAccess': 'true',
+    'programmaticAccess': 'false',
+    'appAccessMethod_static_loginUrl': 'https://portal.azure.com',
+    'britiveIssuerUrl': 'https://<britive_tenant_url>/api/auth/sso/oauth2',
+    'azureWifAudience': 'api://AzureADTokenExchange',
+    'scanMethod': 'collectUsersGroups',
+    'scanGroupsMemberships': 'true',
+    'scanServicePrincipals': 'false',
+    'scanAiIdentities': 'false',
+    'displayProgrammaticKeys': 'false',
+    'maxSessionDurationForProfiles': '604800'
+}
+```
+
+### Oracle WIF
+```sh
+{
+    'displayName': 'Oracle WIF',
+    'britiveIssuerUrl': 'https://<britive_tenant_url>/api/auth/sso/oauth2'
     'maxSessionDurationForProfiles': '604800'
 }
 ```

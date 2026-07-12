@@ -46,8 +46,8 @@ func NewResourceApplication(v *validate.Validation, importHelper *imports.Import
 			"application_type": {
 				Type:         schema.TypeString,
 				Required:     true,
-				Description:  "Britive application type. Supported types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta' and 'Britive'",
-				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta", "Britive"}, true),
+				Description:  "Britive application type. Supported types 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta', 'Britive', 'Azure WIF' and 'Oracle WIF'",
+				ValidateFunc: validation.StringInSlice([]string{"Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta", "Britive", "Azure WIF", "Oracle WIF"}, true),
 			},
 			"version": {
 				Type:        schema.TypeString,
