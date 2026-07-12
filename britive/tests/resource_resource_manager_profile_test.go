@@ -26,6 +26,7 @@ func TestBritiveResourceManagerProfile(t *testing.T) {
 					testAccCheckBritiveResourceManagerProfileExists("britive_resource_manager_resource_label.resource_label_1"),
 					testAccCheckBritiveResourceManagerProfileExists("britive_resource_manager_resource_label.resource_label_2"),
 					testAccCheckBritiveResourceManagerProfileExists("britive_resource_manager_profile.resource_profile_1"),
+					resource.TestCheckResourceAttr("britive_resource_manager_profile.resource_profile_1", "exclusive_checkout", "true"),
 				),
 			},
 		},
@@ -73,6 +74,7 @@ func testAccCheckBritiveResourceManagerProfileConfig(resourceLabelName1, resourc
 		extension_duration               = "2h0m0s"
 		extension_limit                  = 2
 		allow_impersonation  = true
+		exclusive_checkout   = true
 
 		associations {
 			label_key   = britive_resource_manager_resource_label.resource_label_1.name

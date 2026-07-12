@@ -502,6 +502,7 @@ type ResourceManagerProfile struct {
 	ResourceLabelColorMap         map[string]string   `json:"resourceLabelColorMap,omitempty"`
 	DelegationEnabled             bool                `json:"delegationEnabled,omitempty"`
 	PolicyOrderingEnabled         bool                `json:"policyOrderingEnabled,omitempty"`
+	ExclusiveCheckout             bool                `json:"exclusiveCheckout"`
 	Extendable                    bool                `json:"extendable"`
 	NotificationPriorToExpiration *int64              `json:"notificationPriorToExpiration,omitempty"`
 	ExtensionDuration             *int64              `json:"extensionDuration,omitempty"`
