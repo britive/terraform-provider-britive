@@ -506,6 +506,7 @@ type ResourceManagerProfile struct {
 	// which would prevent the PATCH from ever setting delegation to false.
 	DelegationEnabled             bool                `json:"delegationEnabled"`
 	PolicyOrderingEnabled         bool                `json:"policyOrderingEnabled,omitempty"`
+	ExclusiveCheckout             bool                `json:"exclusiveCheckout"`
 	Extendable                    bool                `json:"extendable"`
 	NotificationPriorToExpiration *int64              `json:"notificationPriorToExpiration,omitempty"`
 	ExtensionDuration             *int64              `json:"extensionDuration,omitempty"`

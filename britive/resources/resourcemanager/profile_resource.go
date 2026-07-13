@@ -32,6 +32,7 @@ type ProfileResourceModel struct {
 	ExpirationDuration             types.Int64        `tfsdk:"expiration_duration"`
 	Status                         types.String       `tfsdk:"status"`
 	AllowImpersonation             types.Bool         `tfsdk:"allow_impersonation"`
+	ExclusiveCheckout              types.Bool         `tfsdk:"exclusive_checkout"`
 	Extendable                     types.Bool         `tfsdk:"extendable"`
 	NotificationPriorToExpiration  types.String       `tfsdk:"notification_prior_to_expiration"`
 	ExtensionDuration              types.String       `tfsdk:"extension_duration"`
@@ -92,6 +93,12 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 				Description: "Enable or disable delegation",
+			},
+			"exclusive_checkout": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: "Enable or disable exclusive checkout for the resource manager profile. When enabled, only one checkout is allowed at a time.",
 			},
 			"extendable": schema.BoolAttribute{
 				Optional:    true,
@@ -427,6 +434,7 @@ func (r *ProfileResource) mapResourceToModel(ctx context.Context, plan *ProfileR
 		Name:               plan.Name.ValueString(),
 		ExpirationDuration: int(plan.ExpirationDuration.ValueInt64()),
 		DelegationEnabled:  plan.AllowImpersonation.ValueBool(),
+		ExclusiveCheckout:  plan.ExclusiveCheckout.ValueBool(),
 		Extendable:         plan.Extendable.ValueBool(),
 		Associations:       make(map[string][]string),
 	}
@@ -491,6 +499,7 @@ func (r *ProfileResource) mapModelToResource(ctx context.Context, profile *briti
 	state.ExpirationDuration = types.Int64Value(int64(profile.ExpirationDuration))
 	state.Status = types.StringValue(profile.Status)
 	state.AllowImpersonation = types.BoolValue(profile.DelegationEnabled)
+	state.ExclusiveCheckout = types.BoolValue(profile.ExclusiveCheckout)
 	state.Extendable = types.BoolValue(profile.Extendable)
 
 	if profile.Extendable {

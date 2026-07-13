@@ -76,9 +76,9 @@ func (r *ApplicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"application_type": schema.StringAttribute{
 				Required:    true,
-				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Okta', 'Britive'.",
+				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Azure WIF', 'Okta', 'Britive', 'Oracle WIF'.",
 				Validators: []validator.String{
-					stringvalidator.OneOfCaseInsensitive("Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Okta", "Britive"),
+					stringvalidator.OneOfCaseInsensitive("Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Azure WIF", "Okta", "Britive", "Oracle WIF"),
 				},
 			},
 			"version": schema.StringAttribute{
