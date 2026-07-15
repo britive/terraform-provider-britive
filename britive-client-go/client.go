@@ -1,13 +1,12 @@
 package britive
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -17,57 +16,93 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 var (
 	syncOnce     sync.Once
 	client       *Client
-	retryWaitMin = time.Second       // minimum wait between retries
+	retryWaitMin = 30 * time.Second  // minimum wait between retries
 	retryWaitMax = 600 * time.Second // maximum wait between retries
 )
 
 // Client - Britive API client
 type Client struct {
-	APIBaseURL   string
-	HTTPClient   *http.Client
-	Token        string
-	Version      string
-	SyncMap      *sync.Map
-	MaxRetries   int
-	RetryWaitMin time.Duration
-	RetryWaitMax time.Duration
+	APIBaseURL  string
+	RetryClient *retryablehttp.Client
+	Token       string
+	Version     string
+	SyncMap     *sync.Map
 }
 
 // NewClient - Initializes new Britive API client
-func NewClient(apiBaseURL, token, version string, maxRetries, retryWaitMinSecs, retryWaitMaxSecs int) (*Client, error) {
+func NewClient(apiBaseURL, token, version string, maxRetries int) (*Client, error) {
 	syncOnce.Do(func() {
 		if maxRetries <= 0 {
 			maxRetries = defaultMaxRetries
 		}
-		waitMin := retryWaitMin
-		if retryWaitMinSecs > 0 {
-			waitMin = time.Duration(retryWaitMinSecs) * time.Second
+
+		rc := retryablehttp.NewClient()
+		rc.RetryMax = maxRetries
+		rc.RetryWaitMin = retryWaitMin
+		rc.RetryWaitMax = retryWaitMax
+		rc.Logger = nil
+		rc.CheckRetry = only429CheckRetry
+		rc.Backoff = func(min, max time.Duration, attempt int, resp *http.Response) time.Duration {
+			if resp == nil || resp.StatusCode != http.StatusTooManyRequests {
+				return retryablehttp.DefaultBackoff(min, max, attempt, resp)
+			}
+
+			method, rawURL := "", ""
+			if resp.Request != nil {
+				method = resp.Request.Method
+				rawURL = resp.Request.URL.String()
+			}
+
+			// Retry-After present: scale exponentially — Retry-After * 2^attempt, clamped to [min, max].
+			if ra := resp.Header.Get("Retry-After"); ra != "" {
+				if secs, err := strconv.Atoi(ra); err == nil && secs > 0 {
+					scaled := time.Duration(float64(secs)*math.Pow(2, float64(attempt))) * time.Second
+					if scaled < min {
+						scaled = min
+					} else if scaled > max {
+						scaled = max
+					}
+					log.Printf("[WARN] britive: HTTP 429 on %s %s — attempt %d/%d, Retry-After header=%ss, retrying after %s (%ds * 2^%d)",
+						method, rawURL, attempt+1, maxRetries+1, ra, scaled, secs, attempt)
+					return scaled
+				}
+			}
+
+			// Fall back to exponential backoff.
+			wait := retryablehttp.DefaultBackoff(min, max, attempt, resp)
+			log.Printf("[WARN] britive: HTTP 429 on %s %s — attempt %d/%d, retrying after %s (exponential backoff)",
+				method, rawURL, attempt+1, maxRetries+1, wait)
+			return wait
 		}
-		waitMax := retryWaitMax
-		if retryWaitMaxSecs > 0 {
-			waitMax = time.Duration(retryWaitMaxSecs) * time.Second
-		}
+		rc.HTTPClient = &http.Client{Timeout: 0}
+
 		client = &Client{
-			HTTPClient:   &http.Client{Timeout: 0},
-			APIBaseURL:   apiBaseURL,
-			Token:        token,
-			Version:      version,
-			SyncMap:      &sync.Map{},
-			MaxRetries:   maxRetries,
-			RetryWaitMin: waitMin,
-			RetryWaitMax: waitMax,
+			RetryClient: rc,
+			APIBaseURL:  apiBaseURL,
+			Token:       token,
+			Version:     version,
+			SyncMap:     &sync.Map{},
 		}
 	})
 	return client, nil
 }
 
-func init() {
-	rand.Seed(time.Now().UnixNano()) //nolint:staticcheck
+// only429CheckRetry retries only on HTTP 429 (Too Many Requests).
+func only429CheckRetry(_ context.Context, resp *http.Response, err error) (bool, error) {
+	if err != nil {
+		return false, err
+	}
+	if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+		return true, nil
+	}
+	return false, nil
 }
 
 // QueryRequest - godoc
@@ -204,101 +239,47 @@ func (c *Client) DoWithLock(req *http.Request, key string) ([]byte, error) {
 	return c.Do(req)
 }
 
-// Do - Perform Britive API call with exponential backoff retry on HTTP 429
+// Do - Perform Britive API call; retries on HTTP 429 are handled by RetryClient.
 func (c *Client) Do(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
 	req.Header.Set("Content-Type", "application/json")
 	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
 	req.Header.Add("User-Agent", userAgent)
 
-	// Preserve request body bytes so they can be replayed on retry
-	var bodyBytes []byte
-	if req.Body != nil && req.Body != http.NoBody {
-		var readErr error
-		bodyBytes, readErr = ioutil.ReadAll(req.Body)
-		req.Body.Close()
-		if readErr != nil {
-			return nil, readErr
-		}
-		req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
-		req.ContentLength = int64(len(bodyBytes))
+	retryReq, err := retryablehttp.FromRequest(req)
+	if err != nil {
+		return nil, err
 	}
 
-	log.Printf("[DEBUG] britive-retry: %s %s (max_retries=%d)", req.Method, req.URL, c.MaxRetries)
+	res, err := c.RetryClient.Do(retryReq)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
 
-	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
-		if attempt > 0 && bodyBytes != nil {
-			req.Body = ioutil.NopCloser(bytes.NewReader(bodyBytes))
-			req.ContentLength = int64(len(bodyBytes))
-		}
-
-		res, err := c.HTTPClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if res.StatusCode == http.StatusTooManyRequests {
-			retryAfter := res.Header.Get("Retry-After")
-			ioutil.ReadAll(res.Body) //nolint:errcheck
-			res.Body.Close()
-			if attempt >= c.MaxRetries {
-				log.Printf("[WARN] britive-retry: rate limited, exhausted all %d retries for %s %s", c.MaxRetries, req.Method, req.URL)
-				break
-			}
-			wait := calculateBackoff(attempt, c.RetryWaitMin, c.RetryWaitMax, retryAfter)
-			log.Printf("[WARN] britive-retry: rate limited (HTTP 429) on attempt %d/%d, waiting %s before retry", attempt+1, c.MaxRetries+1, wait)
-			time.Sleep(wait)
-			continue
-		}
-
-		if res.StatusCode == http.StatusNoContent {
-			res.Body.Close()
-			return []byte(emptyString), ErrNoContent
-		}
-
-		body, err := ioutil.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			return nil, err
-		}
-
-		if res.StatusCode == http.StatusNotFound {
-			return body, ErrNotFound
-		}
-
-		if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
-			var httpErrorResponse HTTPErrorResponse
-			err = json.Unmarshal(body, &httpErrorResponse)
-			if err == nil && httpErrorResponse.Message != emptyString {
-				return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
-			}
-			return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
-		}
-
-		return body, nil
+	if res.StatusCode == http.StatusNoContent {
+		return []byte(emptyString), ErrNoContent
 	}
 
-	return nil, fmt.Errorf("rate limited: request to %s failed after %d retries", req.URL, c.MaxRetries)
-}
-
-// calculateBackoff returns the wait duration before the next retry.
-// Honors the Retry-After header when present; otherwise uses exponential
-// backoff with full jitter: random(0, min(waitMax, waitMin * 2^attempt)).
-func calculateBackoff(attempt int, waitMin, waitMax time.Duration, retryAfterHeader string) time.Duration {
-	if retryAfterHeader != "" {
-		if seconds, err := strconv.Atoi(retryAfterHeader); err == nil && seconds > 0 {
-			wait := time.Duration(seconds) * time.Second
-			if wait < waitMin {
-				return waitMin
-			}
-			if wait > waitMax {
-				return waitMax
-			}
-			return wait
-		}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
 	}
-	cap := math.Min(float64(waitMax), float64(waitMin)*math.Pow(2, float64(attempt)))
-	return time.Duration(rand.Float64() * cap) //nolint:gosec
+
+	if res.StatusCode == http.StatusNotFound {
+		return body, ErrNotFound
+	}
+
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusAccepted {
+		var httpErrorResponse HTTPErrorResponse
+		err = json.Unmarshal(body, &httpErrorResponse)
+		if err == nil && httpErrorResponse.Message != emptyString {
+			return nil, fmt.Errorf("%s: %s", httpErrorResponse.ErrorCode, httpErrorResponse.Message)
+		}
+		return nil, fmt.Errorf("an error occurred while processing the request\nrequest url: %s\nrequest method: %s\nresponse status: %d\nresponse body: %s", req.URL, req.Method, res.StatusCode, body)
+	}
+
+	return body, nil
 }
 
 // Lock to lock based on key

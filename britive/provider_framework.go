@@ -34,9 +34,7 @@ type BritiveProviderModel struct {
 	Tenant        types.String `tfsdk:"tenant"`
 	Token         types.String `tfsdk:"token"`
 	ConfigPath    types.String `tfsdk:"config_path"`
-	MaxRetries    types.Int64  `tfsdk:"max_retries"`
-	RetryWaitMin  types.Int64  `tfsdk:"retry_wait_min"`
-	RetryWaitMax  types.Int64  `tfsdk:"retry_wait_max"`
+	MaxRetries types.Int64 `tfsdk:"max_retries"`
 }
 
 // Metadata returns the provider type name.
@@ -66,14 +64,6 @@ func (p *BritiveProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 			"max_retries": schema.Int64Attribute{
 				Optional:    true,
 				Description: "Maximum number of retries for rate limited (HTTP 429) API requests. Defaults to 10.",
-			},
-			"retry_wait_min": schema.Int64Attribute{
-				Optional:    true,
-				Description: "Minimum wait time in seconds between retries for rate limited requests. Defaults to 1.",
-			},
-			"retry_wait_max": schema.Int64Attribute{
-				Optional:    true,
-				Description: "Maximum wait time in seconds between retries for rate limited requests. Defaults to 600.",
 			},
 		},
 	}
@@ -157,9 +147,7 @@ func (p *BritiveProvider) Configure(ctx context.Context, req provider.ConfigureR
 	// Create Britive API client
 	apiBaseURL := fmt.Sprintf("%s/api", strings.TrimSuffix(tenant, "/"))
 	maxRetries := int(config.MaxRetries.ValueInt64())
-	retryWaitMin := int(config.RetryWaitMin.ValueInt64())
-	retryWaitMax := int(config.RetryWaitMax.ValueInt64())
-	client, err := britive.NewClient(apiBaseURL, token, p.version, maxRetries, retryWaitMin, retryWaitMax)
+	client, err := britive.NewClient(apiBaseURL, token, p.version, maxRetries)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Britive API Client",
