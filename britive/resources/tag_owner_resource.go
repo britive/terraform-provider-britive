@@ -9,6 +9,7 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -18,9 +19,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &TagOwnerResource{}
-	_ resource.ResourceWithConfigure   = &TagOwnerResource{}
-	_ resource.ResourceWithImportState = &TagOwnerResource{}
+	_ resource.Resource                   = &TagOwnerResource{}
+	_ resource.ResourceWithConfigure      = &TagOwnerResource{}
+	_ resource.ResourceWithImportState    = &TagOwnerResource{}
+	_ resource.ResourceWithValidateConfig = &TagOwnerResource{}
 )
 
 func NewTagOwnerResource() resource.Resource {
@@ -32,10 +34,10 @@ type TagOwnerResource struct {
 }
 
 type TagOwnerResourceModel struct {
-	ID    types.String      `tfsdk:"id"`
-	TagID types.String      `tfsdk:"tag_id"`
-	Users []TagOwnerEntityModel  `tfsdk:"user"`
-	Tags  []TagOwnerEntityModel  `tfsdk:"tag"`
+	ID    types.String          `tfsdk:"id"`
+	TagID types.String          `tfsdk:"tag_id"`
+	Users []TagOwnerEntityModel `tfsdk:"user"`
+	Tags  []TagOwnerEntityModel `tfsdk:"tag"`
 }
 
 // TagOwnerEntity maps to each user {} or tag {} block.
@@ -102,6 +104,38 @@ func (r *TagOwnerResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"tag":  ownerBlock,
 		},
 	}
+}
+
+// ValidateConfig rejects any user or tag block where both id and name are set simultaneously.
+func (r *TagOwnerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data TagOwnerResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	for _, u := range data.Users {
+		if tagOwnerEntitySet(u.ID) && tagOwnerEntitySet(u.Name) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("user"),
+				"Invalid Tag Owner Configuration",
+				"A user block must specify either id or name, not both.",
+			)
+		}
+	}
+	for _, t := range data.Tags {
+		if tagOwnerEntitySet(t.ID) && tagOwnerEntitySet(t.Name) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("tag"),
+				"Invalid Tag Owner Configuration",
+				"A tag block must specify either id or name, not both.",
+			)
+		}
+	}
+}
+
+func tagOwnerEntitySet(v types.String) bool {
+	return !v.IsNull() && !v.IsUnknown() && v.ValueString() != ""
 }
 
 func (r *TagOwnerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -292,9 +326,9 @@ func (r *TagOwnerResource) applyOwners(tagID string, users, tags []TagOwnerEntit
 	}
 
 	request := britive.TagWithOwners{
-		TagID:       tagID,
-		Name:        tag.Name,
-		Description: tag.Description,
+		TagID:         tagID,
+		Name:          tag.Name,
+		Description:   tag.Description,
 		Relationships: britive.TagOwnerRelationships{Owners: owners},
 	}
 	_, err = r.client.UpdateTagOwners(request)
