@@ -1,4 +1,11 @@
 
+## 2.3.6
+
+DEPRECATIONS:
+* **Resource:** `britive_application` : The `scanOrganization` and `scanProjectsOnly` properties are no longer supported for `GCP WIF` applications and must be removed from the `properties` block in existing configurations. These properties remain supported for the standard `GCP` application type.
+
+=======
+
 ## 2.3.5
 
 ENHANCEMENTS:

@@ -465,14 +465,6 @@ resource "britive_application" "gcp_wif_new" {
     value = false
   }
   properties {
-    name  = "scanOrganization"
-    value = false
-  }
-  properties {
-    name  = "scanProjectsOnly"
-    value = true
-  }
-  properties {
     name  = "maxSessionDurationForProfiles"
     value = 10000
   }
@@ -510,12 +502,12 @@ resource "britive_application" "gcp_wif_new" {
 > - `primaryDomain`: Email Domain of Britive Users.
 > - `secondaryDomain`: Primary Domain in Google Workspace.
 > - `replaceDomain`: Use another domain for Account Mapping.
-> - `scanOrganization`: Scan all Folders and Projects.
-> - `scanProjectsOnly`: Scan Projects only.
 > - `scanExternalUsersGroups`: Scan External Users and Groups.
 > - `maxSessionDurationForProfiles`: Maximum Session Duration for Profiles.
 > - `gcpProjectFilter`: Exclude Projects from Scan.
 > - `gcpProjectFilterInclusion`: Include projects in Scan.
+>
+> **Note:** `scanOrganization` and `scanProjectsOnly` are no longer supported for `GCP WIF` applications and must not be set in the `properties` block.
 
 ### Google Workspace Application
 
@@ -853,7 +845,6 @@ resource "britive_application" "azure_1" {
 
 ```hcl
 resource "britive_application" "azure_wif" {
-  provider         = britive.courage
   application_type = "Azure wif"
   user_account_mappings {
     name        = "Mobile"
@@ -968,7 +959,6 @@ resource "britive_application" "azure_wif" {
 
 ```hcl
 resource "britive_application" "oracle_wif" {
-  provider         = britive
   application_type = "Oracle wif"
   user_account_mappings {
     name        = "Mobile"
