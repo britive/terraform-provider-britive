@@ -395,14 +395,6 @@ func testAccCheckBritiveApplicationConfig() string {
 		value = false
 	}
 	properties {
-		name  = "scanOrganization"
-		value = false
-	}
-	properties {
-		name  = "scanProjectsOnly"
-		value = true
-	}
-	properties {
 		name  = "maxSessionDurationForProfiles"
 		value = 10000
 	}
