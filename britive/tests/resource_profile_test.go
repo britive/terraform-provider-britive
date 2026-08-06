@@ -87,8 +87,8 @@ func TestBritiveProfileTagAssociations(t *testing.T) {
 	associationType := "EnvironmentGroup"
 	associationValue := "QA"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveProfileConfigWithTagAssociations(name, description, applicationName, tagKey, tagValue),

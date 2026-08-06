@@ -35,8 +35,8 @@ func TestBritiveTagRequestable(t *testing.T) {
 	description := "AT - New Britive Tag Requestable Test Description"
 	identityProviderName := "Britive"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				// Create tag with requestable explicitly set to true
@@ -55,8 +55,8 @@ func TestBritiveTagWithAttributes(t *testing.T) {
 	description := "AT - New Britive Tag Attributes Test Description"
 	identityProviderName := "Britive"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				// Step 1: create with requestable=true and three attributes (one multi-valued)

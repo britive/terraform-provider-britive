@@ -169,8 +169,8 @@ func TestBritiveProfilePolicyTagAssociations(t *testing.T) {
 	tagValue := "engineering"
 	resourceName := "britive_profile_policy.new"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveProfilePolicyConfigWithTagAssociations(applicationName, profileName, profilePolicyName, profilePolicyDescription, tagKey, tagValue),

@@ -968,7 +968,7 @@ func (r *ProfileResource) mapProfileAssociationsModelToResource(appContainerID s
 			profileAssociations = append(profileAssociations, ProfileAssociationModel{
 				Type:       types.StringValue(association.Type),
 				Value:      types.StringValue(associationValue),
-				ParentName: types.StringValue(""),
+				ParentName: types.StringNull(),
 			})
 
 		case "ApplicationResource":
