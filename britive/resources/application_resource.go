@@ -12,6 +12,8 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/planmodifiers"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -39,14 +41,18 @@ type ApplicationResource struct {
 }
 
 type ApplicationResourceModel struct {
-	ID                           types.String              `tfsdk:"id"`
-	ApplicationType              types.String              `tfsdk:"application_type"`
-	Version                      types.String              `tfsdk:"version"`
-	CatalogAppID                 types.Int64               `tfsdk:"catalog_app_id"`
-	EntityRootEnvironmentGroupID types.String              `tfsdk:"entity_root_environment_group_id"`
-	Properties                   []PropertyModel           `tfsdk:"properties"`
-	SensitiveProperties          []PropertyModel           `tfsdk:"sensitive_properties"`
-	UserAccountMappings          []UserAccountMappingModel `tfsdk:"user_account_mappings"`
+	ID                           types.String `tfsdk:"id"`
+	ApplicationType              types.String `tfsdk:"application_type"`
+	Version                      types.String `tfsdk:"version"`
+	CatalogAppID                 types.Int64  `tfsdk:"catalog_app_id"`
+	EntityRootEnvironmentGroupID types.String `tfsdk:"entity_root_environment_group_id"`
+	// Properties, SensitiveProperties, and UserAccountMappings are types.Set (rather than a plain
+	// Go slice) because the underlying blocks can arrive as unknown during ValidateResourceConfig
+	// (e.g. when built from a value that is only known after apply). A plain slice type cannot
+	// represent "unknown" and the framework will error attempting to convert it.
+	Properties          types.Set `tfsdk:"properties"`
+	SensitiveProperties types.Set `tfsdk:"sensitive_properties"`
+	UserAccountMappings types.Set `tfsdk:"user_account_mappings"`
 }
 
 type PropertyModel struct {
@@ -57,6 +63,50 @@ type PropertyModel struct {
 type UserAccountMappingModel struct {
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
+}
+
+func propertyElementType() attr.Type {
+	return types.ObjectType{AttrTypes: map[string]attr.Type{
+		"name":  types.StringType,
+		"value": types.StringType,
+	}}
+}
+
+func userAccountMappingElementType() attr.Type {
+	return types.ObjectType{AttrTypes: map[string]attr.Type{
+		"name":        types.StringType,
+		"description": types.StringType,
+	}}
+}
+
+// propertiesFromSet converts a types.Set of properties into a slice. A null or unknown set
+// yields an empty slice so callers can treat "not yet known" the same as "not set".
+func propertiesFromSet(ctx context.Context, set types.Set) ([]PropertyModel, diag.Diagnostics) {
+	var props []PropertyModel
+	if set.IsNull() || set.IsUnknown() {
+		return props, nil
+	}
+	diags := set.ElementsAs(ctx, &props, false)
+	return props, diags
+}
+
+func setFromProperties(ctx context.Context, props []PropertyModel) (types.Set, diag.Diagnostics) {
+	return types.SetValueFrom(ctx, propertyElementType(), props)
+}
+
+// userMappingsFromSet converts a types.Set of user account mappings into a slice. A null or
+// unknown set yields an empty slice.
+func userMappingsFromSet(ctx context.Context, set types.Set) ([]UserAccountMappingModel, diag.Diagnostics) {
+	var mappings []UserAccountMappingModel
+	if set.IsNull() || set.IsUnknown() {
+		return mappings, nil
+	}
+	diags := set.ElementsAs(ctx, &mappings, false)
+	return mappings, diags
+}
+
+func setFromUserMappings(ctx context.Context, mappings []UserAccountMappingModel) (types.Set, diag.Diagnostics) {
+	return types.SetValueFrom(ctx, userAccountMappingElementType(), mappings)
 }
 
 func (r *ApplicationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -166,10 +216,20 @@ func (r *ApplicationResource) ValidateConfig(ctx context.Context, req resource.V
 		return
 	}
 
-	// Validate that properties contains displayName
-	if len(data.Properties) > 0 {
+	properties, diags := propertiesFromSet(ctx, data.Properties)
+	resp.Diagnostics.Append(diags...)
+	userMappings, diags := userMappingsFromSet(ctx, data.UserAccountMappings)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Validate that properties contains displayName. If properties is not yet known (e.g. it is
+	// built from a value only available after apply), skip this check - it will be re-validated
+	// on a subsequent plan once the value is known.
+	if !data.Properties.IsUnknown() && len(properties) > 0 {
 		hasDisplayName := false
-		for _, prop := range data.Properties {
+		for _, prop := range properties {
 			if prop.Name.ValueString() == "displayName" {
 				hasDisplayName = true
 				break
@@ -186,7 +246,7 @@ func (r *ApplicationResource) ValidateConfig(ctx context.Context, req resource.V
 	}
 
 	// Validate user_account_mappings max 1
-	if len(data.UserAccountMappings) > 1 {
+	if !data.UserAccountMappings.IsUnknown() && len(userMappings) > 1 {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("user_account_mappings"),
 			"Too Many Mappings",
@@ -246,7 +306,7 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Get application name from displayName property
-	applicationName, err := r.getApplicationName(&plan)
+	applicationName, err := r.getApplicationName(ctx, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Getting Application Name",
@@ -297,7 +357,7 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Configure user account mappings
-	userMappings, err := r.buildUserMappings(&plan)
+	userMappings, err := r.buildUserMappings(ctx, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Building User Mappings",
@@ -430,7 +490,12 @@ func (r *ApplicationResource) Read(ctx context.Context, req resource.ReadRequest
 			Description: types.StringValue(description),
 		})
 	}
-	state.UserAccountMappings = mappings
+	mappingsSet, diags := setFromUserMappings(ctx, mappings)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.UserAccountMappings = mappingsSet
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -474,8 +539,25 @@ func (r *ApplicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	// Compare plan vs state to see whether properties/mappings actually changed
+	planProperties, diags := propertiesFromSet(ctx, plan.Properties)
+	resp.Diagnostics.Append(diags...)
+	planSensitiveProperties, diags := propertiesFromSet(ctx, plan.SensitiveProperties)
+	resp.Diagnostics.Append(diags...)
+	stateProperties, diags := propertiesFromSet(ctx, state.Properties)
+	resp.Diagnostics.Append(diags...)
+	stateSensitiveProperties, diags := propertiesFromSet(ctx, state.SensitiveProperties)
+	resp.Diagnostics.Append(diags...)
+	planMappings, diags := userMappingsFromSet(ctx, plan.UserAccountMappings)
+	resp.Diagnostics.Append(diags...)
+	stateMappings, diags := userMappingsFromSet(ctx, state.UserAccountMappings)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Update properties if changed
-	if !propertySliceEqual(plan.Properties, state.Properties) || !propertySliceEqual(plan.SensitiveProperties, state.SensitiveProperties) {
+	if !propertySliceEqual(planProperties, stateProperties) || !propertySliceEqual(planSensitiveProperties, stateSensitiveProperties) {
 		// Use plaintext sensitive values from config for the API call; plan retains hashes for state
 		planForAPI := plan
 		planForAPI.SensitiveProperties = config.SensitiveProperties
@@ -501,8 +583,8 @@ func (r *ApplicationResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	// Update user account mappings if changed
-	if !userMappingSliceEqual(plan.UserAccountMappings, state.UserAccountMappings) {
-		userMappings, err := r.buildUserMappings(&plan)
+	if !userMappingSliceEqual(planMappings, stateMappings) {
+		userMappings, err := r.buildUserMappings(ctx, &plan)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Building User Mappings",
@@ -656,7 +738,12 @@ func (r *ApplicationResource) ImportState(ctx context.Context, req resource.Impo
 		})
 	}
 	if len(mappings) > 0 {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_account_mappings"), mappings)...)
+		mappingsSet, diags := setFromUserMappings(ctx, mappings)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_account_mappings"), mappingsSet)...)
 	}
 }
 
@@ -706,8 +793,13 @@ func (r *ApplicationResource) getAppCatalogDetails(ctx context.Context, data *Ap
 		return nil, fmt.Errorf("application_type '%s' with version '%s' not supported by britive. Try versions: %v", appType, appVersion, allVersions)
 	}
 
-	// Validate properties
-	if len(data.Properties) > 0 {
+	// Validate properties. If not yet known, propertiesFromSet returns an empty slice and
+	// validation is simply skipped until the value is known.
+	properties, diags := propertiesFromSet(ctx, data.Properties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read properties: %s", diags.Errors()[0].Summary())
+	}
+	if len(properties) > 0 {
 		allowedProps := make(map[string]britive.SystemAppPropertyType)
 		for _, pt := range foundApp.PropertyTypes {
 			if pt.Type != "com.britive.pab.api.Secret" && pt.Type != "com.britive.pab.api.SecretFile" {
@@ -715,7 +807,7 @@ func (r *ApplicationResource) getAppCatalogDetails(ctx context.Context, data *Ap
 			}
 		}
 
-		for _, prop := range data.Properties {
+		for _, prop := range properties {
 			name := prop.Name.ValueString()
 			value := prop.Value.ValueString()
 
@@ -731,7 +823,11 @@ func (r *ApplicationResource) getAppCatalogDetails(ctx context.Context, data *Ap
 	}
 
 	// Validate sensitive properties
-	if len(data.SensitiveProperties) > 0 {
+	sensitiveProperties, diags := propertiesFromSet(ctx, data.SensitiveProperties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read sensitive properties: %s", diags.Errors()[0].Summary())
+	}
+	if len(sensitiveProperties) > 0 {
 		allowedSensitive := make(map[string]bool)
 		for _, pt := range foundApp.PropertyTypes {
 			if pt.Type == "com.britive.pab.api.Secret" || pt.Type == "com.britive.pab.api.SecretFile" {
@@ -739,7 +835,7 @@ func (r *ApplicationResource) getAppCatalogDetails(ctx context.Context, data *Ap
 			}
 		}
 
-		for _, prop := range data.SensitiveProperties {
+		for _, prop := range sensitiveProperties {
 			name := prop.Name.ValueString()
 			if !allowedSensitive[name] {
 				return nil, fmt.Errorf("sensitive property '%s' is not supported for application type '%s'", name, foundApp.Name)
@@ -750,12 +846,16 @@ func (r *ApplicationResource) getAppCatalogDetails(ctx context.Context, data *Ap
 	return foundApp, nil
 }
 
-func (r *ApplicationResource) getApplicationName(data *ApplicationResourceModel) (string, error) {
-	if len(data.Properties) == 0 {
+func (r *ApplicationResource) getApplicationName(ctx context.Context, data *ApplicationResourceModel) (string, error) {
+	properties, diags := propertiesFromSet(ctx, data.Properties)
+	if diags.HasError() {
+		return "", fmt.Errorf("failed to read properties: %s", diags.Errors()[0].Summary())
+	}
+	if len(properties) == 0 {
 		return "", fmt.Errorf("properties are required")
 	}
 
-	for _, prop := range data.Properties {
+	for _, prop := range properties {
 		if prop.Name.ValueString() == "displayName" {
 			return prop.Value.ValueString(), nil
 		}
@@ -773,8 +873,13 @@ func (r *ApplicationResource) buildPropertiesForAPI(ctx context.Context, plan *A
 		propertiesMap[property.Name] = fmt.Sprintf("%v", property.Type)
 	}
 
+	planProperties, diags := propertiesFromSet(ctx, plan.Properties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read properties: %s", diags.Errors()[0].Summary())
+	}
+
 	// Add regular properties
-	for _, prop := range plan.Properties {
+	for _, prop := range planProperties {
 		propertyName := prop.Name.ValueString()
 		propertyValue := prop.Value.ValueString()
 
@@ -801,10 +906,15 @@ func (r *ApplicationResource) buildPropertiesForAPI(ctx context.Context, plan *A
 		properties.PropertyTypes = append(properties.PropertyTypes, propertyType)
 	}
 
+	planSensitiveProperties, diags := propertiesFromSet(ctx, plan.SensitiveProperties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read sensitive properties: %s", diags.Errors()[0].Summary())
+	}
+
 	// Add sensitive properties
 	// Deduplicate sensitive properties by name
 	sensitivePropertiesMap := make(map[string]string)
-	for _, prop := range plan.SensitiveProperties {
+	for _, prop := range planSensitiveProperties {
 		propertyName := prop.Name.ValueString()
 		propertyValue := prop.Value.ValueString()
 
@@ -842,12 +952,21 @@ func (r *ApplicationResource) buildPropertiesForUpdate(ctx context.Context, plan
 		return nil, err
 	}
 
+	planProperties, diags := propertiesFromSet(ctx, plan.Properties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read properties: %s", diags.Errors()[0].Summary())
+	}
+	planSensitiveProperties, diags := propertiesFromSet(ctx, plan.SensitiveProperties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read sensitive properties: %s", diags.Errors()[0].Summary())
+	}
+
 	// Build map of current plan properties
 	newPropertyNames := make(map[string]bool)
-	for _, prop := range plan.Properties {
+	for _, prop := range planProperties {
 		newPropertyNames[prop.Name.ValueString()] = true
 	}
-	for _, prop := range plan.SensitiveProperties {
+	for _, prop := range planSensitiveProperties {
 		newPropertyNames[prop.Name.ValueString()] = true
 	}
 
@@ -864,8 +983,17 @@ func (r *ApplicationResource) buildPropertiesForUpdate(ctx context.Context, plan
 		}
 	}
 
+	stateProperties, diags := propertiesFromSet(ctx, state.Properties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read state properties: %s", diags.Errors()[0].Summary())
+	}
+	stateSensitiveProperties, diags := propertiesFromSet(ctx, state.SensitiveProperties)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read state sensitive properties: %s", diags.Errors()[0].Summary())
+	}
+
 	// Add removed properties back to their catalog default values
-	allOldProps := append(state.Properties, state.SensitiveProperties...)
+	allOldProps := append(stateProperties, stateSensitiveProperties...)
 	for _, prop := range allOldProps {
 		propName := prop.Name.ValueString()
 		if !newPropertyNames[propName] {
@@ -890,10 +1018,15 @@ func (r *ApplicationResource) buildPropertiesForUpdate(ctx context.Context, plan
 	return properties, nil
 }
 
-func (r *ApplicationResource) buildUserMappings(plan *ApplicationResourceModel) (*britive.UserMappings, error) {
+func (r *ApplicationResource) buildUserMappings(ctx context.Context, plan *ApplicationResourceModel) (*britive.UserMappings, error) {
 	userMappings := &britive.UserMappings{}
 
-	for _, mapping := range plan.UserAccountMappings {
+	mappings, diags := userMappingsFromSet(ctx, plan.UserAccountMappings)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to read user account mappings: %s", diags.Errors()[0].Summary())
+	}
+
+	for _, mapping := range mappings {
 		userMappings.UserAccountMappings = append(userMappings.UserAccountMappings, britive.UserMapping{
 			Name:        mapping.Name.ValueString(),
 			Description: mapping.Description.ValueString(),
@@ -931,14 +1064,22 @@ func (r *ApplicationResource) mapPropertiesFromAPI(ctx context.Context, state *A
 	}
 
 	// Build user property map from state
+	existingProperties, diags := propertiesFromSet(ctx, state.Properties)
+	if diags.HasError() {
+		return fmt.Errorf("failed to read properties: %s", diags.Errors()[0].Summary())
+	}
 	userProperties := make(map[string]interface{})
-	for _, prop := range state.Properties {
+	for _, prop := range existingProperties {
 		userProperties[prop.Name.ValueString()] = prop.Value.ValueString()
 	}
 
 	// Get existing sensitive properties from state
+	existingSensitivePropertiesList, diags := propertiesFromSet(ctx, state.SensitiveProperties)
+	if diags.HasError() {
+		return fmt.Errorf("failed to read sensitive properties: %s", diags.Errors()[0].Summary())
+	}
 	existingSensitiveProps := make(map[string]string)
-	for _, prop := range state.SensitiveProperties {
+	for _, prop := range existingSensitivePropertiesList {
 		existingSensitiveProps[prop.Name.ValueString()] = prop.Value.ValueString()
 	}
 
@@ -994,8 +1135,17 @@ func (r *ApplicationResource) mapPropertiesFromAPI(ctx context.Context, state *A
 		}
 	}
 
-	state.Properties = stateProperties
-	state.SensitiveProperties = stateSensitiveProperties
+	propertiesSet, diags := setFromProperties(ctx, stateProperties)
+	if diags.HasError() {
+		return fmt.Errorf("failed to build properties set: %s", diags.Errors()[0].Summary())
+	}
+	sensitivePropertiesSet, diags := setFromProperties(ctx, stateSensitiveProperties)
+	if diags.HasError() {
+		return fmt.Errorf("failed to build sensitive properties set: %s", diags.Errors()[0].Summary())
+	}
+
+	state.Properties = propertiesSet
+	state.SensitiveProperties = sensitivePropertiesSet
 
 	return nil
 }
