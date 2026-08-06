@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -337,7 +338,10 @@ func parseLabelID(id string) string {
 // ModifyPlan normalizes Optional+Computed fields and manages computed audit fields for
 // list values. TPF enforces strict plan-vs-actual consistency for Computed attributes in
 // ListNestedBlock (unlike SDKv2), so audit fields must be explicitly set to unknown when
-// the API will change them, and copied from state by name (not index) otherwise.
+// the API will change them, and copied from state by name otherwise. Values whose name
+// has no match in state (and vice versa) are paired up positionally among the leftovers,
+// so renaming a value's name is treated as a rename of that element rather than a
+// delete+create — this preserves value_id/created_by/created_on across the rename.
 func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return
@@ -378,8 +382,11 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 		}
 	}
 
-	// Build a name-keyed map of the prior state values.
+	// Build a name-keyed map of the prior state values, remembering each entry's index
+	// and name so unmatched entries can later be paired positionally (renames).
 	type stateValueEntry struct {
+		index       int
+		name        types.String
 		valueID     types.String
 		createdBy   types.Int64
 		updatedBy   types.Int64
@@ -394,9 +401,11 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		for _, sv := range state.Values {
+		for i, sv := range state.Values {
 			if !sv.Name.IsNull() && !sv.Name.IsUnknown() {
 				stateValueMap[sv.Name.ValueString()] = stateValueEntry{
+					index:       i,
+					name:        sv.Name,
 					valueID:     sv.ValueID,
 					createdBy:   sv.CreatedBy,
 					updatedBy:   sv.UpdatedBy,
@@ -406,6 +415,43 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 				}
 			}
 		}
+	}
+
+	// Correlate each planned value with a prior state value. Values are matched by name
+	// first (handles untouched values, and reordering). Any plan values left unmatched
+	// (their name isn't in state) are paired, in order, with any state values left
+	// unmatched (their name isn't referenced by the plan) — treating this as a rename of
+	// the same element instead of a delete+create, so its value_id/created_by/created_on
+	// survive the rename.
+	correlated := make([]*stateValueEntry, len(plan.Values))
+	consumedState := make(map[int]bool, len(state.Values))
+	var unmatchedPlanIdx []int
+	for i, pv := range plan.Values {
+		if pv.Name.IsNull() || pv.Name.IsUnknown() {
+			continue
+		}
+		if sv, ok := stateValueMap[pv.Name.ValueString()]; ok && !consumedState[sv.index] {
+			svCopy := sv
+			correlated[i] = &svCopy
+			consumedState[sv.index] = true
+		} else {
+			unmatchedPlanIdx = append(unmatchedPlanIdx, i)
+		}
+	}
+	var unmatchedState []stateValueEntry
+	for _, sv := range stateValueMap {
+		if !consumedState[sv.index] {
+			unmatchedState = append(unmatchedState, sv)
+		}
+	}
+	sort.Slice(unmatchedState, func(a, b int) bool { return unmatchedState[a].index < unmatchedState[b].index })
+	for n, i := range unmatchedPlanIdx {
+		if n >= len(unmatchedState) {
+			break
+		}
+		svCopy := unmatchedState[n]
+		correlated[i] = &svCopy
+		consumedState[svCopy.index] = true
 	}
 
 	// Detect whether any user-controlled attribute is changing.
@@ -425,9 +471,13 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 		case len(plan.Values) != len(state.Values):
 			isModification = true
 		default:
-			for _, pv := range plan.Values {
-				sv, ok := stateValueMap[pv.Name.ValueString()]
-				if !ok {
+			for i, pv := range plan.Values {
+				sv := correlated[i]
+				if sv == nil {
+					isModification = true
+					break
+				}
+				if pv.Name.ValueString() != sv.name.ValueString() {
 					isModification = true
 					break
 				}
@@ -447,9 +497,9 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 		if pv.Name.IsNull() || pv.Name.IsUnknown() {
 			continue
 		}
-		sv, inState := stateValueMap[pv.Name.ValueString()]
+		sv := correlated[i]
 
-		if !inState {
+		if sv == nil {
 			// New element: the API will set all these; plan them as unknown.
 			plan.Values[i].ValueID = types.StringUnknown()
 			plan.Values[i].CreatedBy = types.Int64Unknown()
@@ -487,11 +537,14 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 		modified = true
 	}
 
-	// Reorder plan.Values to match the prior state's order (by name). The API's underlying
-	// data is unordered (previously a Set under SDKv2), but ListNestedBlock is positional, so
-	// a config that lists the same values in a different order than state would otherwise
-	// surface a spurious "changed" diff at every index instead of no diff at all.
-	if len(state.Values) > 0 && len(plan.Values) > 0 {
+	// Reorder plan.Values to match the prior state's order, but ONLY when the config
+	// lists exactly the same set of names as state, just in a different sequence (a pure
+	// reorder). The API's underlying data is unordered, but ListNestedBlock is positional,
+	// so reordering unchanged values in config would otherwise surface a spurious
+	// "changed" diff at every index. If any name was added, removed, or renamed, the sets
+	// won't match and we leave plan.Values in config order — forcing state's order in
+	// that case would misrepresent the actual change and produce an invalid plan.
+	if len(state.Values) > 0 && len(plan.Values) == len(state.Values) {
 		planByName := make(map[string]int, len(plan.Values))
 		hasUnknownName := false
 		for i, pv := range plan.Values {
@@ -502,27 +555,23 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 			planByName[pv.Name.ValueString()] = i
 		}
 
-		if !hasUnknownName {
-			consumed := make(map[string]bool, len(plan.Values))
+		sameNameSet := !hasUnknownName
+		if sameNameSet {
+			for _, sv := range state.Values {
+				if _, ok := planByName[sv.Name.ValueString()]; !ok {
+					sameNameSet = false
+					break
+				}
+			}
+		}
+
+		if sameNameSet {
 			reordered := make([]ResourceLabelValueModel, 0, len(plan.Values))
 			for _, sv := range state.Values {
-				name := sv.Name.ValueString()
-				if idx, ok := planByName[name]; ok && !consumed[name] {
-					reordered = append(reordered, plan.Values[idx])
-					consumed[name] = true
-				}
+				reordered = append(reordered, plan.Values[planByName[sv.Name.ValueString()]])
 			}
-			for i, pv := range plan.Values {
-				name := pv.Name.ValueString()
-				if !consumed[name] {
-					reordered = append(reordered, plan.Values[i])
-					consumed[name] = true
-				}
-			}
-			if len(reordered) == len(plan.Values) {
-				plan.Values = reordered
-				modified = true
-			}
+			plan.Values = reordered
+			modified = true
 		}
 	}
 
