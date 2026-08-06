@@ -1,3 +1,14 @@
+## 3.0.0
+
+BREAKING CHANGES:
+* Provider migrated from Terraform Plugin SDK v2 to Terraform Plugin Framework (Protocol v6). This is a major internal rewrite with no changes to the HCL resource/data source schemas. Existing Terraform state is compatible; however, the provider binary now requires Terraform >= 1.0 and uses protocol version 6.
+
+ENHANCEMENTS:
+* All 28 resources and 10 data sources fully rewritten using the Terraform Plugin Framework for improved type safety, plan modifiers, and validator support.
+* `britive_resource_manager_profile_permission`: Added `prompt_at_checkout` argument to a permission's `variables`, so a variable's value can be supplied by the user at checkout time instead of being configured in Terraform.
+* `britive_resource_manager_resource_type_permission`: Added support for declaring a password-type permission variable by suffixing its name with `:password` in `variables` (e.g. `variables = ["test1", "test2:password"]`); `britive_resource_manager_profile_permission` then references it by its base name and exposes the resolved type via the variable's `type` attribute.
+* `britive_permission`: Added `permission_scopes` argument to restrict a permission to one or more application types (e.g. `AWS`, `Azure`, `GCP`). Only valid when `consumer` is `apps` and `resources` is `["*"]`.
+
 ## 2.3.6
 
 DEPRECATIONS:
