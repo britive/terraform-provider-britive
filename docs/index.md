@@ -6,6 +6,8 @@ The Britive provider is used to interact with the resources supported by Britive
 
 Use the navigation to the left to read about the available resources.
 
+!>Upgrading from a 2.x.x release to v3.0.0? This is a full rewrite of the provider. Back up your Terraform state before upgrading and review the [migration guide](guides/migration-guide.md) first.
+
 ## Migration Notes
 
 To reduce API calls during plan/apply, prefer ID-first configuration where supported:
