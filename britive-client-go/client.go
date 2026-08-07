@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -23,8 +24,20 @@ import (
 var (
 	syncOnce     sync.Once
 	client       *Client
-	retryWaitMin = 30 * time.Second  // minimum wait between retries
-	retryWaitMax = 600 * time.Second // maximum wait between retries
+	retryWaitMin = 10 * time.Second  // minimum wait between retries (used only when the server gives no Retry-After)
+	retryWaitMax = 480 * time.Second // maximum wait between retries (8 min)
+)
+
+const (
+	// retryAfterFloor is the sanity-only floor applied when the server sends Retry-After.
+	// Unlike retryWaitMin, it does not override a server-provided value that's genuinely short.
+	retryAfterFloor = 1 * time.Second
+	// retryAfterGrowth mildly escalates the server's own Retry-After value on repeated 429s
+	// (rather than the previous 2^attempt scaling, which could blow a 60s hint up to 10 minutes by the 5th retry).
+	retryAfterGrowth = 1.5
+	// backoffJitterFrac spreads out concurrent retries (e.g. many resources created via `count`)
+	// so they don't all wake up and collide again at the exact same instant.
+	backoffJitterFrac = 0.2
 )
 
 // Client - Britive API client
@@ -60,26 +73,47 @@ func NewClient(apiBaseURL, token, version string, maxRetries int) (*Client, erro
 				rawURL = resp.Request.URL.String()
 			}
 
-			// Retry-After present: scale exponentially — Retry-After * 2^attempt, clamped to [min, max].
+			var wait time.Duration
+			source := "exponential backoff"
+			effectiveMax := max
+
+			// Retry-After present: trust the server's own value, escalating mildly (x1.5 per
+			// repeated 429) rather than exponentially, so a volatile header doesn't get blown
+			// out of proportion. Only a 1s sanity floor applies here — not the generic
+			// retryWaitMin — since a short server-given value should be honored, not inflated.
+			// If the server's raw ask itself exceeds our configured ceiling, honor it outright
+			// on this attempt — the ceiling caps our own escalation, never the server's literal
+			// request.
 			if ra := resp.Header.Get("Retry-After"); ra != "" {
 				if secs, err := strconv.Atoi(ra); err == nil && secs > 0 {
-					scaled := time.Duration(float64(secs)*math.Pow(2, float64(attempt))) * time.Second
-					if scaled < min {
-						scaled = min
-					} else if scaled > max {
-						scaled = max
+					if rawWait := time.Duration(secs) * time.Second; rawWait > effectiveMax {
+						effectiveMax = rawWait
 					}
-					log.Printf("[WARN] britive: HTTP 429 on %s %s — attempt %d/%d, Retry-After header=%ss, retrying after %s (%ds * 2^%d)",
-						method, rawURL, attempt+1, maxRetries+1, ra, scaled, secs, attempt)
-					return scaled
+					scaled := float64(secs) * math.Pow(retryAfterGrowth, float64(attempt))
+					wait = time.Duration(scaled * float64(time.Second))
+					if wait < retryAfterFloor {
+						wait = retryAfterFloor
+					} else if wait > effectiveMax {
+						wait = effectiveMax
+					}
+					source = fmt.Sprintf("Retry-After=%ss * %.1f^%d", ra, retryAfterGrowth, attempt)
 				}
 			}
 
-			// Fall back to exponential backoff.
-			wait := retryablehttp.DefaultBackoff(min, max, attempt, resp)
-			log.Printf("[WARN] britive: HTTP 429 on %s %s — attempt %d/%d, retrying after %s (exponential backoff)",
-				method, rawURL, attempt+1, maxRetries+1, wait)
-			return wait
+			if wait == 0 {
+				wait = retryablehttp.DefaultBackoff(min, max, attempt, resp)
+			}
+
+			// Jitter avoids many concurrently-throttled requests (e.g. resources created via
+			// `count`) all waking up and colliding at the same instant again.
+			jittered := addJitter(wait, backoffJitterFrac)
+			if jittered > effectiveMax {
+				jittered = effectiveMax
+			}
+
+			log.Printf("[WARN] britive: HTTP 429 on %s %s — attempt %d/%d, retrying after %s (%s, jittered from %s)",
+				method, rawURL, attempt+1, maxRetries+1, jittered, source, wait)
+			return jittered
 		}
 		rc.HTTPClient = &http.Client{Timeout: 0}
 
@@ -103,6 +137,21 @@ func only429CheckRetry(_ context.Context, resp *http.Response, err error) (bool,
 		return true, nil
 	}
 	return false, nil
+}
+
+// addJitter randomizes d by +/- frac to keep concurrently-throttled requests from retrying
+// in lockstep. frac is a fraction of d (e.g. 0.2 == +/-20%).
+func addJitter(d time.Duration, frac float64) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	delta := float64(d) * frac
+	offset := (rand.Float64()*2 - 1) * delta // uniform in [-delta, +delta]
+	jittered := time.Duration(float64(d) + offset)
+	if jittered < 0 {
+		jittered = 0
+	}
+	return jittered
 }
 
 // QueryRequest - godoc
