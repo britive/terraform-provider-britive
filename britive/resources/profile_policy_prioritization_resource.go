@@ -90,15 +90,20 @@ func (r *ProfilePolicyPrioritizationResource) Schema(_ context.Context, _ resour
 }
 
 func (r *ProfilePolicyPrioritizationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ProfilePolicyPrioritizationResourceModel
+	// Only fetch the attribute this validation needs. Decoding the full config
+	// into ProfilePolicyPrioritizationResourceModel fails when policy_priority
+	// contains values that are not yet known at plan time (e.g. referencing
+	// attributes of other not-yet-applied resources), since []PolicyPriorityModel
+	// cannot represent an unknown value.
+	var policyPriorityEnabled types.Bool
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("policy_priority_enabled"), &policyPriorityEnabled)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Validate policy_priority_enabled must be true
-	if !data.PolicyPriorityEnabled.IsNull() && !data.PolicyPriorityEnabled.ValueBool() {
+	if !policyPriorityEnabled.IsNull() && !policyPriorityEnabled.IsUnknown() && !policyPriorityEnabled.ValueBool() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("policy_priority_enabled"),
 			"Invalid Configuration",

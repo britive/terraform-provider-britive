@@ -188,8 +188,13 @@ func (r *EntityEnvironmentResource) Create(ctx context.Context, req resource.Cre
 	}
 	log.Printf("[INFO] Updated application environment properties")
 
-	// Read back state (plan still has hashed sensitive values for correct state storage)
-	err = r.readAndMapState(applicationID, ae.EntityID, &plan)
+	// Populate remaining state from API, but trust the values we just submitted for
+	// properties/sensitive_properties (see readAndMapState) rather than round-tripping them
+	// through a GET — some properties are accepted by the API without being echoed back on
+	// read, and reconciling against that here would trip Terraform's post-apply consistency
+	// check. The next Read reconciles against the live API and surfaces any such drift as an
+	// ordinary plan diff instead of an apply-time error.
+	err = r.readAndMapState(applicationID, ae.EntityID, &plan, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Entity Environment", err.Error())
 		return
@@ -213,7 +218,7 @@ func (r *EntityEnvironmentResource) Read(ctx context.Context, req resource.ReadR
 
 	log.Printf("[INFO] Reading entity environment %s for application %s", entityID, applicationID)
 
-	err = r.readAndMapState(applicationID, entityID, &state)
+	err = r.readAndMapState(applicationID, entityID, &state, false)
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -278,8 +283,9 @@ func (r *EntityEnvironmentResource) Update(ctx context.Context, req resource.Upd
 	}
 	log.Printf("[INFO] Updated application entity environment properties")
 
-	// Read back state (plan still has hashed sensitive values for correct state storage)
-	err = r.readAndMapState(applicationID, entityID, &plan)
+	// Trust the values we just submitted for properties/sensitive_properties; see the
+	// comment in Create for why we don't round-trip them through a GET here.
+	err = r.readAndMapState(applicationID, entityID, &plan, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Entity Environment", err.Error())
 		return
@@ -491,7 +497,14 @@ func (r *EntityEnvironmentResource) mapPropertiesResourceToModel(plan *EntityEnv
 	return properties, nil
 }
 
-func (r *EntityEnvironmentResource) readAndMapState(applicationID, entityID string, state *EntityEnvironmentResourceModel) error {
+// readAndMapState refreshes entity/parent-group info from the API. When trustSubmittedValues is
+// true (Create/Update, called right after a successful patch), properties/sensitive_properties are
+// left as-is instead of being reconciled against a fresh GET: the API can accept a property without
+// echoing it back on read, and overwriting state with that GET's result here would make state
+// diverge from what was just planned, tripping Terraform's "produced inconsistent result after
+// apply" check. Leaving them untouched keeps this apply consistent; the next Read (trustSubmittedValues
+// = false) reconciles against the live API and surfaces any such drift as an ordinary plan diff.
+func (r *EntityEnvironmentResource) readAndMapState(applicationID, entityID string, state *EntityEnvironmentResourceModel, trustSubmittedValues bool) error {
 	state.ApplicationID = types.StringValue(applicationID)
 	state.EntityID = types.StringValue(entityID)
 
@@ -515,6 +528,10 @@ func (r *EntityEnvironmentResource) readAndMapState(applicationID, entityID stri
 
 	if !found {
 		return britive.ErrNotFound
+	}
+
+	if trustSubmittedValues {
+		return nil
 	}
 
 	// Get properties

@@ -90,13 +90,18 @@ func (r *RMProfilePolicyPrioritizationResource) Schema(_ context.Context, _ reso
 }
 
 func (r *RMProfilePolicyPrioritizationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data RMProfilePolicyPrioritizationModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	// Only fetch the attribute this validation needs. Decoding the full config
+	// into RMProfilePolicyPrioritizationModel fails when policy_priority contains
+	// values that are not yet known at plan time (e.g. referencing attributes of
+	// other not-yet-applied resources), since []RMPolicyPriorityModel cannot
+	// represent an unknown value.
+	var policyPriorityEnabled types.Bool
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("policy_priority_enabled"), &policyPriorityEnabled)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !data.PolicyPriorityEnabled.IsNull() && !data.PolicyPriorityEnabled.ValueBool() {
+	if !policyPriorityEnabled.IsNull() && !policyPriorityEnabled.IsUnknown() && !policyPriorityEnabled.ValueBool() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("policy_priority_enabled"),
 			"Invalid Configuration",

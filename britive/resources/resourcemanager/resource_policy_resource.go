@@ -356,7 +356,15 @@ func (r *ResourcePolicyResource) mapResourceToModel(ctx context.Context, plan *R
 		if diagsVals.HasError() {
 			return policy, fmt.Errorf("error parsing resource label values")
 		}
-		policy.ResourceLabels[label.LabelKey.ValueString()] = values
+		labelKey := label.LabelKey.ValueString()
+		// ResourceLabels is a map keyed by label_key, so two resource_labels blocks with the
+		// same label_key would silently collapse into one, sending only the last block's values
+		// to the API while Terraform's plan still expects both — causing an inconsistent-apply
+		// error. Fail with a clear message instead of dropping data silently.
+		if _, exists := policy.ResourceLabels[labelKey]; exists {
+			return policy, fmt.Errorf("duplicate resource_labels block for label_key %q: each label_key must appear in at most one resource_labels block, merge their values into a single block", labelKey)
+		}
+		policy.ResourceLabels[labelKey] = values
 	}
 
 	return policy, nil

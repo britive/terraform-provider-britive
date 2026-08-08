@@ -477,7 +477,15 @@ func (r *ProfileResource) mapResourceToModel(ctx context.Context, plan *ProfileR
 		if diagsVals.HasError() {
 			return profile, fmt.Errorf("error parsing association values")
 		}
-		profile.Associations[assoc.LabelKey.ValueString()] = values
+		labelKey := assoc.LabelKey.ValueString()
+		// Associations is a map keyed by label_key, so two associations blocks with the same
+		// label_key would silently collapse into one, sending only the last block's values to
+		// the API while Terraform's plan still expects both — causing an inconsistent-apply
+		// error. Fail with a clear message instead of dropping data silently.
+		if _, exists := profile.Associations[labelKey]; exists {
+			return profile, fmt.Errorf("duplicate associations block for label_key %q: each label_key must appear in at most one associations block, merge their values into a single block", labelKey)
+		}
+		profile.Associations[labelKey] = values
 	}
 
 	return profile, nil
