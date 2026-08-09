@@ -9,6 +9,9 @@ ENHANCEMENTS:
 * `britive_resource_manager_resource_type_permission`: Added support for declaring a password-type permission variable by suffixing its name with `:password` in `variables` (e.g. `variables = ["test1", "test2:password"]`); `britive_resource_manager_profile_permission` then references it by its base name and exposes the resolved type via the variable's `type` attribute.
 * `britive_permission`: Added `permission_scopes` argument to restrict a permission to one or more application types (e.g. `AWS`, `Azure`, `GCP`). Only valid when `consumer` is `apps` and `resources` is `["*"]`.
 
+BUG FIXES:
+* `britive_resource_manager_response_template`: Fixed `template_id` never being populated in state (it was declared in the schema but not set on read since v2.3.x); this will appear as a one-time value population on the first plan/refresh after upgrading.
+
 ## 2.3.6
 
 DEPRECATIONS:

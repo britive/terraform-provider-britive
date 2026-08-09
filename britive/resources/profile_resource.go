@@ -30,21 +30,21 @@ type ProfileResource struct {
 
 // ProfileResourceModel describes the resource data model.
 type ProfileResourceModel struct {
-	ID                             types.String            `tfsdk:"id"`
-	AppContainerID                 types.String            `tfsdk:"app_container_id"`
-	AppName                        types.String            `tfsdk:"app_name"`
-	Name                           types.String            `tfsdk:"name"`
-	Description                    types.String            `tfsdk:"description"`
-	Disabled                       types.Bool              `tfsdk:"disabled"`
-	Associations                   []ProfileAssociationModel `tfsdk:"associations"`
-	TagAssociations                []ProfileTagAssociationModel `tfsdk:"tag_associations"`
-	ExpirationDuration             validators.DurationStringValue `tfsdk:"expiration_duration"`
-	Extendable                     types.Bool                     `tfsdk:"extendable"`
-	NotificationPriorToExpiration  validators.DurationStringValue `tfsdk:"notification_prior_to_expiration"`
-	ExtensionDuration              validators.DurationStringValue `tfsdk:"extension_duration"`
-	ExtensionLimit                 types.Int64             `tfsdk:"extension_limit"`
-	DestinationURL                 types.String            `tfsdk:"destination_url"`
-	AllowImpersonation             types.Bool              `tfsdk:"allow_impersonation"`
+	ID                            types.String                   `tfsdk:"id"`
+	AppContainerID                types.String                   `tfsdk:"app_container_id"`
+	AppName                       types.String                   `tfsdk:"app_name"`
+	Name                          types.String                   `tfsdk:"name"`
+	Description                   types.String                   `tfsdk:"description"`
+	Disabled                      types.Bool                     `tfsdk:"disabled"`
+	Associations                  []ProfileAssociationModel      `tfsdk:"associations"`
+	TagAssociations               []ProfileTagAssociationModel   `tfsdk:"tag_associations"`
+	ExpirationDuration            validators.DurationStringValue `tfsdk:"expiration_duration"`
+	Extendable                    types.Bool                     `tfsdk:"extendable"`
+	NotificationPriorToExpiration validators.DurationStringValue `tfsdk:"notification_prior_to_expiration"`
+	ExtensionDuration             validators.DurationStringValue `tfsdk:"extension_duration"`
+	ExtensionLimit                types.Int64                    `tfsdk:"extension_limit"`
+	DestinationURL                types.String                   `tfsdk:"destination_url"`
+	AllowImpersonation            types.Bool                     `tfsdk:"allow_impersonation"`
 }
 
 type ProfileAssociationModel struct {
@@ -296,19 +296,19 @@ func (r *ProfileResource) UpgradeState(_ context.Context) map[int64]resource.Sta
 	// needed — the Framework uses it only for type-safe unmarshaling).
 	priorSchema := schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"id":                              schema.StringAttribute{Computed: true},
-			"app_container_id":                schema.StringAttribute{Required: true},
-			"app_name":                        schema.StringAttribute{Optional: true, Computed: true},
-			"name":                            schema.StringAttribute{Required: true},
-			"description":                     schema.StringAttribute{Optional: true},
-			"disabled":                        schema.BoolAttribute{Optional: true, Computed: true},
-			"expiration_duration":             schema.StringAttribute{Required: true, CustomType: validators.DurationStringType{}},
-			"extendable":                      schema.BoolAttribute{Optional: true, Computed: true},
+			"id":                               schema.StringAttribute{Computed: true},
+			"app_container_id":                 schema.StringAttribute{Required: true},
+			"app_name":                         schema.StringAttribute{Optional: true, Computed: true},
+			"name":                             schema.StringAttribute{Required: true},
+			"description":                      schema.StringAttribute{Optional: true},
+			"disabled":                         schema.BoolAttribute{Optional: true, Computed: true},
+			"expiration_duration":              schema.StringAttribute{Required: true, CustomType: validators.DurationStringType{}},
+			"extendable":                       schema.BoolAttribute{Optional: true, Computed: true},
 			"notification_prior_to_expiration": schema.StringAttribute{Optional: true, CustomType: validators.DurationStringType{}},
-			"extension_duration":              schema.StringAttribute{Optional: true, CustomType: validators.DurationStringType{}},
-			"extension_limit":                 schema.Int64Attribute{Optional: true},
-			"destination_url":                 schema.StringAttribute{Optional: true},
-			"allow_impersonation":             schema.BoolAttribute{Optional: true, Computed: true},
+			"extension_duration":               schema.StringAttribute{Optional: true, CustomType: validators.DurationStringType{}},
+			"extension_limit":                  schema.Int64Attribute{Optional: true},
+			"destination_url":                  schema.StringAttribute{Optional: true},
+			"allow_impersonation":              schema.BoolAttribute{Optional: true, Computed: true},
 		},
 		Blocks: map[string]schema.Block{
 			"associations": schema.SetNestedBlock{
@@ -344,6 +344,17 @@ func (r *ProfileResource) UpgradeState(_ context.Context) map[int64]resource.Sta
 				}
 				if !priorState.DestinationURL.IsNull() && priorState.DestinationURL.ValueString() == "" {
 					priorState.DestinationURL = types.StringNull()
+				}
+				// v0 (SDKv2) never populated parent_name for Environment/EnvironmentGroup
+				// associations, storing "" in the flatmap for that sub-field. Read always
+				// emits null for it going forward, so leaving "" here would make this Set
+				// element hash differently from what a fresh Read produces, showing a
+				// spurious remove+add of every such association on the first refresh.
+				for i := range priorState.Associations {
+					assoc := &priorState.Associations[i]
+					if !assoc.ParentName.IsNull() && assoc.ParentName.ValueString() == "" {
+						assoc.ParentName = types.StringNull()
+					}
 				}
 				resp.Diagnostics.Append(resp.State.Set(ctx, &priorState)...)
 			},
