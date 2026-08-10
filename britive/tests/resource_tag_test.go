@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveTag(t *testing.T) {
@@ -14,8 +14,8 @@ func TestBritiveTag(t *testing.T) {
 	description := "AT - New Britive Tag Test Description"
 	identityProviderName := "Britive"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:  func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveTagConfig(name, description, identityProviderName),
@@ -35,8 +35,8 @@ func TestBritiveTagRequestable(t *testing.T) {
 	description := "AT - New Britive Tag Requestable Test Description"
 	identityProviderName := "Britive"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				// Create tag with requestable explicitly set to true
@@ -55,8 +55,8 @@ func TestBritiveTagWithAttributes(t *testing.T) {
 	description := "AT - New Britive Tag Attributes Test Description"
 	identityProviderName := "Britive"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				// Step 1: create with requestable=true and three attributes (one multi-valued)

@@ -71,7 +71,7 @@ The following arguments are supported:
 * `checkout_time_limit` - (Optional) The check-out time limit in minutes. Default is `60`.
 * `is_draft` - (Optional) Indicates if the permission is a draft. Default is `false`.
 * `show_orig_creds` - (Optional) Indicates if original credentials should be shown. Default is `false`.
-* `variables` - (Optional) List of variables.
+* `variables` - (Optional) List of variables. To declare a variable as a password type, suffix its name with `:password` (e.g. `["test1", "test2:password"]`). Variables without a `:password` suffix default to the `String` type.
 * `checkin_code_file` - (Optional) The file path for check-in code. Conflicts with `checkin_code`, `checkout_code`, and `code_language`.
 * `checkout_code_file` - (Optional) The file path for check-out code. Conflicts with `checkin_code`, `checkout_code`, and `code_language`.
 * `checkin_code` - (Optional) The inline check-in code. Conflicts with `checkin_code_file` and `checkout_code_file`.

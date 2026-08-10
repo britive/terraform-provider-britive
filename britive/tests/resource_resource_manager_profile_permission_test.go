@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveResourceManagerProfilePermission(t *testing.T) {
@@ -21,8 +21,8 @@ func TestBritiveResourceManagerProfilePermission(t *testing.T) {
 	resourceManagerProfileName := "AT-Britive_Resource_Manager_Test_Resource_Profile_Name_1"
 	resourceManagerProfileDescription := "AT-Britive_Resource_Manager_Test_Resource_Profile_1_Description"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription),
@@ -33,7 +33,29 @@ func TestBritiveResourceManagerProfilePermission(t *testing.T) {
 					testAccCheckBritiveResourceManagerProfilePermissionExists("britive_resource_manager_response_template.response_template"),
 					testAccCheckBritiveResourceManagerProfilePermissionExists("britive_resource_manager_resource_type_permission.type_permission_1"),
 					testAccCheckBritiveResourceManagerProfilePermissionExists("britive_resource_manager_profile.profile_1"),
+					resource.TestCheckTypeSetElemNestedAttrs("britive_resource_manager_profile_permission.profile_permission_1", "variables.*", map[string]string{
+						"name":               "test1",
+						"value":              "t1",
+						"is_system_defined":  "false",
+						"prompt_at_checkout": "false",
+						"type":               "String",
+					}),
+					resource.TestCheckTypeSetElemNestedAttrs("britive_resource_manager_profile_permission.profile_permission_1", "variables.*", map[string]string{
+						"name":               "test2",
+						"is_system_defined":  "false",
+						"regex_pattern":      "^[a-z]{3}$",
+						"description":        "test regex pattern",
+						"prompt_at_checkout": "true",
+						"type":               "password",
+					}),
 				),
+			},
+			// Re-plan with the same, unchanged config: this must produce an
+			// empty plan, confirming prompt_at_checkout's config-driven
+			// default (false when test1 omits it) is stable across plans.
+			{
+				Config:   testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription),
+				PlanOnly: true,
 			},
 		},
 	})
@@ -53,8 +75,10 @@ func testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName,
 		}
 		variables {
 			name = "test2"
-			value = "t3"
 			is_system_defined = false
+			regex_pattern = "^[a-z]{3}$"
+			description = "test regex pattern"
+			prompt_at_checkout = true
 		}
 	}
 
@@ -93,7 +117,7 @@ func testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName,
 		checkout_time_limit = 360
 		is_draft            = false
 		show_orig_creds     = true
-		variables           = ["test1", "test2"]
+		variables           = ["test1", "test2:password"]
 		code_language = "PyThon"
 		checkin_code  = <<EOT
 			#!/bin/bash
@@ -109,13 +133,17 @@ func testAccCheckBritiveResourceManagerProfilePermissionConfig(resourceTypeName,
 	}
 
 	resource "britive_resource_manager_profile" "profile_1" {
-		name = "%s"
-		description = "%s"
-		expiration_duration = 10800000
+		name                             = "%s"
+		description                      = "%s"
+		expiration_duration              = 10800000
+		extendable                       = true
+		notification_prior_to_expiration = "1h0m0s"
+		extension_duration               = "2h0m0s"
+		extension_limit                  = 2
 
 		associations {
 			label_key = "Resource-Type"
-			values = [britive_resource_manager_resource_type.resource_type_1.name]
+			values    = [britive_resource_manager_resource_type.resource_type_1.name]
 		}
 	}
 	`, resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription)

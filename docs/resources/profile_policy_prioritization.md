@@ -31,6 +31,7 @@ resource "britive_profile_policy_prioritization" "new_priority" {
 The following arguments are supported:
 
 * `profile_id` - (Required) The identity of britive application profile.
+* `policy_priority_enabled` - (Optional) Enable policy ordering. Must be `true`. Default: `true`.
 * `policy_priority` - (Optional) The policy priority
     * `id` - (Required) The identity of britive profile policy.
     * `priority` - (Required) The priority order (integer), where 0 is the highest priority.

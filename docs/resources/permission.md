@@ -27,6 +27,29 @@ resource "britive_permission" "new" {
 }
 ```
 
+### Example Usage with `permission_scopes`
+
+`permission_scopes` can only be configured when `consumer` is `apps` (Application) and `resources` is `["*"]`. Each value is an application type (e.g. `AWS`, `Azure`, `GCP`) that the permission is scoped to.
+
+```hcl
+resource "britive_permission" "new_with_scopes" {
+    name        = "My Application Permission"
+    description = "View permission description"
+    consumer    = "apps"
+    resources   = [
+        "*",
+    ]
+    actions     = [
+        "apps.app.list",
+        "apps.app.view",
+    ]
+    permission_scopes = [
+        "AWS",
+        "Azure",
+    ]
+}
+```
+
 ## Argument Reference
 
 The following arguments are supported:
@@ -40,6 +63,8 @@ The following arguments are supported:
 * `resources` - (Required) A resource in the definition of the corresponding consumer, or '*' (meaning any).
 
 * `actions` - (Required) A set of pre-defined actions for each consumer.
+
+* `permission_scopes` - (Optional) A set of application types (e.g. `AWS`, `Azure`, `GCP`) to restrict the permission to. Can only be set when `consumer` is `apps` (Application) and `resources` is `["*"]`. Configuring it with any other `consumer`/`resources` combination is rejected by the Britive API with an error; the provider does not perform this validation itself.
 
 ## Attribute Reference
 

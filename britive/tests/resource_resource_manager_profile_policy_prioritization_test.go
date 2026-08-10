@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestBritiveResourceManagerProfilePolicyPrioritization(t *testing.T) {
@@ -24,8 +24,8 @@ func TestBritiveResourceManagerProfilePolicyPrioritization(t *testing.T) {
 	profilePolicyDescription2 := "AT - New Britive Resource Manager Profile Policy for Prioritization Test 2 Description"
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceManagerProfilePolicyPrioritizationConfig(
@@ -86,18 +86,22 @@ resource "britive_resource_manager_resource_label" "resource_label_1" {
 	}
 
 	resource "britive_resource_manager_profile" "resource_profile_1" {
-		name                 = "%s"
-		description          = "%s"
-		expiration_duration  = 10800000
-		allow_impersonation  = true
+		name                             = "%s"
+		description                      = "%s"
+		expiration_duration              = 10800000
+		extendable                       = true
+		notification_prior_to_expiration = "1h0m0s"
+		extension_duration               = "2h0m0s"
+		extension_limit                  = 2
+		allow_impersonation              = true
 
 		associations {
-			label_key   = britive_resource_manager_resource_label.resource_label_1.name
-			values = ["Production", "Development"]
+			label_key = britive_resource_manager_resource_label.resource_label_1.name
+			values    = ["Production", "Development"]
 		}
 		associations {
-			label_key   = britive_resource_manager_resource_label.resource_label_2.name
-			values = ["us-east-1", "eu-west-1"]
+			label_key = britive_resource_manager_resource_label.resource_label_2.name
+			values    = ["us-east-1", "eu-west-1"]
 		}
 	}
 
@@ -118,7 +122,7 @@ resource "britive_resource_manager_resource_label" "resource_label_1" {
 			}
 		)
 		access_type  = "Allow"
-		consumer     = "resourceprofile"   
+		consumer     = "resourceprofile"
 		is_active    = true
 		is_draft     = false
 		is_read_only = false
@@ -144,7 +148,7 @@ resource "britive_resource_manager_resource_label" "resource_label_1" {
 			}
 		)
 		access_type  = "Allow"
-		consumer     = "resourceprofile"   
+		consumer     = "resourceprofile"
 		is_active    = true
 		is_draft     = false
 		is_read_only = false
@@ -170,7 +174,7 @@ resource "britive_resource_manager_resource_label" "resource_label_1" {
 			}
 		)
 		access_type  = "Allow"
-		consumer     = "resourceprofile"   
+		consumer     = "resourceprofile"
 		is_active    = true
 		is_draft     = false
 		is_read_only = false
