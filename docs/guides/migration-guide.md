@@ -27,6 +27,7 @@ This guide explains:
 - The risks involved, since this is a **full internal rewrite**, not an incremental change.
 - How to **back up your Terraform state** before upgrading.
 - What to expect on your **first plan and refresh** after upgrading.
+- A few **additional one-time diff patterns** on specific resources, and how to tell whether one is safe to apply.
 - How to **roll back to provider v2.3.x** if you run into problems after upgrading.
 
 
@@ -160,6 +161,91 @@ functions, not drift in your tenant. Typical entries:
 Accepting these into state (for example via `terraform apply -refresh-only`, or as part of a normal apply) is
 safe and expected. If you see changes that do not fit these patterns — in particular value changes on
 attributes you configured, or destroy/recreate actions — stop and investigate before applying.
+
+
+
+## More one-time diffs you may see on specific resources
+
+
+
+The previous section covers the general categories of one-time state normalization. A small number of
+resources can additionally show an `update in-place` action on your first plan after upgrading, because of two
+mechanics in the provider's use of the Plugin Framework:
+
+
+
+- **Computed (read-only) attributes on resources where some other attribute is genuinely changing.** IDs,
+  version strings, derived hashes, derived file names, and derived maps are recalculated by the provider after
+  every apply. When an unrelated attribute on the same resource triggers an update, these can show as
+  `(known after apply)` even though their value will not actually change.
+- **A handful of blocks that model a single nested object using Set semantics.** Terraform correlates Set
+  elements by hashing the whole object; if that object contains a Computed field, Terraform can show the whole
+  block as removed-and-re-added even when every value in it is identical on both sides.
+
+
+
+You may see this on:
+
+
+
+| Resource | Attribute(s) | What you'll see |
+| --- | --- | --- |
+| `britive_advanced_settings` | `justification_settings` (also possible on `itsm`, `im`) | The block shown as removed then re-added; `justification_id` may render as `(known after apply)` or as the same value on both sides |
+| `britive_resource_manager_profile` | `resource_label_color_map` | `(known after apply)` |
+| `britive_resource_manager_profile` | `extension_duration`, `extension_limit`, `notification_prior_to_expiration` | `"" -> null` / `0 -> null` |
+| `britive_resource_manager_resource_type_permission` | `permission_id`, `version`, `inline_file_exists`, `checkin_file_name`, `checkout_file_name` | `(known after apply)` |
+| `britive_resource_manager_resource_type_permission` | `checkin_code_file_hash`, `checkout_code_file_hash` | A previously-stored hash changing to `null` when no check-in/check-out file is configured |
+| `britive_resource_manager_resource_type_permission` | `variables` | `[] -> null` |
+
+
+
+You may also see `britive_resource_manager_resource_type` and `britive_resource_manager_response_template`
+proposed for an in-place update with **no individual attribute shown as different** — everything in the plan
+output listed as unchanged. We have not yet isolated the specific field driving this; treat it with the same
+review process below, and confirm the *following* `terraform plan` reports no changes.
+
+
+
+Like the diffs in the previous section, these are one-time: once applied, state is corrected and the same diff
+should not reappear on later plans for that resource.
+
+
+
+### Is it safe to just apply these?
+
+
+
+**Yes, for the specific patterns above** — with one condition. Every attribute in the table falls into one of
+two groups:
+
+
+
+- **Truly read-only:** `justification_id`, `itsm_id`, `im_id`, `resource_label_color_map`, `permission_id`,
+  `version`, `inline_file_exists`, `checkin_file_name`, `checkout_file_name`, `checkin_code_file_hash`, and
+  `checkout_code_file_hash` are declared `Computed` with no `Optional` counterpart — Terraform's own schema
+  does not let you set these in `.tf` config at all, so their value is always provider-derived.
+- **Optional fields shown as unconfigured:** `extension_duration`, `extension_limit`,
+  `notification_prior_to_expiration`, and `variables` genuinely are settable by you. The `"" -> null` /
+  `0 -> null` / `[] -> null` diff is safe *specifically because these examples show them unconfigured* —
+  nothing you set is being altered. If you have actually set one of these four to a real value and see it
+  change, that is a different situation and needs review; it does not belong in this safe category.
+
+
+
+In both groups, when the diff matches what's described above, nothing in your `.tf` configuration is changing,
+and apply sends the same values to the API as before — it is not asking the API to change any real setting.
+
+
+
+**The condition:** before applying, check that the *rest* of the plan is unchanged. If you see a value change
+on something you actually configured — a name, a description, a duration you set, an association, a
+permission list — or a destroy/recreate action, that is a real change and needs review; do not assume it
+falls into this category just because it appears alongside one of the patterns above.
+
+
+
+For extra certainty: apply, then immediately run `terraform plan` again. It should report "No changes." If it
+doesn't, stop and reach out to the Britive team with the plan output rather than continuing to apply.
 
 
 
