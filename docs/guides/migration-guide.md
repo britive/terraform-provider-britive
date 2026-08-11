@@ -14,7 +14,7 @@ description: |-
 Starting with **v3.0.0**, the Britive Terraform provider has been rewritten from the ground up on
 [HashiCorp's Terraform Plugin Framework](https://developer.hashicorp.com/terraform/plugin/framework) (protocol
 version 6), replacing the legacy [Terraform Plugin SDKv2](https://developer.hashicorp.com/terraform/plugin/sdkv2)
-implementation used in v2.x releases (up to and including **v2.3.x**).
+implementation used in v2.x releases (up to and including **v2.3.6**).
 
 
 
@@ -188,14 +188,27 @@ You may see this on:
 
 
 
-| Resource | Attribute(s) | What you'll see |
-| --- | --- | --- |
-| `britive_advanced_settings` | `justification_settings` (also possible on `itsm`, `im`) | The block shown as removed then re-added; `justification_id` may render as `(known after apply)` or as the same value on both sides |
-| `britive_resource_manager_profile` | `resource_label_color_map` | `(known after apply)` |
-| `britive_resource_manager_profile` | `extension_duration`, `extension_limit`, `notification_prior_to_expiration` | `"" -> null` / `0 -> null` |
-| `britive_resource_manager_resource_type_permission` | `permission_id`, `version`, `inline_file_exists`, `checkin_file_name`, `checkout_file_name` | `(known after apply)` |
-| `britive_resource_manager_resource_type_permission` | `checkin_code_file_hash`, `checkout_code_file_hash` | A previously-stored hash changing to `null` when no check-in/check-out file is configured |
-| `britive_resource_manager_resource_type_permission` | `variables` | `[] -> null` |
+**`britive_advanced_settings`**
+
+- `justification_settings` — block shown as removed then re-added; `justification_id` may render as
+  `(known after apply)` or as the same value on both sides.
+- `itsm` (if configured) — the same pattern is possible here too.
+- `im` (if configured) — the same pattern is possible here too.
+
+**`britive_resource_manager_profile`**
+
+- `resource_label_color_map` — `(known after apply)`.
+- `extension_duration` — `"" -> null`.
+- `extension_limit` — `0 -> null`.
+- `notification_prior_to_expiration` — `"" -> null`.
+
+**`britive_resource_manager_resource_type_permission`**
+
+- `permission_id`, `version`, `inline_file_exists`, `checkin_file_name`, `checkout_file_name` — each may show
+  `(known after apply)`.
+- `checkin_code_file_hash` — a previously-stored hash changing to `null` when no check-in file is configured.
+- `checkout_code_file_hash` — a previously-stored hash changing to `null` when no check-out file is configured.
+- `variables` — `[] -> null`.
 
 
 
@@ -215,7 +228,7 @@ should not reappear on later plans for that resource.
 
 
 
-**Yes, for the specific patterns above** — with one condition. Every attribute in the table falls into one of
+**Yes, for the specific patterns above** — with one condition. Every attribute listed above falls into one of
 two groups:
 
 
