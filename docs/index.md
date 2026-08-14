@@ -70,7 +70,10 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
 
 * `tenant` - (Optional) This is the Britive Tenant URL, for example `https://company.britive.com`. It must be provided, but it can also be sourced from the `BRITIVE_TENANT` environment variable.  
 
-* `token` - (Optional) This is the API Token to interact with your Britive API. It must be provided, but it can also be sourced from the `BRITIVE_TOKEN` environment variable.
+* `token` - (Optional) This is the API Token to interact with your Britive API. It must be provided, but it can also be sourced from the `BRITIVE_TOKEN` environment variable. The provider auto-discovers the token's auth scheme from its shape:
+  * a legacy API token (fewer than 50 characters) is sent as `TOKEN <token>`
+  * a workload identity token, formatted as `OIDC::<ID token>` or `AWS::<ID token>`, is sent as-is
+  * any other token is treated as a JWT and sent as `Bearer <token>`
 
 * `config_path` - (Optional) This is the file path for Britive provider configuration. The default configuration path is `~/.britive/tf.config`. It can also be sourced from the `BRITIVE_CONFIG` environment variable.
 

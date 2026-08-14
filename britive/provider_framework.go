@@ -55,7 +55,9 @@ func (p *BritiveProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 			"token": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "This is the API Token to interact with your Britive API. Can also be set with the BRITIVE_TOKEN environment variable.",
+				Description: "This is the API Token to interact with your Britive API. Can also be set with the BRITIVE_TOKEN environment variable. " +
+					"The token's auth scheme is auto-discovered: a legacy API token (< 50 characters) is sent as `TOKEN <token>`, " +
+					"a workload identity token (e.g. `OIDC::<id token>` or `AWS::<id token>`) is sent as-is, and any other token is sent as a `Bearer <token>` JWT.",
 			},
 			"config_path": schema.StringAttribute{
 				Optional:    true,
