@@ -142,7 +142,7 @@ func (c *Client) AddRemoveIcon(resourceTypeID string, uploadFilePath string) err
 		return err
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
+	req.Header.Set("Authorization", authorizationHeaderValue(c.Token))
 	req.Header.Set("Content-Type", "text/xml")
 	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
 	req.Header.Add("User-Agent", userAgent)
