@@ -1,3 +1,8 @@
+## 3.0.1
+
+BUG FIXES:
+* `britive_profile`, `britive_tag_owner`, `britive_resource_manager_resource_type_permission`, `britive_resource_manager_profile_permission`, `britive_resource_manager_resource_label`: Fixed a "Value Conversion Error" (`Received unknown value, however the target type cannot handle unknown values`) that could crash `terraform validate`/`terraform plan`/`terraform apply` when a Set/List-typed block or argument (`associations`, `tag_associations`, `user`, `tag`, `response_templates`, `variables`, `values`) was driven by a `for_each`/`count` `dynamic` block referencing `each.value`/`count.index`, or by an attribute of another resource that is only known after apply.
+
 ## 3.0.0
 
 BREAKING CHANGES:

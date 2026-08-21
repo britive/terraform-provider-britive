@@ -190,10 +190,6 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						"parent_name": schema.StringAttribute{
 							Description: "The parent name of the resource. Required only if the association type is ApplicationResource",
 							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 					},
 				},
@@ -241,6 +237,16 @@ func (r *ProfileResource) Configure(_ context.Context, req resource.ConfigureReq
 
 // ValidateConfig validates the resource configuration.
 func (r *ProfileResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Resources using for_each/count with a dynamic "associations" block driven by
+	// each.value/count.index are validated once, pre-expansion, with those references
+	// left unknown. A Set containing any unknown element collapses to a wholly unknown
+	// value, which the []ProfileAssociationModel field can't represent. These checks are
+	// best-effort and already deferred to apply time for individually unknown fields, so
+	// skip entirely rather than fail the whole config when it isn't fully known yet.
+	if !req.Config.Raw.IsFullyKnown() {
+		return
+	}
+
 	var data ProfileResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -370,15 +376,19 @@ func (r *ProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	var plan ProfileResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	// Read only the attribute this logic needs. Decoding the full plan into
+	// ProfileResourceModel fails when associations/tag_associations are wholly
+	// unknown (e.g. built from a not-yet-applied resource's output), since
+	// []ProfileAssociationModel/[]ProfileTagAssociationModel can't represent an
+	// unknown collection value.
+	var extendable types.Bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("extendable"), &extendable)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !plan.Extendable.IsUnknown() && !plan.Extendable.ValueBool() {
-		plan.ExtensionLimit = types.Int64Null()
-		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	if !extendable.IsUnknown() && !extendable.ValueBool() {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("extension_limit"), types.Int64Null())...)
 	}
 }
 

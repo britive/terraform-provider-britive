@@ -235,6 +235,15 @@ func (r *ResourceTypePermissionsResource) Configure(_ context.Context, req resou
 
 // ValidateConfig validates the resource configuration.
 func (r *ResourceTypePermissionsResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Resources using for_each/count with response_templates/variables driven by
+	// each.value/count.index are validated once, pre-expansion, with those references
+	// left unknown. A List/Set containing any unknown element collapses to a wholly
+	// unknown value, which the []types.String fields can't represent, so skip validation
+	// entirely rather than fail the whole config when it isn't fully known yet.
+	if !req.Config.Raw.IsFullyKnown() {
+		return
+	}
+
 	var data ResourceTypePermissionsResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -285,6 +294,20 @@ func (r *ResourceTypePermissionsResource) ModifyPlan(ctx context.Context, req re
 	// Only compute hashes during planning
 	if req.Plan.Raw.IsNull() {
 		// Resource is being destroyed
+		return
+	}
+
+	// response_templates/variables can be wholly unknown (e.g. built from a
+	// not-yet-applied resource's output), which the plain []types.String fields
+	// on the model can't represent. This logic never uses either field, so skip
+	// entirely rather than crash decoding the full plan.
+	var responseTemplates, variables types.Set
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("response_templates"), &responseTemplates)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("variables"), &variables)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if responseTemplates.IsUnknown() || variables.IsUnknown() {
 		return
 	}
 

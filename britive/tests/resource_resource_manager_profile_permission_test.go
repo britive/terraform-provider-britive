@@ -164,3 +164,120 @@ func testAccCheckBritiveResourceManagerProfilePermissionExists(n string) resourc
 		return nil
 	}
 }
+
+// TestBritiveResourceManagerProfilePermissionUnknownVariables is a regression test: the
+// "variables" dynamic block is gated by
+// britive_resource_manager_resource_type.resource_type_1.id, an attribute only known
+// after apply for a newly created resource type. This keeps the variables Set unknown
+// all the way through PlanResourceChange, which previously crashed ModifyPlan's
+// req.Plan.Get into []PermissionVariableModel.
+func TestBritiveResourceManagerProfilePermissionUnknownVariables(t *testing.T) {
+	resourceTypeName := "AT-Britive_Resource_Manager_Test_Resource_Type_Name_Unknown"
+	resourceTypeDescription := "AT-Britive_Resource_Manager_Test_Resource_Type_Unknown_Description"
+	resourceResourceName := "AT-Britive_Resource_Manager_Test_Resource_Name_Unknown"
+	resourceResourceDescription := "AT-Britive_Resource_Manager_Test_Resource_Unknown_Description"
+	responseTemplateName := "AT-Britive_Resource_Manager_Test_Response_Template_Name_Unknown"
+	responseTemplateDescription := "AT-Britive_Resource_Manager_Test_Response_Template_Unknown_Description"
+	resourceTypePermissionName := "AT-Britive_Resource_Manager_Test_Resource_Type_Permission_Name_Unknown"
+	resourceTypePermissionDescription := "AT-Britive_Resource_Manager_Test_Resource_Type_Permission_Unknown_Description"
+	resourceManagerProfileName := "AT-Britive_Resource_Manager_Test_Resource_Profile_Name_Unknown"
+	resourceManagerProfileDescription := "AT-Britive_Resource_Manager_Test_Resource_Profile_Unknown_Description"
+	resourceName := "britive_resource_manager_profile_permission.unknown_vars"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveResourceManagerProfilePermissionUnknownVariablesConfig(resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveResourceManagerProfilePermissionExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName, "variables.#", "1"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveResourceManagerProfilePermissionUnknownVariablesConfig(resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_profile_permission" "unknown_vars" {
+		profile_id = britive_resource_manager_profile.profile_1.id
+		name       = britive_resource_manager_resource_type_permission.type_permission_1.name
+		version    = "LoCaL"
+
+		dynamic "variables" {
+			for_each = britive_resource_manager_resource_type.resource_type_1.id == "" ? [] : [{ name = "test1" }]
+			content {
+				name              = variables.value.name
+				is_system_defined = false
+			}
+		}
+	}
+
+	resource "britive_resource_manager_resource_type" "resource_type_1" {
+		name        = "%s"
+		description = "%s"
+		parameters {
+			param_name   = "testfield5"
+			param_type   = "StrinG"
+			is_mandatory = true
+		}
+	}
+
+	resource "britive_resource_manager_resource" "resource_1" {
+		name = "%s"
+		description = "%s"
+		resource_type = britive_resource_manager_resource_type.resource_type_1.name
+		parameter_values = {
+			"testfield5" = "v5"
+		}
+	}
+
+	resource "britive_resource_manager_response_template" "response_template" {
+		name                      = "%s"
+		description               = "%s"
+		is_console_access_enabled = true
+		show_on_ui                = false
+		template_data             = "The user {{YS}} has the {{admin}}."
+	}
+
+	resource "britive_resource_manager_resource_type_permission" "type_permission_1" {
+		name                = "%s"
+		resource_type_id    = britive_resource_manager_resource_type.resource_type_1.id
+		description         = "%s"
+		checkin_time_limit  = 180
+		checkout_time_limit = 360
+		is_draft            = false
+		show_orig_creds     = true
+		variables           = ["test1"]
+		code_language = "PyThon"
+		checkin_code  = <<EOT
+			#!/bin/bash
+			echo "Running task 1"
+			echo "Running task 2"
+			EOT
+		checkout_code = <<EOT
+			#!/bin/bash
+			echo "Running task 2"
+			echo "Running task 3"
+			EOT
+		response_templates = [britive_resource_manager_response_template.response_template.name]
+	}
+
+	resource "britive_resource_manager_profile" "profile_1" {
+		name                             = "%s"
+		description                      = "%s"
+		expiration_duration              = 10800000
+		extendable                       = true
+		notification_prior_to_expiration = "1h0m0s"
+		extension_duration               = "2h0m0s"
+		extension_limit                  = 2
+
+		associations {
+			label_key = "Resource-Type"
+			values    = [britive_resource_manager_resource_type.resource_type_1.name]
+		}
+	}
+	`, resourceTypeName, resourceTypeDescription, resourceResourceName, resourceResourceDescription, responseTemplateName, responseTemplateDescription, resourceTypePermissionName, resourceTypePermissionDescription, resourceManagerProfileName, resourceManagerProfileDescription)
+}
