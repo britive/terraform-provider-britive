@@ -13,6 +13,7 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
+	"github.com/britive/terraform-provider-britive/britive/helpers/tfutils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -234,17 +235,35 @@ func (r *ResourceTypePermissionsResource) Configure(_ context.Context, req resou
 }
 
 // ValidateConfig validates the resource configuration.
+// ValidateConfig validates the resource configuration.
+//
+// Attributes are read individually rather than decoding the whole configuration
+// into ResourceTypePermissionsResourceModel: its ResponseTemplates/Variables
+// fields are plain Go slices, which cannot hold an unknown collection. Terraform
+// evaluates a for_each resource during the validate walk with no
+// instance-expansion context, so values derived from each.value arrive unknown
+// and a full Config.Get would fail with "Received unknown value, however the
+// target type cannot handle unknown values".
 func (r *ResourceTypePermissionsResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ResourceTypePermissionsResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	var showOrigCreds types.Bool
+	var responseTemplates types.Set
+	var checkinCodeFile, checkoutCodeFile, checkinCode, checkoutCode types.String
+
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("show_orig_creds"), &showOrigCreds)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("response_templates"), &responseTemplates)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("checkin_code_file"), &checkinCodeFile)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("checkout_code_file"), &checkoutCodeFile)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("checkin_code"), &checkinCode)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("checkout_code"), &checkoutCode)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Validate response_templates when show_orig_creds is false.
-	// Unknown value cannot be validated at this stage; defer to apply time.
-	if !data.ShowOrigCreds.IsUnknown() && !data.ShowOrigCreds.IsNull() && !data.ShowOrigCreds.ValueBool() {
-		if len(data.ResponseTemplates) == 0 {
+	// Unknown values cannot be validated at this stage; defer to apply time.
+	if !showOrigCreds.IsUnknown() && !showOrigCreds.IsNull() && !showOrigCreds.ValueBool() &&
+		!responseTemplates.IsUnknown() {
+		if len(responseTemplates.Elements()) == 0 {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("show_orig_creds"),
 				"Invalid Configuration",
@@ -255,9 +274,9 @@ func (r *ResourceTypePermissionsResource) ValidateConfig(ctx context.Context, re
 
 	// Validate file paths must be set together.
 	// Unknown values cannot be validated at this stage; defer to apply time.
-	if !data.CheckinCodeFile.IsUnknown() && !data.CheckoutCodeFile.IsUnknown() {
-		hasCheckinFile := !data.CheckinCodeFile.IsNull() && data.CheckinCodeFile.ValueString() != ""
-		hasCheckoutFile := !data.CheckoutCodeFile.IsNull() && data.CheckoutCodeFile.ValueString() != ""
+	if !checkinCodeFile.IsUnknown() && !checkoutCodeFile.IsUnknown() {
+		hasCheckinFile := !checkinCodeFile.IsNull() && checkinCodeFile.ValueString() != ""
+		hasCheckoutFile := !checkoutCodeFile.IsNull() && checkoutCodeFile.ValueString() != ""
 		if hasCheckinFile != hasCheckoutFile {
 			resp.Diagnostics.AddError(
 				"Invalid Configuration",
@@ -268,9 +287,9 @@ func (r *ResourceTypePermissionsResource) ValidateConfig(ctx context.Context, re
 
 	// Validate inline code must be set together.
 	// Unknown values cannot be validated at this stage; defer to apply time.
-	if !data.CheckinCode.IsUnknown() && !data.CheckoutCode.IsUnknown() {
-		hasCheckinCode := !data.CheckinCode.IsNull() && data.CheckinCode.ValueString() != ""
-		hasCheckoutCode := !data.CheckoutCode.IsNull() && data.CheckoutCode.ValueString() != ""
+	if !checkinCode.IsUnknown() && !checkoutCode.IsUnknown() {
+		hasCheckinCode := !checkinCode.IsNull() && checkinCode.ValueString() != ""
+		hasCheckoutCode := !checkoutCode.IsNull() && checkoutCode.ValueString() != ""
 		if hasCheckinCode != hasCheckoutCode {
 			resp.Diagnostics.AddError(
 				"Invalid Configuration",
@@ -285,6 +304,15 @@ func (r *ResourceTypePermissionsResource) ModifyPlan(ctx context.Context, req re
 	// Only compute hashes during planning
 	if req.Plan.Raw.IsNull() {
 		// Resource is being destroyed
+		return
+	}
+
+	// response_templates/variables are plain Go slices in the model, which cannot
+	// hold an unknown collection (e.g. one built from a not-yet-applied value).
+	// Nothing here can be normalized until those values resolve, so skip rather
+	// than fail the plan with a value conversion error.
+	if tfutils.HasUnknownStructure(req.Plan.Raw, "response_templates", "variables") ||
+		tfutils.HasUnknownStructure(req.Config.Raw, "response_templates", "variables") {
 		return
 	}
 

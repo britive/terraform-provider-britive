@@ -1,3 +1,8 @@
+## 3.0.1
+
+BUG FIXES:
+* **Resource:** `britive_profile`, `britive_tag_owner`, `britive_resource_manager_resource_type_permission`, `britive_resource_manager_profile_permission`, `britive_resource_manager_resource_label` : Fixed a "Value Conversion Error ... Received unknown value, however the target type cannot handle unknown values" failure during `terraform validate` and `terraform plan`. It affected any resource declared with `for_each` whose nested blocks are populated from `each.value` (e.g. a `dynamic "associations"` block on `britive_profile`), and any nested block whose `for_each` is not resolved until apply. Terraform evaluates such configurations without instance-expansion context, so the block legitimately arrives as an unknown value; the provider now tolerates it and defers those checks to a later plan instead of erroring. No configuration or state changes are required.
+
 ## 3.0.0
 
 BREAKING CHANGES:

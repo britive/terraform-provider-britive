@@ -10,6 +10,7 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
+	"github.com/britive/terraform-provider-britive/britive/helpers/tfutils"
 	"github.com/britive/terraform-provider-britive/britive/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -239,26 +240,38 @@ func (r *ProfileResource) Configure(_ context.Context, req resource.ConfigureReq
 }
 
 // ValidateConfig validates the resource configuration.
+//
+// Attributes are read individually rather than decoding the whole configuration
+// into ProfileResourceModel: `associations` and `tag_associations` are plain Go
+// slices, which cannot hold an unknown collection. Terraform evaluates a
+// for_each resource during the validate walk with no instance-expansion context,
+// so a dynamic "associations" block fed from each.value legitimately arrives as
+// an unknown set and a full Config.Get would fail with "Received unknown value,
+// however the target type cannot handle unknown values".
 func (r *ProfileResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ProfileResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	var extendable types.Bool
+	var notificationPriorToExpiration, extensionDuration validators.DurationStringValue
+
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("extendable"), &extendable)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("notification_prior_to_expiration"), &notificationPriorToExpiration)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("extension_duration"), &extensionDuration)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// When extendable is true, notification_prior_to_expiration and extension_duration are required.
 	// Unknown values cannot be validated at this stage; defer to apply time.
-	if !data.Extendable.IsUnknown() && !data.Extendable.IsNull() && data.Extendable.ValueBool() {
-		if !data.NotificationPriorToExpiration.IsUnknown() &&
-			(data.NotificationPriorToExpiration.IsNull() || data.NotificationPriorToExpiration.ValueString() == "") {
+	if !extendable.IsUnknown() && !extendable.IsNull() && extendable.ValueBool() {
+		if !notificationPriorToExpiration.IsUnknown() &&
+			(notificationPriorToExpiration.IsNull() || notificationPriorToExpiration.ValueString() == "") {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("notification_prior_to_expiration"),
 				"Missing Required Field",
 				"When extendable is true, notification_prior_to_expiration must be provided",
 			)
 		}
-		if !data.ExtensionDuration.IsUnknown() &&
-			(data.ExtensionDuration.IsNull() || data.ExtensionDuration.ValueString() == "") {
+		if !extensionDuration.IsUnknown() &&
+			(extensionDuration.IsNull() || extensionDuration.ValueString() == "") {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("extension_duration"),
 				"Missing Required Field",
@@ -267,9 +280,23 @@ func (r *ProfileResource) ValidateConfig(ctx context.Context, req resource.Valid
 		}
 	}
 
+	var associationsSet types.Set
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("associations"), &associationsSet)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// An unknown or partially unknown set decodes to the elements that are known;
+	// the rest is validated on the next plan, once the values are resolved.
+	associations, diags := tfutils.ElementsAsSlice[ProfileAssociationModel](ctx, associationsSet)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Validate that ApplicationResource associations have parent_name.
 	// Unknown type/parent_name cannot be validated at this stage; defer to apply time.
-	for i, assoc := range data.Associations {
+	for i, assoc := range associations {
 		if assoc.Type.IsUnknown() {
 			continue
 		}
@@ -364,20 +391,24 @@ func (r *ProfileResource) UpgradeState(_ context.Context) map[int64]resource.Sta
 
 // ModifyPlan nulls out extension_limit when extendable is false, preventing a
 // plan/state inconsistency caused by UseStateForUnknown copying the prior value.
+//
+// Only the two attributes involved are read: decoding the whole plan into
+// ProfileResourceModel would fail whenever `associations`/`tag_associations` are
+// unknown (a dynamic block whose for_each is not yet resolved), because those
+// fields are plain Go slices. See ValidateConfig.
 func (r *ProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return
 	}
 
-	var plan ProfileResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	var extendable types.Bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("extendable"), &extendable)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !plan.Extendable.IsUnknown() && !plan.Extendable.ValueBool() {
-		plan.ExtensionLimit = types.Int64Null()
-		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	if !extendable.IsUnknown() && !extendable.ValueBool() {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("extension_limit"), types.Int64Null())...)
 	}
 }
 

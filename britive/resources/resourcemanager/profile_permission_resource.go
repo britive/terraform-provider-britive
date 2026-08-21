@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/helpers/tfutils"
 	"github.com/britive/terraform-provider-britive/britive/planmodifiers"
 	"github.com/britive/terraform-provider-britive/britive/validators"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -205,6 +206,15 @@ func (r *ProfilePermissionResource) Configure(_ context.Context, req resource.Co
 // whether that was correct or not.
 func (r *ProfilePermissionResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	// Variables is a plain Go slice in the model, which cannot hold an unknown
+	// collection (e.g. a dynamic "variables" block whose for_each is not yet
+	// resolved). Nothing here can be normalized until it resolves, so skip rather
+	// than fail the plan with a value conversion error.
+	if tfutils.HasUnknownStructure(req.Plan.Raw, "variables") ||
+		tfutils.HasUnknownStructure(req.Config.Raw, "variables") {
 		return
 	}
 

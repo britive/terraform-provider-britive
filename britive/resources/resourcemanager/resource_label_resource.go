@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/helpers/tfutils"
 	"github.com/britive/terraform-provider-britive/britive/validators"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -344,6 +345,15 @@ func parseLabelID(id string) string {
 // delete+create — this preserves value_id/created_by/created_on across the rename.
 func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	// Values is a plain Go slice in the model, which cannot hold an unknown
+	// collection (e.g. a dynamic "values" block whose for_each is not yet
+	// resolved). Nothing here can be normalized until it resolves, so skip rather
+	// than fail the plan with a value conversion error.
+	if tfutils.HasUnknownStructure(req.Plan.Raw, "values") ||
+		tfutils.HasUnknownStructure(req.Config.Raw, "values") {
 		return
 	}
 

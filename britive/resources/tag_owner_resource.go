@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/helpers/tfutils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -107,14 +108,33 @@ func (r *TagOwnerResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 }
 
 // ValidateConfig rejects any user or tag block where both id and name are set simultaneously.
+//
+// The blocks are read individually rather than decoding the whole configuration
+// into TagOwnerResourceModel: its Users/Tags fields are plain Go slices, which
+// cannot hold an unknown collection. Terraform evaluates a for_each resource
+// during the validate walk with no instance-expansion context, so a dynamic
+// block fed from each.value arrives as an unknown set and a full Config.Get
+// would fail with "Received unknown value, however the target type cannot handle
+// unknown values".
 func (r *TagOwnerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data TagOwnerResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	var userSet, tagSet types.Set
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("user"), &userSet)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("tag"), &tagSet)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	for _, u := range data.Users {
+	// Unknown blocks decode to nothing here; they are validated on the next plan,
+	// once the values are resolved.
+	users, diags := tfutils.ElementsAsSlice[TagOwnerEntityModel](ctx, userSet)
+	resp.Diagnostics.Append(diags...)
+	tags, diags := tfutils.ElementsAsSlice[TagOwnerEntityModel](ctx, tagSet)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	for _, u := range users {
 		if tagOwnerEntitySet(u.ID) && tagOwnerEntitySet(u.Name) {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("user"),
@@ -123,7 +143,7 @@ func (r *TagOwnerResource) ValidateConfig(ctx context.Context, req resource.Vali
 			)
 		}
 	}
-	for _, t := range data.Tags {
+	for _, t := range tags {
 		if tagOwnerEntitySet(t.ID) && tagOwnerEntitySet(t.Name) {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("tag"),
