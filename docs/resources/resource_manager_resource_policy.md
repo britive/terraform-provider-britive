@@ -117,7 +117,7 @@ In addition to the above arguments, the following attribute is exported:
 You can import a policy for the profile using any of these accepted formats:
 
 ```sh
-terraform import britive_resource_manager_resource_policy.example resource-manager/policies/{{policy_id}}
+terraform import britive_resource_manager_resource_policy.example resource-manager/policies/{{policy_name}}
 terraform import britive_resource_manager_resource_policy.example {{policy_name}}
 
 terraform import britive_resource_manager_resource_policy.example resource-manager/policies/New_Policy
