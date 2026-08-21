@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -586,41 +587,45 @@ func (r *ProfileResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 // ImportState imports the resource state.
 func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Support two import formats:
-	// 1. apps/{app_name}/paps/{profile_name}
-	// 2. {app_name}/{profile_name}
+	// Support four import formats:
+	// 1. apps/app-container-id/{app_container_id}/paps/{profile_name}
+	// 2. app-container-id/{app_container_id}/{profile_name}
+	// 3. apps/{app_name}/paps/{profile_name}
+	// 4. {app_name}/{profile_name}
 
 	importID := req.ID
-	var appName, profileName string
+	var appContainerID, appName, profileName string
 
-	if strings.Contains(importID, "/paps/") {
-		// Format: apps/{app_name}/paps/{profile_name}
-		parts := strings.Split(importID, "/")
-		if len(parts) != 4 || parts[0] != "apps" || parts[2] != "paps" {
-			resp.Diagnostics.AddError(
-				"Invalid Import ID",
-				fmt.Sprintf("Import ID must be in format 'apps/{app_name}/paps/{profile_name}' or '{app_name}/{profile_name}', got: %s", importID),
-			)
-			return
-		}
-		appName = parts[1]
-		profileName = parts[3]
-	} else {
-		// Format: {app_name}/{profile_name}
-		parts := strings.Split(importID, "/")
-		if len(parts) != 2 {
-			resp.Diagnostics.AddError(
-				"Invalid Import ID",
-				fmt.Sprintf("Import ID must be in format 'apps/{app_name}/paps/{profile_name}' or '{app_name}/{profile_name}', got: %s", importID),
-			)
-			return
-		}
-		appName = parts[0]
-		profileName = parts[1]
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`^apps/app-container-id/(?P<app_container_id>[^/]+)/paps/(?P<name>[^/]+)$`),
+		regexp.MustCompile(`^app-container-id/(?P<app_container_id>[^/]+)/(?P<name>[^/]+)$`),
+		regexp.MustCompile(`^apps/(?P<app_name>[^/]+)/paps/(?P<name>[^/]+)$`),
+		regexp.MustCompile(`^(?P<app_name>[^/]+)/(?P<name>[^/]+)$`),
 	}
 
-	if strings.TrimSpace(appName) == "" {
-		resp.Diagnostics.AddError("Invalid Import ID", "app_name cannot be empty")
+	for _, re := range patterns {
+		matches := re.FindStringSubmatch(importID)
+		if matches == nil {
+			continue
+		}
+		for i, groupName := range re.SubexpNames() {
+			switch groupName {
+			case "app_container_id":
+				appContainerID = matches[i]
+			case "app_name":
+				appName = matches[i]
+			case "name":
+				profileName = matches[i]
+			}
+		}
+		break
+	}
+
+	if strings.TrimSpace(appContainerID) == "" && strings.TrimSpace(appName) == "" {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			fmt.Sprintf("Import ID must be in format 'apps/app-container-id/{app_container_id}/paps/{profile_name}', 'app-container-id/{app_container_id}/{profile_name}', 'apps/{app_name}/paps/{profile_name}', or '{app_name}/{profile_name}', got: %s", importID),
+		)
 		return
 	}
 	if strings.TrimSpace(profileName) == "" {
@@ -628,21 +633,24 @@ func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportSt
 		return
 	}
 
-	log.Printf("[INFO] Importing profile: %s/%s", appName, profileName)
+	if strings.TrimSpace(appContainerID) == "" {
+		// Get application by name
+		app, err := r.client.GetApplicationByName(appName)
+		if errors.Is(err, britive.ErrNotFound) {
+			resp.Diagnostics.AddError("Application Not Found", fmt.Sprintf("Application %s not found", appName))
+			return
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Error Getting Application", err.Error())
+			return
+		}
+		appContainerID = app.AppContainerID
+	}
 
-	// Get application by name
-	app, err := r.client.GetApplicationByName(appName)
-	if errors.Is(err, britive.ErrNotFound) {
-		resp.Diagnostics.AddError("Application Not Found", fmt.Sprintf("Application %s not found", appName))
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Error Getting Application", err.Error())
-		return
-	}
+	log.Printf("[INFO] Importing profile: %s/%s", appContainerID, profileName)
 
 	// Get profile by name
-	profile, err := r.client.GetProfileByName(app.AppContainerID, profileName)
+	profile, err := r.client.GetProfileByName(appContainerID, profileName)
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.Diagnostics.AddError("Profile Not Found", fmt.Sprintf("Profile %s not found", profileName))
 		return
@@ -666,7 +674,7 @@ func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportSt
 	// Clear app_name (only used for import)
 	state.AppName = types.StringValue("")
 
-	log.Printf("[INFO] Imported profile: %s/%s", appName, profileName)
+	log.Printf("[INFO] Imported profile: %s/%s", profile.AppContainerID, profileName)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

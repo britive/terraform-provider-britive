@@ -242,10 +242,11 @@ func (r *TagMemberResource) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 func (r *TagMemberResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Support three import formats:
+	// Support import formats:
 	// 1. tags/{tag_id}/users/{user_id}  — ID-first (no name resolution needed)
-	// 2. tags/{tag_name}/users/{username}
-	// 3. {tag_name}/{username}
+	// 2. tag-name/{tag_name}/username/{username}
+	// 3. tags/{tag_name}/users/{username}
+	// 4. {tag_name}/{username}
 
 	importID := req.ID
 
@@ -253,6 +254,7 @@ func (r *TagMemberResource) ImportState(ctx context.Context, req resource.Import
 	// We detect this by trying to parse the format and checking if the tag/user IDs exist directly.
 	idFirstRegex := regexp.MustCompile(`^tags/(?P<tag_id>[^/]+)/users/(?P<user_id>[^/]+)$`)
 	nameRegexes := []string{
+		`^tag-name/(?P<tag_name>[^/]+)/username/(?P<username>[^/]+)$`,
 		`^tags/(?P<tag_name>[^/]+)/users/(?P<username>[^/]+)$`,
 		`^(?P<tag_name>[^/]+)/(?P<username>[^/]+)$`,
 	}
@@ -297,7 +299,7 @@ func (r *TagMemberResource) ImportState(ctx context.Context, req resource.Import
 	if tagName == "" || username == "" {
 		resp.Diagnostics.AddError(
 			"Invalid Import ID",
-			fmt.Sprintf("Import ID %q doesn't match expected formats: 'tags/{tag_id}/users/{user_id}', 'tags/{tag_name}/users/{username}', or '{tag_name}/{username}'", req.ID),
+			fmt.Sprintf("Import ID %q doesn't match expected formats: 'tags/{tag_id}/users/{user_id}', 'tag-name/{tag_name}/username/{username}', 'tags/{tag_name}/users/{username}', or '{tag_name}/{username}'", req.ID),
 		)
 		return
 	}

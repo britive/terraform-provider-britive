@@ -282,14 +282,22 @@ func (r *ResourceLabelResource) ImportState(ctx context.Context, req resource.Im
 	importID := req.ID
 	var labelID string
 
-	if strings.HasPrefix(importID, "resource-manager/labels/") {
+	switch {
+	case strings.HasPrefix(importID, "resource-manager/resource-labels/"):
 		parts := strings.Split(importID, "/")
 		if len(parts) != 3 {
-			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/labels/{id}' or '{id}', got: %s", importID))
+			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/resource-labels/{id}', 'resource-manager/labels/{id}', or '{id}', got: %s", importID))
 			return
 		}
 		labelID = parts[2]
-	} else {
+	case strings.HasPrefix(importID, "resource-manager/labels/"):
+		parts := strings.Split(importID, "/")
+		if len(parts) != 3 {
+			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/resource-labels/{id}', 'resource-manager/labels/{id}', or '{id}', got: %s", importID))
+			return
+		}
+		labelID = parts[2]
+	default:
 		labelID = importID
 	}
 
