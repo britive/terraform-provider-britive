@@ -112,7 +112,15 @@ func (r *ResourceResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	plan.ID = types.StringValue(sa.ResourceID)
-	plan.ResourceTypeID = types.StringValue(sa.ResourceType.ResourceTypeID)
+
+	// The create response doesn't reliably echo back the resolved resource_type_id, so
+	// re-fetch the resource to get the authoritative value.
+	created, err := r.client.GetServerAccessResource(sa.ResourceID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Created Resource", err.Error())
+		return
+	}
+	plan.ResourceTypeID = types.StringValue(created.ResourceType.ResourceTypeID)
 
 	log.Printf("[INFO] Submitted new server access resource: %#v", sa)
 

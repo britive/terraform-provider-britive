@@ -36,8 +36,51 @@ func TestBritiveProfile(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "associations.0.value", associationValue),
 				),
 			},
+			// Import via the documented "apps/{app_name}/paps/{profile_name}" format.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateId:     fmt.Sprintf("apps/%s/paps/%s", applicationName, name),
+				ImportStateVerify: true,
+			},
+			// Import via the bare "{app_name}/{profile_name}" format.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateId:     fmt.Sprintf("%s/%s", applicationName, name),
+				ImportStateVerify: true,
+			},
+			// Import via the documented "apps/app-container-id/{app_container_id}/paps/{profile_name}" format,
+			// which must skip the GetApplicationByName lookup entirely.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateIdFunc: testAccProfileImportStateIdWithAppContainerID("apps/app-container-id/%s/paps/%s", name),
+				ImportStateVerify: true,
+			},
+			// Import via the documented "app-container-id/{app_container_id}/{profile_name}" format.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateIdFunc: testAccProfileImportStateIdWithAppContainerID("app-container-id/%s/%s", name),
+				ImportStateVerify: true,
+			},
 		},
 	})
+}
+
+func testAccProfileImportStateIdWithAppContainerID(idFormat, profileName string) resource.ImportStateIdFunc {
+	return func(s *terraform.State) (string, error) {
+		rs, ok := s.RootModule().Resources["data.britive_application.app"]
+		if !ok {
+			return "", errs.NewNotFoundErrorf("data.britive_application.app in state")
+		}
+		appContainerID := rs.Primary.Attributes["id"]
+		if appContainerID == "" {
+			return "", errs.NewNotFoundErrorf("id for data.britive_application.app in state")
+		}
+		return fmt.Sprintf(idFormat, appContainerID, profileName), nil
+	}
 }
 
 func testAccCheckBritiveProfileConfig(name string, description string, applicationName string) string {
