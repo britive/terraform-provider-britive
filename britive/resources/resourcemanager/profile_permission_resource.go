@@ -10,6 +10,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/planmodifiers"
 	"github.com/britive/terraform-provider-britive/britive/validators"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -205,6 +206,19 @@ func (r *ProfilePermissionResource) Configure(_ context.Context, req resource.Co
 // whether that was correct or not.
 func (r *ProfilePermissionResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	// "variables" can be wholly unknown (e.g. built from a not-yet-applied resource's
+	// output), which []PermissionVariableModel can't represent. There's nothing to
+	// correlate yet in that case, so skip and let a later, more-known plan/apply pass
+	// handle it.
+	var variables types.Set
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("variables"), &variables)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if variables.IsUnknown() {
 		return
 	}
 

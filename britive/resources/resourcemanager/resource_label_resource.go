@@ -11,6 +11,7 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/validators"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -344,6 +345,19 @@ func parseLabelID(id string) string {
 // delete+create — this preserves value_id/created_by/created_on across the rename.
 func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	// "values" can be wholly unknown (e.g. built from a not-yet-applied resource's
+	// output), which []ResourceLabelValueModel can't represent. There's nothing to
+	// correlate yet in that case, so skip and let a later, more-known plan/apply pass
+	// handle it.
+	var values types.List
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("values"), &values)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if values.IsUnknown() {
 		return
 	}
 
