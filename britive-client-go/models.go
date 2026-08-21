@@ -450,6 +450,60 @@ type AllResponseTemplates struct {
 	ResponseTemplates []ResponseTemplate `json:"data,omitempty"`
 }
 
+// RotationTemplateCreateRequest - request body for creating a rotation template stub.
+// The mode (local/inline-code/file), time limit, and variables are configured afterwards
+// via UpdateRotationTemplate; the create call only accepts name/description.
+type RotationTemplateCreateRequest struct {
+	Name        string `json:"rotationTemplateName"`
+	Description string `json:"rotationTemplateDesc,omitempty"`
+}
+
+// RotationTemplateSummary - shape returned by rotation template creation and by the
+// paginated rotation-templates list endpoint (a thinner shape than RotationTemplate's
+// detail/update representation - e.g. "templateId"/"templateName" instead of "id"/"rotationTemplateName").
+type RotationTemplateSummary struct {
+	TemplateID   string `json:"templateId,omitempty"`
+	TemplateName string `json:"templateName,omitempty"`
+	Description  string `json:"description,omitempty"`
+	CreatedOn    string `json:"createdOn,omitempty"`
+	CreatedBy    string `json:"createdBy,omitempty"`
+}
+
+// RotationTemplateVariable - a single variable exposed to a rotation template's script.
+type RotationTemplateVariable struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	MultiValued bool   `json:"multivalued"`
+}
+
+// RotationTemplate - full detail of a rotation template, and the request/response shape
+// for the metadata update call. Note: rotationTemplateName/rotationTemplateDesc are never
+// accepted by the update call (confirmed by capture - present on GET, absent from every PUT
+// body observed), so callers building an update payload must leave Name/Description unset.
+type RotationTemplate struct {
+	ID             string                     `json:"id,omitempty"`
+	ResourceTypeID string                     `json:"resourceTypeId,omitempty"`
+	ResourceType   string                     `json:"resourceType,omitempty"`
+	Name           string                     `json:"rotationTemplateName,omitempty"`
+	Description    string                     `json:"rotationTemplateDesc,omitempty"`
+	TimeoutLimit   int                        `json:"timeoutLimit"`
+	IsLocal        bool                       `json:"isLocal"`
+	InlineFile     bool                       `json:"inlineFile"`
+	EditorType     string                     `json:"editorType,omitempty"`
+	ScriptName     string                     `json:"scriptName,omitempty"`
+	Variables      []RotationTemplateVariable `json:"variables"`
+	PresignedURL   string                     `json:"presignedUrl,omitempty"`
+	CreatedOn      string                     `json:"createdOn,omitempty"`
+	CreatedBy      string                     `json:"createdBy,omitempty"`
+	UpdatedOn      string                     `json:"updatedOn,omitempty"`
+	UpdatedBy      string                     `json:"updatedBy,omitempty"`
+}
+
+// RotationTemplatePresignedURL - response body of the rotation-templates presigned-url endpoint.
+type RotationTemplatePresignedURL struct {
+	PresignedURL string `json:"presignedUrl"`
+}
+
 // ResourceTypePermission - Model for resource type permissions
 type ResourceTypePermission struct {
 	PermissionID      string        `json:"permissionId,omitempty"`
