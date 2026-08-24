@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -189,10 +190,6 @@ func (r *ProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						"parent_name": schema.StringAttribute{
 							Description: "The parent name of the resource. Required only if the association type is ApplicationResource",
 							Optional:    true,
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 					},
 				},
@@ -240,6 +237,16 @@ func (r *ProfileResource) Configure(_ context.Context, req resource.ConfigureReq
 
 // ValidateConfig validates the resource configuration.
 func (r *ProfileResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Resources using for_each/count with a dynamic "associations" block driven by
+	// each.value/count.index are validated once, pre-expansion, with those references
+	// left unknown. A Set containing any unknown element collapses to a wholly unknown
+	// value, which the []ProfileAssociationModel field can't represent. These checks are
+	// best-effort and already deferred to apply time for individually unknown fields, so
+	// skip entirely rather than fail the whole config when it isn't fully known yet.
+	if !req.Config.Raw.IsFullyKnown() {
+		return
+	}
+
 	var data ProfileResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -369,15 +376,19 @@ func (r *ProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	var plan ProfileResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	// Read only the attribute this logic needs. Decoding the full plan into
+	// ProfileResourceModel fails when associations/tag_associations are wholly
+	// unknown (e.g. built from a not-yet-applied resource's output), since
+	// []ProfileAssociationModel/[]ProfileTagAssociationModel can't represent an
+	// unknown collection value.
+	var extendable types.Bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("extendable"), &extendable)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !plan.Extendable.IsUnknown() && !plan.Extendable.ValueBool() {
-		plan.ExtensionLimit = types.Int64Null()
-		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	if !extendable.IsUnknown() && !extendable.ValueBool() {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("extension_limit"), types.Int64Null())...)
 	}
 }
 
@@ -586,41 +597,45 @@ func (r *ProfileResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 // ImportState imports the resource state.
 func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Support two import formats:
-	// 1. apps/{app_name}/paps/{profile_name}
-	// 2. {app_name}/{profile_name}
+	// Support four import formats:
+	// 1. apps/app-container-id/{app_container_id}/paps/{profile_name}
+	// 2. app-container-id/{app_container_id}/{profile_name}
+	// 3. apps/{app_name}/paps/{profile_name}
+	// 4. {app_name}/{profile_name}
 
 	importID := req.ID
-	var appName, profileName string
+	var appContainerID, appName, profileName string
 
-	if strings.Contains(importID, "/paps/") {
-		// Format: apps/{app_name}/paps/{profile_name}
-		parts := strings.Split(importID, "/")
-		if len(parts) != 4 || parts[0] != "apps" || parts[2] != "paps" {
-			resp.Diagnostics.AddError(
-				"Invalid Import ID",
-				fmt.Sprintf("Import ID must be in format 'apps/{app_name}/paps/{profile_name}' or '{app_name}/{profile_name}', got: %s", importID),
-			)
-			return
-		}
-		appName = parts[1]
-		profileName = parts[3]
-	} else {
-		// Format: {app_name}/{profile_name}
-		parts := strings.Split(importID, "/")
-		if len(parts) != 2 {
-			resp.Diagnostics.AddError(
-				"Invalid Import ID",
-				fmt.Sprintf("Import ID must be in format 'apps/{app_name}/paps/{profile_name}' or '{app_name}/{profile_name}', got: %s", importID),
-			)
-			return
-		}
-		appName = parts[0]
-		profileName = parts[1]
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`^apps/app-container-id/(?P<app_container_id>[^/]+)/paps/(?P<name>[^/]+)$`),
+		regexp.MustCompile(`^app-container-id/(?P<app_container_id>[^/]+)/(?P<name>[^/]+)$`),
+		regexp.MustCompile(`^apps/(?P<app_name>[^/]+)/paps/(?P<name>[^/]+)$`),
+		regexp.MustCompile(`^(?P<app_name>[^/]+)/(?P<name>[^/]+)$`),
 	}
 
-	if strings.TrimSpace(appName) == "" {
-		resp.Diagnostics.AddError("Invalid Import ID", "app_name cannot be empty")
+	for _, re := range patterns {
+		matches := re.FindStringSubmatch(importID)
+		if matches == nil {
+			continue
+		}
+		for i, groupName := range re.SubexpNames() {
+			switch groupName {
+			case "app_container_id":
+				appContainerID = matches[i]
+			case "app_name":
+				appName = matches[i]
+			case "name":
+				profileName = matches[i]
+			}
+		}
+		break
+	}
+
+	if strings.TrimSpace(appContainerID) == "" && strings.TrimSpace(appName) == "" {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			fmt.Sprintf("Import ID must be in format 'apps/app-container-id/{app_container_id}/paps/{profile_name}', 'app-container-id/{app_container_id}/{profile_name}', 'apps/{app_name}/paps/{profile_name}', or '{app_name}/{profile_name}', got: %s", importID),
+		)
 		return
 	}
 	if strings.TrimSpace(profileName) == "" {
@@ -628,21 +643,24 @@ func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportSt
 		return
 	}
 
-	log.Printf("[INFO] Importing profile: %s/%s", appName, profileName)
+	if strings.TrimSpace(appContainerID) == "" {
+		// Get application by name
+		app, err := r.client.GetApplicationByName(appName)
+		if errors.Is(err, britive.ErrNotFound) {
+			resp.Diagnostics.AddError("Application Not Found", fmt.Sprintf("Application %s not found", appName))
+			return
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Error Getting Application", err.Error())
+			return
+		}
+		appContainerID = app.AppContainerID
+	}
 
-	// Get application by name
-	app, err := r.client.GetApplicationByName(appName)
-	if errors.Is(err, britive.ErrNotFound) {
-		resp.Diagnostics.AddError("Application Not Found", fmt.Sprintf("Application %s not found", appName))
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Error Getting Application", err.Error())
-		return
-	}
+	log.Printf("[INFO] Importing profile: %s/%s", appContainerID, profileName)
 
 	// Get profile by name
-	profile, err := r.client.GetProfileByName(app.AppContainerID, profileName)
+	profile, err := r.client.GetProfileByName(appContainerID, profileName)
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.Diagnostics.AddError("Profile Not Found", fmt.Sprintf("Profile %s not found", profileName))
 		return
@@ -666,7 +684,7 @@ func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportSt
 	// Clear app_name (only used for import)
 	state.AppName = types.StringValue("")
 
-	log.Printf("[INFO] Imported profile: %s/%s", appName, profileName)
+	log.Printf("[INFO] Imported profile: %s/%s", profile.AppContainerID, profileName)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

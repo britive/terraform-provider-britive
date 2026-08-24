@@ -1,3 +1,14 @@
+## 3.0.1
+
+BUG FIXES:
+* `britive_profile`, `britive_tag_owner`, `britive_resource_manager_resource_type_permission`, `britive_resource_manager_profile_permission`, `britive_resource_manager_resource_label`: Fixed a "Value Conversion Error" (`Received unknown value, however the target type cannot handle unknown values`) that could crash `terraform validate`/`terraform plan`/`terraform apply` when a Set/List-typed block or argument (`associations`, `tag_associations`, `user`, `tag`, `response_templates`, `variables`, `values`) was driven by a `for_each`/`count` `dynamic` block referencing `each.value`/`count.index`, or by an attribute of another resource that is only known after apply.
+* `britive_resource_manager_resource`, `britive_profile`, `britive_resource_manager_resource_label`, `britive_tag_member`: Restored `terraform import` ID formats that were dropped in the 3.0.0 Plugin Framework migration and are still documented from v2.3.6:
+  * `britive_resource_manager_resource`: accepts `resources/{name}` and a bare `{name}`/`{id}` (falls back from an ID lookup to a name lookup) in addition to `resource-manager/resources/{id}`.
+  * `britive_profile`: accepts `apps/app-container-id/{app_container_id}/paps/{profile_name}` and `app-container-id/{app_container_id}/{profile_name}`, which skip the application-name lookup entirely, in addition to the `apps/{app_name}/paps/{profile_name}` and `{app_name}/{profile_name}` formats.
+  * `britive_resource_manager_resource_label`: accepts `resource-manager/resource-labels/{id}` in addition to `resource-manager/labels/{id}`.
+  * `britive_tag_member`: accepts `tag-name/{tag_name}/username/{username}` in addition to `tags/{tag_name}/users/{username}` and `{tag_name}/{username}`.
+* `britive_resource_manager_resource`: Fixed a "Value Conversion Error" (`MISSING TYPE`) on `terraform import` when the imported resource had no `parameter_values`, or no `resource_labels` besides the internal `Resource-Type` label.
+
 ## 3.0.0
 
 BREAKING CHANGES:

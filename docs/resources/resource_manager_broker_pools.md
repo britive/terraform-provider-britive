@@ -31,9 +31,9 @@ The following arguments are supported:
 
 ## Import
 
-Broker pool associations can be imported using the resource ID:
+Broker pool associations can be imported using the resource name:
 
 ```sh
-terraform import britive_resource_manager_resource_broker_pools.example resources/{resource_id}/broker-pools
-terraform import britive_resource_manager_resource_broker_pools.example resources/aius3dsadv8c02xi8j4/broker-pools
+terraform import britive_resource_manager_resource_broker_pools.example resources/{resource_name}/broker-pools
+terraform import britive_resource_manager_resource_broker_pools.example resources/example-resource/broker-pools
 ```

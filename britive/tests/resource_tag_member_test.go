@@ -14,6 +14,7 @@ func TestBritiveTagMember(t *testing.T) {
 	tagName := "AT - New Britive Tag Member Test"
 	tagDescription := "AT - New Britive Tag Member Test Description"
 	username := "britiveprovideracceptancetest"
+	resourceAddr := "britive_tag_member.new"
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -21,11 +22,54 @@ func TestBritiveTagMember(t *testing.T) {
 			{
 				Config: testAccCheckBritiveTagMemberConfig(identityProviderName, tagName, tagDescription, username),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckBritiveTagMemberExists("britive_tag_member.new"),
+					testAccCheckBritiveTagMemberExists(resourceAddr),
 				),
+			},
+			// Import via the documented "tag-name/{tag_name}/username/{username}" format.
+			{
+				ResourceName:      resourceAddr,
+				ImportState:       true,
+				ImportStateId:     fmt.Sprintf("tag-name/%s/username/%s", tagName, username),
+				ImportStateVerify: true,
+			},
+			// Import via the undocumented but retained "tags/{tag_name}/users/{username}" format.
+			{
+				ResourceName:      resourceAddr,
+				ImportState:       true,
+				ImportStateId:     fmt.Sprintf("tags/%s/users/%s", tagName, username),
+				ImportStateVerify: true,
+			},
+			// Import via the bare "{tag_name}/{username}" format.
+			{
+				ResourceName:      resourceAddr,
+				ImportState:       true,
+				ImportStateId:     fmt.Sprintf("%s/%s", tagName, username),
+				ImportStateVerify: true,
+			},
+			// Import via the ID-first "tags/{tag_id}/users/{user_id}" format.
+			{
+				ResourceName:      resourceAddr,
+				ImportState:       true,
+				ImportStateIdFunc: testAccTagMemberImportStateIdByIDs(resourceAddr),
+				ImportStateVerify: true,
 			},
 		},
 	})
+}
+
+func testAccTagMemberImportStateIdByIDs(resourceAddr string) resource.ImportStateIdFunc {
+	return func(s *terraform.State) (string, error) {
+		rs, ok := s.RootModule().Resources[resourceAddr]
+		if !ok {
+			return "", errs.NewNotFoundErrorf("%s in state", resourceAddr)
+		}
+		tagID := rs.Primary.Attributes["tag_id"]
+		userID := rs.Primary.Attributes["user_id"]
+		if tagID == "" || userID == "" {
+			return "", errs.NewNotFoundErrorf("tag_id/user_id for %s in state", resourceAddr)
+		}
+		return fmt.Sprintf("tags/%s/users/%s", tagID, userID), nil
+	}
 }
 
 func testAccCheckBritiveTagMemberConfig(identityProviderName string, tagName string, tagDescription string, username string) string {

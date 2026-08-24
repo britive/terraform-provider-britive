@@ -11,6 +11,7 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/validators"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -282,14 +283,22 @@ func (r *ResourceLabelResource) ImportState(ctx context.Context, req resource.Im
 	importID := req.ID
 	var labelID string
 
-	if strings.HasPrefix(importID, "resource-manager/labels/") {
+	switch {
+	case strings.HasPrefix(importID, "resource-manager/resource-labels/"):
 		parts := strings.Split(importID, "/")
 		if len(parts) != 3 {
-			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/labels/{id}' or '{id}', got: %s", importID))
+			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/resource-labels/{id}', 'resource-manager/labels/{id}', or '{id}', got: %s", importID))
 			return
 		}
 		labelID = parts[2]
-	} else {
+	case strings.HasPrefix(importID, "resource-manager/labels/"):
+		parts := strings.Split(importID, "/")
+		if len(parts) != 3 {
+			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/resource-labels/{id}', 'resource-manager/labels/{id}', or '{id}', got: %s", importID))
+			return
+		}
+		labelID = parts[2]
+	default:
 		labelID = importID
 	}
 
@@ -344,6 +353,19 @@ func parseLabelID(id string) string {
 // delete+create — this preserves value_id/created_by/created_on across the rename.
 func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	// "values" can be wholly unknown (e.g. built from a not-yet-applied resource's
+	// output), which []ResourceLabelValueModel can't represent. There's nothing to
+	// correlate yet in that case, so skip and let a later, more-known plan/apply pass
+	// handle it.
+	var values types.List
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("values"), &values)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if values.IsUnknown() {
 		return
 	}
 

@@ -108,6 +108,15 @@ func (r *TagOwnerResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 
 // ValidateConfig rejects any user or tag block where both id and name are set simultaneously.
 func (r *TagOwnerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Resources using for_each/count with a dynamic "user"/"tag" block driven by
+	// each.value/count.index are validated once, pre-expansion, with those references
+	// left unknown. A Set containing any unknown element collapses to a wholly unknown
+	// value, which the []TagOwnerEntityModel fields can't represent, so skip validation
+	// entirely rather than fail the whole config when it isn't fully known yet.
+	if !req.Config.Raw.IsFullyKnown() {
+		return
+	}
+
 	var data TagOwnerResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {

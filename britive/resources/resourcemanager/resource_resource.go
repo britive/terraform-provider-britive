@@ -112,7 +112,15 @@ func (r *ResourceResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	plan.ID = types.StringValue(sa.ResourceID)
-	plan.ResourceTypeID = types.StringValue(sa.ResourceType.ResourceTypeID)
+
+	// The create response doesn't reliably echo back the resolved resource_type_id, so
+	// re-fetch the resource to get the authoritative value.
+	created, err := r.client.GetServerAccessResource(sa.ResourceID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Created Resource", err.Error())
+		return
+	}
+	plan.ResourceTypeID = types.StringValue(created.ResourceType.ResourceTypeID)
 
 	log.Printf("[INFO] Submitted new server access resource: %#v", sa)
 
@@ -237,31 +245,52 @@ func (r *ResourceResource) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 func (r *ResourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	importID := req.ID
-	var resourceID string
+	// Support import formats:
+	// 1. resource-manager/resources/{id} — ID lookup
+	// 2. resources/{name} — name lookup
+	// 3. {id_or_name} — try as ID first, fall back to name
 
-	if strings.HasPrefix(importID, "resource-manager/resources/") {
+	importID := req.ID
+
+	var serverAccessResource *britive.ServerAccessResource
+	var err error
+
+	switch {
+	case strings.HasPrefix(importID, "resource-manager/resources/"):
 		parts := strings.Split(importID, "/")
 		if len(parts) != 3 {
-			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/resources/{id}' or '{id}', got: %s", importID))
+			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resource-manager/resources/{id}', 'resources/{name}', or '{id}'/'{name}', got: %s", importID))
 			return
 		}
-		resourceID = parts[2]
-	} else {
-		resourceID = importID
+		resourceID := parts[2]
+		log.Printf("[INFO] Importing server access resource: %s", resourceID)
+		serverAccessResource, err = r.client.GetServerAccessResource(resourceID)
+	case strings.HasPrefix(importID, "resources/"):
+		parts := strings.Split(importID, "/")
+		if len(parts) != 2 {
+			resp.Diagnostics.AddError("Invalid Import ID", fmt.Sprintf("Import ID must be 'resources/{name}', got: %s", importID))
+			return
+		}
+		resourceName := parts[1]
+		log.Printf("[INFO] Importing server access resource: %s", resourceName)
+		serverAccessResource, err = r.client.GetServerAccessResourceByName(resourceName)
+	default:
+		log.Printf("[INFO] Importing server access resource: %s", importID)
+		serverAccessResource, err = r.client.GetServerAccessResource(importID)
+		if errors.Is(err, britive.ErrNotFound) {
+			serverAccessResource, err = r.client.GetServerAccessResourceByName(importID)
+		}
 	}
 
-	log.Printf("[INFO] Importing server access resource: %s", resourceID)
-
-	resource, err := r.client.GetServerAccessResource(resourceID)
 	if errors.Is(err, britive.ErrNotFound) {
-		resp.Diagnostics.AddError("Resource Not Found", fmt.Sprintf("Resource %s not found", resourceID))
+		resp.Diagnostics.AddError("Resource Not Found", fmt.Sprintf("Resource %s not found", importID))
 		return
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Getting Resource", err.Error())
 		return
 	}
+	resource := serverAccessResource
 
 	var state ResourceResourceModel
 	state.ID = types.StringValue(resource.ResourceID)
@@ -269,6 +298,8 @@ func (r *ResourceResource) ImportState(ctx context.Context, req resource.ImportS
 	state.Description = types.StringValue(resource.Description)
 	state.ResourceType = types.StringValue(resource.ResourceType.Name)
 	state.ResourceTypeID = types.StringValue(resource.ResourceType.ResourceTypeID)
+	state.ParameterValues = types.MapNull(types.StringType)
+	state.ResourceLabels = types.MapNull(types.StringType)
 
 	if len(resource.ResourceTypeParameterValues) > 0 {
 		paramMap, diags := types.MapValueFrom(ctx, types.StringType, resource.ResourceTypeParameterValues)

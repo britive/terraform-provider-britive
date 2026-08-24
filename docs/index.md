@@ -20,14 +20,14 @@ Name-based fallback behavior is still supported for backward compatibility, but 
 
 ## Example Usage
 
-Terraform 0.13.7 and later:
+Terraform 1.0 and later:
 
 ```hcl
 terraform {
   required_providers {
     britive = {
-      source = "britive/britive"
-      version = ">= 2.3"
+      source  = "britive/britive"
+      version = ">= 3.0"
     }
   }
 }

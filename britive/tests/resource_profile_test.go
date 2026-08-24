@@ -36,8 +36,51 @@ func TestBritiveProfile(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "associations.0.value", associationValue),
 				),
 			},
+			// Import via the documented "apps/{app_name}/paps/{profile_name}" format.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateId:     fmt.Sprintf("apps/%s/paps/%s", applicationName, name),
+				ImportStateVerify: true,
+			},
+			// Import via the bare "{app_name}/{profile_name}" format.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateId:     fmt.Sprintf("%s/%s", applicationName, name),
+				ImportStateVerify: true,
+			},
+			// Import via the documented "apps/app-container-id/{app_container_id}/paps/{profile_name}" format,
+			// which must skip the GetApplicationByName lookup entirely.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateIdFunc: testAccProfileImportStateIdWithAppContainerID("apps/app-container-id/%s/paps/%s", name),
+				ImportStateVerify: true,
+			},
+			// Import via the documented "app-container-id/{app_container_id}/{profile_name}" format.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateIdFunc: testAccProfileImportStateIdWithAppContainerID("app-container-id/%s/%s", name),
+				ImportStateVerify: true,
+			},
 		},
 	})
+}
+
+func testAccProfileImportStateIdWithAppContainerID(idFormat, profileName string) resource.ImportStateIdFunc {
+	return func(s *terraform.State) (string, error) {
+		rs, ok := s.RootModule().Resources["data.britive_application.app"]
+		if !ok {
+			return "", errs.NewNotFoundErrorf("data.britive_application.app in state")
+		}
+		appContainerID := rs.Primary.Attributes["id"]
+		if appContainerID == "" {
+			return "", errs.NewNotFoundErrorf("id for data.britive_application.app in state")
+		}
+		return fmt.Sprintf(idFormat, appContainerID, profileName), nil
+	}
 }
 
 func testAccCheckBritiveProfileConfig(name string, description string, applicationName string) string {
@@ -165,4 +208,123 @@ func testAccCheckBritiveProfileExists(n string) resource.TestCheckFunc {
 
 		return nil
 	}
+}
+
+// TestBritiveProfileForEachDynamicAssociations is a regression test: count on the
+// resource combined with a dynamic "associations" block driven by count.index caused
+// Terraform to validate the un-expanded resource with count.index left unknown. A Set
+// containing an unknown element collapses to a wholly unknown value, which previously
+// crashed ValidateConfig's req.Config.Get into []ProfileAssociationModel.
+//
+// count (not for_each) is used here deliberately: terraform-plugin-testing's legacy
+// state shim used by TestCheckResourceAttr/RootModule().Resources lookups does not
+// support for_each string-keyed instances ("unexpected index type (string) ...,
+// for_each is not supported"), only count's integer-keyed instances.
+func TestBritiveProfileForEachDynamicAssociations(t *testing.T) {
+	applicationName := "DO NOT DELETE - Azure TF Plugin"
+	name := "AT - New Britive Profile ForEach Dynamic Test"
+	resourceName := "britive_profile.iterated.0"
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveProfileForEachDynamicAssociationsConfig(applicationName, name),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveProfileExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName, "associations.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "associations.0.type", "Environment"),
+					resource.TestCheckResourceAttr(resourceName, "associations.0.value", "Subscription 1"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveProfileForEachDynamicAssociationsConfig(applicationName, name string) string {
+	return fmt.Sprintf(`
+	data "britive_application" "app" {
+		name = "%s"
+	}
+
+	locals {
+		profiles = [
+			{
+				name         = "%s"
+				associations = [{ type = "Environment", value = "Subscription 1" }]
+			}
+		]
+	}
+
+	resource "britive_profile" "iterated" {
+		count = length(local.profiles)
+
+		app_container_id    = data.britive_application.app.id
+		name                 = local.profiles[count.index].name
+		expiration_duration  = "25m0s"
+
+		dynamic "associations" {
+			for_each = local.profiles[count.index].associations
+			content {
+				type  = associations.value.type
+				value = associations.value.value
+			}
+		}
+	}`, applicationName, name)
+}
+
+// TestBritiveProfileUnknownAssociationsFromDependency is a regression test: the
+// "associations" dynamic block is gated by britive_profile.trigger.id, an attribute
+// only known after apply since "trigger" is created in the same operation. This keeps
+// the associations Set unknown all the way through PlanResourceChange (unlike the
+// for_each+each.value case, which resolves by plan time), which previously crashed
+// ModifyPlan's req.Plan.Get into []ProfileAssociationModel.
+func TestBritiveProfileUnknownAssociationsFromDependency(t *testing.T) {
+	applicationName := "DO NOT DELETE - Azure TF Plugin"
+	triggerName := "AT - New Britive Profile Dependency Trigger"
+	name := "AT - New Britive Profile Unknown Associations Test"
+	resourceName := "britive_profile.modplan"
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveProfileUnknownAssociationsFromDependencyConfig(applicationName, triggerName, name),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveProfileExists(resourceName),
+					testAccCheckBritiveProfileExists("britive_profile.trigger"),
+					resource.TestCheckResourceAttr(resourceName, "associations.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "associations.0.type", "Environment"),
+					resource.TestCheckResourceAttr(resourceName, "associations.0.value", "Subscription 1"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveProfileUnknownAssociationsFromDependencyConfig(applicationName, triggerName, name string) string {
+	return fmt.Sprintf(`
+	data "britive_application" "app" {
+		name = "%s"
+	}
+
+	resource "britive_profile" "trigger" {
+		app_container_id    = data.britive_application.app.id
+		name                 = "%s"
+		expiration_duration  = "25m0s"
+	}
+
+	resource "britive_profile" "modplan" {
+		app_container_id    = data.britive_application.app.id
+		name                 = "%s"
+		expiration_duration  = "25m0s"
+
+		dynamic "associations" {
+			for_each = britive_profile.trigger.id == "" ? [] : [{ type = "Environment", value = "Subscription 1" }]
+			content {
+				type  = associations.value.type
+				value = associations.value.value
+			}
+		}
+	}`, applicationName, triggerName, name)
 }
