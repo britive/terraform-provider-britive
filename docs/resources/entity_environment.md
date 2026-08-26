@@ -10,7 +10,7 @@ description: |-
 
 This resource allows you to create and configure an application entity of the type "Environment".
 
--> This resource is only supported for Snowflake Standalone, AWS Standalone and Okta applications.
+-> This resource is only supported for Snowflake Standalone, AWS Standalone, Okta, Britive and Kubernetes applications.
 
 -> For applications created from the Britive console, the first entity must be created through the console so that this resource has a parent under which it can be created. This step is not needed for applications created via the Britive Terraform provider plugin.
 
@@ -191,6 +191,76 @@ resource "britive_entity_environment" "okta_env_1" {
 > - `userFilter`: Filter for specific users.
 > - `groupFilter`: Filter for specific groups.
 > - `scanRoles`: Enable scanning of roles.
+
+### Kubernetes Entity Environment
+
+```hcl
+resource "britive_application" "new_kubernetes" {
+    application_type = "Kubernetes"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "New Kubernetes"
+    }
+    properties {
+      name = "description"
+      value = "New Kubernetes Description"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = "43200"
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = true
+    }
+}
+
+resource "britive_entity_environment" "kubernetes_env_1" {
+  application_id  = britive_application.new_kubernetes.id
+  parent_group_id = britive_application.new_kubernetes.entity_root_environment_group_id
+
+  properties {
+    name  = "displayName"
+    value = "My Kubernetes Cluster"
+  }
+  properties {
+    name  = "description"
+    value = "My Kubernetes Cluster Description"
+  }
+  properties {
+    name  = "apiServerUrl"
+    value = "https://k8s.test.example.com"
+  }
+
+  sensitive_properties {
+    name  = "rsaPrivateKey"
+    value = file("${path.module}/k8s_rsa_private_key.pem")
+  }
+  sensitive_properties {
+    name  = "certificateAuthorityData"
+    value = file("${path.module}/k8s_ca.pem")
+  }
+}
+```
+
+-> `properties` and `sensitive_properties` in the above example are mandatory for creating a valid entity of type environment.
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
+
+~> `oidcIssuerUrl` and `clientId` are generated automatically by Britive when the Kubernetes environment is created and are read-only; they are not settable through this resource.
+
+>**Properties:**
+> - `displayName`: Environment Name.
+> - `description`: Environment Description.
+> - `apiServerUrl`: Kubernetes API server URL.
+
+>**Sensitive Properties:**
+> - `rsaPrivateKey`: RSA private key, base64 encoded.
+> - `certificateAuthorityData`: Certificate Authority (CA) certificate data.
 
 ## Argument Reference
 

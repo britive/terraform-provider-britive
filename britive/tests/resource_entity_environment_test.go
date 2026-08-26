@@ -19,6 +19,8 @@ func TestBritiveEntityEnvironment(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveEntityEnvironmentExists("britive_application.snowflake_standalone_new"),
 					testAccCheckBritiveEntityEnvironmentExists("britive_entity_environment.entity_environment_new"),
+					testAccCheckBritiveEntityEnvironmentExists("britive_application.kubernetes_new"),
+					testAccCheckBritiveEntityEnvironmentExists("britive_entity_environment.kubernetes_entity_environment_new"),
 				),
 			},
 		},
@@ -94,6 +96,55 @@ func testAccCheckBritiveEntityEnvironmentConfig() string {
 	sensitive_properties {
 		name = "privateKey"
 		value = "<Private-Key>"
+	}
+	}
+
+	resource "britive_application" "kubernetes_new" {
+    application_type = "Kubernetes"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - Kubernetes APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - Kubernetes APP DESC"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = true
+    }
+	}
+
+	resource "britive_entity_environment" "kubernetes_entity_environment_new" {
+	application_id = britive_application.kubernetes_new.id
+	parent_group_id = britive_application.kubernetes_new.entity_root_environment_group_id
+	properties {
+		name = "displayName"
+		value = "AT - Kubernetes Env"
+	}
+	properties {
+		name = "description"
+		value = "AT - Kubernetes Env Desc"
+	}
+	properties {
+		name = "apiServerUrl"
+		value = "https://test.k8surlsample.com"
+	}
+	sensitive_properties {
+		name = "rsaPrivateKey"
+		value = "<RSA-Private-Key>"
+	}
+	sensitive_properties {
+		name = "certificateAuthorityData"
+		value = "<Certificate-Authority-Data>"
 	}
 	}
 	`)

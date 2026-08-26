@@ -10,7 +10,7 @@ description: |-
 
 This resource allows you to create and manage applications in Britive.
 
--> This resource is supported only on Snowflake, Snowflake Standalone, GCP, GCP Standalone, GCP WIF, Google Workspace, AWS, AWS Standalone, Azure, Azure WIF, Okta, Britive, and Oracle WIF applications.
+-> This resource is supported only on Snowflake, Snowflake Standalone, GCP, GCP Standalone, GCP WIF, Google Workspace, AWS, AWS Standalone, Azure, Azure WIF, Okta, Britive, Oracle WIF, and Kubernetes applications.
 
 ## Example Usage
 
@@ -1072,11 +1072,47 @@ resource "britive_application" "britive_1" {
 > - `description`: Application Description.
 > - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
 
+### Kubernetes Application
+
+```hcl
+resource "britive_application" "kubernetes_1" {
+    application_type = "Kubernetes"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "Kubernetes App"
+    }
+    properties {
+      name = "description"
+      value = "Kubernetes App Desc"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 43200
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = true
+    }
+}
+```
+
+> **Properties:**
+> - `displayName`: Application Name.
+> - `description`: Application Description.
+> - `maxSessionDurationForProfiles`: Maximum session duration for profiles.
+> - `displayProgrammaticKeys`: Display programmatic access keys.
+
+Once created, environment groups and environments (Kubernetes clusters) for this application can be managed with the [`britive_entity_group`](entity_group.md) and [`britive_entity_environment`](entity_environment.md) resources, using `entity_root_environment_group_id` as the root `parent_id`/`parent_group_id`.
+
 ## Argument Reference
 
 The following arguments are supported:
 
-* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone`, `GCP WIF`, `Google Workspace`, `AWS`, `AWS Standalone`, `Azure`, `Azure WIF`, `Okta`, `Britive` and `Oracle WIF`.
+* `application_type` - (Required) The type of the application. Supported types are `Snowflake`, `Snowflake Standalone`, `GCP`, `GCP Standalone`, `GCP WIF`, `Google Workspace`, `AWS`, `AWS Standalone`, `Azure`, `Azure WIF`, `Okta`, `Britive`, `Oracle WIF` and `Kubernetes`.
 
 * `version` - (Optional) The version of the application resource.  
   If specified, it must match a supported version for the selected `application_type`.  
@@ -1103,7 +1139,7 @@ In addition to the above arguments, the following attributes are exported.
 
 * `catalog_app_id` - The identifier of the application type in the Britive catalog.
 
-* `entity_root_environment_group_id` - The root environment group ID (only for AWS Standalone, Okta, Snowflake Standalone, and Britive applications).
+* `entity_root_environment_group_id` - The root environment group ID (only for AWS Standalone, Okta, Snowflake Standalone, Britive, and Kubernetes applications).
 
 ## Import
 

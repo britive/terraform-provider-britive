@@ -1,3 +1,8 @@
+## 3.0.2
+
+ENHANCEMENTS:
+* **Resource:** `britive_application` : Added support for `Kubernetes` as a new `application_type`, including `entity_root_environment_group_id` support so `britive_entity_group` and `britive_entity_environment` can be used to manage Kubernetes environment groups and environments.
+
 ## 3.0.1
 
 BUG FIXES:

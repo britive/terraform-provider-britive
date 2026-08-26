@@ -10,7 +10,7 @@ description: |-
 
 This resource allows you to create and configure an application entity of the type "Environment Group".
 
--> This resource is only supported for Snowflake Standalone, AWS Standalone and Okta applications.
+-> This resource is only supported for Snowflake Standalone, AWS Standalone, Okta, Britive and Kubernetes applications.
 
 -> For applications created from the Britive console, the first entity must be created through the console so that this resource has a parent under which it can be created. This step is not needed for applications created via the Britive Terraform provider plugin.
 
@@ -63,11 +63,43 @@ resource "britive_entity_group" "AWS_Env_Group" {
     parent_id          = "asjdhuhxxdccudhd"
 }
 
+# Example: Kubernetes EnvironmentGroup
+resource "britive_application" "new_kubernetes" {
+    application_type = "Kubernetes"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "New Kubernetes"
+    }
+    properties {
+      name = "description"
+      value = "New Kubernetes Description"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = "43200"
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = true
+    }
+}
+
+resource "britive_entity_group" "kubernetes_env_group" {
+    application_id     = britive_application.new_kubernetes.id
+    entity_name        = "My Kubernetes Entity Group"
+    entity_description = "My Kubernetes Entity Group Description"
+    parent_id          = britive_application.new_kubernetes.entity_root_environment_group_id
+}
+
 ```
 
 ## Argument Reference
 
-The following arguments are supported for Snowflake Standalone, AWS Standalone and Okta applications:
+The following arguments are supported for Snowflake Standalone, AWS Standalone, Okta, Britive and Kubernetes applications:
 * `application_id` - (Required, ForceNew) The identity of the Britive application.
 * `entity_name` - (Required) The name of the environment group entity to be created.
 * `entity_description` - (Required) Description of the environment group entity.
