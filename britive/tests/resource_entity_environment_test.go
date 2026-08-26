@@ -139,10 +139,6 @@ func testAccCheckBritiveEntityEnvironmentConfig() string {
 		value = "https://test.k8surlsample.com"
 	}
 	sensitive_properties {
-		name = "rsaPrivateKey"
-		value = "<RSA-Private-Key>"
-	}
-	sensitive_properties {
 		name = "certificateAuthorityData"
 		value = "<Certificate-Authority-Data>"
 	}
