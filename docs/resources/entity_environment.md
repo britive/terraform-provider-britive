@@ -237,10 +237,6 @@ resource "britive_entity_environment" "kubernetes_env_1" {
   }
 
   sensitive_properties {
-    name  = "rsaPrivateKey"
-    value = file("${path.module}/k8s_rsa_private_key.pem")
-  }
-  sensitive_properties {
     name  = "certificateAuthorityData"
     value = file("${path.module}/k8s_ca.pem")
   }
@@ -259,7 +255,6 @@ resource "britive_entity_environment" "kubernetes_env_1" {
 > - `apiServerUrl`: Kubernetes API server URL.
 
 >**Sensitive Properties:**
-> - `rsaPrivateKey`: RSA private key, base64 encoded.
 > - `certificateAuthorityData`: Certificate Authority (CA) certificate data.
 
 ## Argument Reference
