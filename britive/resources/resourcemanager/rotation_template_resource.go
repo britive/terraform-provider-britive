@@ -148,11 +148,8 @@ func (r *RotationTemplateResource) Schema(_ context.Context, _ resource.SchemaRe
 				},
 			},
 			"script_name": schema.StringAttribute{
-				Description: "Server-derived script file name: the basename of script_file_path for FilePath mode, an auto-generated name for InlineFile mode, absent for Local mode",
+				Description: "Server-derived script file name: the basename of script_file_path for FilePath mode, an auto-generated name for InlineFile mode, absent for Local mode. Predicted at plan time by ModifyPlan rather than via a plan modifier - see its comment for why.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -275,6 +272,15 @@ func (r *RotationTemplateResource) ModifyPlan(ctx context.Context, req resource.
 		return
 	}
 
+	var state RotationTemplateResourceModel
+	hasPriorState := !req.State.Raw.IsNull()
+	if hasPriorState {
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	// When description is absent from config (null), force plan to null so that a
 	// Computed+Optional field does not carry forward a prior-state value.
 	if config.Description.IsNull() && !plan.Description.IsNull() {
@@ -285,20 +291,13 @@ func (r *RotationTemplateResource) ModifyPlan(ctx context.Context, req resource.
 	// description update (confirmed by capture - absent from every PUT body observed).
 	// Unlike name, this is deliberately NOT RequiresReplace - reject the change outright
 	// instead of silently forcing a destroy+recreate the user didn't ask for.
-	if !req.State.Raw.IsNull() {
-		var state RotationTemplateResourceModel
-		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		if !plan.Description.Equal(state.Description) {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("description"),
-				"Cannot Update Description",
-				"The rotation template's description cannot be changed after creation - the API does not support updating it. Revert description to its current value, or destroy and recreate the resource if a different description is required.",
-			)
-			return
-		}
+	if hasPriorState && !plan.Description.Equal(state.Description) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("description"),
+			"Cannot Update Description",
+			"The rotation template's description cannot be changed after creation - the API does not support updating it. Revert description to its current value, or destroy and recreate the resource if a different description is required.",
+		)
+		return
 	}
 
 	// Compute the script file hash if a file is specified; clear to null when not using
@@ -313,6 +312,45 @@ func (r *RotationTemplateResource) ModifyPlan(ctx context.Context, req resource.
 		plan.ScriptFileHash = types.StringValue(newHash)
 	} else {
 		plan.ScriptFileHash = types.StringNull()
+	}
+
+	// Predict script_name to match what uploadScript will actually produce at apply time.
+	// script_name has no UseStateForUnknown modifier precisely because of this: for FilePath
+	// mode it's derived from script_file_path (filepath.Base), which can change on update, so
+	// blindly carrying forward the prior state's value would make the plan promise "no change"
+	// right before apply produces a different real value - which the provider protocol treats
+	// as a bug ("inconsistent result after apply"). Computing it explicitly here whenever
+	// possible avoids both that and the unrelated "(known after apply)" churn on every plan.
+	switch strings.ToLower(plan.TemplateType.ValueString()) {
+	case "filepath":
+		if !plan.ScriptFilePath.IsNull() && plan.ScriptFilePath.ValueString() != "" {
+			plan.ScriptName = types.StringValue(filepath.Base(plan.ScriptFilePath.ValueString()))
+		} else {
+			plan.ScriptName = types.StringNull()
+		}
+	case "inlinefile":
+		// The auto-generated name is "{template_id}_rotation_template_file" (see
+		// uploadScript) and template_id never changes for an existing resource, so this is
+		// stable and predictable once template_id is known. For a brand-new resource being
+		// created, template_id is still unknown at plan time - script_name genuinely can't
+		// be predicted yet, so leave it as whatever the attribute's own Computed default
+		// (unknown) already produced; that's an honest "(known after apply)", not a stale
+		// promise, so it doesn't trigger the consistency check.
+		if !plan.TemplateID.IsNull() && !plan.TemplateID.IsUnknown() && plan.TemplateID.ValueString() != "" {
+			plan.ScriptName = types.StringValue(plan.TemplateID.ValueString() + "_rotation_template_file")
+		}
+	default: // local
+		// Confirmed by capture: switching to Local does not clear a previously-set
+		// scriptName server-side - uploadScript is a no-op in this mode, so Update() omits
+		// the field entirely, and (like name/description) the API leaves omitted fields
+		// untouched rather than clearing them. So for an existing resource, predict "no
+		// change" by carrying forward prior state; only a resource that's Local from
+		// creation (no prior state) genuinely never had one.
+		if hasPriorState {
+			plan.ScriptName = state.ScriptName
+		} else {
+			plan.ScriptName = types.StringNull()
+		}
 	}
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
@@ -377,7 +415,10 @@ func (r *RotationTemplateResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	r.mapModelToResource(full, &plan, false)
+	if err := r.mapModelToResource(full, &plan, false); err != nil {
+		resp.Diagnostics.AddError("Error Reading Rotation Template Script Content", err.Error())
+		return
+	}
 
 	log.Printf("[INFO] Created rotation template: %s", templateID)
 
@@ -407,7 +448,10 @@ func (r *RotationTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	r.mapModelToResource(template, &state, false)
+	if err := r.mapModelToResource(template, &state, false); err != nil {
+		resp.Diagnostics.AddError("Error Reading Rotation Template Script Content", err.Error())
+		return
+	}
 
 	log.Printf("[INFO] Retrieved rotation template: %s", templateID)
 
@@ -454,7 +498,10 @@ func (r *RotationTemplateResource) Update(ctx context.Context, req resource.Upda
 	plan.ID = state.ID
 	plan.TemplateID = state.TemplateID
 
-	r.mapModelToResource(full, &plan, false)
+	if err := r.mapModelToResource(full, &plan, false); err != nil {
+		resp.Diagnostics.AddError("Error Reading Rotation Template Script Content", err.Error())
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -505,12 +552,14 @@ func (r *RotationTemplateResource) ImportState(ctx context.Context, req resource
 	state.ResourceTypeID = types.StringValue(fmt.Sprintf("resource-manager/resource-types/%s", resourceTypeID))
 	state.TemplateID = types.StringValue(templateID)
 
-	r.mapModelToResource(template, &state, true)
+	if err := r.mapModelToResource(template, &state, true); err != nil {
+		resp.Diagnostics.AddError("Error Getting Rotation Template Script Content", err.Error())
+		return
+	}
 
-	// script_file_path/script_content aren't recoverable from the API on import (the API
-	// only exposes uploaded content via a presigned download URL, not as plan-comparable
-	// local state) - they stay null; the next plan will show them as needing to be set if
-	// drift detection against a local source is wanted after import.
+	// script_file_path (FilePath mode) isn't recoverable from the API on import - only the
+	// original local path was ever known, not by the provider. script_content (InlineFile
+	// mode) IS recovered above via presigned download, so it's already populated correctly.
 
 	log.Printf("[INFO] Imported rotation template: %s", templateID)
 
@@ -602,7 +651,19 @@ func canonicalVariableType(t string) string {
 // case-only diff on every plan. Mirroring resource_type_resource.go's paramMap trick: when
 // not importing, and the API's value case-insensitively matches what's already in state,
 // keep the user's original casing instead of overwriting it.
-func (r *RotationTemplateResource) mapModelToResource(template *britive.RotationTemplate, state *RotationTemplateResourceModel, imported bool) {
+//
+// This also downloads the live script content for drift detection, so that an out-of-band
+// edit made directly on the backend shows up as a plan diff instead of going unnoticed:
+//   - InlineFile mode: written straight into script_content, a plain Optional (not Computed)
+//     attribute - Terraform's normal diff logic compares that refreshed state against config.
+//   - FilePath mode: script_content isn't applicable (the local file is the source of truth,
+//     not remote content), so instead the remote content's hash is written into
+//     script_file_hash. ModifyPlan independently computes that same attribute from the local
+//     file's hash; a mismatch between the two shows up as a diff and triggers Update(), which
+//     unconditionally re-uploads the local file.
+//
+// Returns an error if a download fails.
+func (r *RotationTemplateResource) mapModelToResource(template *britive.RotationTemplate, state *RotationTemplateResourceModel, imported bool) error {
 	state.Name = types.StringValue(template.Name)
 	state.Description = preserveOptionalString(template.Description, state.Description)
 	// Converting back from the wire's seconds to the schema's minutes; see buildUpdatePayload.
@@ -651,6 +712,48 @@ func (r *RotationTemplateResource) mapModelToResource(template *britive.Rotation
 		})
 	}
 	state.Variables = variables
+
+	switch {
+	case template.IsLocal:
+		// No script exists in this mode - clear any value left over from a prior mode
+		// (e.g. switching template_type away from InlineFile/FilePath) so state matches
+		// what ValidateConfig already requires of config here.
+		state.ScriptContent = types.StringNull()
+		state.ScriptFileHash = types.StringNull()
+
+	case template.InlineFile:
+		// InlineFile mode: script_content IS the tracked source of truth, so overwrite it
+		// with the live remote content directly - see the doc comment above for how that
+		// drives drift detection. script_file_hash isn't applicable here.
+		if template.PresignedURL != "" {
+			content, err := r.client.DownloadRotationTemplateScript(template.PresignedURL)
+			if err != nil {
+				return err
+			}
+			state.ScriptContent = types.StringValue(content)
+		}
+		state.ScriptFileHash = types.StringNull()
+
+	default:
+		// FilePath mode: the tracked source of truth is the *local* file at script_file_path,
+		// not remote content, so we can't overwrite script_file_path itself the way InlineFile
+		// overwrites script_content. Instead, hash the live remote content and write that into
+		// script_file_hash (a Computed attribute) - ModifyPlan independently computes that same
+		// attribute's planned value from the local file's hash. When someone edits the backend
+		// out-of-band those two hashes diverge, Terraform shows it as a plan diff on
+		// script_file_hash, and applying it calls Update(), which unconditionally re-uploads
+		// the local file - restoring the backend to match the local source of truth.
+		state.ScriptContent = types.StringNull()
+		if template.PresignedURL != "" {
+			content, err := r.client.DownloadRotationTemplateScript(template.PresignedURL)
+			if err != nil {
+				return err
+			}
+			state.ScriptFileHash = types.StringValue(hashBytes([]byte(content)))
+		}
+	}
+
+	return nil
 }
 
 // lastPathSegment strips any composite-ID path prefix (e.g. a cross-resource reference

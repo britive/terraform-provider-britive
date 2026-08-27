@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -166,6 +167,35 @@ func (c *Client) UploadRotationTemplateScriptFile(resourceTypeID string, templat
 	}
 
 	return uploadRotationTemplateScript(presignedURL, content, "application/octet-stream")
+}
+
+// DownloadRotationTemplateScript fetches a rotation template's current script content from
+// its presigned download URL (the RotationTemplate.PresignedURL field returned alongside
+// GetRotationTemplate's detail response). Used for InlineFile-mode drift detection: Read()
+// compares this live content against the configured script_content so out-of-band edits on
+// the backend show up as a plan diff instead of going unnoticed. Not called for Local mode
+// (no script exists) or FilePath mode (script_content isn't the tracked source of truth there).
+func (c *Client) DownloadRotationTemplateScript(presignedURL string) (string, error) {
+	req, err := http.NewRequest("GET", presignedURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error downloading rotation template script: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("error downloading rotation template script: status %s", resp.Status)
+	}
+
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading rotation template script response: %w", err)
+	}
+	return string(content), nil
 }
 
 // uploadRotationTemplateScript performs the actual presigned-URL PUT and, unlike

@@ -708,6 +708,14 @@ func hashFileContent(filePath string) (string, error) {
 		return "", fmt.Errorf("error reading file %s: %w", filePath, err)
 	}
 
+	return hashBytes(content), nil
+}
+
+// hashBytes computes the SHA-256 hex digest of the given content. Shared building block for
+// hashFileContent (hashing a local file) and for hashing downloaded remote content (rotation
+// template FilePath-mode drift detection: comparing what's on disk against what's actually
+// stored on the backend).
+func hashBytes(content []byte) string {
 	hash := sha256.Sum256(content)
-	return hex.EncodeToString(hash[:]), nil
+	return hex.EncodeToString(hash[:])
 }
