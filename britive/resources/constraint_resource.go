@@ -324,17 +324,14 @@ func (r *ConstraintResource) Read(ctx context.Context, req resource.ReadRequest,
 		newExpression := state.Expression.ValueString()
 		newDescription := state.Description.ValueString()
 
-		if britive.ConditionConstraintEqual(newTitle, newExpression, newDescription, result) {
-			state.Title = types.StringValue(newTitle)
-			state.Expression = types.StringValue(newExpression)
-			state.Description = types.StringValue(newDescription)
-		} else {
-			// Update with first matching result
-			if len(result.Result) > 0 {
-				state.Title = types.StringValue(result.Result[0].Title)
-				state.Expression = types.StringValue(result.Result[0].Expression)
-				state.Description = types.StringValue(result.Result[0].Description)
-			}
+		if !britive.ConditionConstraintEqual(newTitle, newExpression, newDescription, result) && len(result.Result) > 0 {
+			// Update with first matching result. Preserve null vs "" on the
+			// remote's empty values, or a null plan diffs forever against a
+			// materialized "" and (since every field is RequiresReplace)
+			// forces a spurious destroy+recreate.
+			state.Title = preserveEmptyConstraintString(result.Result[0].Title, state.Title)
+			state.Expression = preserveEmptyConstraintString(result.Result[0].Expression, state.Expression)
+			state.Description = preserveEmptyConstraintString(result.Result[0].Description, state.Description)
 		}
 	} else {
 		// Read regular constraint
@@ -354,13 +351,8 @@ func (r *ConstraintResource) Read(ctx context.Context, req resource.ReadRequest,
 		// Find matching constraint
 		newName := state.Name.ValueString()
 
-		if britive.ConstraintEqual(newName, result) {
-			state.Name = types.StringValue(newName)
-		} else {
-			// Update with first matching result
-			if len(result.Result) > 0 {
-				state.Name = types.StringValue(result.Result[0].Name)
-			}
+		if !britive.ConstraintEqual(newName, result) && len(result.Result) > 0 {
+			state.Name = preserveEmptyConstraintString(result.Result[0].Name, state.Name)
 		}
 	}
 
@@ -563,14 +555,10 @@ func (r *ConstraintResource) populateStateFromAPI(ctx context.Context, state *Co
 		newExpression := state.Expression.ValueString()
 		newDescription := state.Description.ValueString()
 
-		if britive.ConditionConstraintEqual(newTitle, newExpression, newDescription, result) {
-			state.Title = types.StringValue(newTitle)
-			state.Expression = types.StringValue(newExpression)
-			state.Description = types.StringValue(newDescription)
-		} else if len(result.Result) > 0 {
-			state.Title = types.StringValue(result.Result[0].Title)
-			state.Expression = types.StringValue(result.Result[0].Expression)
-			state.Description = types.StringValue(result.Result[0].Description)
+		if !britive.ConditionConstraintEqual(newTitle, newExpression, newDescription, result) && len(result.Result) > 0 {
+			state.Title = preserveEmptyConstraintString(result.Result[0].Title, state.Title)
+			state.Expression = preserveEmptyConstraintString(result.Result[0].Expression, state.Expression)
+			state.Description = preserveEmptyConstraintString(result.Result[0].Description, state.Description)
 		}
 	} else {
 		result, err := r.client.GetConstraint(profileID, permissionName, permissionType, constraintType)
@@ -580,14 +568,26 @@ func (r *ConstraintResource) populateStateFromAPI(ctx context.Context, state *Co
 
 		newName := state.Name.ValueString()
 
-		if britive.ConstraintEqual(newName, result) {
-			state.Name = types.StringValue(newName)
-		} else if len(result.Result) > 0 {
-			state.Name = types.StringValue(result.Result[0].Name)
+		if !britive.ConstraintEqual(newName, result) && len(result.Result) > 0 {
+			state.Name = preserveEmptyConstraintString(result.Result[0].Name, state.Name)
 		}
 	}
 
 	return nil
+}
+
+// preserveEmptyConstraintString maps an API string field back into state,
+// preserving the null vs "" distinction of the prior value when the API
+// returns "". Every constraint field is RequiresReplace, so materializing ""
+// where the plan/prior state was null would force a spurious destroy+recreate.
+func preserveEmptyConstraintString(apiValue string, priorState types.String) types.String {
+	if apiValue == "" {
+		if priorState.IsNull() {
+			return types.StringNull()
+		}
+		return types.StringValue("")
+	}
+	return types.StringValue(apiValue)
 }
 
 // Helper functions
