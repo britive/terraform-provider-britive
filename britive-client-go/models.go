@@ -499,9 +499,32 @@ type RotationTemplate struct {
 	UpdatedBy      string                     `json:"updatedBy,omitempty"`
 }
 
-// RotationTemplatePresignedURL - response body of the rotation-templates presigned-url endpoint.
-type RotationTemplatePresignedURL struct {
+// PresignedURLResponse - response body of a presigned-url endpoint (shared shape between
+// rotation templates' and scan settings' presigned-url endpoints).
+type PresignedURLResponse struct {
 	PresignedURL string `json:"presignedUrl"`
+}
+
+// ScanSettings - a resource type's scan settings. Unlike RotationTemplate, this is a
+// singleton per resource type (no name/description, created via an idempotent PUT rather
+// than POST-then-PUT) - see resource_manager_resource_type_scan_settings.go's doc comment.
+// ScriptName intentionally has no `omitempty`: confirmed by capture that the API honors an
+// explicit "" (clearing a previously-set script name on switching to Local), unlike
+// RotationTemplate where the field is only ever added, never explicitly cleared.
+type ScanSettings struct {
+	ID             string                     `json:"id,omitempty"`
+	ResourceTypeID string                     `json:"resourceTypeId,omitempty"`
+	ScriptName     string                     `json:"scriptName"`
+	TimeoutLimit   int                        `json:"timeoutLimit"`
+	IsLocal        bool                       `json:"isLocal"`
+	InlineFile     bool                       `json:"inlineFile"`
+	EditorType     string                     `json:"editorType,omitempty"`
+	Variables      []RotationTemplateVariable `json:"variables"`
+	PresignedURL   string                     `json:"presignedUrl,omitempty"`
+	CreatedOn      string                     `json:"createdOn,omitempty"`
+	CreatedBy      string                     `json:"createdBy,omitempty"`
+	UpdatedOn      string                     `json:"updatedOn,omitempty"`
+	UpdatedBy      string                     `json:"updatedBy,omitempty"`
 }
 
 // ResourceTypePermission - Model for resource type permissions

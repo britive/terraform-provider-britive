@@ -23,6 +23,7 @@ const (
 	responseTemplateLockName         = "responseTemplate"
 	resourceTypePermissions          = "resourceTypePermissions"
 	rotationTemplateLockName         = "rotationTemplate"
+	scanSettingsLockName             = "scanSettings"
 	resourceLabelLockName            = "resourceLabel"
 	resourceManagerProfileLock       = "resourceManagerProfile"
 	resourceManagerProfilePolicyLock = "resourceManagerProfilePolicy"
