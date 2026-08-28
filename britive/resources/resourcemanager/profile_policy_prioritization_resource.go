@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -15,6 +16,20 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// rmProfilePolicyPriorityLocks serializes Create/Update/Delete per profile ID.
+// See the equivalent lock in resources.profilePolicyPriorityLocks: the API
+// reorders a resource manager profile's whole policy list on every write, so
+// concurrent applies of multiple policy_priority resources against the same
+// profile must not interleave their read-modify-write cycles.
+var rmProfilePolicyPriorityLocks sync.Map
+
+func lockRMProfilePolicyPriority(profileID string) func() {
+	value, _ := rmProfilePolicyPriorityLocks.LoadOrStore(profileID, &sync.Mutex{})
+	mutex := value.(*sync.Mutex)
+	mutex.Lock()
+	return mutex.Unlock
+}
 
 var (
 	_ resource.Resource                   = &RMProfilePolicyPrioritizationResource{}
@@ -132,6 +147,9 @@ func (r *RMProfilePolicyPrioritizationResource) Create(ctx context.Context, req 
 	profileID := parseRMProfileID(plan.ProfileID.ValueString())
 	policyOrderingEnabled := plan.PolicyPriorityEnabled.ValueBool()
 
+	unlock := lockRMProfilePolicyPriority(profileID)
+	defer unlock()
+
 	if err := r.client.EnableDisableResourceManagerPolicyPrioritization(profileID, policyOrderingEnabled); err != nil {
 		resp.Diagnostics.AddError("Error Enabling Policy Prioritization", err.Error())
 		return
@@ -184,6 +202,9 @@ func (r *RMProfilePolicyPrioritizationResource) Update(ctx context.Context, req 
 	profileID := parseRMProfileID(plan.ProfileID.ValueString())
 	policyOrderingEnabled := plan.PolicyPriorityEnabled.ValueBool()
 
+	unlock := lockRMProfilePolicyPriority(profileID)
+	defer unlock()
+
 	if err := r.client.EnableDisableResourceManagerPolicyPrioritization(profileID, policyOrderingEnabled); err != nil {
 		resp.Diagnostics.AddError("Error Updating Policy Prioritization", err.Error())
 		return
@@ -219,6 +240,9 @@ func (r *RMProfilePolicyPrioritizationResource) Delete(ctx context.Context, req 
 	}
 
 	profileID := parseRMPolicyPrioritizationID(state.ID.ValueString())
+
+	unlock := lockRMProfilePolicyPriority(profileID)
+	defer unlock()
 
 	if err := r.client.EnableDisableResourceManagerPolicyPrioritization(profileID, false); err != nil {
 		resp.Diagnostics.AddError("Error Disabling Policy Prioritization", err.Error())

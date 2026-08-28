@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -15,6 +16,23 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// profilePolicyPriorityLocks serializes Create/Update/Delete per profile ID.
+// The Britive API reorders the whole profile's policy list on every write, so
+// when several britive_profile_policy_prioritization resources target the same
+// profile (e.g. one block per policy), Terraform's parallel apply lets their
+// read-modify-write cycles interleave: one resource's PrioritizePolicies call
+// stomps another's, and the read-back afterward no longer matches what was
+// planned, producing "Provider produced inconsistent result after apply". This
+// lock forces those cycles to run one at a time per profile.
+var profilePolicyPriorityLocks sync.Map
+
+func lockProfilePolicyPriority(profileID string) func() {
+	value, _ := profilePolicyPriorityLocks.LoadOrStore(profileID, &sync.Mutex{})
+	mutex := value.(*sync.Mutex)
+	mutex.Lock()
+	return mutex.Unlock
+}
 
 var (
 	_ resource.Resource                   = &ProfilePolicyPrioritizationResource{}
@@ -140,6 +158,9 @@ func (r *ProfilePolicyPrioritizationResource) Create(ctx context.Context, req re
 	profileID := plan.ProfileID.ValueString()
 	policyOrderingEnabled := plan.PolicyPriorityEnabled.ValueBool()
 
+	unlock := lockProfilePolicyPriority(profileID)
+	defer unlock()
+
 	// Build policy priority model
 	resourcePolicyPriority, err := r.mapResourceToModel(ctx, &plan)
 	if err != nil {
@@ -253,6 +274,9 @@ func (r *ProfilePolicyPrioritizationResource) Update(ctx context.Context, req re
 	profileID := plan.ProfileID.ValueString()
 	policyOrderingEnabled := plan.PolicyPriorityEnabled.ValueBool()
 
+	unlock := lockProfilePolicyPriority(profileID)
+	defer unlock()
+
 	// Build policy priority model
 	resourcePolicyPriority, err := r.mapResourceToModel(ctx, &plan)
 	if err != nil {
@@ -319,6 +343,9 @@ func (r *ProfilePolicyPrioritizationResource) Delete(ctx context.Context, req re
 	}
 
 	profileID := parseProfilePolicyPrioritizationID(state.ID.ValueString())
+
+	unlock := lockProfilePolicyPriority(profileID)
+	defer unlock()
 
 	// Disable policy prioritization
 	profileSummary, err := r.client.GetProfileSummary(profileID)
