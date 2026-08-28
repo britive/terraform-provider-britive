@@ -726,7 +726,7 @@ func (r *RotationTemplateResource) mapModelToResource(template *britive.Rotation
 		// with the live remote content directly - see the doc comment above for how that
 		// drives drift detection. script_file_hash isn't applicable here.
 		if template.PresignedURL != "" {
-			content, err := r.client.DownloadRotationTemplateScript(template.PresignedURL)
+			content, err := r.client.DownloadPresignedContent(template.PresignedURL)
 			if err != nil {
 				return err
 			}
@@ -745,7 +745,7 @@ func (r *RotationTemplateResource) mapModelToResource(template *britive.Rotation
 		// the local file - restoring the backend to match the local source of truth.
 		state.ScriptContent = types.StringNull()
 		if template.PresignedURL != "" {
-			content, err := r.client.DownloadRotationTemplateScript(template.PresignedURL)
+			content, err := r.client.DownloadPresignedContent(template.PresignedURL)
 			if err != nil {
 				return err
 			}
