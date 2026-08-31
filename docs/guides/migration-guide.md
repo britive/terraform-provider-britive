@@ -1,13 +1,13 @@
 ---
-page_title: "Migrating to the Terraform Plugin Framework (v3.0.0)"
+page_title: "Migrating to the Terraform Plugin Framework (v3.0.2)"
 subcategory: ""
 description: |-
-  What changed in the Britive provider v3.0.0 rewrite, what is new, the risks involved, how to back up your state before upgrading, what to expect on your first plan after upgrading, and how to roll back to the legacy SDK-based provider if you hit an issue.
+  What changed in the Britive provider v3.x rewrite, which v3 release to upgrade to, what is new, the risks involved, how to back up your state before upgrading, what to expect on your first plan after upgrading, and how to roll back to the legacy SDK-based provider if you hit an issue.
 ---
 
 
 
-# Migrating to the Terraform Plugin Framework (v3.0.0)
+# Migrating to the Terraform Plugin Framework (v3.0.2)
 
 
 
@@ -18,12 +18,20 @@ implementation used in v2.x releases (up to and including **v2.3.6**).
 
 
 
+**v3.0.2** is the current release and the recommended upgrade target — it is the same rewrite plus fixes
+accumulated across v3.0.1 and v3.0.2 for issues found during early v3.0.0 upgrades. See
+[Which v3 release to upgrade to](#which-v3-release-to-upgrade-to). Everything else in this guide applies to
+the whole v3.x series.
+
+
+
 This guide explains:
 
 
 
 - Why this migration happened and what it means for you.
-- What is unchanged, and what new functionality v3.0.0 adds.
+- Which v3 release to upgrade to, and what v3.0.1 and v3.0.2 fix.
+- What is unchanged, and what new functionality v3.x adds.
 - The risks involved, since this is a **full internal rewrite**, not an incremental change.
 - How to **back up your Terraform state** before upgrading.
 - What to expect on your **first plan and refresh** after upgrading.
@@ -53,13 +61,13 @@ capabilities. Rewriting the Britive provider on the Plugin Framework lets us:
 
 
 
-Your existing configuration should not need any edits to work with v3.0.0.
+Your existing configuration should not need any edits to work with v3.x.
 
 
 
 - **Existing schemas are unchanged.** Every resource and data source argument, attribute name, and nested
   block keeps the same name, type, and nesting as in v2.3.x. Nothing was renamed, retyped, or removed.
-- **The provider surface is unchanged.** v3.0.0 registers the same **28 resources and 10 data sources** as
+- **The provider surface is unchanged.** v3.x registers the same **28 resources and 10 data sources** as
   v2.3.x — none added, none removed.
 - **Terraform state format is compatible.** You should not need to run `terraform state mv`, re-import
   resources, or otherwise manually migrate state.
@@ -67,11 +75,79 @@ Your existing configuration should not need any edits to work with v3.0.0.
 
 
 
-## What is new in v3.0.0
+## Which v3 release to upgrade to
 
 
 
-Alongside the rewrite, v3.0.0 adds new optional functionality. These additions are purely additive: existing
+The Plugin Framework rewrite first shipped in **v3.0.0**. **v3.0.2** is the current release and the
+recommended target — the same rewrite, plus the fixes below accumulated across v3.0.1 and v3.0.2 for issues
+found during early v3.0.0 upgrades.
+
+
+
+**v3.0.1** fixed:
+
+
+
+- `dynamic` blocks driven by `for_each`/`count` could fail with `Value Conversion Error: Received unknown
+  value, however the target type cannot handle unknown values` on `britive_profile`, `britive_tag_owner`,
+  `britive_resource_manager_resource_type_permission`, `britive_resource_manager_profile_permission`, and
+  `britive_resource_manager_resource_label`.
+- Several `terraform import` ID formats documented for v2.3.6 were dropped in v3.0.0; restored for
+  `britive_resource_manager_resource`, `britive_profile`, `britive_resource_manager_resource_label`, and
+  `britive_tag_member`.
+- `britive_resource_manager_resource` import errored with `Value Conversion Error: MISSING TYPE` in some cases.
+
+
+
+**v3.0.2** additionally fixed, on resources whose state predates a v3.x Read fix and hasn't yet been
+refreshed (most likely with `terraform apply -refresh=false` or a saved plan generated that way):
+
+
+
+- `britive_profile`: `Provider produced inconsistent result after apply` on `app_name`.
+- `britive_constraint`: spurious destroy-and-recreate caused by `name`/`title`/`expression`/`description`.
+- `britive_profile_policy_prioritization`, `britive_resource_manager_profile_policy_prioritization`:
+  `Provider produced inconsistent result after apply` on `policy_priority`.
+- `britive_resource_manager_response_template`: `Provider produced inconsistent result after apply` on
+  `template_id`.
+
+
+
+None of these indicate a problem with your Britive tenant. For the three "inconsistent result" cases, the
+underlying update had already succeeded — only the local consistency check failed. `britive_constraint` is
+the exception: it forced a real destroy-and-recreate, so treat any resulting downtime as a real event.
+
+
+
+Pin it explicitly so `terraform init -upgrade` does not leave you on an older v3.x release:
+
+
+
+```hcl
+terraform {
+  required_providers {
+    britive = {
+      source  = "britive/britive"
+      version = "3.0.2"
+    }
+  }
+}
+```
+
+
+
+If you have already upgraded to v3.0.0 or v3.0.1, move to v3.0.2: it is a bug-fix release on the same schemas
+and state format, so there is no additional migration work — change the version constraint and run
+`terraform init -upgrade`.
+
+
+
+## What is new in v3.x
+
+
+
+Alongside the rewrite, v3.x adds new optional functionality. These additions are purely additive: existing
 configurations continue to work untouched, and you do not need to adopt any of it as part of the upgrade.
 
 
@@ -84,6 +160,9 @@ configurations continue to work untouched, and you do not need to adopt any of i
   gain `prompt_at_checkout` and `regex_pattern`, so a value can be supplied by the user at checkout instead
   of being stored in configuration. Password-type variables require `prompt_at_checkout = true` and never
   carry a value in configuration.
+- **Kubernetes applications (v3.0.2).** `britive_application` gains `Kubernetes` as a new `application_type`,
+  including `entity_root_environment_group_id` support so `britive_entity_group` and
+  `britive_entity_environment` can be used to manage Kubernetes environment groups and environments.
 
 
 
@@ -122,10 +201,11 @@ This is materially different from a typical point release, and it carries more r
 
 
 1. **Back up your state** for every workspace that uses this provider (see [below](#back-up-your-terraform-state-before-upgrading)).
-   This step is load-bearing, not precautionary: once v3.0.0 has written state — even via a refresh with zero
+   This step is load-bearing, not precautionary: once v3.x has written state — even via a refresh with zero
    infrastructure changes — that state can no longer be read by v2.3.x, and the backup is the only rollback
    path.
-2. Upgrade a **non-production** workspace/environment first.
+2. Upgrade a **non-production** workspace/environment first, pinning v3.0.2 (see
+   [Which v3 release to upgrade to](#which-v3-release-to-upgrade-to)).
 3. Run `terraform plan` and carefully review the output:
    - ✅ Expected: **no changes** (`No changes. Your infrastructure matches the configuration.`).
    - ⚠️ Investigate: any unexpected diff, especially destroy/recreate actions, before running `terraform apply`.
@@ -142,18 +222,18 @@ This is materially different from a typical point release, and it carries more r
 
 
 
-On the first plan or refresh under v3.0.0, Terraform is likely to report a block titled **"Note: Objects have
+On the first plan or refresh under v3.x, Terraform is likely to report a block titled **"Note: Objects have
 changed outside of Terraform"**. This is a one-time state normalization performed by the new provider's Read
 functions, not drift in your tenant. Typical entries:
 
 
 
 - **Computed attributes being populated** — fields that v2.3.x left unset in state are now filled in by
-  v3.0.0 (for example `template_id` on response templates, or `type` inside resource-manager permission
+  v3.x (for example `template_id` on response templates, or `type` inside resource-manager permission
   variables). These appear as additions, with the values you configured unchanged.
 - **Empty ↔ null normalization** — SDKv2 stored empty strings and empty collections; the Plugin Framework
   normalizes these to null (for example `resource_label_color_map = []` -> `null`).
-- **Read enrichment** — v3.0.0 may populate both the ID and the name of referenced objects where v2.3.x
+- **Read enrichment** — v3.x may populate both the ID and the name of referenced objects where v2.3.x
   stored only the one you configured (for example tag owner user/tag blocks).
 
 
@@ -376,12 +456,12 @@ be `2.3.x` or earlier for anyone following this guide).
 
 
 
-If you upgrade to v3.0.0 and observe unexpected plan diffs, apply failures, or incorrect behavior against a
+If you upgrade to v3.x and observe unexpected plan diffs, apply failures, or incorrect behavior against a
 resource, roll back rather than working around the issue in a production environment.
 
 
 
-**Expect this error if v3.0.0 has already written state.** If any v3.0.0 plan refresh, refresh-only apply, or
+**Expect this error if v3.x has already written state.** If any v3.x plan refresh, refresh-only apply, or
 apply has updated your state, the v2.3.x plan in [Step 4](#step-4--validate-against-your-backed-up-state) will
 fail with errors of the form:
 
@@ -396,7 +476,7 @@ than is currently selected. Upgrade the britive provider to work with this state
 
 
 
-This is expected, not a sign that anything is broken on your tenant: v3.0.0 upgrades resource schema versions
+This is expected, not a sign that anything is broken on your tenant: v3.x upgrades resource schema versions
 in state, and v2.3.x cannot read them back. It is your cue to restore the state backup
 ([Step 4](#step-4--validate-against-your-backed-up-state) below) rather than trying to make the in-place state
 work.
@@ -489,7 +569,7 @@ terraform plan
 
 - If the plan is clean (no unexpected changes), you're safely back on v2.3.x.
 - If Terraform reports state that looks inconsistent — including the "Resource instance managed by newer
-  provider version" errors described above, which occur whenever a v3.0.0 refresh or apply has written state —
+  provider version" errors described above, which occur whenever a v3.x refresh or apply has written state —
   restore the state backup you took earlier instead of trusting the in-place state:
 
 
@@ -506,7 +586,7 @@ terraform plan
 
 
   **If this fails with `cannot import state with serial N over newer state with serial M`:** the remote state has
-  advanced (e.g. a v3.0.0 apply or refresh bumped the serial) since you took the backup, and Terraform is
+  advanced (e.g. a v3.x apply or refresh bumped the serial) since you took the backup, and Terraform is
   refusing to silently discard that history. Do not reach for `-force` immediately — first check what you'd be
   throwing away:
 
