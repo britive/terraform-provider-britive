@@ -238,8 +238,11 @@ func (r *ResponseTemplateResource) Update(ctx context.Context, req resource.Upda
 
 	log.Printf("[INFO] Updated response template: %s", templateID)
 
-	plan.TemplateID = types.StringValue(templateID)
-
+	// Don't overwrite plan.TemplateID here: template_id is embedded in the immutable
+	// `id` and never changes across Update, so a known plan value already matches it.
+	// If the plan carried it forward as null (a resource whose state predates the fix
+	// that started populating template_id on Read), writing a concrete value here
+	// would violate the post-apply consistency check; a subsequent Read populates it.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

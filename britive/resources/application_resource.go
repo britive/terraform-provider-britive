@@ -126,9 +126,9 @@ func (r *ApplicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"application_type": schema.StringAttribute{
 				Required:    true,
-				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Azure WIF', 'Okta', 'Britive', 'Oracle WIF'.",
+				Description: "Britive application type. Supported types: 'Snowflake', 'Snowflake Standalone', 'GCP', 'GCP Standalone', 'GCP WIF', 'Google Workspace', 'AWS', 'AWS Standalone', 'Azure', 'Azure WIF', 'Okta', 'Britive', 'Oracle WIF', 'Kubernetes'.",
 				Validators: []validator.String{
-					stringvalidator.OneOfCaseInsensitive("Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Azure WIF", "Okta", "Britive", "Oracle WIF"),
+					stringvalidator.OneOfCaseInsensitive("Snowflake", "Snowflake Standalone", "GCP", "GCP Standalone", "GCP WIF", "Google Workspace", "AWS", "AWS Standalone", "Azure", "Azure WIF", "Okta", "Britive", "Oracle WIF", "Kubernetes"),
 				},
 			},
 			"version": schema.StringAttribute{
@@ -148,7 +148,7 @@ func (r *ApplicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"entity_root_environment_group_id": schema.StringAttribute{
 				Computed:    true,
-				Description: "Britive application root environment ID for Snowflake Standalone applications.",
+				Description: "Britive application root environment ID for AWS Standalone, Okta, Snowflake Standalone, Britive and Kubernetes applications.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -381,6 +381,7 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 		8:  "Okta",
 		9:  "Snowflake Standalone",
 		12: "Britive",
+		14: "Kubernetes",
 	}
 	if _, ok := allowedEnvGroupApps[appResponse.CatalogAppId]; ok {
 		err = r.client.CreateRootEnvironmentGroup(appResponse.AppContainerId, appResponse.CatalogAppId)
@@ -451,6 +452,7 @@ func (r *ApplicationResource) Read(ctx context.Context, req resource.ReadRequest
 		8:  "Okta",
 		9:  "Snowflake Standalone",
 		12: "Britive",
+		14: "Kubernetes",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupID := ""
@@ -690,6 +692,7 @@ func (r *ApplicationResource) ImportState(ctx context.Context, req resource.Impo
 		8:  "Okta",
 		9:  "Snowflake Standalone",
 		12: "Britive",
+		14: "Kubernetes",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupID := ""
@@ -1170,6 +1173,7 @@ func (r *ApplicationResource) populateStateFromAPI(ctx context.Context, state *A
 		8:  "Okta",
 		9:  "Snowflake Standalone",
 		12: "Britive",
+		14: "Kubernetes",
 	}
 	if _, ok := allowedEnvGroupApps[application.CatalogAppId]; ok {
 		rootGroupID := ""

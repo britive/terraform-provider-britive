@@ -28,6 +28,7 @@ func TestBritiveApplication(t *testing.T) {
 					testAccCheckBritiveApplicationExists("britive_application.azure_new"),
 					testAccCheckBritiveApplicationExists("britive_application.okta_new"),
 					testAccCheckBritiveApplicationExists("britive_application.britive_new"),
+					testAccCheckBritiveApplicationExists("britive_application.kubernetes_new"),
 				),
 			},
 		},
@@ -698,6 +699,30 @@ func testAccCheckBritiveApplicationConfig() string {
     properties {
       name = "maxSessionDurationForProfiles"
       value = 604800
+    }
+	}
+
+	resource "britive_application" "kubernetes_new" {
+    application_type = "Kubernetes"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - Kubernetes APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - Kubernetes APP DESC"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = true
     }
 	}
 	`)

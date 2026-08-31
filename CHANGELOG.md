@@ -1,3 +1,14 @@
+## 3.0.2
+
+ENHANCEMENTS:
+* **Resource:** `britive_application` : Added support for `Kubernetes` as a new `application_type`, including `entity_root_environment_group_id` support so `britive_entity_group` and `britive_entity_environment` can be used to manage Kubernetes environment groups and environments.
+
+BUG FIXES:
+* `britive_profile`: Fixed a "Provider produced inconsistent result after apply" error on `app_name` when updating a profile migrated from v2.x state.
+* `britive_constraint`: Fixed a spurious destroy-and-recreate of constraints migrated from v2.x state, caused by `name`/`title`/`expression`/`description` being re-materialized as `""` instead of staying `null`.
+* `britive_profile_policy_prioritization`, `britive_resource_manager_profile_policy_prioritization`: Fixed a "Provider produced inconsistent result after apply" error on `policy_priority` caused by multiple resources for the same profile reordering the profile's whole policy list in parallel; writes for a given profile now run one at a time.
+* `britive_resource_manager_response_template`: Fixed a "Provider produced inconsistent result after apply" error on `template_id` when updating a template whose state predates 3.0.0's `template_id` population fix.
+
 ## 3.0.1
 
 BUG FIXES:

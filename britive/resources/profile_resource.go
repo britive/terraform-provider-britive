@@ -681,9 +681,6 @@ func (r *ProfileResource) ImportState(ctx context.Context, req resource.ImportSt
 		return
 	}
 
-	// Clear app_name (only used for import)
-	state.AppName = types.StringValue("")
-
 	log.Printf("[INFO] Imported profile: %s/%s", profile.AppContainerID, profileName)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -752,11 +749,13 @@ func (r *ProfileResource) mapResourceToModel(plan *ProfileResourceModel, isUpdat
 
 func (r *ProfileResource) mapModelToResource(profile *britive.Profile, state *ProfileResourceModel) error {
 	state.AppContainerID = types.StringValue(profile.AppContainerID)
-	// app_name is not returned by the API; preserve existing value.
-	// Use "" (not null) so UseStateForUnknown can copy it on subsequent plans,
-	// which is critical when migrating from v2.x where app_name was absent from state.
-	if state.AppName.IsUnknown() || state.AppName.IsNull() {
-		state.AppName = types.StringValue("")
+	// app_name is not returned by the API. On Create the plan value is unknown
+	// (no prior state to copy from) and Terraform requires every attribute to
+	// be known after apply, so resolve it to null. On Update/Read a null plan
+	// (e.g. from a v2-migrated state) must be left untouched — coercing it to
+	// "" there violates the framework's post-apply consistency check.
+	if state.AppName.IsUnknown() {
+		state.AppName = types.StringNull()
 	}
 	state.Name = types.StringValue(profile.Name)
 	// Preserve null vs "" distinction: if API returns empty, keep whatever the plan/state had.

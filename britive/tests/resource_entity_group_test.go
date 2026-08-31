@@ -19,6 +19,8 @@ func TestBritiveEntityGroup(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveEntityGroupExists("britive_application.snowflake_standalone_new"),
 					testAccCheckBritiveEntityGroupExists("britive_entity_group.entity_group_new"),
+					testAccCheckBritiveEntityGroupExists("britive_application.kubernetes_new"),
+					testAccCheckBritiveEntityGroupExists("britive_entity_group.kubernetes_entity_group_new"),
 				),
 			},
 		},
@@ -53,6 +55,37 @@ func testAccCheckBritiveEntityGroupConfig() string {
     entity_name        = "AT - Entity Group"
     entity_description = "AT - Entity Group Description"
     parent_id = britive_application.snowflake_standalone_new.entity_root_environment_group_id
+	}
+
+	resource "britive_application" "kubernetes_new" {
+    application_type = "Kubernetes"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "AT - Kubernetes APP"
+    }
+    properties {
+      name = "description"
+      value = "AT - Kubernetes APP DESC"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = 1000
+    }
+    properties {
+      name = "displayProgrammaticKeys"
+      value = true
+    }
+	}
+
+	resource "britive_entity_group" "kubernetes_entity_group_new" {
+    application_id     = britive_application.kubernetes_new.id
+    entity_name        = "AT - Kubernetes Entity Group"
+    entity_description = "AT - Kubernetes Entity Group Description"
+    parent_id = britive_application.kubernetes_new.entity_root_environment_group_id
 	}
 	`)
 }
