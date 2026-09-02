@@ -206,6 +206,7 @@ func (p *BritiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resourcemanager.NewResponseTemplateResource,
 		resourcemanager.NewRotationTemplateResource,
 		resourcemanager.NewScanSettingsResource,
+		resourcemanager.NewScheduleScanResource,
 		resourcemanager.NewResourceLabelResource,
 		resourcemanager.NewResourceResource,
 		resourcemanager.NewProfileResource,
