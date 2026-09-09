@@ -85,9 +85,9 @@ func (c *Client) ListScheduleScanTasks(taskServiceID string) ([]ScheduleScanTask
 }
 
 // GetScheduleScanTask retrieves a single scheduled scan task by ID. This route used to
-// return 500 (the backend team has since fixed it) - it's now confirmed to still respond
-// with a JSON array (like the plain list endpoint), not a bare object, so this unmarshals
-// as a list and picks out the matching taskID rather than assuming a single-object body.
+// return a server error and has since been fixed - it's now confirmed to still respond with
+// a JSON array (like the plain list endpoint), not a bare object, so this unmarshals as a
+// list and picks out the matching taskID rather than assuming a single-object body.
 func (c *Client) GetScheduleScanTask(taskServiceID string, taskID string) (*ScheduleScanTaskDetail, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/tasks/services/resource-scan/%s/tasks/%s", c.APIBaseURL, taskServiceID, taskID), nil)
 	if err != nil {

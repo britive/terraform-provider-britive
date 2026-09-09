@@ -540,12 +540,12 @@ type ScanSettings struct {
 	UpdatedBy      string                     `json:"updatedBy,omitempty"`
 }
 
-// ScheduleScanTaskService - a resource type's scan task-service record. As of the backend's
-// task-scheduler update, this is registered automatically when the resource type itself is
-// created (britive.ResourceType.TaskServiceID) and deleted automatically when the resource
-// type is deleted - GetScheduleScanTaskService is expected to always succeed for any
-// resource type this provider manages, rather than the old "bundle a task in the same call
-// to lazily create the service" flow.
+// ScheduleScanTaskService - a resource type's scan task-service record. As of a recent API
+// update, this is registered automatically when the resource type itself is created
+// (britive.ResourceType.TaskServiceID) and deleted automatically when the resource type is
+// deleted - GetScheduleScanTaskService is expected to always succeed for any resource type
+// this provider manages, rather than the old "bundle a task in the same call to lazily
+// create the service" flow.
 type ScheduleScanTaskService struct {
 	TaskServiceID   string `json:"taskServiceId,omitempty"`
 	Name            string `json:"name,omitempty"`
