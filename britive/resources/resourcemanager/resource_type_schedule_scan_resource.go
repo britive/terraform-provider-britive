@@ -9,7 +9,6 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -22,11 +21,11 @@ import (
 )
 
 // ScheduleScanResource manages a single scheduled scan ("task") under a resource type's scan
-// task-service. The task service itself is a resource-type-scoped singleton auto-created by
-// the API on the first task created for that resource type - this resource never creates it
-// directly, and never tracks its ID in state, instead re-resolving it from resource_type_id on
-// every Read/Update/Delete/Import via resolveTaskServiceID. There's no single-item GET for a
-// task (only a list), so reads list-and-filter by task_id.
+// task-service. The task service itself is a resource-type-scoped singleton, registered
+// automatically when the resource type itself is created (see britive.ResourceType.TaskServiceID
+// and ResourceTypeResource) - this resource never creates it directly, and never tracks its ID
+// in state, instead re-resolving it from resource_type_id on every Create/Read/Update/Delete/
+// Import via resolveTaskServiceID.
 //
 // The whole task service's enabled/disabled toggle (POST .../enabled-statuses,
 // .../disabled-statuses) is resource-type-wide, not scoped to any one schedule, so it is
@@ -47,32 +46,29 @@ type ScheduleScanResourceModel struct {
 	DayOfMonth     types.Int64          `tfsdk:"day_of_month"`
 	StartTime      types.String         `tfsdk:"start_time"`
 	ResourceLabels []ResourceLabelModel `tfsdk:"resource_labels"`
-	CreatedBy      types.String         `tfsdk:"created_by"`
-	Created        types.Int64          `tfsdk:"created"`
-	Modified       types.Int64          `tfsdk:"modified"`
-	ModifiedBy     types.String         `tfsdk:"modified_by"`
 	NextRun        types.Int64          `tfsdk:"next_run"`
 }
 
 // weekdayToInterval maps a day_of_week value (case-insensitive, full name or abbreviation)
-// to the wire's frequencyInterval for Weekly schedules. Not evidenced by any capture (the
-// captured UI flow only ever exercised Weekly with an already-fixed interval of 1) - this
-// mapping is taken from the business rule as specified, and should be smoke-tested against
-// the live API before relying on it.
+// to the wire's frequencyInterval for Weekly schedules: Monday=1 ... Sunday=7 (ISO 8601
+// weekday numbering). Not evidenced by any capture (the captured UI flow only ever
+// exercised Weekly with an already-fixed interval of 1) - this mapping is taken from the
+// business rule as specified, and should be smoke-tested against the live API before
+// relying on it.
 var weekdayToInterval = map[string]int{
-	"sunday": 1, "sun": 1,
-	"monday": 2, "mon": 2,
-	"tuesday": 3, "tue": 3,
-	"wednesday": 4, "wed": 4,
-	"thursday": 5, "thu": 5,
-	"friday": 6, "fri": 6,
-	"saturday": 7, "sat": 7,
+	"monday": 1, "mon": 1,
+	"tuesday": 2, "tue": 2,
+	"wednesday": 3, "wed": 3,
+	"thursday": 4, "thu": 4,
+	"friday": 5, "fri": 5,
+	"saturday": 6, "sat": 6,
+	"sunday": 7, "sun": 7,
 }
 
 // intervalToWeekday is weekdayToInterval's inverse, used to render the wire's
 // frequencyInterval back into a canonical day name on Read/Import.
 var intervalToWeekday = map[int]string{
-	1: "Sunday", 2: "Monday", 3: "Tuesday", 4: "Wednesday", 5: "Thursday", 6: "Friday", 7: "Saturday",
+	1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday",
 }
 
 // NewScheduleScanResource is a helper function to simplify the provider implementation.
@@ -139,31 +135,12 @@ func (r *ScheduleScanResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"day_of_month": schema.Int64Attribute{
-				Description: "The day of the month (1-31) the scan runs. Required when frequency_type = \"Monthly\"; must be unset otherwise.",
+				Description: "The day of the month (1-31) the scan runs. Required when frequency_type = \"Monthly\"; must be unset otherwise. The valid range is enforced by the API, not this provider.",
 				Optional:    true,
-				Validators: []validator.Int64{
-					int64validator.Between(1, 31),
-				},
 			},
 			"start_time": schema.StringAttribute{
 				Description: "The time of day the scan runs, in 24-hour \"HH:MM\" format",
 				Required:    true,
-			},
-			"created_by": schema.StringAttribute{
-				Description: "The user who created the scheduled scan",
-				Computed:    true,
-			},
-			"created": schema.Int64Attribute{
-				Description: "The creation timestamp of the scheduled scan (epoch milliseconds)",
-				Computed:    true,
-			},
-			"modified": schema.Int64Attribute{
-				Description: "The last-modified timestamp of the scheduled scan (epoch milliseconds). Null until the first update.",
-				Computed:    true,
-			},
-			"modified_by": schema.StringAttribute{
-				Description: "The user who last modified the scheduled scan",
-				Computed:    true,
 			},
 			"next_run": schema.Int64Attribute{
 				Description: "The next scheduled run timestamp (epoch milliseconds)",
@@ -295,6 +272,14 @@ func (r *ScheduleScanResource) Create(ctx context.Context, req resource.CreateRe
 
 	resourceTypeID := lastPathSegment(plan.ResourceTypeID.ValueString())
 
+	// Resource type creation registers the scan task service automatically, so this is
+	// expected to always succeed here.
+	taskServiceID, err := r.resolveTaskServiceID(resourceTypeID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Resolving Schedule Scan Task Service", err.Error())
+		return
+	}
+
 	task := r.buildTaskPayload(ctx, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
@@ -302,7 +287,7 @@ func (r *ScheduleScanResource) Create(ctx context.Context, req resource.CreateRe
 
 	log.Printf("[INFO] Creating schedule scan task for resource type: %s", resourceTypeID)
 
-	created, err := r.client.CreateScheduleScanTask(resourceTypeID, task)
+	created, err := r.client.CreateScheduleScanTask(taskServiceID, task)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Schedule Scan", err.Error())
 		return
@@ -330,10 +315,6 @@ func (r *ScheduleScanResource) Read(ctx context.Context, req resource.ReadReques
 	taskID := state.TaskID.ValueString()
 
 	taskServiceID, err := r.resolveTaskServiceID(resourceTypeID)
-	if errors.Is(err, britive.ErrScheduleScanTaskServiceNotBootstrapped) {
-		resp.State.RemoveResource(ctx)
-		return
-	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Resolving Schedule Scan Task Service", err.Error())
 		return
@@ -413,10 +394,6 @@ func (r *ScheduleScanResource) Delete(ctx context.Context, req resource.DeleteRe
 	taskID := state.TaskID.ValueString()
 
 	taskServiceID, err := r.resolveTaskServiceID(resourceTypeID)
-	if errors.Is(err, britive.ErrScheduleScanTaskServiceNotBootstrapped) {
-		// The task service (and therefore this task) is already gone - nothing to delete.
-		return
-	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Resolving Schedule Scan Task Service", err.Error())
 		return
@@ -474,9 +451,10 @@ func (r *ScheduleScanResource) ImportState(ctx context.Context, req resource.Imp
 
 // Helper functions
 
-// resolveTaskServiceID resolves resourceTypeID's scan task-service ID. Never stored in
-// state - re-resolved on every call so the resource stays correct even if the task
-// service's own ID were ever to change server-side.
+// resolveTaskServiceID resolves resourceTypeID's scan task-service ID - resource type
+// creation registers this automatically, so this is expected to always succeed. Never
+// stored in state - re-resolved on every call so the resource stays correct even if the
+// task service's own ID were ever to change server-side.
 func (r *ScheduleScanResource) resolveTaskServiceID(resourceTypeID string) (string, error) {
 	taskService, err := r.client.GetScheduleScanTaskService(resourceTypeID)
 	if err != nil {
@@ -592,14 +570,6 @@ func (r *ScheduleScanResource) mapModelToResource(ctx context.Context, task *bri
 		state.DayOfMonth = types.Int64Null()
 	}
 
-	state.CreatedBy = optionalStringValue(task.CreatedBy)
-	state.Created = types.Int64Value(task.Created)
-	if task.Modified == 0 {
-		state.Modified = types.Int64Null()
-	} else {
-		state.Modified = types.Int64Value(task.Modified)
-	}
-	state.ModifiedBy = optionalStringValue(task.ModifiedBy)
 	state.NextRun = types.Int64Value(task.NextRun)
 }
 

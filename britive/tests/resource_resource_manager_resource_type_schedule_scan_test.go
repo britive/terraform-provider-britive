@@ -84,10 +84,8 @@ func TestBritiveScheduleScanMonthly(t *testing.T) {
 }
 
 // TestBritiveResourceTypeScanEnabled exercises scan_enabled on
-// britive_resource_manager_resource_type. It's declared here (not in the resource_type
-// test file) because enabling it requires a britive_resource_manager_resource_type_schedule_scan
-// to already exist for the resource type - the scan task service the toggle acts on is only
-// created once the first schedule scan is created.
+// britive_resource_manager_resource_type across an Update (false -> true), alongside a
+// sibling britive_resource_manager_resource_type_schedule_scan.
 func TestBritiveResourceTypeScanEnabled(t *testing.T) {
 	resourceTypeName := "AT-Britive_Schedule_Scan_Tests_Resource_Type_Scan_Enabled"
 	resourceTypeDescription := "AT-Britive_Schedule_Scan_Tests_Resource_Type_Scan_Enabled_Description"
@@ -97,7 +95,6 @@ func TestBritiveResourceTypeScanEnabled(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				// scan_enabled defaults to false - no schedule scan required yet.
 				Config: testAccCheckBritiveResourceTypeScanEnabledConfig(resourceTypeName, resourceTypeDescription, false),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveScheduleScanExists("britive_resource_manager_resource_type.new_resource_type_scan_enabled"),
@@ -105,11 +102,36 @@ func TestBritiveResourceTypeScanEnabled(t *testing.T) {
 					resource.TestCheckResourceAttr("britive_resource_manager_resource_type.new_resource_type_scan_enabled", "scan_enabled", "false"),
 				),
 			},
-			// A schedule scan now exists for the resource type, so enabling succeeds.
 			{
 				Config: testAccCheckBritiveResourceTypeScanEnabledConfig(resourceTypeName, resourceTypeDescription, true),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveScheduleScanExists("britive_resource_manager_resource_type.new_resource_type_scan_enabled"),
+					resource.TestCheckResourceAttr("britive_resource_manager_resource_type.new_resource_type_scan_enabled", "scan_enabled", "true"),
+				),
+			},
+		},
+	})
+}
+
+// TestBritiveResourceTypeScanEnabledSingleApply proves the specific capability this backend
+// change unlocked: scan_enabled = true set directly in the same apply that creates both the
+// resource type and its first schedule scan. Previously the resource type's scan task
+// service was only created lazily on the first schedule scan, making this combination fail
+// outright - now the task service is registered as part of resource type creation itself.
+func TestBritiveResourceTypeScanEnabledSingleApply(t *testing.T) {
+	resourceTypeName := "AT-Britive_Schedule_Scan_Tests_Resource_Type_Scan_Enabled_Single_Apply"
+	resourceTypeDescription := "AT-Britive_Schedule_Scan_Tests_Resource_Type_Scan_Enabled_Single_Apply_Description"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveResourceTypeScanEnabledConfig(resourceTypeName, resourceTypeDescription, true),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveScheduleScanExists("britive_resource_manager_resource_type.new_resource_type_scan_enabled"),
+					testAccCheckBritiveScheduleScanExists("britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_enabled"),
+					resource.TestCheckResourceAttrSet("britive_resource_manager_resource_type.new_resource_type_scan_enabled", "task_service_id"),
 					resource.TestCheckResourceAttr("britive_resource_manager_resource_type.new_resource_type_scan_enabled", "scan_enabled", "true"),
 				),
 			},

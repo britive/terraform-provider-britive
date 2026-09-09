@@ -12,15 +12,13 @@ The `britive_resource_manager_resource_type_schedule_scan` resource allows you t
 scheduled scans for a Britive resource manager resource type. Each instance of this resource
 represents one scheduled scan ("task"); a resource type can have any number of them.
 
-The underlying scan task service for a resource type is created automatically by the API the
-first time a schedule scan is created for it - there's nothing to configure separately for
-that. Whether scanning is actually turned on for the resource type as a whole is managed
-independently via `scan_enabled` on
+The underlying scan task service for a resource type is registered automatically by the API
+when the resource type itself is created (and removed automatically when the resource type
+is deleted) - there's nothing to configure separately for that. Whether scanning is actually
+turned on for the resource type as a whole is managed independently via `scan_enabled` on
 [`britive_resource_manager_resource_type`](resource_manager_resource_type.md), since it's a
-resource-type-wide toggle, not scoped to any one schedule. Note that `scan_enabled` cannot be
-set to `true` in the same apply that creates the resource type's first schedule scan - see
-["Enabling Scanning" in that resource's docs](resource_manager_resource_type.md#enabling-scanning-scan_enabled-requires-two-applies)
-for why and the required two-step workflow.
+resource-type-wide toggle, not scoped to any one schedule - see that resource's `scan_enabled`
+Semantics section for details.
 
 ## Example Usage
 
@@ -87,10 +85,6 @@ In addition to the arguments above, the following attributes are exported:
 
 * `id` - The composite identifier of the schedule scan.
 * `task_id` - The unique identifier of the scheduled scan task.
-* `created_by` - The user who created the scheduled scan.
-* `created` - The creation timestamp of the scheduled scan (epoch milliseconds).
-* `modified` - The last-modified timestamp of the scheduled scan (epoch milliseconds). Null until the first update.
-* `modified_by` - The user who last modified the scheduled scan.
 * `next_run` - The next scheduled run timestamp (epoch milliseconds).
 
 ## Import
@@ -105,4 +99,7 @@ terraform import britive_resource_manager_resource_type_schedule_scan.example re
 
 Destroying this resource deletes the individual schedule scan task only. It does not touch
 the resource type's scan task service, the `scan_enabled` toggle, or any sibling schedule
-scans for the same resource type.
+scans for the same resource type. Destroying the parent
+[`britive_resource_manager_resource_type`](resource_manager_resource_type.md) itself, however,
+deletes its scan task service (and therefore every schedule scan under it) as a cascade on
+the backend - there's no need to destroy schedule scans separately first.

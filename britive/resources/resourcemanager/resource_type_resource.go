@@ -26,12 +26,14 @@ type ResourceTypeResource struct {
 
 // ResourceTypeResourceModel describes the resource data model.
 type ResourceTypeResourceModel struct {
-	ID          types.String                 `tfsdk:"id"`
-	Name        types.String                 `tfsdk:"name"`
-	Description types.String                 `tfsdk:"description"`
-	Icon        types.String                 `tfsdk:"icon"`
-	ScanEnabled types.Bool                   `tfsdk:"scan_enabled"`
-	Parameters  []ResourceTypeParameterModel `tfsdk:"parameters"`
+	ID              types.String                 `tfsdk:"id"`
+	Name            types.String                 `tfsdk:"name"`
+	Description     types.String                 `tfsdk:"description"`
+	Icon            types.String                 `tfsdk:"icon"`
+	TaskServiceID   types.String                 `tfsdk:"task_service_id"`
+	ScanEnabled     types.Bool                   `tfsdk:"scan_enabled"`
+	RotationEnabled types.Bool                   `tfsdk:"rotation_enabled"`
+	Parameters      []ResourceTypeParameterModel `tfsdk:"parameters"`
 }
 
 type ResourceTypeParameterModel struct {
@@ -80,8 +82,23 @@ func (r *ResourceTypeResource) Schema(_ context.Context, _ resource.SchemaReques
 					validators.SVG(),
 				},
 			},
+			"task_service_id": schema.StringAttribute{
+				Description: "The ID of this resource type's scan task service. Registered automatically when the resource type is created and removed automatically when it's deleted - not independently managed by this provider. Used internally to operate on britive_resource_manager_resource_type_schedule_scan and scan_enabled.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"scan_enabled": schema.BoolAttribute{
-				Description: "Whether scheduled scanning is enabled for this resource type. Left unmanaged when omitted from config - the provider never enables or disables scanning unless this is explicitly set, so existing resource types (with or without scheduled scans already configured some other way) are unaffected. The underlying scan task service is only created once at least one britive_resource_manager_resource_type_schedule_scan exists for this resource type - setting this to true before that fails with the API's own error. Removing this argument from config (after previously setting it) disables scanning.",
+				Description: "Whether scheduled scanning is enabled for this resource type. Left unmanaged when omitted from config - the provider never enables or disables scanning unless this is explicitly set, so existing resource types (with or without scheduled scans already configured some other way) are unaffected. The scan task service is registered automatically when the resource type is created, so this can be set in the very same apply that creates the resource type (and any of its schedule scans) - no multi-step apply required. Removing this argument from config (after previously setting it) disables scanning.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"rotation_enabled": schema.BoolAttribute{
+				Description: "Whether rotation is enabled for this resource type's rotation templates. Left unmanaged when omitted from config - the provider only sends this field when it's explicitly present, so existing resource types (with or without rotation already turned on some other way) are unaffected. Independent of any britive_resource_manager_resource_type_rotation_template existing, so it can be set at resource type creation. Removing this argument from config (after previously setting it) disables rotation.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
@@ -134,20 +151,21 @@ func (r *ResourceTypeResource) Configure(_ context.Context, req resource.Configu
 	r.client = client
 }
 
-// ModifyPlan handles the one scan_enabled transition that UseStateForUnknown's own
-// carry-forward gets wrong: removing scan_enabled from config after it was previously
-// tracked as enabled. Without this override, an absent config value simply carries the
-// prior state's value forward unchanged (UseStateForUnknown), which would silently leave
-// scanning on forever once enabled - instead, removing the argument is planned as an
-// explicit transition to false. In every other case (never configured, or configured and
-// unchanged) the attribute is left alone here; see setScanEnabled/readScanEnabled for why
-// this resource otherwise only ever touches scan state when explicitly asked to.
+// ModifyPlan handles the one scan_enabled/rotation_enabled transition that
+// UseStateForUnknown's own carry-forward gets wrong: removing the argument from config
+// after it was previously tracked as enabled. Without this override, an absent config value
+// simply carries the prior state's value forward unchanged (UseStateForUnknown), which would
+// silently leave scanning/rotation on forever once enabled - instead, removing the argument
+// is planned as an explicit transition to false. In every other case (never configured, or
+// configured and unchanged) the attribute is left alone here; see setScanEnabled and
+// mapResourceToModel's RotationEnabled handling for why this resource otherwise only ever
+// touches this state when explicitly asked to.
 //
-// Known limitation: this can't distinguish "the user removed a scan_enabled = true they
-// used to manage in Terraform" from "scan_enabled was never in this resource's config, but
-// scanning happens to already be enabled some other way (e.g. via the UI)" - both look
-// identical (state has enabled=true, config has no scan_enabled). The next apply that
-// touches this resource for any reason will turn scanning off in the second case too.
+// Known limitation: this can't distinguish "the user removed a scan_enabled/rotation_enabled
+// = true they used to manage in Terraform" from "it was never in this resource's config, but
+// happens to already be enabled some other way (e.g. via the UI)" - both look identical
+// (state has enabled=true, config has no value). The next apply that touches this resource
+// for any reason will turn it off in the second case too.
 func (r *ResourceTypeResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
 		// Destroy, or Create - nothing to have "removed" yet.
@@ -162,8 +180,19 @@ func (r *ResourceTypeResource) ModifyPlan(ctx context.Context, req resource.Modi
 		return
 	}
 
+	modified := false
+
 	if config.ScanEnabled.IsNull() && !state.ScanEnabled.IsNull() && state.ScanEnabled.ValueBool() {
 		plan.ScanEnabled = types.BoolValue(false)
+		modified = true
+	}
+
+	if config.RotationEnabled.IsNull() && !state.RotationEnabled.IsNull() && state.RotationEnabled.ValueBool() {
+		plan.RotationEnabled = types.BoolValue(false)
+		modified = true
+	}
+
+	if modified {
 		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 	}
 }
@@ -219,26 +248,36 @@ func (r *ResourceTypeResource) Create(ctx context.Context, req resource.CreateRe
 	// Map model to resource
 	r.mapModelToResource(resourceTypeRead, &plan, false)
 
-	// scan_enabled has no schema Default, so plan.ScanEnabled is Unknown here precisely
-	// when the user didn't set it in config (no prior state exists yet on Create for
-	// UseStateForUnknown to carry forward either) - in that case, don't touch scan state at
-	// all; a freshly created resource type has no scan task service yet anyway, so the
-	// actual value read back below will be false regardless. Only call the API when config
-	// explicitly asked for a value. A failure here doesn't roll back the resource type
-	// itself, which was already created successfully; state is still written below so the
-	// resource type stays tracked.
-	if !plan.ScanEnabled.IsUnknown() {
-		if err := r.setScanEnabled(rto.ResourceTypeID, plan.ScanEnabled.ValueBool()); err != nil {
-			resp.Diagnostics.AddError("Error Setting Resource Type Scan Status", err.Error())
-		}
-	}
-
-	scanEnabled, err := r.readScanEnabled(rto.ResourceTypeID)
+	// The backend registers this resource type's scan task service automatically at
+	// creation time (rto.TaskServiceID) and deletes it automatically when the resource type
+	// is deleted - nothing to bootstrap or clean up here. Fetching it via
+	// GetScheduleScanTaskService also gets its actual current enabled state in the same
+	// call, rather than assuming a default. Because the task service now exists immediately,
+	// scan_enabled can be set in this very same apply - unlike the old lazily-created task
+	// service, there is no dependency on a schedule scan existing first.
+	taskService, err := r.client.GetScheduleScanTaskService(rto.ResourceTypeID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Resource Type Scan Status", err.Error())
-		scanEnabled = false
+		resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
+		return
 	}
-	plan.ScanEnabled = types.BoolValue(scanEnabled)
+	plan.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+
+	// scan_enabled has no schema Default, so plan.ScanEnabled is Unknown here precisely when
+	// the user didn't set it in config - in that case, don't touch scan state at all, just
+	// reflect the task service's actual just-registered value. A failure setting it doesn't
+	// roll back the resource type itself, which was already created successfully; state is
+	// still written below so the resource type stays tracked.
+	if !plan.ScanEnabled.IsUnknown() && plan.ScanEnabled.ValueBool() != taskService.Enabled {
+		enabled, err := r.setScanEnabled(taskService.TaskServiceID, plan.ScanEnabled.ValueBool())
+		if err != nil {
+			resp.Diagnostics.AddError("Error Setting Resource Type Scan Status", err.Error())
+			plan.ScanEnabled = types.BoolValue(taskService.Enabled)
+		} else {
+			plan.ScanEnabled = types.BoolValue(enabled)
+		}
+	} else {
+		plan.ScanEnabled = types.BoolValue(taskService.Enabled)
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -274,12 +313,15 @@ func (r *ResourceTypeResource) Read(ctx context.Context, req resource.ReadReques
 	// Map model to resource
 	r.mapModelToResource(resourceType, &state, false)
 
-	scanEnabled, err := r.readScanEnabled(resourceTypeID)
+	// The task service is registered automatically alongside its resource type and deleted
+	// along with it (backend cascade), so this is expected to always succeed here.
+	taskService, err := r.client.GetScheduleScanTaskService(resourceTypeID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Resource Type Scan Status", err.Error())
+		resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
 		return
 	}
-	state.ScanEnabled = types.BoolValue(scanEnabled)
+	state.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+	state.ScanEnabled = types.BoolValue(taskService.Enabled)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -301,9 +343,13 @@ func (r *ResourceTypeResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	// Check for changes in main fields
+	// Check for changes in main fields. rotation_enabled is included here (not handled
+	// separately like scan_enabled) since it's a plain field on this same resource type
+	// object, sent via the same PUT - see mapResourceToModel's doc comment for how an
+	// unconfigured value is kept out of that PUT entirely rather than clobbering it.
 	if !plan.Name.Equal(state.Name) ||
 		!plan.Description.Equal(state.Description) ||
+		!plan.RotationEnabled.Equal(state.RotationEnabled) ||
 		!parametersEqual(plan.Parameters, state.Parameters) {
 
 		resourceType := r.mapResourceToModel(&plan)
@@ -339,8 +385,26 @@ func (r *ResourceTypeResource) Update(ctx context.Context, req resource.UpdateRe
 	// description/parameters/icon changes above already succeeded, so surface the error but
 	// still read back and persist accurate state below.
 	if !plan.ScanEnabled.Equal(state.ScanEnabled) {
-		if err := r.setScanEnabled(resourceTypeID, plan.ScanEnabled.ValueBool()); err != nil {
-			resp.Diagnostics.AddError("Error Updating Resource Type Scan Status", err.Error())
+		taskServiceID := state.TaskServiceID.ValueString()
+		if taskServiceID == "" {
+			// Defensive: state predates task_service_id being tracked, or refresh was
+			// skipped - resolve it now rather than failing outright.
+			taskService, getErr := r.client.GetScheduleScanTaskService(resourceTypeID)
+			if getErr != nil {
+				resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", getErr.Error())
+			} else {
+				taskServiceID = taskService.TaskServiceID
+				plan.TaskServiceID = types.StringValue(taskServiceID)
+			}
+		}
+		if taskServiceID != "" {
+			enabled, err := r.setScanEnabled(taskServiceID, plan.ScanEnabled.ValueBool())
+			if err != nil {
+				resp.Diagnostics.AddError("Error Updating Resource Type Scan Status", err.Error())
+				plan.ScanEnabled = state.ScanEnabled
+			} else {
+				plan.ScanEnabled = types.BoolValue(enabled)
+			}
 		}
 	}
 
@@ -353,13 +417,6 @@ func (r *ResourceTypeResource) Update(ctx context.Context, req resource.UpdateRe
 
 	// Map model to resource
 	r.mapModelToResource(resourceType, &plan, false)
-
-	scanEnabled, err := r.readScanEnabled(resourceTypeID)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Resource Type Scan Status", err.Error())
-		scanEnabled = false
-	}
-	plan.ScanEnabled = types.BoolValue(scanEnabled)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -436,12 +493,13 @@ func (r *ResourceTypeResource) ImportState(ctx context.Context, req resource.Imp
 	// Map model to resource (imported = true to preserve API param types)
 	r.mapModelToResource(resourceType, &state, true)
 
-	scanEnabled, err := r.readScanEnabled(resourceTypeID)
+	taskService, err := r.client.GetScheduleScanTaskService(resourceTypeID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Resource Type Scan Status", err.Error())
+		resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
 		return
 	}
-	state.ScanEnabled = types.BoolValue(scanEnabled)
+	state.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+	state.ScanEnabled = types.BoolValue(taskService.Enabled)
 
 	log.Printf("[INFO] Imported resource type: %s", resourceTypeID)
 
@@ -450,13 +508,16 @@ func (r *ResourceTypeResource) ImportState(ctx context.Context, req resource.Imp
 
 // Helper functions
 
-// readScanEnabled reports whether scheduled scanning is currently enabled for a resource
-// type. A resource type with no britive_resource_manager_resource_type_schedule_scan
-// created yet has no scan task service at all - treated as disabled, not an error.
-func (r *ResourceTypeResource) readScanEnabled(resourceTypeID string) (bool, error) {
-	taskService, err := r.client.GetScheduleScanTaskService(resourceTypeID)
-	if errors.Is(err, britive.ErrScheduleScanTaskServiceNotBootstrapped) {
-		return false, nil
+// setScanEnabled enables or disables scheduled scanning for a resource type's scan task
+// service, given its already-resolved taskServiceID, and returns the resulting actual
+// enabled state from the API's own response.
+func (r *ResourceTypeResource) setScanEnabled(taskServiceID string, enabled bool) (bool, error) {
+	var taskService *britive.ScheduleScanTaskService
+	var err error
+	if enabled {
+		taskService, err = r.client.EnableScheduleScanTaskService(taskServiceID)
+	} else {
+		taskService, err = r.client.DisableScheduleScanTaskService(taskServiceID)
 	}
 	if err != nil {
 		return false, err
@@ -464,37 +525,23 @@ func (r *ResourceTypeResource) readScanEnabled(resourceTypeID string) (bool, err
 	return taskService.Enabled, nil
 }
 
-// setScanEnabled enables or disables scheduled scanning for a resource type's entire scan
-// task service. Disabling when the task service doesn't exist yet is a no-op (already
-// effectively disabled); enabling in that state returns a clear error rather than the raw
-// API one, since the real cause - no schedule scan exists yet - isn't obvious from it.
-func (r *ResourceTypeResource) setScanEnabled(resourceTypeID string, enabled bool) error {
-	taskService, err := r.client.GetScheduleScanTaskService(resourceTypeID)
-	if errors.Is(err, britive.ErrScheduleScanTaskServiceNotBootstrapped) {
-		if !enabled {
-			return nil
-		}
-		return fmt.Errorf("cannot enable scanning for resource type %s: no britive_resource_manager_resource_type_schedule_scan exists yet for it - the scan task service is only created once a schedule scan exists. "+
-			"This can't be resolved within a single apply that also creates the schedule scan (there's no valid dependency ordering for it - the schedule scan itself depends on this resource type existing first). "+
-			"Apply in two steps instead: first create this resource type and its schedule scan(s) with scan_enabled left false (the default), then set scan_enabled = true and apply again", resourceTypeID)
-	}
-	if err != nil {
-		return err
-	}
-
-	if enabled {
-		_, err = r.client.EnableScheduleScanTaskService(taskService.TaskServiceID)
-	} else {
-		_, err = r.client.DisableScheduleScanTaskService(taskService.TaskServiceID)
-	}
-	return err
-}
-
+// mapResourceToModel builds the create/update request payload from plan. IsRotationEnabled
+// is left nil (omitted from the request) when plan.RotationEnabled is unknown - i.e. never
+// configured - so the field simply isn't part of the request at all rather than sending an
+// explicit false that would disable rotation as a side effect of an unrelated change. When
+// it IS known (either explicitly configured, or carried forward from actual state by
+// UseStateForUnknown on Update), it's always sent, since that's either the user's intent or
+// a no-op restating the current truth.
 func (r *ResourceTypeResource) mapResourceToModel(plan *ResourceTypeResourceModel) britive.ResourceType {
 	resourceType := britive.ResourceType{
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 		Parameters:  make([]britive.Parameter, 0),
+	}
+
+	if !plan.RotationEnabled.IsUnknown() && !plan.RotationEnabled.IsNull() {
+		v := plan.RotationEnabled.ValueBool()
+		resourceType.IsRotationEnabled = &v
 	}
 
 	for _, param := range plan.Parameters {
@@ -514,6 +561,12 @@ func (r *ResourceTypeResource) mapModelToResource(resourceType *britive.Resource
 	// set description), keep null; if it was "" or non-empty, preserve that intent. This avoids
 	// the "was '' but now null" inconsistency when the plan had "" for an Optional-only field.
 	state.Description = preserveOptionalString(resourceType.Description, state.Description)
+
+	if resourceType.IsRotationEnabled != nil {
+		state.RotationEnabled = types.BoolValue(*resourceType.IsRotationEnabled)
+	} else {
+		state.RotationEnabled = types.BoolValue(false)
+	}
 
 	// Build map of user's param types to preserve case (unless imported)
 	paramMap := make(map[string]string)

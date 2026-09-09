@@ -423,11 +423,24 @@ type EscalationPolicies struct {
 }
 
 // ResourceType - godoc
+// TaskServiceID: the backend now registers the resource type's scan task service
+// automatically on create and returns its ID in that same 201 response (and deletes it
+// automatically when the resource type is deleted) - no separate bootstrap/cleanup call
+// needed. See resource_manager_resource_type_schedule_scan.go's doc comment for the
+// task service's own lifecycle.
+// IsRotationEnabled is a *bool (not bool) so the provider can distinguish "not part of this
+// request" (nil, omitted from JSON) from an explicit "false" - the same field is sent on
+// every create/update call alongside name/description, so a plain bool with `omitempty`
+// would make it impossible to ever explicitly request false (Go omits a false bool with
+// omitempty), and without omitempty a zero-value bool would be sent as false on every
+// update that doesn't care about rotation at all, silently disabling it.
 type ResourceType struct {
-	ResourceTypeID string      `json:"resourceTypeId,omitempty"`
-	Name           string      `json:"name"`
-	Description    string      `json:"description,omitempty"`
-	Parameters     []Parameter `json:"parameters,omitempty"`
+	ResourceTypeID    string      `json:"resourceTypeId,omitempty"`
+	Name              string      `json:"name"`
+	Description       string      `json:"description,omitempty"`
+	Parameters        []Parameter `json:"parameters,omitempty"`
+	TaskServiceID     string      `json:"taskServiceId,omitempty"`
+	IsRotationEnabled *bool       `json:"isRotationEnabled,omitempty"`
 }
 
 type Parameter struct {
@@ -527,11 +540,12 @@ type ScanSettings struct {
 	UpdatedBy      string                     `json:"updatedBy,omitempty"`
 }
 
-// ScheduleScanTaskService - a resource type's scan task-service record. Unlike
-// RotationTemplate/ScanSettings, this is auto-created by the API on the first
-// ScheduleScanTask created for a resource type - GetScheduleScanTaskService returns a
-// distinguishable "not yet created" error (confirmed by capture: 400/E1004) before that
-// point, see resource_manager_resource_type_schedule_scan.go's doc comment.
+// ScheduleScanTaskService - a resource type's scan task-service record. As of the backend's
+// task-scheduler update, this is registered automatically when the resource type itself is
+// created (britive.ResourceType.TaskServiceID) and deleted automatically when the resource
+// type is deleted - GetScheduleScanTaskService is expected to always succeed for any
+// resource type this provider manages, rather than the old "bundle a task in the same call
+// to lazily create the service" flow.
 type ScheduleScanTaskService struct {
 	TaskServiceID   string `json:"taskServiceId,omitempty"`
 	Name            string `json:"name,omitempty"`
@@ -543,21 +557,14 @@ type ScheduleScanTaskService struct {
 	TaskType        string `json:"taskType,omitempty"`
 }
 
-// ScheduleScanTaskServiceStub - the static taskService object bundled into every
-// create-task call. Every field here is a hardcoded constant confirmed by capture (not
-// derived from user input) - see newScheduleScanTaskServiceStub.
-type ScheduleScanTaskServiceStub struct {
-	Name    string `json:"name"`
-	Enabled bool   `json:"enabled"`
-	QueueID string `json:"queueId"`
-}
-
 // ScheduleScanTask - the create/update request shape for a single scheduled scan ("task")
 // under a resource type's scan task-service. FrequencyInterval has no `omitempty`: an
 // explicit `null` must be sent for Daily (confirmed by capture), so a nil pointer here is
 // meaningful and must be marshaled as JSON null, not omitted. Properties has no `omitempty`
 // either: an explicit `{}` clears all resource label filters (confirmed by capture) - a nil
-// map would marshal as JSON null instead, which the API would treat as "no change".
+// map would marshal as JSON null instead, which the API would treat as "no change". Sent
+// directly as the create call's body now (no taskService wrapper) - the backend rejects a
+// bundled taskService+task create with 400.
 type ScheduleScanTask struct {
 	Name              string              `json:"name"`
 	Description       string              `json:"description"`
@@ -565,15 +572,6 @@ type ScheduleScanTask struct {
 	FrequencyType     string              `json:"frequencyType"`
 	FrequencyInterval *int                `json:"frequencyInterval"`
 	StartTime         string              `json:"startTime"`
-}
-
-// ScheduleScanTaskCreateRequest - the create call's body: the static taskService stub plus
-// the task payload, bundled together. Confirmed by capture: the API (re)creates the
-// taskService idempotently (a no-op after the first call) and always creates a new task in
-// the same call - there's no separate "just bootstrap the service" endpoint.
-type ScheduleScanTaskCreateRequest struct {
-	TaskService ScheduleScanTaskServiceStub `json:"taskService"`
-	Task        ScheduleScanTask            `json:"task"`
 }
 
 // ScheduleScanTaskDetail - the response/list shape for a scheduled scan task. StartTime

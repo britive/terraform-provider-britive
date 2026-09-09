@@ -8,26 +8,18 @@ import (
 	"strings"
 )
 
-// Schedule scan tasks live under a resource type's scan task-service, a singleton the API
-// auto-creates the first time a task is created for that resource type (there's no separate
-// bootstrap-only endpoint). GetScheduleScanTaskService distinguishes "not created yet" (400/E1004)
-// from a real error via ErrScheduleScanTaskServiceNotBootstrapped. There's no single-item GET for
-// a task - only a list - so GetScheduleScanTask lists and filters client-side.
+// Schedule scan tasks live under a resource type's scan task-service. The task service is
+// now registered automatically when the resource type itself is created (see
+// britive.ResourceType.TaskServiceID) and deleted automatically when the resource type is
+// deleted - there's no bootstrap/cleanup call for it in this file at all anymore, and
+// GetScheduleScanTaskService is expected to always succeed for any resource type this
+// provider manages. Tasks themselves are created via a dedicated POST directly under the
+// task service, and (now that the route works - it used to 500) read back via a real
+// single-item GET rather than listing and filtering.
 
-// newScheduleScanTaskServiceStub returns the static taskService object every create-task call
-// bundles alongside the task payload. Confirmed by capture: every field here is a hardcoded
-// constant, identical across every create call regardless of resource type.
-func newScheduleScanTaskServiceStub() ScheduleScanTaskServiceStub {
-	return ScheduleScanTaskServiceStub{
-		Name:    "ResourceScanner",
-		Enabled: false,
-		QueueID: "resourceScannerQueue",
-	}
-}
-
-// GetScheduleScanTaskService retrieves a resource type's scan task-service record. Returns
-// ErrScheduleScanTaskServiceNotBootstrapped (not a hard error) if no schedule scan task has
-// ever been created for this resource type yet.
+// GetScheduleScanTaskService retrieves a resource type's scan task service, including its
+// taskServiceId and current enabled status. Used to resolve taskServiceId for
+// Read/Update/Delete/Import.
 func (c *Client) GetScheduleScanTaskService(resourceTypeID string) (*ScheduleScanTaskService, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/tasks/services/resource-scan/resource-types/%s", c.APIBaseURL, resourceTypeID), nil)
 	if err != nil {
@@ -36,9 +28,6 @@ func (c *Client) GetScheduleScanTaskService(resourceTypeID string) (*ScheduleSca
 
 	body, err := c.Do(req)
 	if err != nil {
-		if strings.Contains(err.Error(), "E1004") {
-			return nil, ErrScheduleScanTaskServiceNotBootstrapped
-		}
 		return nil, err
 	}
 
@@ -49,21 +38,17 @@ func (c *Client) GetScheduleScanTaskService(resourceTypeID string) (*ScheduleSca
 	return result, nil
 }
 
-// CreateScheduleScanTask creates a new scheduled scan task for a resource type. Bundles the
-// static taskService stub with the task payload, matching the API's combined create call -
-// the taskService is created idempotently (a no-op after the first call for a resource type).
-func (c *Client) CreateScheduleScanTask(resourceTypeID string, task ScheduleScanTask) (*ScheduleScanTaskDetail, error) {
-	createReq := ScheduleScanTaskCreateRequest{
-		TaskService: newScheduleScanTaskServiceStub(),
-		Task:        task,
-	}
-
-	body, err := json.Marshal(createReq)
+// CreateScheduleScanTask creates a new scheduled scan task under an already-registered task
+// service. The task service itself is never created here - the backend rejects a task in the
+// body of the old bundled resource-types create call with 400 now; resource type creation is
+// the only way a taskServiceId comes into existence.
+func (c *Client) CreateScheduleScanTask(taskServiceID string, task ScheduleScanTask) (*ScheduleScanTaskDetail, error) {
+	body, err := json.Marshal(task)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/tasks/services/resource-scan/resource-types/%s", c.APIBaseURL, resourceTypeID), strings.NewReader(string(body)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/tasks/services/resource-scan/%s/tasks", c.APIBaseURL, taskServiceID), strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err
 	}
@@ -99,12 +84,27 @@ func (c *Client) ListScheduleScanTasks(taskServiceID string) ([]ScheduleScanTask
 	return result, nil
 }
 
-// GetScheduleScanTask finds a single scheduled scan task by ID. There is no single-item GET
-// endpoint for a task (confirmed by capture - only a list), so this lists and filters
-// client-side. Returns ErrNotFound if no task with taskID exists in the list.
+// GetScheduleScanTask retrieves a single scheduled scan task by ID. This route used to
+// return 500 (the backend team has since fixed it) - it's now confirmed to still respond
+// with a JSON array (like the plain list endpoint), not a bare object, so this unmarshals
+// as a list and picks out the matching taskID rather than assuming a single-object body.
 func (c *Client) GetScheduleScanTask(taskServiceID string, taskID string) (*ScheduleScanTaskDetail, error) {
-	tasks, err := c.ListScheduleScanTasks(taskServiceID)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/tasks/services/resource-scan/%s/tasks/%s", c.APIBaseURL, taskServiceID, taskID), nil)
 	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if string(body) == emptyString {
+		return nil, ErrNotFound
+	}
+
+	var tasks []ScheduleScanTaskDetail
+	if err := json.Unmarshal(body, &tasks); err != nil {
 		return nil, err
 	}
 
