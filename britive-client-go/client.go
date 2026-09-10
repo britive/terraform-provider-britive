@@ -38,7 +38,27 @@ const (
 	// backoffJitterFrac spreads out concurrent retries (e.g. many resources created via `count`)
 	// so they don't all wake up and collide again at the exact same instant.
 	backoffJitterFrac = 0.2
+	// shortTokenLength is the cutoff below which a token is treated as a legacy
+	// Britive API token rather than a Bearer JWT or workload identity token.
+	shortTokenLength = 50
 )
+
+// authorizationHeaderValue builds the Authorization header value for a Britive
+// API request, auto-discovering the token's scheme from its shape:
+//   - legacy API tokens are short opaque strings (< shortTokenLength chars) -> "TOKEN <token>"
+//   - workload identity tokens are self-describing, e.g. "OIDC::<id token>" or
+//     "AWS::<id token>" -> sent through as-is
+//   - anything else is a Bearer JWT issued via SSO/OAuth -> "Bearer <token>"
+func authorizationHeaderValue(token string) string {
+	switch {
+	case len(token) < shortTokenLength:
+		return fmt.Sprintf("TOKEN %s", token)
+	case strings.Contains(token, "::"):
+		return token
+	default:
+		return fmt.Sprintf("Bearer %s", token)
+	}
+}
 
 // Client - Britive API client
 type Client struct {
@@ -290,7 +310,7 @@ func (c *Client) DoWithLock(req *http.Request, key string) ([]byte, error) {
 
 // Do - Perform Britive API call; retries on HTTP 429 are handled by RetryClient.
 func (c *Client) Do(req *http.Request) ([]byte, error) {
-	req.Header.Set("Authorization", fmt.Sprintf("TOKEN %s", c.Token))
+	req.Header.Set("Authorization", authorizationHeaderValue(c.Token))
 	req.Header.Set("Content-Type", "application/json")
 	userAgent := fmt.Sprintf("britive-client-go/%s golang/%s %s/%s britive-terraform/%s", c.Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, c.Version)
 	req.Header.Add("User-Agent", userAgent)
