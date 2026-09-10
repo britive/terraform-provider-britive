@@ -74,7 +74,7 @@ resource "britive_resource_manager_resource_type_schedule_scan" "daily_example" 
 * `frequency_type` - (Required) How often the scan runs. One of `Daily`, `Weekly`, `Monthly` (case-insensitive).
 * `day_of_week` - (Optional) The day of the week the scan runs. Required when `frequency_type = "Weekly"`; must be unset otherwise. One of `Sunday`/`Sun`, `Monday`/`Mon`, `Tuesday`/`Tue`, `Wednesday`/`Wed`, `Thursday`/`Thu`, `Friday`/`Fri`, `Saturday`/`Sat` (case-insensitive).
 * `day_of_month` - (Optional) The day of the month (`1`-`31`) the scan runs. Required when `frequency_type = "Monthly"`; must be unset otherwise.
-* `start_time` - (Required) The time of day the scan runs, in 24-hour `"HH:MM"` format.
+* `start_time` - (Required) The time of day the scan runs, in 24-hour `"HH:MM"` format, in UTC.
 * `resource_labels` - (Optional) Resource labels to filter the scan to. Omit entirely to scan every resource of this type. Each block supports:
   * `label_key` - (Required) The name of the resource label. Each `label_key` may appear in at most one `resource_labels` block.
   * `values` - (Required) The label's selected values to filter the scan to.

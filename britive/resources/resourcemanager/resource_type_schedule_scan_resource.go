@@ -139,7 +139,7 @@ func (r *ScheduleScanResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 			},
 			"start_time": schema.StringAttribute{
-				Description: "The time of day the scan runs, in 24-hour \"HH:MM\" format",
+				Description: "The time of day the scan runs, in 24-hour \"HH:MM\" format, in UTC.",
 				Required:    true,
 			},
 			"next_run": schema.Int64Attribute{
