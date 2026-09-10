@@ -248,34 +248,45 @@ func (r *ResourceTypeResource) Create(ctx context.Context, req resource.CreateRe
 	// Map model to resource
 	r.mapModelToResource(resourceTypeRead, &plan, false)
 
-	// The backend registers this resource type's scan task service automatically at
-	// creation time (rto.TaskServiceID) and deletes it automatically when the resource type
-	// is deleted - nothing to bootstrap or clean up here. Fetching it via
-	// GetScheduleScanTaskService also gets its actual current enabled state in the same
-	// call, rather than assuming a default. Because the task service now exists immediately,
-	// scan_enabled can be set in this very same apply - unlike the old lazily-created task
-	// service, there is no dependency on a schedule scan existing first.
-	taskService, err := r.client.GetScheduleScanTaskService(rto.ResourceTypeID)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
-		return
+	// The backend registers this resource type's scan task service automatically at creation
+	// time and deletes it automatically when the resource type is deleted - nothing to
+	// bootstrap or clean up here. taskServiceId never changes for the lifetime of the
+	// resource type, and the create response already carries it directly (rto.TaskServiceID),
+	// so there's no need for a separate read just to learn it. Falling back to a lookup only
+	// covers the unexpected case where the create response ever omitted it.
+	taskServiceID := rto.TaskServiceID
+	if taskServiceID == "" {
+		taskService, err := r.client.GetScheduleScanTaskService(rto.ResourceTypeID)
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
+			return
+		}
+		taskServiceID = taskService.TaskServiceID
 	}
-	plan.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+	plan.TaskServiceID = types.StringValue(taskServiceID)
 
 	// scan_enabled has no schema Default, so plan.ScanEnabled is Unknown here precisely when
-	// the user didn't set it in config - in that case, don't touch scan state at all, just
-	// reflect the task service's actual just-registered value. A failure setting it doesn't
-	// roll back the resource type itself, which was already created successfully; state is
-	// still written below so the resource type stays tracked.
-	if !plan.ScanEnabled.IsUnknown() && plan.ScanEnabled.ValueBool() != taskService.Enabled {
-		enabled, err := r.setScanEnabled(taskService.TaskServiceID, plan.ScanEnabled.ValueBool())
+	// the user didn't set it in config. When it IS configured, apply it directly - the task
+	// service was just registered in this same Create call, so nothing else could have
+	// touched its status yet, and setScanEnabled's own response confirms the result without
+	// needing a read first. A failure setting it doesn't roll back the resource type itself,
+	// which was already created successfully; state is still written below so the resource
+	// type stays tracked. Only the "never configured" branch needs an actual read, to reflect
+	// the task service's real just-registered status rather than assuming one.
+	if !plan.ScanEnabled.IsUnknown() {
+		enabled, err := r.setScanEnabled(taskServiceID, plan.ScanEnabled.ValueBool())
 		if err != nil {
 			resp.Diagnostics.AddError("Error Setting Resource Type Scan Status", err.Error())
-			plan.ScanEnabled = types.BoolValue(taskService.Enabled)
+			plan.ScanEnabled = types.BoolValue(false)
 		} else {
 			plan.ScanEnabled = types.BoolValue(enabled)
 		}
 	} else {
+		taskService, err := r.client.GetScheduleScanTaskService(rto.ResourceTypeID)
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
+			return
+		}
 		plan.ScanEnabled = types.BoolValue(taskService.Enabled)
 	}
 
@@ -314,13 +325,19 @@ func (r *ResourceTypeResource) Read(ctx context.Context, req resource.ReadReques
 	r.mapModelToResource(resourceType, &state, false)
 
 	// The task service is registered automatically alongside its resource type and deleted
-	// along with it (backend cascade), so this is expected to always succeed here.
+	// along with it (backend cascade), so this call is expected to always succeed here. It's
+	// still needed on every refresh for scan_enabled's live status (which can change outside
+	// Terraform), but taskServiceId itself never changes for the resource type's lifetime -
+	// it was already set correctly at Create/Import, so it's only backfilled here for state
+	// that predates task_service_id being tracked at all, not re-derived on every read.
 	taskService, err := r.client.GetScheduleScanTaskService(resourceTypeID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
 		return
 	}
-	state.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+	if state.TaskServiceID.IsNull() || state.TaskServiceID.ValueString() == "" {
+		state.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+	}
 	state.ScanEnabled = types.BoolValue(taskService.Enabled)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -493,6 +510,9 @@ func (r *ResourceTypeResource) ImportState(ctx context.Context, req resource.Imp
 	// Map model to resource (imported = true to preserve API param types)
 	r.mapModelToResource(resourceType, &state, true)
 
+	// Unlike Read (which already has taskServiceId from prior state and only refreshes
+	// scan_enabled), import has no prior state at all, so taskServiceId must be derived
+	// fresh here - this and Create are the only two places that do so.
 	taskService, err := r.client.GetScheduleScanTaskService(resourceTypeID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Resource Type Scan Task Service", err.Error())
