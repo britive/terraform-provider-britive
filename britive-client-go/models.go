@@ -423,11 +423,24 @@ type EscalationPolicies struct {
 }
 
 // ResourceType - godoc
+// TaskServiceID: the backend now registers the resource type's scan task service
+// automatically on create and returns its ID in that same 201 response (and deletes it
+// automatically when the resource type is deleted) - no separate bootstrap/cleanup call
+// needed. See resource_manager_resource_type_schedule_scan.go's doc comment for the
+// task service's own lifecycle.
+// IsRotationEnabled is a *bool (not bool) so the provider can distinguish "not part of this
+// request" (nil, omitted from JSON) from an explicit "false" - the same field is sent on
+// every create/update call alongside name/description, so a plain bool with `omitempty`
+// would make it impossible to ever explicitly request false (Go omits a false bool with
+// omitempty), and without omitempty a zero-value bool would be sent as false on every
+// update that doesn't care about rotation at all, silently disabling it.
 type ResourceType struct {
-	ResourceTypeID string      `json:"resourceTypeId,omitempty"`
-	Name           string      `json:"name"`
-	Description    string      `json:"description,omitempty"`
-	Parameters     []Parameter `json:"parameters,omitempty"`
+	ResourceTypeID    string      `json:"resourceTypeId,omitempty"`
+	Name              string      `json:"name"`
+	Description       string      `json:"description,omitempty"`
+	Parameters        []Parameter `json:"parameters,omitempty"`
+	TaskServiceID     string      `json:"taskServiceId,omitempty"`
+	IsRotationEnabled *bool       `json:"isRotationEnabled,omitempty"`
 }
 
 type Parameter struct {
@@ -448,6 +461,137 @@ type ResponseTemplate struct {
 type AllResponseTemplates struct {
 	Count             int                `json:"count,omitempty"`
 	ResponseTemplates []ResponseTemplate `json:"data,omitempty"`
+}
+
+// RotationTemplateCreateRequest - request body for creating a rotation template stub.
+// The mode (local/inline-code/file), time limit, and variables are configured afterwards
+// via UpdateRotationTemplate; the create call only accepts name/description.
+type RotationTemplateCreateRequest struct {
+	Name        string `json:"rotationTemplateName"`
+	Description string `json:"rotationTemplateDesc,omitempty"`
+}
+
+// RotationTemplateSummary - shape returned by rotation template creation and by the
+// paginated rotation-templates list endpoint (a thinner shape than RotationTemplate's
+// detail/update representation - e.g. "templateId"/"templateName" instead of "id"/"rotationTemplateName").
+type RotationTemplateSummary struct {
+	TemplateID   string `json:"templateId,omitempty"`
+	TemplateName string `json:"templateName,omitempty"`
+	Description  string `json:"description,omitempty"`
+	CreatedOn    string `json:"createdOn,omitempty"`
+	CreatedBy    string `json:"createdBy,omitempty"`
+}
+
+// RotationTemplateVariable - a single variable exposed to a rotation template's script.
+type RotationTemplateVariable struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	MultiValued bool   `json:"multivalued"`
+}
+
+// RotationTemplate - full detail of a rotation template, and the request/response shape
+// for the metadata update call. Note: rotationTemplateName/rotationTemplateDesc are never
+// accepted by the update call (confirmed by capture - present on GET, absent from every PUT
+// body observed), so callers building an update payload must leave Name/Description unset.
+type RotationTemplate struct {
+	ID             string                     `json:"id,omitempty"`
+	ResourceTypeID string                     `json:"resourceTypeId,omitempty"`
+	ResourceType   string                     `json:"resourceType,omitempty"`
+	Name           string                     `json:"rotationTemplateName,omitempty"`
+	Description    string                     `json:"rotationTemplateDesc,omitempty"`
+	TimeoutLimit   int                        `json:"timeoutLimit"`
+	IsLocal        bool                       `json:"isLocal"`
+	InlineFile     bool                       `json:"inlineFile"`
+	EditorType     string                     `json:"editorType,omitempty"`
+	ScriptName     string                     `json:"scriptName,omitempty"`
+	Variables      []RotationTemplateVariable `json:"variables"`
+	PresignedURL   string                     `json:"presignedUrl,omitempty"`
+	CreatedOn      string                     `json:"createdOn,omitempty"`
+	CreatedBy      string                     `json:"createdBy,omitempty"`
+	UpdatedOn      string                     `json:"updatedOn,omitempty"`
+	UpdatedBy      string                     `json:"updatedBy,omitempty"`
+}
+
+// PresignedURLResponse - response body of a presigned-url endpoint (shared shape between
+// rotation templates' and scan settings' presigned-url endpoints).
+type PresignedURLResponse struct {
+	PresignedURL string `json:"presignedUrl"`
+}
+
+// ScanSettings - a resource type's scan settings. Unlike RotationTemplate, this is a
+// singleton per resource type (no name/description, created via an idempotent PUT rather
+// than POST-then-PUT) - see resource_manager_resource_type_scan_settings.go's doc comment.
+// ScriptName intentionally has no `omitempty`: confirmed by capture that the API honors an
+// explicit "" (clearing a previously-set script name on switching to Local), unlike
+// RotationTemplate where the field is only ever added, never explicitly cleared.
+type ScanSettings struct {
+	ID             string                     `json:"id,omitempty"`
+	ResourceTypeID string                     `json:"resourceTypeId,omitempty"`
+	ScriptName     string                     `json:"scriptName"`
+	TimeoutLimit   int                        `json:"timeoutLimit"`
+	IsLocal        bool                       `json:"isLocal"`
+	InlineFile     bool                       `json:"inlineFile"`
+	EditorType     string                     `json:"editorType,omitempty"`
+	Variables      []RotationTemplateVariable `json:"variables"`
+	PresignedURL   string                     `json:"presignedUrl,omitempty"`
+	CreatedOn      string                     `json:"createdOn,omitempty"`
+	CreatedBy      string                     `json:"createdBy,omitempty"`
+	UpdatedOn      string                     `json:"updatedOn,omitempty"`
+	UpdatedBy      string                     `json:"updatedBy,omitempty"`
+}
+
+// ScheduleScanTaskService - a resource type's scan task-service record. As of a recent API
+// update, this is registered automatically when the resource type itself is created
+// (britive.ResourceType.TaskServiceID) and deleted automatically when the resource type is
+// deleted - GetScheduleScanTaskService is expected to always succeed for any resource type
+// this provider manages, rather than the old "bundle a task in the same call to lazily
+// create the service" flow.
+type ScheduleScanTaskService struct {
+	TaskServiceID   string `json:"taskServiceId,omitempty"`
+	Name            string `json:"name,omitempty"`
+	TenantNamespace string `json:"tenantNamespace,omitempty"`
+	AppID           string `json:"appId,omitempty"`
+	ScanSourceType  string `json:"scanSourceType,omitempty"`
+	Enabled         bool   `json:"enabled"`
+	QueueID         string `json:"queueId,omitempty"`
+	TaskType        string `json:"taskType,omitempty"`
+}
+
+// ScheduleScanTask - the create/update request shape for a single scheduled scan ("task")
+// under a resource type's scan task-service. FrequencyInterval has no `omitempty`: an
+// explicit `null` must be sent for Daily (confirmed by capture), so a nil pointer here is
+// meaningful and must be marshaled as JSON null, not omitted. Properties has no `omitempty`
+// either: an explicit `{}` clears all resource label filters (confirmed by capture) - a nil
+// map would marshal as JSON null instead, which the API would treat as "no change". Sent
+// directly as the create call's body now (no taskService wrapper) - the backend rejects a
+// bundled taskService+task create with 400.
+type ScheduleScanTask struct {
+	Name              string              `json:"name"`
+	Description       string              `json:"description"`
+	Properties        map[string][]string `json:"properties"`
+	FrequencyType     string              `json:"frequencyType"`
+	FrequencyInterval *int                `json:"frequencyInterval"`
+	StartTime         string              `json:"startTime"`
+}
+
+// ScheduleScanTaskDetail - the response/list shape for a scheduled scan task. StartTime
+// here is an [hour, minute] pair, unlike the "HH:MM" string ScheduleScanTask sends on
+// write. Modified is 0 (JSON null) until the task's first update.
+type ScheduleScanTaskDetail struct {
+	TaskID            string              `json:"taskId,omitempty"`
+	TaskServiceID     string              `json:"taskServiceId,omitempty"`
+	TenantNamespace   string              `json:"tenantNamespace,omitempty"`
+	Name              string              `json:"name"`
+	Description       string              `json:"description"`
+	Properties        map[string][]string `json:"properties"`
+	StartTime         []int               `json:"startTime"`
+	FrequencyType     string              `json:"frequencyType"`
+	FrequencyInterval *int                `json:"frequencyInterval"`
+	CreatedBy         string              `json:"createdBy,omitempty"`
+	Created           int64               `json:"created,omitempty"`
+	Modified          int64               `json:"modified,omitempty"`
+	ModifiedBy        string              `json:"modifiedBy,omitempty"`
+	NextRun           int64               `json:"nextRun,omitempty"`
 }
 
 // ResourceTypePermission - Model for resource type permissions
