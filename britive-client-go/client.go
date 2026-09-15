@@ -47,14 +47,14 @@ const (
 // API request, auto-discovering the token's scheme from its shape:
 //   - legacy API tokens are short opaque strings (< shortTokenLength chars) -> "TOKEN <token>"
 //   - workload identity tokens are self-describing, e.g. "OIDC::<id token>" or
-//     "AWS::<id token>" -> sent through as-is
+//     "AWS::<id token>" -> "WorkloadToken <token>"
 //   - anything else is a Bearer JWT issued via SSO/OAuth -> "Bearer <token>"
 func authorizationHeaderValue(token string) string {
 	switch {
 	case len(token) < shortTokenLength:
 		return fmt.Sprintf("TOKEN %s", token)
 	case strings.Contains(token, "::"):
-		return token
+		return fmt.Sprintf("WorkloadToken %s", token)
 	default:
 		return fmt.Sprintf("Bearer %s", token)
 	}
