@@ -1,7 +1,6 @@
 package britive
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,19 +75,7 @@ func (c *Client) UploadFile(presignedURL string, uploadFilePath string) error {
 		return err
 	}
 
-	// Create the PUT request
-	req, err := http.NewRequest("PUT", presignedURL, bytes.NewReader(fileData))
-	if err != nil {
-		fmt.Println("Failed to create request:", err)
-		return err
-	}
-
-	// Optionally set the content type if needed
-	req.Header.Set("Content-Type", "text/plain") // or "application/octet-stream"
-
-	// Perform the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := putToPresignedURL(presignedURL, fileData, "text/plain") // or "application/octet-stream"
 	if err != nil {
 		fmt.Println("Upload failed:", err)
 		return err
@@ -124,21 +111,7 @@ func (c *Client) UploadPermissionFiles(permissionId string, checkInFilePath stri
 }
 
 func (c *Client) UploadCode(presignedURL string, code string, contentType string) error {
-
-	codePayload := []byte(code)
-
-	// Create the PUT request
-	req, err := http.NewRequest("PUT", presignedURL, bytes.NewBuffer(codePayload))
-	if err != nil {
-		fmt.Println("Failed to create request:", err)
-		return err
-	}
-
-	req.Header.Set("Content-Type", contentType)
-
-	// Perform the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := putToPresignedURL(presignedURL, []byte(code), contentType)
 	if err != nil {
 		fmt.Println("Upload code failed:", err)
 		return err

@@ -1,5 +1,5 @@
 ---
-page_title: "Migrating to the Terraform Plugin Framework (v3.0.2)"
+page_title: "Migrating to the Terraform Plugin Framework (v3.0.3)"
 subcategory: ""
 description: |-
   What changed in the Britive provider v3.x rewrite, which v3 release to upgrade to, what is new, the risks involved, how to back up your state before upgrading, what to expect on your first plan after upgrading, and how to roll back to the legacy SDK-based provider if you hit an issue.
@@ -7,7 +7,7 @@ description: |-
 
 
 
-# Migrating to the Terraform Plugin Framework (v3.0.2)
+# Migrating to the Terraform Plugin Framework (v3.0.3)
 
 
 
@@ -18,8 +18,8 @@ implementation used in v2.x releases (up to and including **v2.3.6**).
 
 
 
-**v3.0.2** is the current release and the recommended upgrade target — it is the same rewrite plus fixes
-accumulated across v3.0.1 and v3.0.2 for issues found during early v3.0.0 upgrades. See
+**v3.0.3** is the current release and the recommended upgrade target — it is the same rewrite plus fixes
+accumulated across v3.0.1, v3.0.2, and v3.0.3 for issues found during early v3.x upgrades. See
 [Which v3 release to upgrade to](#which-v3-release-to-upgrade-to). Everything else in this guide applies to
 the whole v3.x series.
 
@@ -30,7 +30,7 @@ This guide explains:
 
 
 - Why this migration happened and what it means for you.
-- Which v3 release to upgrade to, and what v3.0.1 and v3.0.2 fix.
+- Which v3 release to upgrade to, and what v3.0.1, v3.0.2, and v3.0.3 fix.
 - What is unchanged, and what new functionality v3.x adds.
 - The risks involved, since this is a **full internal rewrite**, not an incremental change.
 - How to **back up your Terraform state** before upgrading.
@@ -79,9 +79,9 @@ Your existing configuration should not need any edits to work with v3.x.
 
 
 
-The Plugin Framework rewrite first shipped in **v3.0.0**. **v3.0.2** is the current release and the
-recommended target — the same rewrite, plus the fixes below accumulated across v3.0.1 and v3.0.2 for issues
-found during early v3.0.0 upgrades.
+The Plugin Framework rewrite first shipped in **v3.0.0**. **v3.0.3** is the current release and the
+recommended target — the same rewrite, plus the fixes below accumulated across v3.0.1, v3.0.2, and v3.0.3 for
+issues found during early v3.0.0 upgrades.
 
 
 
@@ -120,6 +120,23 @@ the exception: it forced a real destroy-and-recreate, so treat any resulting dow
 
 
 
+**v3.0.3** additionally fixed:
+
+
+
+- `britive_resource_manager_resource_label`: `Provider produced invalid plan` on `values[].description` for
+  labels migrated from v2.x state, and `Provider produced inconsistent result after apply` on
+  `values[].updated_by`/`updated_on` when a value's position in state didn't match its position in config.
+
+
+As with the v3.0.2 fixes above, these did not indicate any problem with your Britive tenant — only the local
+consistency check failed. One additional one-time diff is possible on `britive_resource_manager_resource_label`
+after upgrading: if the backend's stored order for a label's `values` differs from the order they're authored
+in config, the first plan may show a reordering diff. This is expected, harmless, and self-resolves after that
+apply.
+
+
+
 Pin it explicitly so `terraform init -upgrade` does not leave you on an older v3.x release:
 
 
@@ -129,7 +146,7 @@ terraform {
   required_providers {
     britive = {
       source  = "britive/britive"
-      version = "3.0.2"
+      version = "3.0.3"
     }
   }
 }
@@ -137,8 +154,8 @@ terraform {
 
 
 
-If you have already upgraded to v3.0.0 or v3.0.1, move to v3.0.2: it is a bug-fix release on the same schemas
-and state format, so there is no additional migration work — change the version constraint and run
+If you have already upgraded to v3.0.0, v3.0.1, or v3.0.2, move to v3.0.3: it is a bug-fix release on the same
+schemas and state format, so there is no additional migration work — change the version constraint and run
 `terraform init -upgrade`.
 
 
@@ -204,7 +221,7 @@ This is materially different from a typical point release, and it carries more r
    This step is load-bearing, not precautionary: once v3.x has written state — even via a refresh with zero
    infrastructure changes — that state can no longer be read by v2.3.x, and the backup is the only rollback
    path.
-2. Upgrade a **non-production** workspace/environment first, pinning v3.0.2 (see
+2. Upgrade a **non-production** workspace/environment first, pinning v3.0.3 (see
    [Which v3 release to upgrade to](#which-v3-release-to-upgrade-to)).
 3. Run `terraform plan` and carefully review the output:
    - ✅ Expected: **no changes** (`No changes. Your infrastructure matches the configuration.`).
