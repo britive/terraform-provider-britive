@@ -471,15 +471,16 @@ type RotationTemplateCreateRequest struct {
 	Description string `json:"rotationTemplateDesc,omitempty"`
 }
 
-// RotationTemplateSummary - shape returned by rotation template creation and by the
-// paginated rotation-templates list endpoint (a thinner shape than RotationTemplate's
-// detail/update representation - e.g. "templateId"/"templateName" instead of "id"/"rotationTemplateName").
+// RotationTemplateSummary - shape returned by rotation template creation (a thinner shape
+// than RotationTemplate's detail/update representation - e.g. "templateId"/"templateName"
+// instead of "id"/"rotationTemplateName"). The same thinner shape is also returned by the
+// paginated rotation-templates list endpoint, but only TemplateID is used today (the
+// resource immediately follows up with a full GetRotationTemplate read-back) - the other
+// fields the create/list response carries (templateName, description, createdOn, createdBy)
+// aren't modeled here since nothing reads them; add them back if a list data source is
+// ever built against that endpoint.
 type RotationTemplateSummary struct {
-	TemplateID   string `json:"templateId,omitempty"`
-	TemplateName string `json:"templateName,omitempty"`
-	Description  string `json:"description,omitempty"`
-	CreatedOn    string `json:"createdOn,omitempty"`
-	CreatedBy    string `json:"createdBy,omitempty"`
+	TemplateID string `json:"templateId,omitempty"`
 }
 
 // RotationTemplateVariable - a single variable exposed to a rotation template's script.
@@ -493,23 +494,20 @@ type RotationTemplateVariable struct {
 // for the metadata update call. Note: rotationTemplateName/rotationTemplateDesc are never
 // accepted by the update call (confirmed by capture - present on GET, absent from every PUT
 // body observed), so callers building an update payload must leave Name/Description unset.
+// The API also returns id/resourceTypeId/resourceType/createdOn/createdBy/updatedOn/updatedBy,
+// but none of them are read anywhere: the template's own ID is already tracked via
+// RotationTemplateSummary.TemplateID at creation, and the rest are unused audit/parent
+// metadata, so they're deliberately left out rather than kept as unread struct fields.
 type RotationTemplate struct {
-	ID             string                     `json:"id,omitempty"`
-	ResourceTypeID string                     `json:"resourceTypeId,omitempty"`
-	ResourceType   string                     `json:"resourceType,omitempty"`
-	Name           string                     `json:"rotationTemplateName,omitempty"`
-	Description    string                     `json:"rotationTemplateDesc,omitempty"`
-	TimeoutLimit   int                        `json:"timeoutLimit"`
-	IsLocal        bool                       `json:"isLocal"`
-	InlineFile     bool                       `json:"inlineFile"`
-	EditorType     string                     `json:"editorType,omitempty"`
-	ScriptName     string                     `json:"scriptName,omitempty"`
-	Variables      []RotationTemplateVariable `json:"variables"`
-	PresignedURL   string                     `json:"presignedUrl,omitempty"`
-	CreatedOn      string                     `json:"createdOn,omitempty"`
-	CreatedBy      string                     `json:"createdBy,omitempty"`
-	UpdatedOn      string                     `json:"updatedOn,omitempty"`
-	UpdatedBy      string                     `json:"updatedBy,omitempty"`
+	Name         string                     `json:"rotationTemplateName,omitempty"`
+	Description  string                     `json:"rotationTemplateDesc,omitempty"`
+	TimeoutLimit int                        `json:"timeoutLimit"`
+	IsLocal      bool                       `json:"isLocal"`
+	InlineFile   bool                       `json:"inlineFile"`
+	EditorType   string                     `json:"editorType,omitempty"`
+	ScriptName   string                     `json:"scriptName,omitempty"`
+	Variables    []RotationTemplateVariable `json:"variables"`
+	PresignedURL string                     `json:"presignedUrl,omitempty"`
 }
 
 // PresignedURLResponse - response body of a presigned-url endpoint (shared shape between
@@ -524,20 +522,20 @@ type PresignedURLResponse struct {
 // ScriptName intentionally has no `omitempty`: confirmed by capture that the API honors an
 // explicit "" (clearing a previously-set script name on switching to Local), unlike
 // RotationTemplate where the field is only ever added, never explicitly cleared.
+// The API also returns resourceTypeId/createdOn/createdBy/updatedOn/updatedBy, but nothing
+// reads them - resource_type_id is already known from the Terraform config that identifies
+// this singleton, and the rest are unused audit metadata - so they're left out rather than
+// kept as unread struct fields. ID is kept: it's used as an empty/non-empty sentinel to
+// distinguish "never configured" from a real record.
 type ScanSettings struct {
-	ID             string                     `json:"id,omitempty"`
-	ResourceTypeID string                     `json:"resourceTypeId,omitempty"`
-	ScriptName     string                     `json:"scriptName"`
-	TimeoutLimit   int                        `json:"timeoutLimit"`
-	IsLocal        bool                       `json:"isLocal"`
-	InlineFile     bool                       `json:"inlineFile"`
-	EditorType     string                     `json:"editorType,omitempty"`
-	Variables      []RotationTemplateVariable `json:"variables"`
-	PresignedURL   string                     `json:"presignedUrl,omitempty"`
-	CreatedOn      string                     `json:"createdOn,omitempty"`
-	CreatedBy      string                     `json:"createdBy,omitempty"`
-	UpdatedOn      string                     `json:"updatedOn,omitempty"`
-	UpdatedBy      string                     `json:"updatedBy,omitempty"`
+	ID           string                     `json:"id,omitempty"`
+	ScriptName   string                     `json:"scriptName"`
+	TimeoutLimit int                        `json:"timeoutLimit"`
+	IsLocal      bool                       `json:"isLocal"`
+	InlineFile   bool                       `json:"inlineFile"`
+	EditorType   string                     `json:"editorType,omitempty"`
+	Variables    []RotationTemplateVariable `json:"variables"`
+	PresignedURL string                     `json:"presignedUrl,omitempty"`
 }
 
 // ScheduleScanTaskService - a resource type's scan task-service record. As of a recent API
@@ -576,7 +574,9 @@ type ScheduleScanTask struct {
 
 // ScheduleScanTaskDetail - the response/list shape for a scheduled scan task. StartTime
 // here is an [hour, minute] pair, unlike the "HH:MM" string ScheduleScanTask sends on
-// write. Modified is 0 (JSON null) until the task's first update.
+// write. The API also returns createdBy/created/modified/modifiedBy, but this resource
+// doesn't expose them in Terraform state (see resource_type_schedule_scan_resource.go),
+// so they're deliberately left out here too rather than kept as unread struct fields.
 type ScheduleScanTaskDetail struct {
 	TaskID            string              `json:"taskId,omitempty"`
 	TaskServiceID     string              `json:"taskServiceId,omitempty"`
@@ -587,10 +587,6 @@ type ScheduleScanTaskDetail struct {
 	StartTime         []int               `json:"startTime"`
 	FrequencyType     string              `json:"frequencyType"`
 	FrequencyInterval *int                `json:"frequencyInterval"`
-	CreatedBy         string              `json:"createdBy,omitempty"`
-	Created           int64               `json:"created,omitempty"`
-	Modified          int64               `json:"modified,omitempty"`
-	ModifiedBy        string              `json:"modifiedBy,omitempty"`
 	NextRun           int64               `json:"nextRun,omitempty"`
 }
 

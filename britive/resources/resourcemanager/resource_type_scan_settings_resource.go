@@ -264,11 +264,18 @@ func (r *ScanSettingsResource) ModifyPlan(ctx context.Context, req resource.Modi
 	}
 
 	// Predict script_name to match what uploadScript will actually produce at apply time -
-	// same "inconsistent result after apply" concern as rotation template's equivalent, but
-	// simpler here: resource_type_id is user-supplied (not server-generated), so the
-	// InlineFile auto-name is fully computable even on create, and Local mode explicitly
-	// clears script_name (confirmed by capture the API honors an explicit ""), so there's
-	// no need to carry forward prior state.
+	// same "inconsistent result after apply" concern as rotation template's equivalent.
+	// resource_type_id is usually already known at plan time (it's user-supplied, not
+	// server-generated), making the InlineFile auto-name fully computable even on create -
+	// but not always: when it references another resource being created in the same apply
+	// (e.g. britive_resource_manager_resource_type.example.id, exactly as shown in this
+	// resource's own example), it's genuinely unknown until that resource exists. Guessing
+	// with the empty string in that case produced a wrong prediction ("_scan_file" instead
+	// of "<real-id>_scan_file"), causing a "Provider produced inconsistent final plan"
+	// error - so mirror rotation template's own handling of this and leave script_name as
+	// an honest "(known after apply)" instead. Local mode explicitly clears script_name
+	// (confirmed by capture the API honors an explicit ""), so there's no need to carry
+	// forward prior state there.
 	switch strings.ToLower(plan.TemplateType.ValueString()) {
 	case "filepath":
 		if !plan.ScriptFilePath.IsNull() && plan.ScriptFilePath.ValueString() != "" {
@@ -277,7 +284,11 @@ func (r *ScanSettingsResource) ModifyPlan(ctx context.Context, req resource.Modi
 			plan.ScriptName = types.StringNull()
 		}
 	case "inlinefile":
-		plan.ScriptName = types.StringValue(lastPathSegment(plan.ResourceTypeID.ValueString()) + "_scan_file")
+		if plan.ResourceTypeID.IsUnknown() {
+			plan.ScriptName = types.StringUnknown()
+		} else {
+			plan.ScriptName = types.StringValue(lastPathSegment(plan.ResourceTypeID.ValueString()) + "_scan_file")
+		}
 	default: // local
 		plan.ScriptName = types.StringNull()
 	}

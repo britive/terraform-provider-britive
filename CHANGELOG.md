@@ -1,4 +1,4 @@
-## Unreleased
+## 3.0.3
 
 ENHANCEMENTS:
 * **New Resource:** `britive_resource_manager_resource_type_rotation_template` : Create, update, and manage rotation templates for a resource manager resource type, with `Local`, `InlineFile`, and `FilePath` script modes.
