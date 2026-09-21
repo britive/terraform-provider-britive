@@ -471,6 +471,22 @@ func (r *RotationTemplateResource) Update(ctx context.Context, req resource.Upda
 
 	template := r.buildUpdatePayload(&plan)
 
+	// The presigned-url endpoint uploadScript relies on rejects the request if the template
+	// is still flagged Local server-side - which it is here whenever this update is
+	// switching an existing Local template to InlineFile/FilePath, since the mode switch
+	// hasn't been sent yet. Send it first - complete with the
+	// deterministic scriptName uploadScript would otherwise only set afterward, matching the
+	// combined mode+scriptName shape confirmed working by capture - so the server already
+	// recognizes the new mode by the time uploadScript asks for a presigned url. Confirmed
+	// necessary by acceptance testing this exact transition.
+	if strings.ToLower(plan.TemplateType.ValueString()) != "local" {
+		template.ScriptName = computeRotationTemplateScriptName(templateID, &plan)
+		if _, err := r.client.UpdateRotationTemplate(resourceTypeID, templateID, template); err != nil {
+			resp.Diagnostics.AddError("Error Updating Rotation Template", err.Error())
+			return
+		}
+	}
+
 	if err := r.uploadScript(resourceTypeID, templateID, &plan, &template); err != nil {
 		resp.Diagnostics.AddError("Error Uploading Rotation Template Script", err.Error())
 		return
@@ -612,14 +628,28 @@ func (r *RotationTemplateResource) uploadScript(resourceTypeID, templateID strin
 		if err := r.client.UploadRotationTemplateScriptCode(resourceTypeID, templateID, plan.ScriptContent.ValueString(), plan.ScriptLanguage.ValueString()); err != nil {
 			return err
 		}
-		template.ScriptName = templateID + "_rotation_template_file"
 	case "filepath":
 		if err := r.client.UploadRotationTemplateScriptFile(resourceTypeID, templateID, plan.ScriptFilePath.ValueString()); err != nil {
 			return err
 		}
-		template.ScriptName = filepath.Base(plan.ScriptFilePath.ValueString())
 	}
+	template.ScriptName = computeRotationTemplateScriptName(templateID, plan)
 	return nil
+}
+
+// computeRotationTemplateScriptName returns the deterministic scriptName uploadScript will
+// end up setting for the current template_type, without performing any upload. Exists so
+// Update() can include the correct scriptName in the metadata PUT it must send before
+// uploadScript's presigned-url request - see Update()'s comment for why.
+func computeRotationTemplateScriptName(templateID string, plan *RotationTemplateResourceModel) string {
+	switch strings.ToLower(plan.TemplateType.ValueString()) {
+	case "inlinefile":
+		return templateID + "_rotation_template_file"
+	case "filepath":
+		return filepath.Base(plan.ScriptFilePath.ValueString())
+	default:
+		return ""
+	}
 }
 
 // canonicalVariableType normalizes a case-insensitive `type` input to the exact casing
