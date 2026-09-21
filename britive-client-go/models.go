@@ -528,14 +528,13 @@ type PresignedURLResponse struct {
 // kept as unread struct fields. ID is kept: it's used as an empty/non-empty sentinel to
 // distinguish "never configured" from a real record.
 type ScanSettings struct {
-	ID           string                     `json:"id,omitempty"`
-	ScriptName   string                     `json:"scriptName"`
-	TimeoutLimit int                        `json:"timeoutLimit"`
-	IsLocal      bool                       `json:"isLocal"`
-	InlineFile   bool                       `json:"inlineFile"`
-	EditorType   string                     `json:"editorType,omitempty"`
-	Variables    []RotationTemplateVariable `json:"variables"`
-	PresignedURL string                     `json:"presignedUrl,omitempty"`
+	ID           string `json:"id,omitempty"`
+	ScriptName   string `json:"scriptName"`
+	TimeoutLimit int    `json:"timeoutLimit"`
+	IsLocal      bool   `json:"isLocal"`
+	InlineFile   bool   `json:"inlineFile"`
+	EditorType   string `json:"editorType,omitempty"`
+	PresignedURL string `json:"presignedUrl,omitempty"`
 }
 
 // ScheduleScanTaskService - a resource type's scan task-service record. As of a recent API

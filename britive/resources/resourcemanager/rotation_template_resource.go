@@ -340,17 +340,14 @@ func (r *RotationTemplateResource) ModifyPlan(ctx context.Context, req resource.
 			plan.ScriptName = types.StringValue(plan.TemplateID.ValueString() + "_rotation_template_file")
 		}
 	default: // local
-		// Confirmed by capture: switching to Local does not clear a previously-set
-		// scriptName server-side - uploadScript is a no-op in this mode, so Update() omits
-		// the field entirely, and (like name/description) the API leaves omitted fields
-		// untouched rather than clearing them. So for an existing resource, predict "no
-		// change" by carrying forward prior state; only a resource that's Local from
-		// creation (no prior state) genuinely never had one.
-		if hasPriorState {
-			plan.ScriptName = state.ScriptName
-		} else {
-			plan.ScriptName = types.StringNull()
-		}
+		// uploadScript is a no-op in this mode, so Update() omits scriptName from the
+		// request entirely - but the API clears it to null server-side regardless of
+		// omission (confirmed by acceptance testing switching an existing InlineFile/
+		// FilePath template to Local), matching scan settings' own explicit-clear
+		// behavior for the same mode. So predict null unconditionally rather than
+		// carrying forward a prior InlineFile/FilePath-derived value that won't survive
+		// apply.
+		plan.ScriptName = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)

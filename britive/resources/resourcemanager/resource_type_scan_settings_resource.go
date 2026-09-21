@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -37,16 +36,15 @@ type ScanSettingsResource struct {
 
 // ScanSettingsResourceModel describes the resource data model.
 type ScanSettingsResourceModel struct {
-	ID             types.String                    `tfsdk:"id"`
-	ResourceTypeID types.String                    `tfsdk:"resource_type_id"`
-	TimeLimit      types.Int64                     `tfsdk:"time_limit"`
-	TemplateType   types.String                    `tfsdk:"template_type"`
-	ScriptFilePath types.String                    `tfsdk:"script_file_path"`
-	ScriptFileHash types.String                    `tfsdk:"script_file_hash"`
-	ScriptContent  types.String                    `tfsdk:"script_content"`
-	ScriptLanguage types.String                    `tfsdk:"script_language"`
-	ScriptName     types.String                    `tfsdk:"script_name"`
-	Variables      []RotationTemplateVariableModel `tfsdk:"variables"`
+	ID             types.String `tfsdk:"id"`
+	ResourceTypeID types.String `tfsdk:"resource_type_id"`
+	TimeLimit      types.Int64  `tfsdk:"time_limit"`
+	TemplateType   types.String `tfsdk:"template_type"`
+	ScriptFilePath types.String `tfsdk:"script_file_path"`
+	ScriptFileHash types.String `tfsdk:"script_file_hash"`
+	ScriptContent  types.String `tfsdk:"script_content"`
+	ScriptLanguage types.String `tfsdk:"script_language"`
+	ScriptName     types.String `tfsdk:"script_name"`
 }
 
 // scanSettingsDefaultTimeLimitMinutes matches the API's own observed default (1200 seconds)
@@ -133,32 +131,6 @@ func (r *ScanSettingsResource) Schema(_ context.Context, _ resource.SchemaReques
 			"script_name": schema.StringAttribute{
 				Description: "Server-derived script file name: the basename of script_file_path for FilePath mode, an auto-generated name for InlineFile mode, empty for Local mode. Predicted at plan time by ModifyPlan rather than via a plan modifier.",
 				Computed:    true,
-			},
-		},
-		Blocks: map[string]schema.Block{
-			"variables": schema.SetNestedBlock{
-				Description: "Variables exposed to the scan script",
-				NestedObject: schema.NestedBlockObject{
-					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
-							Description: "The variable name",
-							Required:    true,
-						},
-						"type": schema.StringAttribute{
-							Description: "The variable type. One of String, Number, Date.",
-							Required:    true,
-							Validators: []validator.String{
-								stringvalidator.OneOfCaseInsensitive("String", "Number", "Date"),
-							},
-						},
-						"multi_valued": schema.BoolAttribute{
-							Description: "Whether the variable accepts multiple values",
-							Optional:    true,
-							Computed:    true,
-							Default:     booldefault.StaticBool(false),
-						},
-					},
-				},
 			},
 		},
 	}
@@ -386,7 +358,6 @@ func (r *ScanSettingsResource) Delete(ctx context.Context, req resource.DeleteRe
 		EditorType:   "text",
 		ScriptName:   "",
 		TimeoutLimit: scanSettingsDefaultTimeLimitMinutes * 60,
-		Variables:    make([]britive.RotationTemplateVariable, 0),
 	}
 
 	if _, err := r.client.UpsertScanSettings(resourceTypeID, reset); err != nil {
@@ -471,22 +442,15 @@ func (r *ScanSettingsResource) upsert(ctx context.Context, plan *ScanSettingsRes
 
 // buildUpsertPayload maps the plan into the API's PUT request shape, deriving
 // isLocal/inlineFile/editorType from template_type. Does not set ScriptName (set by
-// uploadScript, or explicitly cleared to "" for Local mode below).
+// uploadScript, or explicitly cleared to "" for Local mode below). Scan settings has no
+// variables support (unlike rotation templates) - the API never echoes the field back,
+// confirmed by capture and by live testing - so it's omitted from the schema entirely.
 func (r *ScanSettingsResource) buildUpsertPayload(plan *ScanSettingsResourceModel) britive.ScanSettings {
 	settings := britive.ScanSettings{
 		// The API's timeoutLimit is in seconds; time_limit is exposed to users in minutes,
 		// same convention as rotation template's time_limit.
 		TimeoutLimit: int(plan.TimeLimit.ValueInt64()) * 60,
 		EditorType:   "text",
-		Variables:    make([]britive.RotationTemplateVariable, 0, len(plan.Variables)),
-	}
-
-	for _, v := range plan.Variables {
-		settings.Variables = append(settings.Variables, britive.RotationTemplateVariable{
-			Name:        v.Name.ValueString(),
-			Type:        canonicalVariableType(v.Type.ValueString()),
-			MultiValued: v.MultiValued.ValueBool(),
-		})
 	}
 
 	switch strings.ToLower(plan.TemplateType.ValueString()) {
@@ -555,29 +519,6 @@ func (r *ScanSettingsResource) mapModelToResource(settings *britive.ScanSettings
 	} else {
 		state.ScriptLanguage = computedLanguage
 	}
-
-	variableTypeMap := make(map[string]string)
-	if !imported {
-		for _, v := range state.Variables {
-			variableTypeMap[v.Name.ValueString()] = v.Type.ValueString()
-		}
-	}
-
-	variables := make([]RotationTemplateVariableModel, 0, len(settings.Variables))
-	for _, v := range settings.Variables {
-		varType := v.Type
-		if !imported {
-			if userType, ok := variableTypeMap[v.Name]; ok && strings.EqualFold(userType, v.Type) {
-				varType = userType
-			}
-		}
-		variables = append(variables, RotationTemplateVariableModel{
-			Name:        types.StringValue(v.Name),
-			Type:        types.StringValue(varType),
-			MultiValued: types.BoolValue(v.MultiValued),
-		})
-	}
-	state.Variables = variables
 
 	switch {
 	case settings.IsLocal:

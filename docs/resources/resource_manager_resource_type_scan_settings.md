@@ -30,12 +30,6 @@ resource "britive_resource_manager_resource_type_scan_settings" "local_example" 
   resource_type_id = britive_resource_manager_resource_type.example.id
   time_limit        = 20
   template_type     = "Local"
-
-  variables {
-    name         = "username"
-    type         = "String"
-    multi_valued = false
-  }
 }
 ```
 
@@ -74,10 +68,6 @@ resource "britive_resource_manager_resource_type_scan_settings" "add_file_exampl
 * `script_file_path` - (Optional) Path to a local file to upload as the scan script. Required when `template_type = "FilePath"`; must be unset otherwise. Content-Type on upload is derived from the file's own extension (falling back to `application/octet-stream` if unrecognized).
 * `script_content` - (Optional) Inline scan script content. Required when `template_type = "InlineFile"`; must be unset otherwise. The provider re-reads the live content on every `terraform plan`/`refresh`, so an out-of-band edit made directly on the backend shows up as drift and gets reverted to match this value on the next `apply`.
 * `script_language` - (Optional) The language of `script_content`. One of `Text`, `Python`, `Batch`, `JavaScript`, `PowerShell`, `Shell` (case-insensitive). Defaults to `text`. Only meaningful when `template_type = "InlineFile"`.
-* `variables` - (Optional) A set of variables exposed to the scan script. Each variable supports:
-  * `name` - (Required) The variable name.
-  * `type` - (Required) The variable type. One of `String`, `Number`, `Date` (case-insensitive).
-  * `multi_valued` - (Optional) Whether the variable accepts multiple values. Defaults to `false`.
 
 ## Attribute Reference
 
@@ -104,5 +94,5 @@ you want drift detection against a local source in that mode.
 
 There is no evidence of a delete endpoint for scan settings - it's a resource-type-scoped
 singleton, not a removable record. `terraform destroy` instead resets the settings to
-`Local` mode with the API's own observed defaults (no script, 20-minute time limit, no
-variables), the closest equivalent to "un-configuring" it.
+`Local` mode with the API's own observed defaults (no script, 20-minute time limit), the
+closest equivalent to "un-configuring" it.

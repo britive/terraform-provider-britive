@@ -67,17 +67,6 @@ func testAccCheckBritiveScanSettingsLocalConfig(resourceTypeName, resourceTypeDe
 		resource_type_id = britive_resource_manager_resource_type.new_resource_type_ss_local.id
 		time_limit        = 20
 		template_type     = "Local"
-
-		variables {
-			name         = "var1"
-			type         = "String"
-			multi_valued = false
-		}
-		variables {
-			name         = "var2"
-			type         = "Number"
-			multi_valued = true
-		}
 	}`, resourceTypeName, resourceTypeDescription)
 }
 
@@ -98,12 +87,6 @@ func testAccCheckBritiveScanSettingsInlineFileConfig(resourceTypeName, resourceT
 			hii
 			byyy
 		EOT
-
-		variables {
-			name         = "username"
-			type         = "String"
-			multi_valued = false
-		}
 	}`, resourceTypeName, resourceTypeDescription)
 }
 
@@ -118,12 +101,6 @@ func testAccCheckBritiveScanSettingsLocalUpdateConfig(resourceTypeName, resource
 		resource_type_id = britive_resource_manager_resource_type.new_resource_type_ss_inline.id
 		time_limit        = 25
 		template_type     = "Local"
-
-		variables {
-			name         = "username"
-			type         = "String"
-			multi_valued = false
-		}
 	}`, resourceTypeName, resourceTypeDescription)
 }
 
