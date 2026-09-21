@@ -63,6 +63,34 @@ resource "britive_entity_group" "AWS_Env_Group" {
     parent_id          = "asjdhuhxxdccudhd"
 }
 
+# Example: Britive EnvironmentGroup
+resource "britive_application" "new_britive" {
+    application_type = "Britive"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "New Britive"
+    }
+    properties {
+      name = "description"
+      value = "New Britive Description"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = "604800"
+    }
+}
+
+resource "britive_entity_group" "britive_env_group" {
+    application_id     = britive_application.new_britive.id
+    entity_name        = "My Britive Entity Group"
+    entity_description = "My Britive Entity Group Description"
+    parent_id          = britive_application.new_britive.entity_root_environment_group_id
+}
+
 # Example: Kubernetes EnvironmentGroup
 resource "britive_application" "new_kubernetes" {
     application_type = "Kubernetes"

@@ -192,6 +192,64 @@ resource "britive_entity_environment" "okta_env_1" {
 > - `groupFilter`: Filter for specific groups.
 > - `scanRoles`: Enable scanning of roles.
 
+### Britive Entity Environment
+
+```hcl
+resource "britive_application" "new_britive" {
+    application_type = "Britive"
+    user_account_mappings {
+      name = "Mobile"
+      description = "Mobile"
+    }
+    properties {
+      name = "displayName"
+      value = "New Britive"
+    }
+    properties {
+      name = "description"
+      value = "New Britive Description"
+    }
+    properties {
+      name = "maxSessionDurationForProfiles"
+      value = "604800"
+    }
+}
+
+resource "britive_entity_environment" "britive_env_1" {
+  application_id  = britive_application.new_britive.id
+  parent_group_id = britive_application.new_britive.entity_root_environment_group_id
+
+  properties {
+    name  = "displayName"
+    value = "My Britive Environment"
+  }
+  properties {
+    name  = "description"
+    value = "My Britive Environment Description"
+  }
+  properties {
+    name  = "apiBaseUrl"
+    value = "https://{tenantId}.britive-app.com/"
+  }
+  sensitive_properties {
+    name  = "apiToken"
+    value = "testToken"
+  }
+}
+```
+
+-> `properties` and `sensitive_properties` in the above example are mandatory for creating a valid entity of type environment.
+
+~> This resource does not track changes made to `sensitive_properties` through the Britive console.
+
+>**Properties:**
+> - `displayName`: Environment Name.
+> - `description`: Environment Description.
+> - `apiBaseUrl`: Base URL of the Britive tenant to connect to.
+
+>**Sensitive Properties:**
+> - `apiToken`: API token used to authenticate with the connected Britive tenant.
+
 ### Kubernetes Entity Environment
 
 ```hcl
