@@ -6,7 +6,7 @@ The Britive provider is used to interact with the resources supported by Britive
 
 Use the navigation to the left to read about the available resources.
 
-!>Upgrading from a 2.x.x release to v3.0.0? This is a full rewrite of the provider. Back up your Terraform state before upgrading and review the [migration guide](guides/migration-guide.md) first.
+!>Upgrading from a 2.x.x release to v3.0.x? This is a full rewrite of the provider. Back up your Terraform state before upgrading and review the [migration guide](guides/migration-guide.md) first.
 
 ## Migration Notes
 
@@ -70,7 +70,7 @@ In addition to [generic `provider` arguments](https://www.terraform.io/docs/conf
 
 * `tenant` - (Optional) This is the Britive Tenant URL, for example `https://company.britive.com`. It must be provided, but it can also be sourced from the `BRITIVE_TENANT` environment variable.  
 
-* `token` - (Optional) This is the API Token to interact with your Britive API. It must be provided, but it can also be sourced from the `BRITIVE_TOKEN` environment variable.
+* `token` - (Optional) This is the API Token to interact with your Britive API. It must be provided, but it can also be sourced from the `BRITIVE_TOKEN` environment variable. Supports a legacy API token, a workload identity token (formatted as `OIDC::<ID token>` or `AWS::<ID token>`), or a JWT - the provider automatically detects which type you're using.
 
 * `config_path` - (Optional) This is the file path for Britive provider configuration. The default configuration path is `~/.britive/tf.config`. It can also be sourced from the `BRITIVE_CONFIG` environment variable.
 

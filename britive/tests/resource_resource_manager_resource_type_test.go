@@ -13,7 +13,7 @@ func TestBritiveResourceType(t *testing.T) {
 	name := "AT_Britive_Resource_Manager_Test_Resource_Type"
 	description := "AT_Britive_Resource_Manager_Test_Resource_Type_Description"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheckFramework(t) },
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -24,6 +24,56 @@ func TestBritiveResourceType(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestBritiveResourceTypeRotationEnabled exercises rotation_enabled on
+// britive_resource_manager_resource_type. Unlike scan_enabled, rotation_enabled has no
+// dependency on any britive_resource_manager_resource_type_rotation_template existing, so it
+// can be set to true in the very same apply that creates the resource type (step 1). Step 2
+// removes the argument from config entirely (after it was true) to exercise ModifyPlan's
+// "removed after being enabled" transition, which is planned as an explicit disable rather
+// than silently carrying the enabled value forward.
+func TestBritiveResourceTypeRotationEnabled(t *testing.T) {
+	name := "AT_Britive_Resource_Manager_Test_Resource_Type_Rotation_Enabled"
+	description := "AT_Britive_Resource_Manager_Test_Resource_Type_Rotation_Enabled_Description"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveResourceTypeRotationEnabledConfig(name, description, true),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveResourceTypeExists("britive_resource_manager_resource_type.new_resource_type_rotation_enabled"),
+					resource.TestCheckResourceAttr("britive_resource_manager_resource_type.new_resource_type_rotation_enabled", "rotation_enabled", "true"),
+				),
+			},
+			{
+				Config: testAccCheckBritiveResourceTypeRotationEnabledUnsetConfig(name, description),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveResourceTypeExists("britive_resource_manager_resource_type.new_resource_type_rotation_enabled"),
+					resource.TestCheckResourceAttr("britive_resource_manager_resource_type.new_resource_type_rotation_enabled", "rotation_enabled", "false"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveResourceTypeRotationEnabledConfig(name, description string, rotationEnabled bool) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_type" "new_resource_type_rotation_enabled" {
+		name             = "%s"
+		description      = "%s"
+		rotation_enabled = %t
+	}`, name, description, rotationEnabled)
+}
+
+func testAccCheckBritiveResourceTypeRotationEnabledUnsetConfig(name, description string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_type" "new_resource_type_rotation_enabled" {
+		name        = "%s"
+		description = "%s"
+	}`, name, description)
 }
 
 func testAccCheckBritiveResourceTypeConfig(name, description string) string {

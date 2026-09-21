@@ -379,27 +379,51 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 
 	modified := false
 
-	// Normalize top-level description and label_color: null config → null plan.
+	// Normalize top-level description and label_color: null config → null plan, and a
+	// non-null config always wins outright - same rationale as the per-value description
+	// normalization below (state upgraded from the pre-Framework provider can carry a
+	// refreshed value that doesn't match a long-standing config value).
 	if config.Description.IsNull() {
 		if !plan.Description.IsNull() {
 			plan.Description = types.StringNull()
 			modified = true
 		}
+	} else if !config.Description.Equal(plan.Description) {
+		plan.Description = config.Description
+		modified = true
 	}
 	if config.LabelColor.IsNull() {
 		if !plan.LabelColor.IsNull() {
 			plan.LabelColor = types.StringNull()
 			modified = true
 		}
+	} else if !config.LabelColor.Equal(plan.LabelColor) {
+		plan.LabelColor = config.LabelColor
+		modified = true
 	}
 
-	// Normalize value descriptions: null config → null plan.
+	// Normalize value descriptions: null config → null plan, and - critically - a non-null
+	// config always wins outright rather than trusting whatever Terraform's own naive plan
+	// produced for this position. This second case is not just defensive: a resource whose
+	// state was upgraded from the pre-Framework (SDKv2) provider can carry over a value
+	// whose description was never actually persisted for that specific value on the
+	// backend (an old-provider-era gap, not reproducible from a fresh Create/Update here),
+	// so the refreshed state's description for it comes back null/empty even though config
+	// has always specified one. Explicitly forcing plan to match config here guarantees the
+	// "planned value == config value whenever config is non-null" invariant Terraform
+	// enforces, instead of relying on it holding by construction.
 	for i, pv := range plan.Values {
 		if i >= len(config.Values) {
 			break
 		}
-		if config.Values[i].Description.IsNull() && !pv.Description.IsNull() {
-			plan.Values[i].Description = types.StringNull()
+		cv := config.Values[i].Description
+		if cv.IsNull() {
+			if !pv.Description.IsNull() {
+				plan.Values[i].Description = types.StringNull()
+				modified = true
+			}
+		} else if !cv.Equal(pv.Description) {
+			plan.Values[i].Description = cv
 			modified = true
 		}
 	}
@@ -499,7 +523,16 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 					isModification = true
 					break
 				}
-				if pv.Name.ValueString() != sv.name.ValueString() {
+				// A position whose name doesn't match what prior state had at that
+				// same raw index means the overall values list is reordered relative
+				// to state (values is a ListNestedBlock, so plan.Values is never
+				// reordered to match state - see the comment where the old reorder
+				// logic used to live). Terraform will see the list itself as changed
+				// and call Update regardless of whether this value's own content
+				// changed, and the API re-stamps updated_by/updated_on on every write
+				// it receives - so a pure reorder must be treated as a modification
+				// too, not just a per-name content difference.
+				if i >= len(state.Values) || pv.Name.ValueString() != state.Values[i].Name.ValueString() {
 					isModification = true
 					break
 				}
@@ -559,43 +592,21 @@ func (r *ResourceLabelResource) ModifyPlan(ctx context.Context, req resource.Mod
 		modified = true
 	}
 
-	// Reorder plan.Values to match the prior state's order, but ONLY when the config
-	// lists exactly the same set of names as state, just in a different sequence (a pure
-	// reorder). The API's underlying data is unordered, but ListNestedBlock is positional,
-	// so reordering unchanged values in config would otherwise surface a spurious
-	// "changed" diff at every index. If any name was added, removed, or renamed, the sets
-	// won't match and we leave plan.Values in config order — forcing state's order in
-	// that case would misrepresent the actual change and produce an invalid plan.
-	if len(state.Values) > 0 && len(plan.Values) == len(state.Values) {
-		planByName := make(map[string]int, len(plan.Values))
-		hasUnknownName := false
-		for i, pv := range plan.Values {
-			if pv.Name.IsNull() || pv.Name.IsUnknown() {
-				hasUnknownName = true
-				break
-			}
-			planByName[pv.Name.ValueString()] = i
-		}
-
-		sameNameSet := !hasUnknownName
-		if sameNameSet {
-			for _, sv := range state.Values {
-				if _, ok := planByName[sv.Name.ValueString()]; !ok {
-					sameNameSet = false
-					break
-				}
-			}
-		}
-
-		if sameNameSet {
-			reordered := make([]ResourceLabelValueModel, 0, len(plan.Values))
-			for _, sv := range state.Values {
-				reordered = append(reordered, plan.Values[planByName[sv.Name.ValueString()]])
-			}
-			plan.Values = reordered
-			modified = true
-		}
-	}
+	// plan.Values is deliberately left in config's own order and never reordered to match
+	// prior state. values is a ListNestedBlock, which Terraform validates positionally: for
+	// any attribute that isn't Computed-and-differing (like name, and now description per
+	// the normalization above), the plan at position i MUST equal config at position i, or
+	// Terraform rejects the plan outright ("Provider produced invalid plan"). The backend's
+	// storage order for a label's values has no relationship to the order the user authored
+	// them in config (confirmed by capture - a freshly-read label's values commonly come
+	// back in a different order than config), so reordering plan to match state's order
+	// would misalign plan[i] against config[i] for every position where the two orders
+	// differ, tripping that exact check. Per-name correlation (above) already ensures each
+	// position's computed audit fields are correct regardless of state's order, so this is
+	// the only affordance needed - it just means a value's position in `terraform plan`
+	// output may show as "changed" even when its content hasn't, if the backend's order
+	// happens to differ from config's. That's a cosmetic diff, not a functional one: Update
+	// sends the same content either way.
 
 	if modified {
 		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
