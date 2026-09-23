@@ -388,12 +388,32 @@ func (r *ResourceTypePermissionsResource) Create(ctx context.Context, req resour
 	// Create draft permission
 	createdPerm, err := r.client.CreateResourceTypePermission(*permission)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Creating Permission", err.Error())
+		resp.Diagnostics.AddError(
+			"Error Creating Permission",
+			fmt.Sprintf("permission %q for resource type %s: %s", permission.Name, permission.ResourceTypeID, err.Error()),
+		)
 		return
 	}
 
 	permission.PermissionID = createdPerm.PermissionID
 	log.Printf("[INFO] Finalizing resource type permission: %s", permission.PermissionID)
+
+	// Persist the ID (and any other computed fields we already know) as soon as
+	// the permission exists in Britive. If a later step (file/code upload, the
+	// finalizing update) fails, Terraform still tracks this permission via a
+	// partial state instead of losing it: a subsequent apply/destroy can then
+	// reconcile or clean it up, rather than leaving an orphan that a later
+	// create call rejects as a duplicate name and that blocks deleting its
+	// resource type.
+	plan.ID = types.StringValue(createdPerm.PermissionID)
+	plan.PermissionID = types.StringValue(createdPerm.PermissionID)
+	if createdState, readErr := r.client.GetResourceTypePermission(createdPerm.PermissionID); readErr == nil {
+		r.mapModelToResource(createdState, &plan)
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Upload files or code
 	if !plan.CheckinCodeFile.IsNull() && plan.CheckinCodeFile.ValueString() != "" {
@@ -430,10 +450,6 @@ func (r *ResourceTypePermissionsResource) Create(ctx context.Context, req resour
 		resp.Diagnostics.AddError("Error Updating Permission", err.Error())
 		return
 	}
-
-	// Set ID
-	plan.ID = types.StringValue(createdPerm.PermissionID)
-	plan.PermissionID = types.StringValue(createdPerm.PermissionID)
 
 	// Read back to get computed values
 	permission, err = r.client.GetResourceTypePermission(createdPerm.PermissionID)
@@ -699,16 +715,22 @@ func (r *ResourceTypePermissionsResource) mapModelToResource(permission *britive
 	state.CheckinFileName = types.StringValue(permission.CheckinFileName)
 	state.CheckoutFileName = types.StringValue(permission.CheckoutFileName)
 
-	// Map response templates
-	templateNames := make([]types.String, 0)
-	for _, rt := range permission.ResponseTemplates {
-		if rtMap, ok := rt.(map[string]interface{}); ok {
-			if name, ok := rtMap["name"].(string); ok {
-				templateNames = append(templateNames, types.StringValue(name))
+	// Map response templates. response_templates is Optional (not Computed), so its
+	// post-apply value must match the plan exactly - when the API returns none (e.g.
+	// config omitted it, leaving the planned value null), leave state untouched rather
+	// than assigning an empty-but-non-nil slice, which would encode as an empty set and
+	// trip Terraform's "produced inconsistent result after apply" consistency check.
+	if len(permission.ResponseTemplates) > 0 {
+		templateNames := make([]types.String, 0, len(permission.ResponseTemplates))
+		for _, rt := range permission.ResponseTemplates {
+			if rtMap, ok := rt.(map[string]interface{}); ok {
+				if name, ok := rtMap["name"].(string); ok {
+					templateNames = append(templateNames, types.StringValue(name))
+				}
 			}
 		}
+		state.ResponseTemplates = templateNames
 	}
-	state.ResponseTemplates = templateNames
 }
 
 // staticInt64Default implements defaults.Int64 for a static integer value.
