@@ -67,8 +67,8 @@ The following arguments are supported:
 * `name` - (Required) The name of the permission. Must be unique.
 * `resource_type_id` - (Required) The ID of the associated resource type.
 * `description` - (Optional) The description of the permission. Default is an empty string.
-* `checkin_time_limit` - (Optional) The check-in time limit in minutes. Default is `60`.
-* `checkout_time_limit` - (Optional) The check-out time limit in minutes. Default is `60`.
+* `checkin_time_limit` - (Optional) The check-in time limit in seconds. Default is `60`.
+* `checkout_time_limit` - (Optional) The check-out time limit in seconds. Default is `60`.
 * `is_draft` - (Optional) Indicates if the permission is a draft. Default is `false`.
 * `show_orig_creds` - (Optional) Indicates if original credentials should be shown. Default is `false`.
 * `variables` - (Optional) List of variables. To declare a variable as a password type, suffix its name with `:password` (e.g. `["test1", "test2:password"]`). Variables without a `:password` suffix default to the `String` type.
