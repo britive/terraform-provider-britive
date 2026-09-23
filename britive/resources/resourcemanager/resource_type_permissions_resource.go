@@ -107,13 +107,13 @@ func (r *ResourceTypePermissionsResource) Schema(_ context.Context, _ resource.S
 				Computed:    true,
 			},
 			"checkin_time_limit": schema.Int64Attribute{
-				Description: "The check-in time limit in minutes",
+				Description: "The check-in time limit in seconds",
 				Optional:    true,
 				Computed:    true,
 				Default:     staticInt64Default{60},
 			},
 			"checkout_time_limit": schema.Int64Attribute{
-				Description: "The check-out time limit in minutes",
+				Description: "The check-out time limit in seconds",
 				Optional:    true,
 				Computed:    true,
 				Default:     staticInt64Default{60},
