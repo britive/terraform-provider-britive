@@ -5,6 +5,8 @@ ENHANCEMENTS:
 * **New Resource:** `britive_resource_manager_resource_type_scan_settings` : Create, update, and manage a resource manager resource type's scan settings (singleton per resource type), with the same `Local`/`InlineFile`/`FilePath` script modes.
 * **New Resource:** `britive_resource_manager_resource_type_schedule_scan` : Create, update, and manage scheduled scans (`Daily`/`Weekly`/`Monthly`) for a resource manager resource type, with optional resource-label filtering.
 * **Resource:** `britive_resource_manager_resource_type` : Added `scan_enabled` and `rotation_enabled` arguments to enable or disable scheduled scanning and rotation for the resource type; added a `task_service_id` computed attribute used internally by `britive_resource_manager_resource_type_schedule_scan`. Both arguments are unmanaged when omitted from config, so upgrading does not affect existing resource types.
+* **New Resource:** `britive_application_scan_schedule` : Create, update, and manage scheduled scans (`Hourly`/`Daily`/`Weekly`/`Monthly`) for an application, with optional environment/environment-group scoping via an `associations` block.
+* **Resource:** `britive_application` : Added a `scan_enabled` argument to enable or disable all scheduled scans for the application.
 
 BUG FIXES:
 * `britive_resource_manager_resource_label`: Fixed a "Provider produced invalid plan" error on `values[].description` for labels migrated from v2.x state, where a value's description could refresh as empty/null even though config had always specified one.
