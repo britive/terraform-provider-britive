@@ -201,6 +201,7 @@ func (p *BritiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resources.NewProfilePolicyResource,
 		resources.NewProfilePolicyPrioritizationResource,
 		resources.NewApplicationResource,
+		resources.NewApplicationScanScheduleResource,
 		resources.NewProfileResource,
 		// Resource Manager resources
 		resourcemanager.NewResourceTypeResource,

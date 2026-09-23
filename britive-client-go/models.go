@@ -589,6 +589,66 @@ type ScheduleScanTaskDetail struct {
 	NextRun           int64               `json:"nextRun,omitempty"`
 }
 
+// ApplicationScanScope - a single scope entry ({type, value}) restricting an application scan
+// schedule task to a specific Environment or EnvironmentGroup. Ignored by the API when the
+// task's OrgScan is true.
+type ApplicationScanScope struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+// ApplicationScanScheduleProperties - the properties payload for an application scan
+// schedule task (confirmed by capture: {appId, scope, orgScan}). Scope has no `omitempty`:
+// an explicit `[]` clears every previously configured scope entry (confirmed by capture),
+// which a nil slice would instead marshal as JSON null. OrgScan is a *bool (not bool) with
+// `omitempty` so the provider can send it only when org_scan is explicitly present in
+// config - a plain bool with omitempty would make it impossible to ever explicitly request
+// false, and without omitempty a zero-value bool would be sent as false on every request
+// that doesn't care about org_scan at all.
+type ApplicationScanScheduleProperties struct {
+	AppID   string                 `json:"appId"`
+	Scope   []ApplicationScanScope `json:"scope"`
+	OrgScan *bool                  `json:"orgScan,omitempty"`
+}
+
+// ApplicationScheduleScanTask - the create/update request shape for a single scheduled scan
+// under an application's scan task-service. StartTime is a *string ("HH:MM"): Hourly
+// schedules send an explicit JSON null (confirmed by capture), so a nil pointer is
+// meaningful here and must not be omitted. FrequencyInterval is likewise a *int since Daily
+// sends explicit null. Description was never exercised as non-empty in the capture this was
+// designed from - it's included with `omitempty` (unlike resource manager's schedule scan,
+// which always sends it) so it's simply left out of the request when unset, rather than
+// asserting untested behavior for an explicit empty string.
+type ApplicationScheduleScanTask struct {
+	Name              string                            `json:"name"`
+	Description       string                            `json:"description,omitempty"`
+	StartTime         *string                           `json:"startTime"`
+	FrequencyType     string                            `json:"frequencyType"`
+	FrequencyInterval *int                              `json:"frequencyInterval"`
+	Properties        ApplicationScanScheduleProperties `json:"properties"`
+}
+
+// ApplicationScheduleScanTaskDetail - the response/list shape for an application scan
+// schedule task. StartTime here is an [hour, minute] pair, unlike the "HH:MM"/null
+// ApplicationScheduleScanTask sends on write. Modified is 0 (JSON null) until the task's
+// first update.
+type ApplicationScheduleScanTaskDetail struct {
+	TaskID            string                            `json:"taskId,omitempty"`
+	TaskServiceID     string                            `json:"taskServiceId,omitempty"`
+	TenantNamespace   string                            `json:"tenantNamespace,omitempty"`
+	Name              string                            `json:"name"`
+	Description       string                            `json:"description"`
+	Properties        ApplicationScanScheduleProperties `json:"properties"`
+	StartTime         []int                             `json:"startTime"`
+	FrequencyType     string                            `json:"frequencyType"`
+	FrequencyInterval *int                              `json:"frequencyInterval"`
+	CreatedBy         string                            `json:"createdBy,omitempty"`
+	Created           int64                             `json:"created,omitempty"`
+	Modified          int64                             `json:"modified,omitempty"`
+	ModifiedBy        string                            `json:"modifiedBy,omitempty"`
+	NextRun           int64                             `json:"nextRun,omitempty"`
+}
+
 // ResourceTypePermission - Model for resource type permissions
 type ResourceTypePermission struct {
 	PermissionID      string        `json:"permissionId,omitempty"`
@@ -635,22 +695,22 @@ type ResourceLabelValue struct {
 
 // ResourceManagerProfile - godoc
 type ResourceManagerProfile struct {
-	ProfileId                     string              `json:"profileId,omitempty"`
-	Name                          string              `json:"name,omitempty"`
-	Description                   *string             `json:"description,omitempty"`
-	ExpirationDuration            int                 `json:"expirationDuration,omitempty"`
-	Status                        string              `json:"status,omitempty"`
-	Associations                  map[string][]string `json:"associations,omitempty"`
-	ResourceLabelColorMap         map[string]string   `json:"resourceLabelColorMap,omitempty"`
+	ProfileId             string              `json:"profileId,omitempty"`
+	Name                  string              `json:"name,omitempty"`
+	Description           *string             `json:"description,omitempty"`
+	ExpirationDuration    int                 `json:"expirationDuration,omitempty"`
+	Status                string              `json:"status,omitempty"`
+	Associations          map[string][]string `json:"associations,omitempty"`
+	ResourceLabelColorMap map[string]string   `json:"resourceLabelColorMap,omitempty"`
 	// DelegationEnabled must NOT use omitempty: Go omits false for bool with omitempty,
 	// which would prevent the PATCH from ever setting delegation to false.
-	DelegationEnabled             bool                `json:"delegationEnabled"`
-	PolicyOrderingEnabled         bool                `json:"policyOrderingEnabled,omitempty"`
-	ExclusiveCheckout             bool                `json:"exclusiveCheckout"`
-	Extendable                    bool                `json:"extendable"`
-	NotificationPriorToExpiration *int64              `json:"notificationPriorToExpiration,omitempty"`
-	ExtensionDuration             *int64              `json:"extensionDuration,omitempty"`
-	ExtensionLimit                interface{}         `json:"extensionLimit,omitempty"`
+	DelegationEnabled             bool        `json:"delegationEnabled"`
+	PolicyOrderingEnabled         bool        `json:"policyOrderingEnabled,omitempty"`
+	ExclusiveCheckout             bool        `json:"exclusiveCheckout"`
+	Extendable                    bool        `json:"extendable"`
+	NotificationPriorToExpiration *int64      `json:"notificationPriorToExpiration,omitempty"`
+	ExtensionDuration             *int64      `json:"extensionDuration,omitempty"`
+	ExtensionLimit                interface{} `json:"extensionLimit,omitempty"`
 }
 
 // ResourceManagerProfilePolicy - godoc

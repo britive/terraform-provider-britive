@@ -1131,6 +1131,8 @@ The following arguments are supported:
   - `name` - (Required) The name of the sensitive property.
   - `value` - (Required) The value of the sensitive property.
 
+* `scan_enabled` - (Optional) Whether scheduled scanning is enabled for this application. Left **unmanaged** when omitted from config - see `scan_enabled` Semantics below.
+
 ## Attribute Reference
 
 In addition to the above arguments, the following attributes are exported.
@@ -1140,6 +1142,8 @@ In addition to the above arguments, the following attributes are exported.
 * `catalog_app_id` - The identifier of the application type in the Britive catalog.
 
 * `entity_root_environment_group_id` - The root environment group ID (only for AWS Standalone, Okta, Snowflake Standalone, Britive, and Kubernetes applications).
+
+* `task_service_id` - The ID of this application's scan task service. Registered automatically when the application is created - not independently managed by this provider. Used internally by `scan_enabled` and by [`britive_application_scan_schedule`](application_scan_schedule.md).
 
 ## Import
 
@@ -1151,6 +1155,57 @@ terraform import britive_application.new {{application_id}}
 ```
   
 -> During the import process, only properties with values explicitly set or different from their default values will be imported. This avoids overwriting default configurations and ensures only customized settings are preserved in the Terraform state.
+
+## `scan_enabled` Semantics
+
+`scan_enabled` is unlike this resource's other attributes in one respect: **omitting it from
+config is not the same as setting it to `false`**. It is only ever acted on when present in
+config at all:
+
+* Omitted entirely - the provider never touches it. The exported value simply reflects
+  whatever the application's actual scanning status already is. This is deliberate so that
+  adopting this provider version, or managing an existing application that already has
+  scanning turned on some other way, never flips anything.
+* Set to `true` or `false` - the provider actively updates it to match.
+* Previously set, then removed from config - treated as an explicit request to turn it off
+  (not "stop managing it and leave it as-is").
+
+Setting `scan_enabled` to any value for an `application_type` that does not support
+scheduled scanning at all (currently only `Kubernetes`) fails `terraform apply` with an
+"Unsupported Application Scan Schedule Configuration" error - see
+[`britive_application_scan_schedule`](application_scan_schedule.md#application-type-support)
+for the full per-type support matrix (also covering that resource's own `scope`/`org_scan`
+arguments).
+
+The backend registers an application's scan task service asynchronously after the
+application itself is created, so on rare occasions `terraform apply` can fail on a brand
+new application with an "Error Reading Application Scan Task Service" error if the lookup
+runs before the task service exists yet. When that happens, the application itself is not
+rolled back or deleted - it and everything else configured in that same apply (properties,
+user account mappings, etc.) are still saved to state, with `task_service_id` and
+`scan_enabled` left at their not-yet-resolved defaults (empty and `false`). Simply running
+`terraform apply` again once the backend has caught up resolves both automatically via this
+resource's normal refresh - there's no need to `terraform destroy`/recreate the application.
+
+The application's scan task service (what `scan_enabled` actually toggles) is registered
+automatically as part of application creation, so `scan_enabled = true` can be set in the
+very same apply that creates both the application and its first
+[`britive_application_scan_schedule`](application_scan_schedule.md):
+
+```hcl
+resource "britive_application" "example" {
+  application_type = "AWS Standalone"
+  scan_enabled     = true
+}
+
+resource "britive_application_scan_schedule" "example" {
+  application_id     = britive_application.example.id
+  name               = "daily-scan"
+  frequency_type     = "Daily"
+  start_time         = "06:30"
+  org_scan           = true
+}
+```
 
 ## Deleting Properties
 

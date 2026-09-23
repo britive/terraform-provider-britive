@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -30,6 +31,7 @@ var (
 	_ resource.ResourceWithConfigure      = &ApplicationResource{}
 	_ resource.ResourceWithImportState    = &ApplicationResource{}
 	_ resource.ResourceWithValidateConfig = &ApplicationResource{}
+	_ resource.ResourceWithModifyPlan     = &ApplicationResource{}
 )
 
 func NewApplicationResource() resource.Resource {
@@ -46,6 +48,8 @@ type ApplicationResourceModel struct {
 	Version                      types.String `tfsdk:"version"`
 	CatalogAppID                 types.Int64  `tfsdk:"catalog_app_id"`
 	EntityRootEnvironmentGroupID types.String `tfsdk:"entity_root_environment_group_id"`
+	TaskServiceID                types.String `tfsdk:"task_service_id"`
+	ScanEnabled                  types.Bool   `tfsdk:"scan_enabled"`
 	// Properties, SensitiveProperties, and UserAccountMappings are types.Set (rather than a plain
 	// Go slice) because the underlying blocks can arrive as unknown during ValidateResourceConfig
 	// (e.g. when built from a value that is only known after apply). A plain slice type cannot
@@ -151,6 +155,21 @@ func (r *ApplicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "Britive application root environment ID for AWS Standalone, Okta, Snowflake Standalone, Britive and Kubernetes applications.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"task_service_id": schema.StringAttribute{
+				Description: "The ID of this application's scan task service. Registered automatically when the application is created - not independently managed by this provider. Used internally to operate on scan_enabled and britive_application_scan_schedule.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"scan_enabled": schema.BoolAttribute{
+				Description: "Whether scheduled scanning is enabled for this application. Left unmanaged when omitted from config - the provider never enables or disables scanning unless this is explicitly set, so existing applications (with or without scheduled scans already configured some other way) are unaffected. The scan task service is registered automatically when the application is created, so this can be set in the very same apply that creates the application (and any of its britive_application_scan_schedule resources) - no multi-step apply required. Removing this argument from config (after previously setting it) disables scanning.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -280,6 +299,39 @@ func (r *ApplicationResource) Configure(_ context.Context, req resource.Configur
 	r.client = client
 }
 
+// ModifyPlan handles the one scan_enabled transition that UseStateForUnknown's own carry-forward
+// gets wrong: removing the argument from config after it was previously tracked as enabled.
+// Without this override, an absent config value simply carries the prior state's value forward
+// unchanged (UseStateForUnknown), which would silently leave scanning on forever once enabled -
+// instead, removing the argument is planned as an explicit transition to false. In every other
+// case (never configured, or configured and unchanged) the attribute is left alone here. Mirrors
+// resourcemanager.ResourceTypeResource.ModifyPlan.
+//
+// Known limitation: this can't distinguish "the user removed a scan_enabled = true they used to
+// manage in Terraform" from "it was never in this resource's config, but happens to already be
+// enabled some other way (e.g. via the UI)" - both look identical (state has enabled=true, config
+// has no value). The next apply that touches this resource for any reason will turn it off in the
+// second case too.
+func (r *ApplicationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+		// Destroy, or Create - nothing to have "removed" yet.
+		return
+	}
+
+	var plan, config, state ApplicationResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if config.ScanEnabled.IsNull() && !state.ScanEnabled.IsNull() && state.ScanEnabled.ValueBool() {
+		plan.ScanEnabled = types.BoolValue(false)
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	}
+}
+
 func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan ApplicationResourceModel
 
@@ -404,6 +456,59 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 		plan.EntityRootEnvironmentGroupID = types.StringValue(rootEnvID)
 	}
 
+	// The backend registers this application's scan task service automatically at creation
+	// time, but asynchronously - a lookup this soon after creation can transiently 404/error
+	// (e.g. "E1004: Task service does not exist ...") before it exists yet. Rather than
+	// retrying in-process (bounded, and still no guarantee the backend has caught up by the
+	// time it gives up) or deleting the application we just created (which risks racing a
+	// manual retry's CreateApplication into a "duplicate object" conflict before the backend
+	// finishes tearing the deleted one down), a single attempt is made here and, on failure,
+	// everything already known is still written to state below with task_service_id/
+	// scan_enabled left unresolved (empty/false) - Read's own task_service_id backfill (see
+	// its doc comment) picks both up on the routine refresh of any later terraform apply, once
+	// the task service actually exists, with no need for this Create call to retry or block on
+	// it itself.
+	taskService, err := r.client.GetApplicationScanTaskService(appResponse.AppContainerId)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Application Scan Task Service", err.Error())
+		plan.TaskServiceID = types.StringValue("")
+		plan.ScanEnabled = types.BoolValue(false)
+		if popErr := r.populateStateFromAPI(ctx, &plan); popErr != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Application",
+				fmt.Sprintf("Could not read application after creation: %s", popErr.Error()),
+			)
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		return
+	}
+	plan.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+
+	// scan_enabled has no schema Default, so plan.ScanEnabled is Unknown here precisely when
+	// the user didn't set it in config. When it IS configured, apply it directly - the task
+	// service was just resolved in this same Create call, so nothing else could have touched
+	// its status yet. A failure setting it doesn't roll back the application itself, which was
+	// already created successfully; state is still written below so the application stays
+	// tracked. Only the "never configured" branch reflects the task service's real status.
+	if !plan.ScanEnabled.IsUnknown() {
+		if capabilities := lookupApplicationScanScheduleCapabilities(plan.ApplicationType.ValueString()); !capabilities.ScheduleScan {
+			resp.Diagnostics.AddError(
+				"Unsupported Application Scan Schedule Configuration",
+				fmt.Sprintf("scheduled scanning is not supported for application type %q - leave scan_enabled unset", plan.ApplicationType.ValueString()),
+			)
+			return
+		}
+		enabled, err := r.setScanEnabled(taskService.TaskServiceID, plan.ScanEnabled.ValueBool())
+		if err != nil {
+			resp.Diagnostics.AddError("Error Setting Application Scan Status", err.Error())
+			plan.ScanEnabled = types.BoolValue(false)
+		} else {
+			plan.ScanEnabled = types.BoolValue(enabled)
+		}
+	} else {
+		plan.ScanEnabled = types.BoolValue(taskService.Enabled)
+	}
+
 	// Read back to populate all fields
 	if err := r.populateStateFromAPI(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
@@ -498,6 +603,22 @@ func (r *ApplicationResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 	state.UserAccountMappings = mappingsSet
+
+	// The task service is registered automatically alongside the application and deleted along
+	// with it, so this call is expected to always succeed here. It's still needed on every
+	// refresh for scan_enabled's live status (which can change outside Terraform), but
+	// taskServiceId itself never changes for the application's lifetime - it was already set
+	// correctly at Create/Import, so it's only backfilled here for state that predates
+	// task_service_id being tracked at all, not re-derived on every read.
+	taskService, err := r.client.GetApplicationScanTaskService(applicationID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Application Scan Task Service", err.Error())
+		return
+	}
+	if state.TaskServiceID.IsNull() || state.TaskServiceID.ValueString() == "" {
+		state.TaskServiceID = types.StringValue(taskService.TaskServiceID)
+	}
+	state.ScanEnabled = types.BoolValue(taskService.Enabled)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -602,6 +723,43 @@ func (r *ApplicationResource) Update(ctx context.Context, req resource.UpdateReq
 				fmt.Sprintf("Could not configure user mappings: %s", err.Error()),
 			)
 			return
+		}
+	}
+
+	// Handle scan_enabled separately. plan.ScanEnabled only differs from state.ScanEnabled here
+	// when config explicitly set a value that doesn't match reality, or when ModifyPlan planned
+	// an explicit false because scan_enabled was removed from config - in the steady "never
+	// configured" case UseStateForUnknown carries state forward unchanged, so no API call
+	// happens. A failure here doesn't abort the update - property/mapping changes above already
+	// succeeded, so surface the error but still read back and persist accurate state below.
+	if !plan.ScanEnabled.Equal(state.ScanEnabled) {
+		if capabilities := lookupApplicationScanScheduleCapabilities(plan.ApplicationType.ValueString()); !capabilities.ScheduleScan {
+			resp.Diagnostics.AddError(
+				"Unsupported Application Scan Schedule Configuration",
+				fmt.Sprintf("scheduled scanning is not supported for application type %q - leave scan_enabled unset", plan.ApplicationType.ValueString()),
+			)
+			return
+		}
+		taskServiceID := state.TaskServiceID.ValueString()
+		if taskServiceID == "" {
+			// Defensive: state predates task_service_id being tracked, or refresh was skipped -
+			// resolve it now rather than failing outright.
+			taskService, getErr := r.client.GetApplicationScanTaskService(applicationID)
+			if getErr != nil {
+				resp.Diagnostics.AddError("Error Reading Application Scan Task Service", getErr.Error())
+			} else {
+				taskServiceID = taskService.TaskServiceID
+				plan.TaskServiceID = types.StringValue(taskServiceID)
+			}
+		}
+		if taskServiceID != "" {
+			enabled, err := r.setScanEnabled(taskServiceID, plan.ScanEnabled.ValueBool())
+			if err != nil {
+				resp.Diagnostics.AddError("Error Updating Application Scan Status", err.Error())
+				plan.ScanEnabled = state.ScanEnabled
+			} else {
+				plan.ScanEnabled = types.BoolValue(enabled)
+			}
 		}
 	}
 
@@ -748,9 +906,37 @@ func (r *ApplicationResource) ImportState(ctx context.Context, req resource.Impo
 		}
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_account_mappings"), mappingsSet)...)
 	}
+
+	// Unlike Read (which already has taskServiceId from prior state and only refreshes
+	// scan_enabled), import has no prior state at all, so taskServiceId must be derived fresh
+	// here - this and Create are the only two places that do so.
+	taskService, err := r.client.GetApplicationScanTaskService(applicationID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Application Scan Task Service", err.Error())
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("task_service_id"), taskService.TaskServiceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("scan_enabled"), taskService.Enabled)...)
 }
 
 // Helper functions
+
+// setScanEnabled enables or disables scheduled scanning for an application's scan task
+// service, given its already-resolved taskServiceID, and returns the resulting actual enabled
+// state from the API's own response.
+func (r *ApplicationResource) setScanEnabled(taskServiceID string, enabled bool) (bool, error) {
+	var taskService *britive.ScheduleScanTaskService
+	var err error
+	if enabled {
+		taskService, err = r.client.EnableApplicationScanTaskService(taskServiceID)
+	} else {
+		taskService, err = r.client.DisableApplicationScanTaskService(taskServiceID)
+	}
+	if err != nil {
+		return false, err
+	}
+	return taskService.Enabled, nil
+}
 
 func (r *ApplicationResource) validatePropertiesAgainstSystemApps(ctx context.Context, data *ApplicationResourceModel) error {
 	if data.ApplicationType.IsNull() {
