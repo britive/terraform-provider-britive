@@ -10,6 +10,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -36,17 +37,53 @@ type ScheduleScanResource struct {
 
 // ScheduleScanResourceModel describes the resource data model.
 type ScheduleScanResourceModel struct {
-	ID             types.String         `tfsdk:"id"`
-	ResourceTypeID types.String         `tfsdk:"resource_type_id"`
-	TaskID         types.String         `tfsdk:"task_id"`
-	Name           types.String         `tfsdk:"name"`
-	Description    types.String         `tfsdk:"description"`
-	FrequencyType  types.String         `tfsdk:"frequency_type"`
-	DayOfWeek      types.String         `tfsdk:"day_of_week"`
-	DayOfMonth     types.Int64          `tfsdk:"day_of_month"`
-	StartTime      types.String         `tfsdk:"start_time"`
-	ResourceLabels []ResourceLabelModel `tfsdk:"resource_labels"`
-	NextRun        types.Int64          `tfsdk:"next_run"`
+	ID             types.String `tfsdk:"id"`
+	ResourceTypeID types.String `tfsdk:"resource_type_id"`
+	TaskID         types.String `tfsdk:"task_id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	FrequencyType  types.String `tfsdk:"frequency_type"`
+	DayOfWeek      types.String `tfsdk:"day_of_week"`
+	DayOfMonth     types.Int64  `tfsdk:"day_of_month"`
+	StartTime      types.String `tfsdk:"start_time"`
+	// A types.Set, not a plain Go slice: resource_labels is a block populated via a nested
+	// "dynamic" block whose for_each is itself derived from this resource's own for_each
+	// (e.g. each.value.labels). Terraform core can't statically resolve that repetition count
+	// during validate/plan, so it represents the whole block collection as unknown - a plain
+	// []ResourceLabelModel can't hold that ("Value Conversion Error ... Suggested Type:
+	// basetypes.SetValue"), so keep it as the framework's own attr.Value and convert to/from
+	// []ResourceLabelModel manually (see resourceLabelsFromSet/resourceLabelsToSet) wherever
+	// concrete elements are needed.
+	ResourceLabels types.Set   `tfsdk:"resource_labels"`
+	NextRun        types.Int64 `tfsdk:"next_run"`
+}
+
+// resourceLabelObjectType is the tftypes shape of one resource_labels block element, mirroring
+// ResourceLabelModel's tfsdk tags.
+var resourceLabelObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"label_key": types.StringType,
+		"values":    types.SetType{ElemType: types.StringType},
+	},
+}
+
+// resourceLabelsFromSet decodes a resource_labels set into concrete []ResourceLabelModel.
+// Returns nil without error for a null/unknown set (unknown occurs at plan time - see
+// ResourceLabels's doc comment - and is always fully resolved again by apply time).
+func resourceLabelsFromSet(ctx context.Context, set types.Set, diags *diag.Diagnostics) []ResourceLabelModel {
+	if set.IsNull() || set.IsUnknown() {
+		return nil
+	}
+	var labels []ResourceLabelModel
+	diags.Append(set.ElementsAs(ctx, &labels, false)...)
+	return labels
+}
+
+// resourceLabelsToSet is resourceLabelsFromSet's inverse.
+func resourceLabelsToSet(ctx context.Context, labels []ResourceLabelModel, diags *diag.Diagnostics) types.Set {
+	set, d := types.SetValueFrom(ctx, resourceLabelObjectType, labels)
+	diags.Append(d...)
+	return set
 }
 
 // weekdayToInterval maps a day_of_week value (case-insensitive, full name or abbreviation)
@@ -477,8 +514,9 @@ func (r *ScheduleScanResource) buildTaskPayload(ctx context.Context, plan *Sched
 		Properties: make(map[string][]string),
 	}
 
-	seen := make(map[string]bool, len(plan.ResourceLabels))
-	for _, label := range plan.ResourceLabels {
+	resourceLabels := resourceLabelsFromSet(ctx, plan.ResourceLabels, diags)
+	seen := make(map[string]bool, len(resourceLabels))
+	for _, label := range resourceLabels {
 		var values []string
 		diags.Append(label.Values.ElementsAs(ctx, &values, false)...)
 		labelKey := label.LabelKey.ValueString()
@@ -582,7 +620,7 @@ func (r *ScheduleScanResource) mapModelToResource(ctx context.Context, task *bri
 // unrecognized label_key silently dropped) - Read/Import don't have that constraint, since
 // refreshing state to match live truth (and letting any difference show up as an ordinary
 // plan diff) is exactly their job.
-func (r *ScheduleScanResource) refreshResourceLabels(ctx context.Context, properties map[string][]string, diags *diag.Diagnostics) []ResourceLabelModel {
+func (r *ScheduleScanResource) refreshResourceLabels(ctx context.Context, properties map[string][]string, diags *diag.Diagnostics) types.Set {
 	resourceLabelsList := make([]ResourceLabelModel, 0, len(properties))
 	for labelKey, values := range properties {
 		valuesSet, diagsSet := types.SetValueFrom(ctx, types.StringType, values)
@@ -595,7 +633,7 @@ func (r *ScheduleScanResource) refreshResourceLabels(ctx context.Context, proper
 			Values:   valuesSet,
 		})
 	}
-	return resourceLabelsList
+	return resourceLabelsToSet(ctx, resourceLabelsList, diags)
 }
 
 // formatStartTime renders the API's [hour, minute] pair as a "HH:MM" string. Used only by

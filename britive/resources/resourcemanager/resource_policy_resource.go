@@ -24,18 +24,26 @@ type ResourcePolicyResource struct {
 }
 
 type ResourcePolicyResourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	PolicyName     types.String `tfsdk:"policy_name"`
-	Description    types.String `tfsdk:"description"`
-	IsActive       types.Bool   `tfsdk:"is_active"`
-	IsDraft        types.Bool   `tfsdk:"is_draft"`
-	IsReadOnly     types.Bool   `tfsdk:"is_read_only"`
-	Consumer       types.String `tfsdk:"consumer"`
-	AccessType     types.String `tfsdk:"access_type"`
-	AccessLevel    types.String `tfsdk:"access_level"`
-	Members        types.String `tfsdk:"members"`
-	Condition      types.String `tfsdk:"condition"`
-	ResourceLabels []ResourceLabelModel `tfsdk:"resource_labels"`
+	ID          types.String `tfsdk:"id"`
+	PolicyName  types.String `tfsdk:"policy_name"`
+	Description types.String `tfsdk:"description"`
+	IsActive    types.Bool   `tfsdk:"is_active"`
+	IsDraft     types.Bool   `tfsdk:"is_draft"`
+	IsReadOnly  types.Bool   `tfsdk:"is_read_only"`
+	Consumer    types.String `tfsdk:"consumer"`
+	AccessType  types.String `tfsdk:"access_type"`
+	AccessLevel types.String `tfsdk:"access_level"`
+	Members     types.String `tfsdk:"members"`
+	Condition   types.String `tfsdk:"condition"`
+	// A types.Set, not a plain Go slice: resource_labels is a block, and when it's populated
+	// via a nested "dynamic" block whose for_each is itself derived from this resource's own
+	// for_each (e.g. each.value.labels), Terraform core can't statically resolve the block's
+	// repetition count during validate/plan, so it represents the whole block collection as
+	// unknown - a plain []ResourceLabelModel can't hold that ("Value Conversion Error ...
+	// Suggested Type: basetypes.SetValue"). Convert to/from []ResourceLabelModel manually (see
+	// resourceLabelsFromSet/resourceLabelsToSet in resource_type_schedule_scan_resource.go)
+	// wherever concrete elements are needed.
+	ResourceLabels types.Set `tfsdk:"resource_labels"`
 }
 
 type ResourceLabelModel struct {
@@ -350,7 +358,12 @@ func (r *ResourcePolicyResource) mapResourceToModel(ctx context.Context, plan *R
 	// Always initialize the map so that removing all labels sends {} (not null) to the API.
 	// A nil map marshals as JSON null, which the API treats as "no change" rather than "clear".
 	policy.ResourceLabels = make(map[string][]string)
-	for _, label := range plan.ResourceLabels {
+	var labelDiags diag.Diagnostics
+	resourceLabels := resourceLabelsFromSet(ctx, plan.ResourceLabels, &labelDiags)
+	if labelDiags.HasError() {
+		return policy, fmt.Errorf("error parsing resource labels: %s", labelDiags)
+	}
+	for _, label := range resourceLabels {
 		var values []string
 		diagsVals := label.Values.ElementsAs(ctx, &values, false)
 		if diagsVals.HasError() {
@@ -426,7 +439,7 @@ func (r *ResourcePolicyResource) mapModelToResource(ctx context.Context, policy 
 			Values:   valuesSet,
 		})
 	}
-	state.ResourceLabels = resourceLabelsList
+	state.ResourceLabels = resourceLabelsToSet(ctx, resourceLabelsList, diags)
 }
 
 func (r *ResourcePolicyResource) parseUniqueID(id string) string {

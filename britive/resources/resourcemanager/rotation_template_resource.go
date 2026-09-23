@@ -11,6 +11,8 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -29,19 +31,27 @@ type RotationTemplateResource struct {
 
 // RotationTemplateResourceModel describes the resource data model.
 type RotationTemplateResourceModel struct {
-	ID             types.String                    `tfsdk:"id"`
-	TemplateID     types.String                    `tfsdk:"template_id"`
-	ResourceTypeID types.String                    `tfsdk:"resource_type_id"`
-	Name           types.String                    `tfsdk:"name"`
-	Description    types.String                    `tfsdk:"description"`
-	TimeLimit      types.Int64                     `tfsdk:"time_limit"`
-	TemplateType   types.String                    `tfsdk:"template_type"`
-	ScriptFilePath types.String                    `tfsdk:"script_file_path"`
-	ScriptFileHash types.String                    `tfsdk:"script_file_hash"`
-	ScriptContent  types.String                    `tfsdk:"script_content"`
-	ScriptLanguage types.String                    `tfsdk:"script_language"`
-	ScriptName     types.String                    `tfsdk:"script_name"`
-	Variables      []RotationTemplateVariableModel `tfsdk:"variables"`
+	ID             types.String `tfsdk:"id"`
+	TemplateID     types.String `tfsdk:"template_id"`
+	ResourceTypeID types.String `tfsdk:"resource_type_id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	TimeLimit      types.Int64  `tfsdk:"time_limit"`
+	TemplateType   types.String `tfsdk:"template_type"`
+	ScriptFilePath types.String `tfsdk:"script_file_path"`
+	ScriptFileHash types.String `tfsdk:"script_file_hash"`
+	ScriptContent  types.String `tfsdk:"script_content"`
+	ScriptLanguage types.String `tfsdk:"script_language"`
+	ScriptName     types.String `tfsdk:"script_name"`
+	// A types.Set, not a plain Go slice: variables is a block populated via a nested
+	// "dynamic" block whose for_each is itself derived from this resource's own for_each
+	// (e.g. each.value.labels). Terraform core can't statically resolve that repetition count
+	// during validate/plan, so it represents the whole block collection as unknown - a plain
+	// []RotationTemplateVariableModel can't hold that ("Value Conversion Error ... Suggested
+	// Type: basetypes.SetValue"), so keep it as the framework's own attr.Value and convert
+	// to/from []RotationTemplateVariableModel manually (see variablesFromSet/variablesToSet)
+	// wherever concrete elements are needed.
+	Variables types.Set `tfsdk:"variables"`
 }
 
 // RotationTemplateVariableModel describes a single variable exposed to the template's script.
@@ -49,6 +59,36 @@ type RotationTemplateVariableModel struct {
 	Name        types.String `tfsdk:"name"`
 	Type        types.String `tfsdk:"type"`
 	MultiValued types.Bool   `tfsdk:"multi_valued"`
+}
+
+// rotationTemplateVariableObjectType is the tftypes shape of one variables block element,
+// mirroring RotationTemplateVariableModel's tfsdk tags.
+var rotationTemplateVariableObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"name":         types.StringType,
+		"type":         types.StringType,
+		"multi_valued": types.BoolType,
+	},
+}
+
+// variablesFromSet decodes a variables set into concrete []RotationTemplateVariableModel.
+// Returns nil without error for a null/unknown set (unknown occurs at plan time - see
+// RotationTemplateResourceModel.Variables's doc comment - and is always fully resolved again
+// by apply time).
+func variablesFromSet(ctx context.Context, set types.Set, diags *diag.Diagnostics) []RotationTemplateVariableModel {
+	if set.IsNull() || set.IsUnknown() {
+		return nil
+	}
+	var variables []RotationTemplateVariableModel
+	diags.Append(set.ElementsAs(ctx, &variables, false)...)
+	return variables
+}
+
+// variablesToSet is variablesFromSet's inverse.
+func variablesToSet(ctx context.Context, variables []RotationTemplateVariableModel, diags *diag.Diagnostics) types.Set {
+	set, d := types.SetValueFrom(ctx, rotationTemplateVariableObjectType, variables)
+	diags.Append(d...)
+	return set
 }
 
 // NewRotationTemplateResource is a helper function to simplify the provider implementation.
@@ -379,7 +419,10 @@ func (r *RotationTemplateResource) Create(ctx context.Context, req resource.Crea
 	templateID := created.TemplateID
 	log.Printf("[INFO] Finalizing rotation template: %s", templateID)
 
-	template := r.buildUpdatePayload(&plan)
+	template := r.buildUpdatePayload(ctx, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// From this point on, a failure leaves a real draft on the server that Terraform
 	// doesn't yet track in state - the next apply would retry CreateRotationTemplate with
@@ -412,7 +455,7 @@ func (r *RotationTemplateResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	if err := r.mapModelToResource(full, &plan, false); err != nil {
+	if err := r.mapModelToResource(ctx, full, &plan, false, &resp.Diagnostics); err != nil {
 		resp.Diagnostics.AddError("Error Reading Rotation Template Script Content", err.Error())
 		return
 	}
@@ -445,7 +488,7 @@ func (r *RotationTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	if err := r.mapModelToResource(template, &state, false); err != nil {
+	if err := r.mapModelToResource(ctx, template, &state, false, &resp.Diagnostics); err != nil {
 		resp.Diagnostics.AddError("Error Reading Rotation Template Script Content", err.Error())
 		return
 	}
@@ -469,7 +512,10 @@ func (r *RotationTemplateResource) Update(ctx context.Context, req resource.Upda
 	resourceTypeID := lastPathSegment(state.ResourceTypeID.ValueString())
 	templateID := state.TemplateID.ValueString()
 
-	template := r.buildUpdatePayload(&plan)
+	template := r.buildUpdatePayload(ctx, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// The presigned-url endpoint uploadScript relies on rejects the request if the template
 	// is still flagged Local server-side - which it is here whenever this update is
@@ -511,7 +557,7 @@ func (r *RotationTemplateResource) Update(ctx context.Context, req resource.Upda
 	plan.ID = state.ID
 	plan.TemplateID = state.TemplateID
 
-	if err := r.mapModelToResource(full, &plan, false); err != nil {
+	if err := r.mapModelToResource(ctx, full, &plan, false, &resp.Diagnostics); err != nil {
 		resp.Diagnostics.AddError("Error Reading Rotation Template Script Content", err.Error())
 		return
 	}
@@ -565,7 +611,7 @@ func (r *RotationTemplateResource) ImportState(ctx context.Context, req resource
 	state.ResourceTypeID = types.StringValue(fmt.Sprintf("resource-manager/resource-types/%s", resourceTypeID))
 	state.TemplateID = types.StringValue(templateID)
 
-	if err := r.mapModelToResource(template, &state, true); err != nil {
+	if err := r.mapModelToResource(ctx, template, &state, true, &resp.Diagnostics); err != nil {
 		resp.Diagnostics.AddError("Error Getting Rotation Template Script Content", err.Error())
 		return
 	}
@@ -585,16 +631,17 @@ func (r *RotationTemplateResource) ImportState(ctx context.Context, req resource
 // isLocal/inlineFile/editorType from template_type. Does not set Name/Description
 // (never accepted by the update call) or ScriptName (set by uploadScript, or left
 // unset for Local mode).
-func (r *RotationTemplateResource) buildUpdatePayload(plan *RotationTemplateResourceModel) britive.RotationTemplate {
+func (r *RotationTemplateResource) buildUpdatePayload(ctx context.Context, plan *RotationTemplateResourceModel, diags *diag.Diagnostics) britive.RotationTemplate {
+	planVariables := variablesFromSet(ctx, plan.Variables, diags)
 	template := britive.RotationTemplate{
 		// The API's timeoutLimit is in seconds (bounds 60-900); time_limit is exposed to
 		// users in minutes (matching the UI's own "In Minutes(MM)" label), so convert here.
 		TimeoutLimit: int(plan.TimeLimit.ValueInt64()) * 60,
 		EditorType:   "text",
-		Variables:    make([]britive.RotationTemplateVariable, 0, len(plan.Variables)),
+		Variables:    make([]britive.RotationTemplateVariable, 0, len(planVariables)),
 	}
 
-	for _, v := range plan.Variables {
+	for _, v := range planVariables {
 		template.Variables = append(template.Variables, britive.RotationTemplateVariable{
 			Name:        v.Name.ValueString(),
 			Type:        canonicalVariableType(v.Type.ValueString()),
@@ -690,7 +737,7 @@ func canonicalVariableType(t string) string {
 //     unconditionally re-uploads the local file.
 //
 // Returns an error if a download fails.
-func (r *RotationTemplateResource) mapModelToResource(template *britive.RotationTemplate, state *RotationTemplateResourceModel, imported bool) error {
+func (r *RotationTemplateResource) mapModelToResource(ctx context.Context, template *britive.RotationTemplate, state *RotationTemplateResourceModel, imported bool, diags *diag.Diagnostics) error {
 	state.Name = types.StringValue(template.Name)
 	state.Description = preserveOptionalString(template.Description, state.Description)
 	// Converting back from the wire's seconds to the schema's minutes; see buildUpdatePayload.
@@ -719,7 +766,7 @@ func (r *RotationTemplateResource) mapModelToResource(template *britive.Rotation
 
 	variableTypeMap := make(map[string]string)
 	if !imported {
-		for _, v := range state.Variables {
+		for _, v := range variablesFromSet(ctx, state.Variables, diags) {
 			variableTypeMap[v.Name.ValueString()] = v.Type.ValueString()
 		}
 	}
@@ -738,7 +785,7 @@ func (r *RotationTemplateResource) mapModelToResource(template *britive.Rotation
 			MultiValued: types.BoolValue(v.MultiValued),
 		})
 	}
-	state.Variables = variables
+	state.Variables = variablesToSet(ctx, variables, diags)
 
 	switch {
 	case template.IsLocal:
