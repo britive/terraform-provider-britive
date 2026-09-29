@@ -139,6 +139,85 @@ func TestBritiveResourceTypeScanEnabledSingleApply(t *testing.T) {
 	})
 }
 
+// TestBritiveScheduleScanForEachDynamicResourceLabels is a regression test for a bug where
+// combining `for_each` on britive_resource_manager_resource_type_schedule_scan with a nested
+// `dynamic "resource_labels"` block whose own for_each is derived from each.value made
+// Terraform represent the whole resource_labels block collection as unknown during
+// validate/plan (Terraform core can't statically resolve a dynamic block's repetition count in
+// that combination). The provider's resource_labels model field used to be a plain
+// []ResourceLabelModel, which can't hold an unknown value, and calling Config.Get on it in
+// ValidateConfig crashed with "Value Conversion Error ... Suggested Type: basetypes.SetValue".
+// See docs/guides and britive_dynamic_block_tf_issue in terraform_examples for the original
+// repro. Now fixed by modeling resource_labels as types.Set instead.
+func TestBritiveScheduleScanForEachDynamicResourceLabels(t *testing.T) {
+	resourceTypeName := "AT-Britive_Schedule_Scan_Tests_Resource_Type_ForEach"
+	resourceTypeDescription := "AT-Britive_Schedule_Scan_Tests_Resource_Type_ForEach_Description"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveScheduleScanForEachDynamicResourceLabelsConfig(resourceTypeName, resourceTypeDescription),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveScheduleScanExists("britive_resource_manager_resource_type.new_resource_type_ss_for_each"),
+					testAccCheckBritiveScheduleScanExists(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["a"]`),
+					testAccCheckBritiveScheduleScanExists(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["b"]`),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveScheduleScanForEachDynamicResourceLabelsConfig(resourceTypeName, resourceTypeDescription string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_type" "new_resource_type_ss_for_each" {
+		name        = "%s"
+		description = "%s"
+	}
+
+	resource "britive_resource_manager_resource_label" "schedule_scan_for_each_label" {
+		name        = "AT_Schedule_Scan_ForEach_Label"
+		description = "AT_Schedule_Scan_ForEach_Label_Description"
+
+		values {
+			name = "Val1"
+		}
+		values {
+			name = "Val2"
+		}
+	}
+
+	locals {
+		schedule_scans_for_each = {
+			a = {
+				name   = "AT-for-each-scan-a"
+				values = ["Val1"]
+			}
+			b = {
+				name   = "AT-for-each-scan-b"
+				values = ["Val2"]
+			}
+		}
+	}
+
+	resource "britive_resource_manager_resource_type_schedule_scan" "new_schedule_scan_for_each" {
+		for_each          = local.schedule_scans_for_each
+		resource_type_id  = britive_resource_manager_resource_type.new_resource_type_ss_for_each.id
+		name              = each.value.name
+		frequency_type    = "Daily"
+		start_time        = "05:00"
+
+		dynamic "resource_labels" {
+			for_each = [each.value]
+			content {
+				label_key = britive_resource_manager_resource_label.schedule_scan_for_each_label.name
+				values    = resource_labels.value.values
+			}
+		}
+	}`, resourceTypeName, resourceTypeDescription)
+}
+
 func testAccCheckBritiveScheduleScanDailyConfig(resourceTypeName, resourceTypeDescription string) string {
 	return fmt.Sprintf(`
 	resource "britive_resource_manager_resource_type" "new_resource_type_ss_daily" {

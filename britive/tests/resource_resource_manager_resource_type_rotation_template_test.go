@@ -60,6 +60,73 @@ func TestBritiveRotationTemplateInlineFile(t *testing.T) {
 	})
 }
 
+// TestBritiveRotationTemplateForEachDynamicVariables is a regression test for a bug where
+// combining `for_each` on britive_resource_manager_resource_type_rotation_template with a
+// nested `dynamic "variables"` block whose own for_each is derived from each.value made
+// Terraform represent the whole variables block collection as unknown during validate/plan
+// (Terraform core can't statically resolve a dynamic block's repetition count in that
+// combination). The provider's variables model field used to be a plain
+// []RotationTemplateVariableModel, which can't hold an unknown value, and calling Config.Get
+// on it in ValidateConfig crashed with "Value Conversion Error ... Suggested Type:
+// basetypes.SetValue". Now fixed by modeling variables as types.Set instead.
+func TestBritiveRotationTemplateForEachDynamicVariables(t *testing.T) {
+	resourceTypeName := "AT-Britive_Rotation_Template_Tests_Resource_Type_ForEach"
+	resourceTypeDescription := "AT-Britive_Rotation_Template_Tests_Resource_Type_ForEach_Description"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveRotationTemplateForEachDynamicVariablesConfig(resourceTypeName, resourceTypeDescription),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveRotationTemplateExists("britive_resource_manager_resource_type.new_resource_type_rt_for_each"),
+					testAccCheckBritiveRotationTemplateExists(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["a"]`),
+					testAccCheckBritiveRotationTemplateExists(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["b"]`),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveRotationTemplateForEachDynamicVariablesConfig(resourceTypeName, resourceTypeDescription string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_type" "new_resource_type_rt_for_each" {
+		name        = "%s"
+		description = "%s"
+	}
+
+	locals {
+		rotation_templates_for_each = {
+			a = {
+				name     = "AT-for-each-rt-a"
+				var_name = "var_a"
+			}
+			b = {
+				name     = "AT-for-each-rt-b"
+				var_name = "var_b"
+			}
+		}
+	}
+
+	resource "britive_resource_manager_resource_type_rotation_template" "new_rotation_template_for_each" {
+		for_each         = local.rotation_templates_for_each
+		resource_type_id = britive_resource_manager_resource_type.new_resource_type_rt_for_each.id
+		name             = each.value.name
+		time_limit       = 5
+		template_type    = "Local"
+
+		dynamic "variables" {
+			for_each = [each.value]
+			content {
+				name         = variables.value.var_name
+				type         = "String"
+				multi_valued = false
+			}
+		}
+	}`, resourceTypeName, resourceTypeDescription)
+}
+
 func testAccCheckBritiveRotationTemplateLocalConfig(resourceTypeName, resourceTypeDescription, templateName, templateDescription string) string {
 	return fmt.Sprintf(`
 	resource "britive_resource_manager_resource_type" "new_resource_type_rt_local" {
