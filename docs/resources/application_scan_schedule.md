@@ -25,34 +25,10 @@ This resource's schema deliberately mirrors
 underlying scan task-service API. The one addition is `hour_interval`, for the `Hourly`
 frequency type, which has no resource-manager equivalent.
 
-## Application Type Support
-
-Scheduled scanning itself, `scope`, and `org_scan` are each supported only for certain
-`application_type` values (see [`britive_application`](application.md)). The provider
-validates this on `terraform apply` against the application's actual type, resolved live via
-the API rather than trusted from local config:
-
-| Application Type       | Scheduled Scanning | `scope` | `org_scan` |
-|-------------------------|:---:|:---:|:---:|
-| AWS                     | Yes | Yes | Yes |
-| AWS Standalone          | Yes | Yes | No  |
-| Azure                   | Yes | No  | No  |
-| Azure WIF               | Yes | No  | No  |
-| GCP                     | Yes | No  | No  |
-| GCP Standalone          | Yes | No  | No  |
-| GCP WIF                 | Yes | No  | No  |
-| Google Workspace        | Yes | No  | No  |
-| Kubernetes              | No  | No  | No  |
-| Britive                 | Yes | Yes | No  |
-| Oracle WIF              | Yes | Yes | Yes |
-| Okta                    | Yes | Yes | No  |
-| Snowflake               | Yes | Yes | Yes |
-| Snowflake Standalone    | Yes | Yes | No  |
-
-Using this resource at all against a `Kubernetes` application, or setting `scope`/`org_scan`
-for an application type whose column above is `No`, fails `terraform apply` with an
-"Unsupported Application Scan Schedule Configuration" error before any API call that would
-create or modify the schedule.
+-> Not every `application_type` (see [`britive_application`](application.md)) supports
+scheduled scanning, or its `associations`/`org_scan` arguments, to the same extent - the
+backend enforces this itself and rejects an unsupported combination when applied, rather than
+the provider validating it locally.
 
 ## Example Usage
 
@@ -77,11 +53,11 @@ resource "britive_application_scan_schedule" "daily_example" {
   frequency_type = "Daily"
   start_time     = "11:00"
 
-  scope {
+  associations {
     type  = "EnvironmentGroup"
     value = "ou-example-group-1"
   }
-  scope {
+  associations {
     type  = "Environment"
     value = "111111111111"
   }
@@ -98,7 +74,7 @@ resource "britive_application_scan_schedule" "weekly_example" {
   day_of_week    = "Monday"
   start_time     = "21:45"
 
-  scope {
+  associations {
     type  = "Environment"
     value = "222222222222"
   }
@@ -115,7 +91,7 @@ resource "britive_application_scan_schedule" "monthly_example" {
   day_of_month   = 7
   start_time     = "13:30"
 
-  scope {
+  associations {
     type  = "EnvironmentGroup"
     value = "ou-example-group-2"
   }
@@ -131,17 +107,16 @@ resource "britive_application_scan_schedule" "monthly_example" {
 * `day_of_month` - (Optional) The day of the month (`1`-`31`) the scan runs. Required when `frequency_type = "Monthly"`; must be unset otherwise.
 * `hour_interval` - (Optional) Number of hours between scans (e.g. `5` = every 5 hours). Required when `frequency_type = "Hourly"`; must be unset otherwise. Has no equivalent on `britive_resource_manager_resource_type_schedule_scan`, since `Hourly` is an application-only frequency type.
 * `start_time` - (Optional) The time of day the scan runs, in 24-hour `"HH:MM"` format. Required for `Daily`/`Weekly`/`Monthly`; must be unset for `Hourly`, which runs on its own interval instead.
-* `org_scan` - (Optional) Whether to scan the entire organization, ignoring `scope`. Left **unmanaged** when omitted from config - the provider only sends this field to the API when it's explicitly present in config; the exported value otherwise just reflects whatever the task's actual `orgScan` status already is. Exported as `null` (not `false`) for application types that don't support `org_scan` at all, since the API omits the field entirely for those rather than returning an explicit `false`.
-* `scope` - (Optional) Environments/environment groups the scan is restricted to. Omit entirely (and set `org_scan = true`) to scan the whole organization. Each block supports:
+* `org_scan` - (Optional) Whether to scan the entire organization, ignoring `associations`. Left **unmanaged** when omitted from config - the provider only sends this field to the API when it's explicitly present in config; the exported value otherwise just reflects whatever the task's actual `orgScan` status already is. Exported as `null` (not `false`) for application types that don't support `org_scan` at all, since the API omits the field entirely for those rather than returning an explicit `false`. Not every `application_type` supports `org_scan` - the backend rejects an unsupported combination when applied.
+* `associations` - (Optional) Environments/environment groups the scan is restricted to (named to match [`britive_profile`](profile.md)'s `associations` block; the underlying API calls this "scope"). Omit entirely (and set `org_scan = true`) to scan the whole organization. Each block supports:
   * `type` - (Required) One of `Environment`, `EnvironmentGroup` (case-insensitive).
-  * `value` - (Required) The environment or environment group, by name or ID (mirrors [`britive_profile`](profile.md)'s `associations` block). Two `scope` blocks of the same `type` may reference the same environment/environment group via different forms (one by name, one by ID) without conflict - each is tracked and refreshed independently.
+  * `value` - (Required) The environment or environment group, by name or ID (mirrors `britive_profile`'s `associations` block). Two `associations` blocks of the same `type` may reference the same environment/environment group via different forms (one by name, one by ID) without conflict - each is tracked and refreshed independently.
 
 ## Attribute Reference
 
 In addition to the arguments above, the following attributes are exported:
 
 * `id` - The composite identifier of the scan schedule.
-* `application_type` - The associated application's type. Resolved automatically from `application_id` and cached, since it never changes for a given application - not independently managed by this provider. Used internally to validate `scope`/`org_scan`/scheduled-scan support (see Application Type Support above).
 * `task_id` - The unique identifier of the scheduled scan task.
 * `next_run` - The next scheduled run timestamp (epoch milliseconds).
 

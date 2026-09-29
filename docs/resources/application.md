@@ -1170,12 +1170,9 @@ config at all:
 * Previously set, then removed from config - treated as an explicit request to turn it off
   (not "stop managing it and leave it as-is").
 
-Setting `scan_enabled` to any value for an `application_type` that does not support
-scheduled scanning at all (currently only `Kubernetes`) fails `terraform apply` with an
-"Unsupported Application Scan Schedule Configuration" error - see
-[`britive_application_scan_schedule`](application_scan_schedule.md#application-type-support)
-for the full per-type support matrix (also covering that resource's own `scope`/`org_scan`
-arguments).
+Not every `application_type` supports scheduled scanning - the backend enforces this itself
+and rejects `scan_enabled` for an unsupported type when applied, rather than the provider
+validating it locally.
 
 The backend registers an application's scan task service asynchronously after the
 application itself is created, so on rare occasions `terraform apply` can fail on a brand

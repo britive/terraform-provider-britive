@@ -598,9 +598,14 @@ type ApplicationScanScope struct {
 }
 
 // ApplicationScanScheduleProperties - the properties payload for an application scan
-// schedule task (confirmed by capture: {appId, scope, orgScan}). Scope has no `omitempty`:
-// an explicit `[]` clears every previously configured scope entry (confirmed by capture),
-// which a nil slice would instead marshal as JSON null. OrgScan is a *bool (not bool) with
+// schedule task (confirmed by capture: {appId, scope, orgScan}). Scope is named to match the
+// API's own wire field ("scope") deliberately, even though the Terraform-facing
+// britive_application_scan_schedule resource calls the equivalent argument "associations" (to
+// match the terminology britive_profile/britive_profile_policy already use for
+// environment/environment-group assignment) - see
+// resources.ApplicationScanAssociationModel's doc comment. Scope has no `omitempty`: an
+// explicit `[]` clears every previously configured scope entry (confirmed by capture), which
+// a nil slice would instead marshal as JSON null. OrgScan is a *bool (not bool) with
 // `omitempty` so the provider can send it only when org_scan is explicitly present in
 // config - a plain bool with omitempty would make it impossible to ever explicitly request
 // false, and without omitempty a zero-value bool would be sent as false on every request

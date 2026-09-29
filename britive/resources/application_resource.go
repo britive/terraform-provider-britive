@@ -491,13 +491,6 @@ func (r *ApplicationResource) Create(ctx context.Context, req resource.CreateReq
 	// already created successfully; state is still written below so the application stays
 	// tracked. Only the "never configured" branch reflects the task service's real status.
 	if !plan.ScanEnabled.IsUnknown() {
-		if capabilities := lookupApplicationScanScheduleCapabilities(plan.ApplicationType.ValueString()); !capabilities.ScheduleScan {
-			resp.Diagnostics.AddError(
-				"Unsupported Application Scan Schedule Configuration",
-				fmt.Sprintf("scheduled scanning is not supported for application type %q - leave scan_enabled unset", plan.ApplicationType.ValueString()),
-			)
-			return
-		}
 		enabled, err := r.setScanEnabled(taskService.TaskServiceID, plan.ScanEnabled.ValueBool())
 		if err != nil {
 			resp.Diagnostics.AddError("Error Setting Application Scan Status", err.Error())
@@ -733,13 +726,6 @@ func (r *ApplicationResource) Update(ctx context.Context, req resource.UpdateReq
 	// happens. A failure here doesn't abort the update - property/mapping changes above already
 	// succeeded, so surface the error but still read back and persist accurate state below.
 	if !plan.ScanEnabled.Equal(state.ScanEnabled) {
-		if capabilities := lookupApplicationScanScheduleCapabilities(plan.ApplicationType.ValueString()); !capabilities.ScheduleScan {
-			resp.Diagnostics.AddError(
-				"Unsupported Application Scan Schedule Configuration",
-				fmt.Sprintf("scheduled scanning is not supported for application type %q - leave scan_enabled unset", plan.ApplicationType.ValueString()),
-			)
-			return
-		}
 		taskServiceID := state.TaskServiceID.ValueString()
 		if taskServiceID == "" {
 			// Defensive: state predates task_service_id being tracked, or refresh was skipped -

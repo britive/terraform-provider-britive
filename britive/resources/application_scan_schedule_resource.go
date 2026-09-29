@@ -50,58 +50,29 @@ type ApplicationScanScheduleResource struct {
 // resources configure tasks on the same underlying scan task-service API; hour_interval has
 // no resource-manager equivalent, since Hourly is an application-only frequency_type.
 type ApplicationScanScheduleResourceModel struct {
-	ID              types.String                `tfsdk:"id"`
-	ApplicationID   types.String                `tfsdk:"application_id"`
-	ApplicationType types.String                `tfsdk:"application_type"`
-	TaskID          types.String                `tfsdk:"task_id"`
-	Name            types.String                `tfsdk:"name"`
-	FrequencyType   types.String                `tfsdk:"frequency_type"`
-	DayOfWeek       types.String                `tfsdk:"day_of_week"`
-	DayOfMonth      types.Int64                 `tfsdk:"day_of_month"`
-	HourInterval    types.Int64                 `tfsdk:"hour_interval"`
-	StartTime       types.String                `tfsdk:"start_time"`
-	OrgScan         types.Bool                  `tfsdk:"org_scan"`
-	Scope           []ApplicationScanScopeModel `tfsdk:"scope"`
-	NextRun         types.Int64                 `tfsdk:"next_run"`
+	ID            types.String                      `tfsdk:"id"`
+	ApplicationID types.String                      `tfsdk:"application_id"`
+	TaskID        types.String                      `tfsdk:"task_id"`
+	Name          types.String                      `tfsdk:"name"`
+	FrequencyType types.String                      `tfsdk:"frequency_type"`
+	DayOfWeek     types.String                      `tfsdk:"day_of_week"`
+	DayOfMonth    types.Int64                       `tfsdk:"day_of_month"`
+	HourInterval  types.Int64                       `tfsdk:"hour_interval"`
+	StartTime     types.String                      `tfsdk:"start_time"`
+	OrgScan       types.Bool                        `tfsdk:"org_scan"`
+	Associations  []ApplicationScanAssociationModel `tfsdk:"associations"`
+	NextRun       types.Int64                       `tfsdk:"next_run"`
 }
 
-// ApplicationScanScopeModel is a single scope entry restricting a scan to one Environment or
-// EnvironmentGroup.
-type ApplicationScanScopeModel struct {
+// ApplicationScanAssociationModel is a single association entry restricting a scan to one
+// Environment or EnvironmentGroup. Named "association" (not "scope") to match the terminology
+// britive_profile/britive_profile_policy already use for assigning environments/environment
+// groups - the backend API itself still calls this "scope" (see
+// britive.ApplicationScanScheduleProperties.Scope), so that name is kept at the client-go
+// layer; only the Terraform-facing name changes here.
+type ApplicationScanAssociationModel struct {
 	Type  types.String `tfsdk:"type"`
 	Value types.String `tfsdk:"value"`
-}
-
-// applicationScanScheduleCapabilities describes, for one application_type, whether scheduled
-// scanning is supported at all, and if so whether scope/org_scan are meaningful for it.
-type applicationScanScheduleCapabilities struct {
-	ScheduleScan bool
-	Scope        bool
-	OrgScan      bool
-}
-
-// applicationScanScheduleSupportByType is a business-rule table supplied directly by the
-// Britive team (not derived from any HAR capture) describing which application_type values
-// support scan scheduling at all, and if so whether scope and org_scan are meaningful for
-// them. Keyed by the exact application_type strings validated by application_resource.go's
-// own stringvalidator.OneOfCaseInsensitive list. An application_type absent from this table
-// (e.g. a new type added to that list before this table is updated to match) is treated
-// permissively rather than blocked - see resolveApplicationScanScheduleCapabilities.
-var applicationScanScheduleSupportByType = map[string]applicationScanScheduleCapabilities{
-	"AWS":                  {ScheduleScan: true, Scope: true, OrgScan: true},
-	"AWS Standalone":       {ScheduleScan: true, Scope: true, OrgScan: false},
-	"Azure":                {ScheduleScan: true, Scope: false, OrgScan: false},
-	"Azure WIF":            {ScheduleScan: true, Scope: false, OrgScan: false},
-	"GCP":                  {ScheduleScan: true, Scope: false, OrgScan: false},
-	"GCP Standalone":       {ScheduleScan: true, Scope: false, OrgScan: false},
-	"GCP WIF":              {ScheduleScan: true, Scope: false, OrgScan: false},
-	"Google Workspace":     {ScheduleScan: true, Scope: false, OrgScan: false},
-	"Kubernetes":           {ScheduleScan: false, Scope: false, OrgScan: false},
-	"Britive":              {ScheduleScan: true, Scope: true, OrgScan: false},
-	"Oracle WIF":           {ScheduleScan: true, Scope: true, OrgScan: true},
-	"Okta":                 {ScheduleScan: true, Scope: true, OrgScan: false},
-	"Snowflake":            {ScheduleScan: true, Scope: true, OrgScan: true},
-	"Snowflake Standalone": {ScheduleScan: true, Scope: true, OrgScan: false},
 }
 
 // NewApplicationScanScheduleResource is a helper function to simplify the provider implementation.
@@ -131,13 +102,6 @@ func (r *ApplicationScanScheduleResource) Schema(_ context.Context, _ resource.S
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"application_type": schema.StringAttribute{
-				Description: "The associated application's type. Resolved automatically from application_id and cached - not independently managed by this provider. Used internally to validate scope/org_scan/scheduled-scan support against the application's type.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"task_id": schema.StringAttribute{
@@ -182,7 +146,7 @@ func (r *ApplicationScanScheduleResource) Schema(_ context.Context, _ resource.S
 				Optional:    true,
 			},
 			"org_scan": schema.BoolAttribute{
-				Description: "Whether to scan the entire organization, ignoring scope. Left unmanaged when omitted from config - the provider only sends this field to the API when it's explicitly present in config; the exported value otherwise just reflects whatever the task's actual orgScan status already is.",
+				Description: "Whether to scan the entire organization, ignoring associations. Left unmanaged when omitted from config - the provider only sends this field to the API when it's explicitly present in config; the exported value otherwise just reflects whatever the task's actual orgScan status already is.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
@@ -195,7 +159,7 @@ func (r *ApplicationScanScheduleResource) Schema(_ context.Context, _ resource.S
 			},
 		},
 		Blocks: map[string]schema.Block{
-			"scope": schema.SetNestedBlock{
+			"associations": schema.SetNestedBlock{
 				Description: "Environments/environment groups the scan is restricted to. Omit entirely (and set org_scan = true) to scan the whole organization.",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
@@ -338,8 +302,8 @@ func (r *ApplicationScanScheduleResource) Create(ctx context.Context, req resour
 		return
 	}
 
-	// Read separately from plan: org_scan needs the raw config value, not plan.OrgScan - see
-	// validateApplicationScanScheduleConfig's doc comment for why.
+	// Read separately from plan: org_scan is only ever sent to the API when explicitly present
+	// in config, not just carried forward from state - see buildTaskPayload's doc comment.
 	var config ApplicationScanScheduleResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
@@ -347,22 +311,6 @@ func (r *ApplicationScanScheduleResource) Create(ctx context.Context, req resour
 	}
 
 	applicationID := plan.ApplicationID.ValueString()
-
-	// application_type never changes for a given application_id, so it's resolved once here
-	// (application_scan_schedule has no create response of its own to carry it, unlike
-	// britive_application's own task_service_id at its Create) and cached in state; Update/Read
-	// reuse the cached value instead of re-resolving it (see application_type's schema
-	// description, and Update/Read's own fallback-if-empty handling below).
-	applicationType, capabilities, err := r.resolveApplicationScanScheduleCapabilities(applicationID)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Application", err.Error())
-		return
-	}
-	plan.ApplicationType = types.StringValue(applicationType)
-	if err := validateApplicationScanScheduleConfig(applicationType, capabilities, &plan, config.OrgScan); err != nil {
-		resp.Diagnostics.AddError("Unsupported Application Scan Schedule Configuration", err.Error())
-		return
-	}
 
 	// Application creation registers the scan task service automatically, but asynchronously -
 	// retry, since a lookup immediately after creation (e.g. when this schedule is created in
@@ -408,17 +356,6 @@ func (r *ApplicationScanScheduleResource) Read(ctx context.Context, req resource
 	applicationID := state.ApplicationID.ValueString()
 	taskID := state.TaskID.ValueString()
 
-	// application_type never changes for a given application_id, so it's only backfilled here
-	// for state that predates it being tracked at all, not re-resolved on every read.
-	if state.ApplicationType.ValueString() == "" {
-		applicationType, _, err := r.resolveApplicationScanScheduleCapabilities(applicationID)
-		if err != nil {
-			resp.Diagnostics.AddError("Error Reading Application", err.Error())
-			return
-		}
-		state.ApplicationType = types.StringValue(applicationType)
-	}
-
 	taskServiceID, err := r.resolveTaskServiceID(applicationID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Resolving Application Scan Task Service", err.Error())
@@ -437,14 +374,14 @@ func (r *ApplicationScanScheduleResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	priorScope := state.Scope
+	priorAssociations := state.Associations
 	r.mapModelToResource(task, &state, false)
-	scope, err := r.refreshApplicationScanScope(applicationID, task.Properties.Scope, priorScope)
+	associations, err := r.refreshApplicationScanAssociations(applicationID, task.Properties.Scope, priorAssociations)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Resolving Application Scan Schedule Scope", err.Error())
+		resp.Diagnostics.AddError("Error Resolving Application Scan Schedule Associations", err.Error())
 		return
 	}
-	state.Scope = scope
+	state.Associations = associations
 	state.StartTime = formatApplicationScanStartTime(task.StartTime, task.FrequencyType)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -461,10 +398,9 @@ func (r *ApplicationScanScheduleResource) Update(ctx context.Context, req resour
 		return
 	}
 
-	// Read separately from plan/state: org_scan needs the raw config value, not plan.OrgScan -
-	// see validateApplicationScanScheduleConfig's doc comment for why. This matters
-	// specifically on Update, where plan.OrgScan can carry a value forward from state (via its
-	// UseStateForUnknown plan modifier) that config never actually set.
+	// Read separately from plan/state: org_scan is only ever sent to the API when explicitly
+	// present in config, not just carried forward from state (via its UseStateForUnknown plan
+	// modifier) - see buildTaskPayload's doc comment.
 	var config ApplicationScanScheduleResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
@@ -473,28 +409,6 @@ func (r *ApplicationScanScheduleResource) Update(ctx context.Context, req resour
 
 	applicationID := state.ApplicationID.ValueString()
 	taskID := state.TaskID.ValueString()
-
-	// application_type never changes for a given application_id - state.ApplicationType is
-	// trusted directly when already cached; only resolved fresh here as a defensive fallback
-	// for state that predates it being tracked (mirrors task_service_id's own Update fallback
-	// on britive_application).
-	applicationType := state.ApplicationType.ValueString()
-	var capabilities applicationScanScheduleCapabilities
-	if applicationType == "" {
-		var err error
-		applicationType, capabilities, err = r.resolveApplicationScanScheduleCapabilities(applicationID)
-		if err != nil {
-			resp.Diagnostics.AddError("Error Reading Application", err.Error())
-			return
-		}
-		plan.ApplicationType = types.StringValue(applicationType)
-	} else {
-		capabilities = lookupApplicationScanScheduleCapabilities(applicationType)
-	}
-	if err := validateApplicationScanScheduleConfig(applicationType, capabilities, &plan, config.OrgScan); err != nil {
-		resp.Diagnostics.AddError("Unsupported Application Scan Schedule Configuration", err.Error())
-		return
-	}
 
 	taskServiceID, err := r.resolveTaskServiceID(applicationID)
 	if err != nil {
@@ -560,23 +474,6 @@ func (r *ApplicationScanScheduleResource) ImportState(ctx context.Context, req r
 		return
 	}
 
-	// Only ScheduleScan support is checked here, not scope/org_scan - there's no prior config
-	// on import to judge "was scope/org_scan intentionally set" against, only whatever the
-	// server already has, and it's not this check's job to flag values a Create/Update
-	// bypassing this provider might have gotten into the API some other way.
-	applicationType, capabilities, err := r.resolveApplicationScanScheduleCapabilities(applicationID)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Application", err.Error())
-		return
-	}
-	if !capabilities.ScheduleScan {
-		resp.Diagnostics.AddError(
-			"Unsupported Application Scan Schedule Configuration",
-			fmt.Sprintf("scheduled scanning is not supported for application type %q", applicationType),
-		)
-		return
-	}
-
 	taskServiceID, err := r.resolveTaskServiceID(applicationID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Resolving Application Scan Task Service", err.Error())
@@ -598,16 +495,15 @@ func (r *ApplicationScanScheduleResource) ImportState(ctx context.Context, req r
 	var state ApplicationScanScheduleResourceModel
 	state.ID = types.StringValue(applicationScanScheduleCompositeID(applicationID, taskID))
 	state.ApplicationID = types.StringValue(applicationID)
-	state.ApplicationType = types.StringValue(applicationType)
 	state.TaskID = types.StringValue(taskID)
 
 	r.mapModelToResource(task, &state, true)
-	scope, err := r.refreshApplicationScanScope(applicationID, task.Properties.Scope, nil)
+	associations, err := r.refreshApplicationScanAssociations(applicationID, task.Properties.Scope, nil)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Resolving Application Scan Schedule Scope", err.Error())
+		resp.Diagnostics.AddError("Error Resolving Application Scan Schedule Associations", err.Error())
 		return
 	}
-	state.Scope = scope
+	state.Associations = associations
 	state.StartTime = formatApplicationScanStartTime(task.StartTime, task.FrequencyType)
 
 	log.Printf("[INFO] Imported application scan schedule task: %s", taskID)
@@ -616,68 +512,6 @@ func (r *ApplicationScanScheduleResource) ImportState(ctx context.Context, req r
 }
 
 // Helper functions
-
-// resolveApplicationScanScheduleCapabilities resolves applicationID's application_type via
-// GetApplication and looks up its known scan-schedule capabilities in
-// applicationScanScheduleSupportByType. An application_type not present in that table (kept
-// in sync with application_resource.go's own enum, but not enforced to match it) is treated
-// permissively - i.e. as if it supports scan scheduling, scope, and org_scan - rather than
-// blocking a type this table simply hasn't been updated to cover yet.
-func (r *ApplicationScanScheduleResource) resolveApplicationScanScheduleCapabilities(applicationID string) (applicationType string, capabilities applicationScanScheduleCapabilities, err error) {
-	application, err := r.client.GetApplication(applicationID)
-	if err != nil {
-		return "", applicationScanScheduleCapabilities{}, err
-	}
-	applicationType = application.CatalogAppName
-	return applicationType, lookupApplicationScanScheduleCapabilities(applicationType), nil
-}
-
-// lookupApplicationScanScheduleCapabilities looks up applicationType's known scan-schedule
-// capabilities in applicationScanScheduleSupportByType, matching case-insensitively - mirrors
-// application_resource.go's own case-insensitive application_type validation
-// (stringvalidator.OneOfCaseInsensitive), so a raw config value (as ApplicationResource uses
-// directly, having no separate catalog lookup of its own to canonicalize casing first) still
-// matches. An application_type absent from the table (e.g. a new type added to
-// application_resource.go's enum before this table is updated to match) is treated
-// permissively rather than blocked. Shared by both ApplicationScanScheduleResource (keyed off
-// the live application's CatalogAppName) and ApplicationResource's scan_enabled handling
-// (keyed off the plan/state's own application_type).
-func lookupApplicationScanScheduleCapabilities(applicationType string) applicationScanScheduleCapabilities {
-	for name, capabilities := range applicationScanScheduleSupportByType {
-		if strings.EqualFold(name, applicationType) {
-			return capabilities
-		}
-	}
-	return applicationScanScheduleCapabilities{ScheduleScan: true, Scope: true, OrgScan: true}
-}
-
-// validateApplicationScanScheduleConfig checks plan's scope usage, and configOrgScan's
-// org_scan usage, against applicationType's known capabilities, in addition to whether
-// scheduled scanning is supported for that type at all. Used by Create/Update, which have a
-// plan (and config) to check the user's actual configured intent against; ImportState checks
-// only ScheduleScan support directly, since there's no prior config there to judge "was
-// scope/org_scan intentionally set" against - see its call site.
-//
-// org_scan is checked against configOrgScan (the raw config value), not plan.OrgScan: unlike
-// scope (a plain Optional block with no Computed flag, so plan.Scope always reflects config
-// directly), org_scan is Computed with a UseStateForUnknown plan modifier. Once the server has
-// ever echoed back orgScan=true for this task (e.g. its own default for an empty-scope
-// schedule the config never mentioned org_scan for at all), plan.OrgScan carries that value
-// forward on every later Update regardless of config - using plan.OrgScan here would
-// therefore reject an application type that doesn't support org_scan even when the user's
-// config never set it, which is exactly the bug this guards against.
-func validateApplicationScanScheduleConfig(applicationType string, capabilities applicationScanScheduleCapabilities, plan *ApplicationScanScheduleResourceModel, configOrgScan types.Bool) error {
-	if !capabilities.ScheduleScan {
-		return fmt.Errorf("scheduled scanning is not supported for application type %q", applicationType)
-	}
-	if !capabilities.Scope && len(plan.Scope) > 0 {
-		return fmt.Errorf("scope is not supported for application type %q - leave it unset", applicationType)
-	}
-	if !capabilities.OrgScan && !configOrgScan.IsNull() && !configOrgScan.IsUnknown() {
-		return fmt.Errorf("org_scan is not supported for application type %q - leave it unset", applicationType)
-	}
-	return nil
-}
 
 // applicationScanTaskServiceCreateRetries/applicationScanTaskServiceCreateRetryDelay govern
 // how many times, and how far apart, a Create path retries GetApplicationScanTaskService
@@ -741,18 +575,21 @@ func (r *ApplicationScanScheduleResource) resolveTaskServiceID(applicationID str
 // buildTaskPayload maps the plan into the API's create/update request shape, deriving
 // frequencyInterval from day_of_week/day_of_month/hour_interval based on frequency_type -
 // mirrors resourcemanager.ScheduleScanResource.buildTaskPayload, reusing the same
-// schedulescan.WeekdayToInterval mapping for the Weekly case. scope entries are resolved from
-// name-or-ID to the API's expected raw ID via resolveApplicationScanScope; a resolution
-// failure is reported through diags and yields a zero-value task, matching the pattern
-// resourcemanager.ScheduleScanResource.buildTaskPayload uses for a duplicate resource_labels
-// block. configOrgScan is the raw config value, not plan.OrgScan - see
-// validateApplicationScanScheduleConfig's doc comment for why that distinction matters here.
+// schedulescan.WeekdayToInterval mapping for the Weekly case. association entries are resolved
+// from name-or-ID to the API's expected raw ID via resolveApplicationScanAssociations; a
+// resolution failure is reported through diags and yields a zero-value task, matching the
+// pattern resourcemanager.ScheduleScanResource.buildTaskPayload uses for a duplicate
+// resource_labels block. configOrgScan is the raw config value, not plan.OrgScan: org_scan is
+// Computed with a UseStateForUnknown plan modifier, so once the server has ever echoed back a
+// value for it, plan.OrgScan would carry that forward on every later Update even when config
+// never set it - checking config here is what makes "never configured" actually mean "never
+// sent".
 func (r *ApplicationScanScheduleResource) buildTaskPayload(ctx context.Context, plan *ApplicationScanScheduleResourceModel, configOrgScan types.Bool, diags *diag.Diagnostics) britive.ApplicationScheduleScanTask {
 	applicationID := plan.ApplicationID.ValueString()
 
-	resolvedScope, err := r.resolveApplicationScanScope(applicationID, plan.Scope)
+	resolvedAssociations, err := r.resolveApplicationScanAssociations(applicationID, plan.Associations)
 	if err != nil {
-		diags.AddError("Error Resolving Application Scan Schedule Scope", err.Error())
+		diags.AddError("Error Resolving Application Scan Schedule Associations", err.Error())
 		return britive.ApplicationScheduleScanTask{}
 	}
 
@@ -761,13 +598,15 @@ func (r *ApplicationScanScheduleResource) buildTaskPayload(ctx context.Context, 
 		FrequencyType: schedulescan.CanonicalCasing(plan.FrequencyType.ValueString(), "Hourly", "Daily", "Weekly", "Monthly"),
 		Properties: britive.ApplicationScanScheduleProperties{
 			AppID: applicationID,
-			Scope: resolvedScope,
+			// The backend API calls this "scope" - see ApplicationScanScheduleProperties.Scope's
+			// doc comment. resolvedAssociations is the Terraform-facing "associations" block,
+			// resolved to the wire shape the API expects.
+			Scope: resolvedAssociations,
 		},
 	}
 
-	// org_scan is only ever sent when explicitly present in config - see its schema
-	// description. Checked against configOrgScan, not plan.OrgScan - see this function's and
-	// validateApplicationScanScheduleConfig's doc comments for why.
+	// org_scan is only ever sent when explicitly present in config - see this function's own
+	// doc comment for why configOrgScan (not plan.OrgScan) is what's checked here.
 	if !configOrgScan.IsNull() && !configOrgScan.IsUnknown() {
 		orgScan := plan.OrgScan.ValueBool()
 		task.Properties.OrgScan = &orgScan
@@ -798,7 +637,7 @@ func (r *ApplicationScanScheduleResource) buildTaskPayload(ctx context.Context, 
 }
 
 // mapModelToResource maps the API's scan schedule task detail onto Terraform state, except
-// for scope and start_time - see refreshApplicationScanScope and
+// for associations and start_time - see refreshApplicationScanAssociations and
 // formatApplicationScanStartTime for why those are handled separately. frequency_type and
 // day_of_week are validated case-insensitively but sent to the API in one fixed
 // casing/mapping, so the value echoed back is not necessarily what the user typed - when not
@@ -865,16 +704,18 @@ func (r *ApplicationScanScheduleResource) mapModelToResource(task *britive.Appli
 	state.NextRun = types.Int64Value(task.NextRun)
 }
 
-// resolveApplicationScanScope resolves each scope entry's value - accepted as either a name or
-// a raw environment/environment-group ID, mirroring ProfileResource.saveProfileAssociations -
-// into the actual ID the API's properties.scope[].value expects. Fetches the application's
-// environment tree once via GetApplicationRootEnvironmentGroup and matches each entry against
-// either Name or ID within the list for its scope type (Environment vs EnvironmentGroup).
-// Collects every entry that matched neither into a single error, rather than failing on the
-// first one, so a practitioner sees every bad value in one apply.
-func (r *ApplicationScanScheduleResource) resolveApplicationScanScope(applicationID string, scope []ApplicationScanScopeModel) ([]britive.ApplicationScanScope, error) {
-	resolved := make([]britive.ApplicationScanScope, 0, len(scope))
-	if len(scope) == 0 {
+// resolveApplicationScanAssociations resolves each association entry's value - accepted as
+// either a name or a raw environment/environment-group ID, mirroring
+// ProfileResource.saveProfileAssociations - into the actual ID the API's properties.scope[].value
+// expects (the backend API itself calls this "scope"; see
+// britive.ApplicationScanScheduleProperties.Scope). Fetches the application's environment tree
+// once via GetApplicationRootEnvironmentGroup and matches each entry against either Name or ID
+// within the list for its association type (Environment vs EnvironmentGroup). Collects every
+// entry that matched neither into a single error, rather than failing on the first one, so a
+// practitioner sees every bad value in one apply.
+func (r *ApplicationScanScheduleResource) resolveApplicationScanAssociations(applicationID string, associations []ApplicationScanAssociationModel) ([]britive.ApplicationScanScope, error) {
+	resolved := make([]britive.ApplicationScanScope, 0, len(associations))
+	if len(associations) == 0 {
 		return resolved, nil
 	}
 
@@ -884,12 +725,12 @@ func (r *ApplicationScanScheduleResource) resolveApplicationScanScope(applicatio
 	}
 
 	unmatched := make([]string, 0)
-	for _, s := range scope {
-		scopeType := schedulescan.CanonicalCasing(s.Type.ValueString(), "Environment", "EnvironmentGroup")
-		scopeValue := s.Value.ValueString()
+	for _, s := range associations {
+		associationType := schedulescan.CanonicalCasing(s.Type.ValueString(), "Environment", "EnvironmentGroup")
+		associationValue := s.Value.ValueString()
 
 		var rootAssociations []britive.Association
-		if scopeType == "EnvironmentGroup" {
+		if associationType == "EnvironmentGroup" {
 			rootAssociations = appRootEnvironmentGroup.EnvironmentGroups
 		} else {
 			rootAssociations = appRootEnvironmentGroup.Environments
@@ -897,9 +738,9 @@ func (r *ApplicationScanScheduleResource) resolveApplicationScanScope(applicatio
 
 		found := false
 		for _, aeg := range rootAssociations {
-			if aeg.Name == scopeValue || aeg.ID == scopeValue {
+			if aeg.Name == associationValue || aeg.ID == associationValue {
 				resolved = append(resolved, britive.ApplicationScanScope{
-					Type:  scopeType,
+					Type:  associationType,
 					Value: aeg.ID,
 				})
 				found = true
@@ -907,36 +748,38 @@ func (r *ApplicationScanScheduleResource) resolveApplicationScanScope(applicatio
 			}
 		}
 		if !found {
-			unmatched = append(unmatched, fmt.Sprintf("%s=%s", scopeType, scopeValue))
+			unmatched = append(unmatched, fmt.Sprintf("%s=%s", associationType, associationValue))
 		}
 	}
 
 	if len(unmatched) > 0 {
-		return nil, errs.NewNotFoundErrorf("scope %v", unmatched)
+		return nil, errs.NewNotFoundErrorf("association %v", unmatched)
 	}
 
 	return resolved, nil
 }
 
-// refreshApplicationScanScope rebuilds the scope block list from the API's live properties,
-// converting each entry's raw environment/environment-group ID back to its name - unless
-// priorScope shows the practitioner's config used the raw ID form for that entry, in which
-// case the ID is preserved to avoid a perpetual name/ID diff. Mirrors
+// refreshApplicationScanAssociations rebuilds the associations block list from the API's live
+// properties.scope (see britive.ApplicationScanScheduleProperties.Scope's doc comment for why
+// the wire name differs), converting each entry's raw environment/environment-group ID back to
+// its name - unless priorAssociations shows the practitioner's config used the raw ID form for
+// that entry, in which case the ID is preserved to avoid a perpetual name/ID diff. Mirrors
 // ProfileResource.mapProfileAssociationsModelToResource. Used only by Read/ImportState, never
-// by Create/Update: see buildTaskPayload/resolveApplicationScanScope for why those accept (and
-// must return exactly) whichever form - name or ID - the user configured.
-// consumed tracks which priorScope entries have already been matched to an earlier scope
-// entry in this same call. Without it, two scope entries that resolve to the same
-// association (e.g. one block by name, one by that same environment's raw ID) would both
-// match the same single prior ID-form entry and both come back as identical {Type, ID}
-// pairs - not just a diff, but a hard "Duplicate Set Element" planning error, since scope is
-// a Set and the framework rejects a returned state containing two identical members outright.
-// Marking an entry consumed once it's chosen forces the next scope entry that would otherwise
-// reuse it to fall through to the (still-correct, and distinct) name-form default instead.
-func (r *ApplicationScanScheduleResource) refreshApplicationScanScope(applicationID string, scope []britive.ApplicationScanScope, priorScope []ApplicationScanScopeModel) ([]ApplicationScanScopeModel, error) {
-	scopeList := make([]ApplicationScanScopeModel, 0, len(scope))
+// by Create/Update: see buildTaskPayload/resolveApplicationScanAssociations for why those
+// accept (and must return exactly) whichever form - name or ID - the user configured.
+// consumed tracks which priorAssociations entries have already been matched to an earlier
+// entry in this same call. Without it, two association entries that resolve to the same
+// environment/environment-group (e.g. one block by name, one by that same environment's raw
+// ID) would both match the same single prior ID-form entry and both come back as identical
+// {Type, ID} pairs - not just a diff, but a hard "Duplicate Set Element" planning error, since
+// associations is a Set and the framework rejects a returned state containing two identical
+// members outright. Marking an entry consumed once it's chosen forces the next entry that
+// would otherwise reuse it to fall through to the (still-correct, and distinct) name-form
+// default instead.
+func (r *ApplicationScanScheduleResource) refreshApplicationScanAssociations(applicationID string, scope []britive.ApplicationScanScope, priorAssociations []ApplicationScanAssociationModel) ([]ApplicationScanAssociationModel, error) {
+	associationList := make([]ApplicationScanAssociationModel, 0, len(scope))
 	if len(scope) == 0 {
-		return scopeList, nil
+		return associationList, nil
 	}
 
 	appRootEnvironmentGroup, err := r.client.GetApplicationRootEnvironmentGroup(applicationID)
@@ -944,7 +787,7 @@ func (r *ApplicationScanScheduleResource) refreshApplicationScanScope(applicatio
 		return nil, err
 	}
 
-	consumed := make([]bool, len(priorScope))
+	consumed := make([]bool, len(priorAssociations))
 
 	for _, s := range scope {
 		var rootAssociations []britive.Association
@@ -962,11 +805,11 @@ func (r *ApplicationScanScheduleResource) refreshApplicationScanScope(applicatio
 			}
 		}
 		if a == nil {
-			return nil, errs.NewNotFoundErrorf("scope %s %s", s.Type, s.Value)
+			return nil, errs.NewNotFoundErrorf("association %s %s", s.Type, s.Value)
 		}
 
 		value := a.Name
-		for i, prior := range priorScope {
+		for i, prior := range priorAssociations {
 			if consumed[i] {
 				continue
 			}
@@ -977,18 +820,18 @@ func (r *ApplicationScanScheduleResource) refreshApplicationScanScope(applicatio
 			}
 		}
 
-		scopeList = append(scopeList, ApplicationScanScopeModel{
+		associationList = append(associationList, ApplicationScanAssociationModel{
 			Type:  types.StringValue(s.Type),
 			Value: types.StringValue(value),
 		})
 	}
 
-	return scopeList, nil
+	return associationList, nil
 }
 
 // formatApplicationScanStartTime renders the API's [hour, minute] pair as a "HH:MM" string,
 // reusing schedulescan.FormatStartTime. Used only by Read/ImportState, for the same reason as
-// refreshApplicationScanScope: start_time has no Computed flag, so Create/Update must return
+// refreshApplicationScanAssociations: start_time has no Computed flag, so Create/Update must return
 // exactly what was planned rather than a reformatted value. For Hourly schedules the server
 // assigns an arbitrary, not-user-meaningful startTime (confirmed by capture: the create
 // request sends startTime = null and gets a non-null value back) - normalized to null here so
