@@ -7,7 +7,10 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 func TestBritiveResourceResourcePolicy(t *testing.T) {
@@ -134,11 +137,17 @@ func TestBritiveResourceResourcePolicyForEachDynamicResourceLabels(t *testing.T)
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveResourceResourcePolicyForEachDynamicResourceLabelsConfig(resourceLabelName, resourceLabelDescription),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckBritiveResourceResourcePolicyExists("britive_resource_manager_resource_label.resource_label_for_each"),
-					testAccCheckBritiveResourceManagerProfilePolicyExists(`britive_resource_manager_resource_policy.resource_policy_for_each["a"]`),
-					testAccCheckBritiveResourceManagerProfilePolicyExists(`britive_resource_manager_resource_policy.resource_policy_for_each["b"]`),
-				),
+				// Can't use the legacy Check (func(s *terraform.State) error) API here: its
+				// state shim only supports count-style (integer) resource indexes, and errors
+				// out ("for_each is not supported") the moment ANY resource in state has a
+				// for_each (string/map) index - which is exactly what this test exercises.
+				// ConfigStateChecks reads the raw JSON state directly instead, so it works
+				// fine with for_each-keyed addresses.
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("britive_resource_manager_resource_label.resource_label_for_each", tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_policy.resource_policy_for_each["a"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_policy.resource_policy_for_each["b"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+				},
 			},
 		},
 	})

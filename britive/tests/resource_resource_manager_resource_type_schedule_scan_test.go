@@ -6,7 +6,10 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 func TestBritiveScheduleScanDaily(t *testing.T) {
@@ -159,11 +162,17 @@ func TestBritiveScheduleScanForEachDynamicResourceLabels(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveScheduleScanForEachDynamicResourceLabelsConfig(resourceTypeName, resourceTypeDescription),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckBritiveScheduleScanExists("britive_resource_manager_resource_type.new_resource_type_ss_for_each"),
-					testAccCheckBritiveScheduleScanExists(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["a"]`),
-					testAccCheckBritiveScheduleScanExists(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["b"]`),
-				),
+				// Can't use the legacy Check (func(s *terraform.State) error) API here: its
+				// state shim only supports count-style (integer) resource indexes, and errors
+				// out ("for_each is not supported") the moment ANY resource in state has a
+				// for_each (string/map) index - which is exactly what this test exercises.
+				// ConfigStateChecks reads the raw JSON state directly instead, so it works
+				// fine with for_each-keyed addresses.
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("britive_resource_manager_resource_type.new_resource_type_ss_for_each", tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["a"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["b"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+				},
 			},
 		},
 	})

@@ -6,7 +6,10 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 func TestBritiveRotationTemplateLocal(t *testing.T) {
@@ -79,11 +82,17 @@ func TestBritiveRotationTemplateForEachDynamicVariables(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveRotationTemplateForEachDynamicVariablesConfig(resourceTypeName, resourceTypeDescription),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckBritiveRotationTemplateExists("britive_resource_manager_resource_type.new_resource_type_rt_for_each"),
-					testAccCheckBritiveRotationTemplateExists(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["a"]`),
-					testAccCheckBritiveRotationTemplateExists(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["b"]`),
-				),
+				// Can't use the legacy Check (func(s *terraform.State) error) API here: its
+				// state shim only supports count-style (integer) resource indexes, and errors
+				// out ("for_each is not supported") the moment ANY resource in state has a
+				// for_each (string/map) index - which is exactly what this test exercises.
+				// ConfigStateChecks reads the raw JSON state directly instead, so it works
+				// fine with for_each-keyed addresses.
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("britive_resource_manager_resource_type.new_resource_type_rt_for_each", tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["a"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["b"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+				},
 			},
 		},
 	})
