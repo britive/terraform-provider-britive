@@ -152,6 +152,19 @@ func TestBritiveResourceTypeScanEnabledSingleApply(t *testing.T) {
 // ValidateConfig crashed with "Value Conversion Error ... Suggested Type: basetypes.SetValue".
 // See docs/guides and britive_dynamic_block_tf_issue in terraform_examples for the original
 // repro. Now fixed by modeling resource_labels as types.Set instead.
+//
+// This actually applies the config (real Create against the live tenant), so it also proves
+// apply - not just plan - works. ConfigStateChecks reads the applied state directly (raw JSON
+// via wd.State), which is safe with for_each-keyed addresses - only the legacy Check (func(s
+// *terraform.State) error) API's state shim chokes on those.
+//
+// A second, empty-config step tears everything down via an ordinary apply before the test
+// ends, rather than relying on the test framework's own automatic post-test destroy: that
+// automatic teardown (terraform-plugin-testing v1.16.0, the latest available at time of
+// writing) unconditionally re-fetches state through the very same legacy shim to run
+// CheckDestroy, and errors with "for_each is not supported" the moment ANY resource in the
+// *final* state has a for_each (string/map) index - which would otherwise leave these
+// resources dangling in the tenant instead of cleanly destroyed.
 func TestBritiveScheduleScanForEachDynamicResourceLabels(t *testing.T) {
 	resourceTypeName := "AT-Britive_Schedule_Scan_Tests_Resource_Type_ForEach"
 	resourceTypeDescription := "AT-Britive_Schedule_Scan_Tests_Resource_Type_ForEach_Description"
@@ -162,17 +175,19 @@ func TestBritiveScheduleScanForEachDynamicResourceLabels(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckBritiveScheduleScanForEachDynamicResourceLabelsConfig(resourceTypeName, resourceTypeDescription),
-				// Can't use the legacy Check (func(s *terraform.State) error) API here: its
-				// state shim only supports count-style (integer) resource indexes, and errors
-				// out ("for_each is not supported") the moment ANY resource in state has a
-				// for_each (string/map) index - which is exactly what this test exercises.
-				// ConfigStateChecks reads the raw JSON state directly instead, so it works
-				// fine with for_each-keyed addresses.
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue("britive_resource_manager_resource_type.new_resource_type_ss_for_each", tfjsonpath.New("id"), knownvalue.NotNull()),
 					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["a"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["a"]`, tfjsonpath.New("name"), knownvalue.StringExact("AT-for-each-scan-a")),
 					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["b"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_schedule_scan.new_schedule_scan_for_each["b"]`, tfjsonpath.New("name"), knownvalue.StringExact("AT-for-each-scan-b")),
 				},
+			},
+			{
+				// Empty config: destroys the resources created above via an ordinary apply,
+				// so state is already empty by the time the framework's own post-test
+				// teardown runs - see the doc comment above for why that matters.
+				Config: `# empty config - tears down the resources created by the previous step`,
 			},
 		},
 	})
