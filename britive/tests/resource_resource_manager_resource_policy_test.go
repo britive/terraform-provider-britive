@@ -201,7 +201,10 @@ func testAccCheckBritiveResourceResourcePolicyForEachDynamicResourceLabelsConfig
 		access_type  = "Allow"
 		access_level = "manage"
 		consumer     = "resourcemanager"
-		is_active    = true
+		// No members are configured on this policy (it only exercises the resource_labels
+		// dynamic block), and the API rejects is_active = true with no members present
+		// (PP-0005), so keep it inactive.
+		is_active    = false
 		is_draft     = false
 		is_read_only = false
 
