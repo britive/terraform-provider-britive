@@ -343,9 +343,20 @@ type ApplicationResponse struct {
 	RootEnvironmentGroup  *ApplicationRootEnvironmentGroup `json:"rootEnvironmentGroup,omitempty"`
 }
 
+// Properties - despite the name, this is the application's catalog metadata (unmarshaled
+// from the response's "catalogApplication" object - see ApplicationResponse.Properties),
+// not just its configured property values. RequiresHierarchicalModel and
+// SupportsEnvironmentScanning are used to derive whether org_scan/associations are supported
+// for britive_application_scan_schedule - see
+// resources.applicationScanScheduleCapabilitiesFromFlags. Confirmed present (both fields, at
+// this same top level of catalogApplication) in a live GET /apps/{id}?view=minimized capture -
+// the exact call GetApplication makes - so the minimized view does carry these flags, not just
+// the full view.
 type Properties struct {
-	PropertyTypes []PropertyTypes `json:"propertyTypes"`
-	Version       string          `json:"version"`
+	PropertyTypes               []PropertyTypes `json:"propertyTypes"`
+	Version                     string          `json:"version"`
+	RequiresHierarchicalModel   bool            `json:"requiresHierarchicalModel"`
+	SupportsEnvironmentScanning bool            `json:"supportsEnvironmentScanning"`
 }
 
 type PropertyTypes struct {

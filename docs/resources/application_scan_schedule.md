@@ -25,10 +25,12 @@ This resource's schema deliberately mirrors
 underlying scan task-service API. The one addition is `hour_interval`, for the `Hourly`
 frequency type, which has no resource-manager equivalent.
 
--> Not every `application_type` (see [`britive_application`](application.md)) supports
-scheduled scanning, or its `associations`/`org_scan` arguments, to the same extent - the
-backend enforces this itself and rejects an unsupported combination when applied, rather than
-the provider validating it locally.
+-> Not every application supports `associations`/`org_scan` to the same extent. Support is
+derived per-application from two live catalog flags (`supportsEnvironmentScanning` and
+`requiresHierarchicalModel`), not from `application_type` - so this stays accurate for
+application types added after this provider version. The provider validates this on
+`terraform apply` and fails fast with a clear error before it would otherwise hit a less
+specific error from the backend.
 
 ## Example Usage
 
@@ -107,7 +109,7 @@ resource "britive_application_scan_schedule" "monthly_example" {
 * `day_of_month` - (Optional) The day of the month (`1`-`31`) the scan runs. Required when `frequency_type = "Monthly"`; must be unset otherwise.
 * `hour_interval` - (Optional) Number of hours between scans (e.g. `5` = every 5 hours). Required when `frequency_type = "Hourly"`; must be unset otherwise. Has no equivalent on `britive_resource_manager_resource_type_schedule_scan`, since `Hourly` is an application-only frequency type.
 * `start_time` - (Optional) The time of day the scan runs, in 24-hour `"HH:MM"` format. Required for `Daily`/`Weekly`/`Monthly`; must be unset for `Hourly`, which runs on its own interval instead.
-* `org_scan` - (Optional) Whether to scan the entire organization, ignoring `associations`. Left **unmanaged** when omitted from config - the provider only sends this field to the API when it's explicitly present in config; the exported value otherwise just reflects whatever the task's actual `orgScan` status already is. Exported as `null` (not `false`) for application types that don't support `org_scan` at all, since the API omits the field entirely for those rather than returning an explicit `false`. Not every `application_type` supports `org_scan` - the backend rejects an unsupported combination when applied.
+* `org_scan` - (Optional) Whether to scan the entire organization, ignoring `associations`. Left **unmanaged** when omitted from config - the provider only sends this field to the API when it's explicitly present in config; the exported value otherwise just reflects whatever the task's actual `orgScan` status already is. Exported as `null` (not `false`) for applications that don't support `org_scan` at all, since the API omits the field entirely for those rather than returning an explicit `false`. Not every application supports `org_scan` - see the note above.
 * `associations` - (Optional) Environments/environment groups the scan is restricted to (named to match [`britive_profile`](profile.md)'s `associations` block; the underlying API calls this "scope"). Omit entirely (and set `org_scan = true`) to scan the whole organization. Each block supports:
   * `type` - (Required) One of `Environment`, `EnvironmentGroup` (case-insensitive).
   * `value` - (Required) The environment or environment group, by name or ID (mirrors `britive_profile`'s `associations` block). Two `associations` blocks of the same `type` may reference the same environment/environment group via different forms (one by name, one by ID) without conflict - each is tracked and refreshed independently.

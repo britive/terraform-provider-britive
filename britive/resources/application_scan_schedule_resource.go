@@ -312,6 +312,16 @@ func (r *ApplicationScanScheduleResource) Create(ctx context.Context, req resour
 
 	applicationID := plan.ApplicationID.ValueString()
 
+	applicationType, capabilities, err := r.resolveApplicationScanScheduleCapabilities(applicationID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Application", err.Error())
+		return
+	}
+	if err := validateApplicationScanScheduleConfig(applicationType, capabilities, &plan, config.OrgScan); err != nil {
+		resp.Diagnostics.AddError("Unsupported Application Scan Schedule Configuration", err.Error())
+		return
+	}
+
 	// Application creation registers the scan task service automatically, but asynchronously -
 	// retry, since a lookup immediately after creation (e.g. when this schedule is created in
 	// the same apply as its application) can transiently 404/error before it exists yet.
@@ -409,6 +419,16 @@ func (r *ApplicationScanScheduleResource) Update(ctx context.Context, req resour
 
 	applicationID := state.ApplicationID.ValueString()
 	taskID := state.TaskID.ValueString()
+
+	applicationType, capabilities, err := r.resolveApplicationScanScheduleCapabilities(applicationID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Application", err.Error())
+		return
+	}
+	if err := validateApplicationScanScheduleConfig(applicationType, capabilities, &plan, config.OrgScan); err != nil {
+		resp.Diagnostics.AddError("Unsupported Application Scan Schedule Configuration", err.Error())
+		return
+	}
 
 	taskServiceID, err := r.resolveTaskServiceID(applicationID)
 	if err != nil {
@@ -512,6 +532,69 @@ func (r *ApplicationScanScheduleResource) ImportState(ctx context.Context, req r
 }
 
 // Helper functions
+
+// applicationScanScheduleCapabilities describes whether org_scan and associations are
+// supported for a given application, derived from live catalog flags (see
+// applicationScanScheduleCapabilitiesFromFlags) rather than a static application_type table -
+// the backend enforces these rules itself, so this is used only to fail fast with a clear
+// error instead of surfacing whatever generic error the backend would otherwise return, and
+// to keep working automatically for application types added after this code is written.
+type applicationScanScheduleCapabilities struct {
+	OrgScan      bool
+	Associations bool
+}
+
+// applicationScanScheduleCapabilitiesFromFlags derives org_scan/associations support from an
+// application's catalog flags (GetApplication's response, under "catalogApplication" - see
+// britive.Properties), per this business rule:
+//
+//	supportsEnvironmentScanning=true,  requiresHierarchicalModel=false -> org_scan and associations both supported
+//	supportsEnvironmentScanning=false, requiresHierarchicalModel=false -> only associations supported
+//	supportsEnvironmentScanning=true,  requiresHierarchicalModel=true  -> neither supported
+//	supportsEnvironmentScanning=false, requiresHierarchicalModel=true  -> org_scan and associations both supported
+//
+// Equivalently: OrgScan is supportsEnvironmentScanning XOR requiresHierarchicalModel;
+// Associations is supported except when both flags are true.
+func applicationScanScheduleCapabilitiesFromFlags(supportsEnvironmentScanning, requiresHierarchicalModel bool) applicationScanScheduleCapabilities {
+	return applicationScanScheduleCapabilities{
+		OrgScan:      supportsEnvironmentScanning != requiresHierarchicalModel,
+		Associations: !(supportsEnvironmentScanning && requiresHierarchicalModel),
+	}
+}
+
+// resolveApplicationScanScheduleCapabilities resolves applicationID's application type (for
+// use in validateApplicationScanScheduleConfig's error messages) and its org_scan/associations
+// support via GetApplication's catalog flags. Re-resolved on every Create/Update rather than
+// cached, since these flags describe the application's catalog type, which callers may expect
+// to reflect the live backend rather than a value captured once at an earlier apply.
+func (r *ApplicationScanScheduleResource) resolveApplicationScanScheduleCapabilities(applicationID string) (applicationType string, capabilities applicationScanScheduleCapabilities, err error) {
+	application, err := r.client.GetApplication(applicationID)
+	if err != nil {
+		return "", applicationScanScheduleCapabilities{}, err
+	}
+	capabilities = applicationScanScheduleCapabilitiesFromFlags(application.Properties.SupportsEnvironmentScanning, application.Properties.RequiresHierarchicalModel)
+	return application.CatalogAppName, capabilities, nil
+}
+
+// validateApplicationScanScheduleConfig checks plan's associations usage, and configOrgScan's
+// org_scan usage, against capabilities, naming applicationType in the error so a practitioner
+// managing several application types doesn't have to guess which one tripped it. configOrgScan
+// is the raw config value, not plan.OrgScan: org_scan is Computed with a UseStateForUnknown
+// plan modifier, so once the server has ever echoed back a value for it, plan.OrgScan would
+// carry that forward on every later Update even when config never set it - checking config
+// here is what makes "never configured" actually mean "never sent", matching
+// buildTaskPayload's own reasoning for the same distinction. associations has no such concern:
+// it's a plain block with no Computed flag, so plan.Associations always reflects config
+// directly.
+func validateApplicationScanScheduleConfig(applicationType string, capabilities applicationScanScheduleCapabilities, plan *ApplicationScanScheduleResourceModel, configOrgScan types.Bool) error {
+	if !capabilities.Associations && len(plan.Associations) > 0 {
+		return fmt.Errorf("associations are not supported for application type %q - leave it unset", applicationType)
+	}
+	if !capabilities.OrgScan && !configOrgScan.IsNull() && !configOrgScan.IsUnknown() {
+		return fmt.Errorf("org_scan is not supported for application type %q - leave it unset", applicationType)
+	}
+	return nil
+}
 
 // applicationScanTaskServiceCreateRetries/applicationScanTaskServiceCreateRetryDelay govern
 // how many times, and how far apart, a Create path retries GetApplicationScanTaskService
