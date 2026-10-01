@@ -6,7 +6,10 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 func TestBritiveRotationTemplateLocal(t *testing.T) {
@@ -58,6 +61,94 @@ func TestBritiveRotationTemplateInlineFile(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestBritiveRotationTemplateForEachDynamicVariables is a regression test for a bug where
+// combining `for_each` on britive_resource_manager_resource_type_rotation_template with a
+// nested `dynamic "variables"` block whose own for_each is derived from each.value made
+// Terraform represent the whole variables block collection as unknown during validate/plan
+// (Terraform core can't statically resolve a dynamic block's repetition count in that
+// combination). The provider's variables model field used to be a plain
+// []RotationTemplateVariableModel, which can't hold an unknown value, and calling Config.Get
+// on it in ValidateConfig crashed with "Value Conversion Error ... Suggested Type:
+// basetypes.SetValue". Now fixed by modeling variables as types.Set instead.
+//
+// This actually applies the config (real Create against the live tenant), so it also proves
+// apply - not just plan - works. ConfigStateChecks reads the applied state directly (raw JSON
+// via wd.State), which is safe with for_each-keyed addresses - only the legacy Check (func(s
+// *terraform.State) error) API's state shim chokes on those.
+//
+// A second, empty-config step tears everything down via an ordinary apply before the test
+// ends, rather than relying on the test framework's own automatic post-test destroy: that
+// automatic teardown (terraform-plugin-testing v1.16.0, the latest available at time of
+// writing) unconditionally re-fetches state through the very same legacy shim to run
+// CheckDestroy, and errors with "for_each is not supported" the moment ANY resource in the
+// *final* state has a for_each (string/map) index - which would otherwise leave these
+// resources dangling in the tenant instead of cleanly destroyed.
+func TestBritiveRotationTemplateForEachDynamicVariables(t *testing.T) {
+	resourceTypeName := "AT-Britive_Rotation_Template_Tests_Resource_Type_ForEach"
+	resourceTypeDescription := "AT-Britive_Rotation_Template_Tests_Resource_Type_ForEach_Description"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveRotationTemplateForEachDynamicVariablesConfig(resourceTypeName, resourceTypeDescription),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("britive_resource_manager_resource_type.new_resource_type_rt_for_each", tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["a"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["a"]`, tfjsonpath.New("name"), knownvalue.StringExact("AT-for-each-rt-a")),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["b"]`, tfjsonpath.New("id"), knownvalue.NotNull()),
+					statecheck.ExpectKnownValue(`britive_resource_manager_resource_type_rotation_template.new_rotation_template_for_each["b"]`, tfjsonpath.New("name"), knownvalue.StringExact("AT-for-each-rt-b")),
+				},
+			},
+			{
+				// Empty config: destroys the resources created above via an ordinary apply,
+				// so state is already empty by the time the framework's own post-test
+				// teardown runs - see the doc comment above for why that matters.
+				Config: `# empty config - tears down the resources created by the previous step`,
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveRotationTemplateForEachDynamicVariablesConfig(resourceTypeName, resourceTypeDescription string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_type" "new_resource_type_rt_for_each" {
+		name        = "%s"
+		description = "%s"
+	}
+
+	locals {
+		rotation_templates_for_each = {
+			a = {
+				name     = "AT-for-each-rt-a"
+				var_name = "var_a"
+			}
+			b = {
+				name     = "AT-for-each-rt-b"
+				var_name = "var_b"
+			}
+		}
+	}
+
+	resource "britive_resource_manager_resource_type_rotation_template" "new_rotation_template_for_each" {
+		for_each         = local.rotation_templates_for_each
+		resource_type_id = britive_resource_manager_resource_type.new_resource_type_rt_for_each.id
+		name             = each.value.name
+		time_limit       = 5
+		template_type    = "Local"
+
+		dynamic "variables" {
+			for_each = [each.value]
+			content {
+				name         = variables.value.var_name
+				type         = "String"
+				multi_valued = false
+			}
+		}
+	}`, resourceTypeName, resourceTypeDescription)
 }
 
 func testAccCheckBritiveRotationTemplateLocalConfig(resourceTypeName, resourceTypeDescription, templateName, templateDescription string) string {
