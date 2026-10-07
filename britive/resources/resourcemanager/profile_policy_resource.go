@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
+	"github.com/britive/terraform-provider-britive/britive/validators"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -66,6 +68,9 @@ func (r *ProfilePolicyResource) Schema(_ context.Context, _ resource.SchemaReque
 			"policy_name": schema.StringAttribute{
 				Required:    true,
 				Description: "The policy associated with the profile",
+				Validators: []validator.String{
+					validators.AlphanumericWithSpaces(),
+				},
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
