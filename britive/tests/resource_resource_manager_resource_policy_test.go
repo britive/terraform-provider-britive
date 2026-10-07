@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
@@ -24,6 +25,9 @@ func TestBritiveResourceResourcePolicy(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveResourceResourcePolicyExists("britive_resource_manager_resource_label.resource_label_1"),
 					testAccCheckBritiveResourceManagerProfilePolicyExists("britive_resource_manager_resource_policy.resource_policy_1"),
+					// policy_name contains spaces - positive case for the
+					// AlphanumericWithSpaces validator, which must accept them.
+					resource.TestCheckResourceAttr("britive_resource_manager_resource_policy.resource_policy_1", "policy_name", "AT-Britive Resource Manager Test Resource Profile-Policy-1"),
 				),
 			},
 		},
@@ -48,7 +52,7 @@ func testAccCheckBritiveResourceResourcePolicyConfig(resourceLabelName1, resourc
 	}
 
 	resource "britive_resource_manager_resource_policy" "resource_policy_1" {
-		policy_name  = "AT-Britive_Resource_Manager_Test_Resource_Profile-Policy-1"
+		policy_name  = "AT-Britive Resource Manager Test Resource Profile-Policy-1"
 		description  = "AT-Britive_Resource_Manager_Test_Resource_Profile_Policy_Description-1"
 		members      = jsonencode(
 			{
@@ -129,4 +133,29 @@ func testAccCheckBritiveResourceResourcePolicyExists(n string) resource.TestChec
 
 		return nil
 	}
+}
+
+// TestBritiveResourceManagerResourcePolicyInvalidName is a negative test: policy_name
+// values with characters outside the allowed set (letters, numbers, spaces, hyphens,
+// underscores) must be rejected at plan time by the AlphanumericWithSpaces schema
+// validator, before any API call is made.
+func TestBritiveResourceManagerResourcePolicyInvalidName(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccCheckBritiveResourceManagerResourcePolicyInvalidNameConfig(),
+				ExpectError: regexp.MustCompile(`(?s).*Invalid Characters.*`),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveResourceManagerResourcePolicyInvalidNameConfig() string {
+	return `
+	resource "britive_resource_manager_resource_policy" "invalid_name" {
+		policy_name = "Sudo Session - Recorded (Directory)"
+	}
+	`
 }
