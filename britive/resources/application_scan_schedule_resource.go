@@ -12,6 +12,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/britive/terraform-provider-britive/britive/helpers/schedulescan"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -50,18 +51,27 @@ type ApplicationScanScheduleResource struct {
 // resources configure tasks on the same underlying scan task-service API; hour_interval has
 // no resource-manager equivalent, since Hourly is an application-only frequency_type.
 type ApplicationScanScheduleResourceModel struct {
-	ID            types.String                      `tfsdk:"id"`
-	ApplicationID types.String                      `tfsdk:"application_id"`
-	TaskID        types.String                      `tfsdk:"task_id"`
-	Name          types.String                      `tfsdk:"name"`
-	FrequencyType types.String                      `tfsdk:"frequency_type"`
-	DayOfWeek     types.String                      `tfsdk:"day_of_week"`
-	DayOfMonth    types.Int64                       `tfsdk:"day_of_month"`
-	HourInterval  types.Int64                       `tfsdk:"hour_interval"`
-	StartTime     types.String                      `tfsdk:"start_time"`
-	OrgScan       types.Bool                        `tfsdk:"org_scan"`
-	Associations  []ApplicationScanAssociationModel `tfsdk:"associations"`
-	NextRun       types.Int64                       `tfsdk:"next_run"`
+	ID            types.String `tfsdk:"id"`
+	ApplicationID types.String `tfsdk:"application_id"`
+	TaskID        types.String `tfsdk:"task_id"`
+	Name          types.String `tfsdk:"name"`
+	FrequencyType types.String `tfsdk:"frequency_type"`
+	DayOfWeek     types.String `tfsdk:"day_of_week"`
+	DayOfMonth    types.Int64  `tfsdk:"day_of_month"`
+	HourInterval  types.Int64  `tfsdk:"hour_interval"`
+	StartTime     types.String `tfsdk:"start_time"`
+	OrgScan       types.Bool   `tfsdk:"org_scan"`
+	// A types.Set, not a plain Go slice: associations is a block populated via a nested
+	// "dynamic" block whose for_each is itself derived from this resource's own for_each (e.g.
+	// each.value.associations). Terraform core can't statically resolve that repetition count
+	// during validate/plan, so it represents the whole block collection as unknown - a plain
+	// []ApplicationScanAssociationModel can't hold that ("Value Conversion Error ... Suggested
+	// Type: basetypes.SetValue"), so keep it as the framework's own attr.Value and convert
+	// to/from []ApplicationScanAssociationModel manually (see
+	// applicationScanAssociationsFromSet/applicationScanAssociationsToSet) wherever concrete
+	// elements are needed. Mirrors resourcemanager.ScheduleScanResourceModel.ResourceLabels.
+	Associations types.Set   `tfsdk:"associations"`
+	NextRun      types.Int64 `tfsdk:"next_run"`
 }
 
 // ApplicationScanAssociationModel is a single association entry restricting a scan to one
@@ -73,6 +83,35 @@ type ApplicationScanScheduleResourceModel struct {
 type ApplicationScanAssociationModel struct {
 	Type  types.String `tfsdk:"type"`
 	Value types.String `tfsdk:"value"`
+}
+
+// applicationScanAssociationObjectType is the tftypes shape of one associations block element,
+// mirroring ApplicationScanAssociationModel's tfsdk tags.
+var applicationScanAssociationObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"type":  types.StringType,
+		"value": types.StringType,
+	},
+}
+
+// applicationScanAssociationsFromSet decodes an associations set into concrete
+// []ApplicationScanAssociationModel. Returns nil without error for a null/unknown set (unknown
+// occurs at plan time - see Associations's doc comment - and is always fully resolved again by
+// apply time).
+func applicationScanAssociationsFromSet(ctx context.Context, set types.Set, diags *diag.Diagnostics) []ApplicationScanAssociationModel {
+	if set.IsNull() || set.IsUnknown() {
+		return nil
+	}
+	var associations []ApplicationScanAssociationModel
+	diags.Append(set.ElementsAs(ctx, &associations, false)...)
+	return associations
+}
+
+// applicationScanAssociationsToSet is applicationScanAssociationsFromSet's inverse.
+func applicationScanAssociationsToSet(ctx context.Context, associations []ApplicationScanAssociationModel, diags *diag.Diagnostics) types.Set {
+	set, d := types.SetValueFrom(ctx, applicationScanAssociationObjectType, associations)
+	diags.Append(d...)
+	return set
 }
 
 // NewApplicationScanScheduleResource is a helper function to simplify the provider implementation.
@@ -384,14 +423,17 @@ func (r *ApplicationScanScheduleResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	priorAssociations := state.Associations
+	priorAssociations := applicationScanAssociationsFromSet(ctx, state.Associations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	r.mapModelToResource(task, &state, false)
 	associations, err := r.refreshApplicationScanAssociations(applicationID, task.Properties.Scope, priorAssociations)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Resolving Application Scan Schedule Associations", err.Error())
 		return
 	}
-	state.Associations = associations
+	state.Associations = applicationScanAssociationsToSet(ctx, associations, &resp.Diagnostics)
 	state.StartTime = formatApplicationScanStartTime(task.StartTime, task.FrequencyType)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -523,7 +565,7 @@ func (r *ApplicationScanScheduleResource) ImportState(ctx context.Context, req r
 		resp.Diagnostics.AddError("Error Resolving Application Scan Schedule Associations", err.Error())
 		return
 	}
-	state.Associations = associations
+	state.Associations = applicationScanAssociationsToSet(ctx, associations, &resp.Diagnostics)
 	state.StartTime = formatApplicationScanStartTime(task.StartTime, task.FrequencyType)
 
 	log.Printf("[INFO] Imported application scan schedule task: %s", taskID)
@@ -587,7 +629,8 @@ func (r *ApplicationScanScheduleResource) resolveApplicationScanScheduleCapabili
 // it's a plain block with no Computed flag, so plan.Associations always reflects config
 // directly.
 func validateApplicationScanScheduleConfig(applicationType string, capabilities applicationScanScheduleCapabilities, plan *ApplicationScanScheduleResourceModel, configOrgScan types.Bool) error {
-	if !capabilities.Associations && len(plan.Associations) > 0 {
+	hasAssociations := !plan.Associations.IsNull() && !plan.Associations.IsUnknown() && len(plan.Associations.Elements()) > 0
+	if !capabilities.Associations && hasAssociations {
 		return fmt.Errorf("associations are not supported for application type %q - leave it unset", applicationType)
 	}
 	if !capabilities.OrgScan && !configOrgScan.IsNull() && !configOrgScan.IsUnknown() {
@@ -628,7 +671,12 @@ func (r *ApplicationScanScheduleResource) resolveTaskServiceID(applicationID str
 func (r *ApplicationScanScheduleResource) buildTaskPayload(ctx context.Context, plan *ApplicationScanScheduleResourceModel, configOrgScan types.Bool, diags *diag.Diagnostics) britive.ApplicationScheduleScanTask {
 	applicationID := plan.ApplicationID.ValueString()
 
-	resolvedAssociations, err := r.resolveApplicationScanAssociations(applicationID, plan.Associations)
+	associations := applicationScanAssociationsFromSet(ctx, plan.Associations, diags)
+	if diags.HasError() {
+		return britive.ApplicationScheduleScanTask{}
+	}
+
+	resolvedAssociations, err := r.resolveApplicationScanAssociations(applicationID, associations)
 	if err != nil {
 		diags.AddError("Error Resolving Application Scan Schedule Associations", err.Error())
 		return britive.ApplicationScheduleScanTask{}

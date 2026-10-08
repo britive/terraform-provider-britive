@@ -1,5 +1,9 @@
 ## 3.0.4
 
+ENHANCEMENTS:
+* **New Resource:** `britive_application_scan_schedule` : Create, update, and manage scheduled scans (`Hourly`/`Daily`/`Weekly`/`Monthly`) for an application, with optional environment/environment-group scoping via an `associations` block.
+* **Resource:** `britive_application` : Added a `scan_enabled` argument to enable or disable all scheduled scans for the application.
+
 BUG FIXES:
 * `britive_resource_manager_resource_type_schedule_scan`, `britive_resource_manager_resource_type_rotation_template`: Fixed a "Value Conversion Error" (`Received unknown value, however the target type cannot handle unknown values`) that could crash `terraform validate`/`terraform plan` when `resource_labels`/`variables` was driven by a `for_each`/`count` `dynamic` block referencing `each.value`/`count.index` on the resource itself - the same class of issue fixed for other resources in 3.0.1.
 * `britive_resource_manager_resource_type_permission`: Fixed a non-atomic `Create` that could leave an orphaned permission on the backend if a later step (file/code upload, finalizing update) failed after the permission was already created - requiring manual backend cleanup and blocking both re-apply (duplicate name) and the parent resource type's destroy. The permission's ID is now persisted to state immediately after creation, and error messages now include the resource's name/ID.
@@ -12,8 +16,6 @@ ENHANCEMENTS:
 * **New Resource:** `britive_resource_manager_resource_type_scan_settings` : Create, update, and manage a resource manager resource type's scan settings (singleton per resource type), with the same `Local`/`InlineFile`/`FilePath` script modes.
 * **New Resource:** `britive_resource_manager_resource_type_schedule_scan` : Create, update, and manage scheduled scans (`Daily`/`Weekly`/`Monthly`) for a resource manager resource type, with optional resource-label filtering.
 * **Resource:** `britive_resource_manager_resource_type` : Added `scan_enabled` and `rotation_enabled` arguments to enable or disable scheduled scanning and rotation for the resource type; added a `task_service_id` computed attribute used internally by `britive_resource_manager_resource_type_schedule_scan`. Both arguments are unmanaged when omitted from config, so upgrading does not affect existing resource types.
-* **New Resource:** `britive_application_scan_schedule` : Create, update, and manage scheduled scans (`Hourly`/`Daily`/`Weekly`/`Monthly`) for an application, with optional environment/environment-group scoping via an `associations` block.
-* **Resource:** `britive_application` : Added a `scan_enabled` argument to enable or disable all scheduled scans for the application.
 
 BUG FIXES:
 * `britive_resource_manager_resource_label`: Fixed a "Provider produced invalid plan" error on `values[].description` for labels migrated from v2.x state, where a value's description could refresh as empty/null even though config had always specified one.
