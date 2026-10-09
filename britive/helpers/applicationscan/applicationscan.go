@@ -5,6 +5,7 @@
 package applicationscan
 
 import (
+	"log"
 	"time"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -14,7 +15,7 @@ import (
 // total attempts (the initial try plus 3 retries), with an exponentially doubling delay before
 // each retry starting at retryBaseDelay - i.e. 1s, 2s, 4s between attempts.
 const (
-	retryAttempts  = 3
+	retryAttempts  = 10
 	retryBaseDelay = 1 * time.Second
 )
 
@@ -46,6 +47,7 @@ func GetTaskServiceWithRetry(client *britive.Client, applicationID string) (*bri
 			return taskService, nil
 		}
 		lastErr = err
+		log.Printf("[DEBUG] applicationscan: attempt %d/%d to get scan task service for application %s failed: %s", attempt, retryAttempts, applicationID, err)
 		if attempt < retryAttempts {
 			time.Sleep(delay)
 			delay *= 2
