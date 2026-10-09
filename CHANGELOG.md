@@ -1,3 +1,14 @@
+## 3.0.4
+
+ENHANCEMENTS:
+* **New Resource:** `britive_application_scan_schedule` : Create, update, and manage scheduled scans (`Hourly`/`Daily`/`Weekly`/`Monthly`) for an application, with optional environment/environment-group scoping via an `associations` block.
+* **Resource:** `britive_application` : Added a `scan_enabled` argument to enable or disable all scheduled scans for the application.
+
+BUG FIXES:
+* `britive_resource_manager_resource_type_schedule_scan`, `britive_resource_manager_resource_type_rotation_template`: Fixed a "Value Conversion Error" (`Received unknown value, however the target type cannot handle unknown values`) that could crash `terraform validate`/`terraform plan` when `resource_labels`/`variables` was driven by a `for_each`/`count` `dynamic` block referencing `each.value`/`count.index` on the resource itself - the same class of issue fixed for other resources in 3.0.1.
+* `britive_resource_manager_resource_type_permission`: Fixed a non-atomic `Create` that could leave an orphaned permission on the backend if a later step (file/code upload, finalizing update) failed after the permission was already created - requiring manual backend cleanup and blocking both re-apply (duplicate name) and the parent resource type's destroy. The permission's ID is now persisted to state immediately after creation, and error messages now include the resource's name/ID.
+* `britive_resource_manager_resource_type_permission`: Fixed the `checkin_time_limit`/`checkout_time_limit` descriptions, which documented the unit as minutes when the API has always used seconds; no value conversion was happening, so existing configs are unaffected - only the documented unit was wrong.
+
 ## 3.0.3
 
 ENHANCEMENTS:

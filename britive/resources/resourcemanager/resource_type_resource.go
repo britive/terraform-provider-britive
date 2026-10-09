@@ -456,7 +456,10 @@ func (r *ResourceTypeResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	err = r.client.DeleteResourceType(resourceTypeID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Deleting Resource Type", err.Error())
+		resp.Diagnostics.AddError(
+			"Error Deleting Resource Type",
+			fmt.Sprintf("resource type %q (id: %s): %s", state.Name.ValueString(), resourceTypeID, err.Error()),
+		)
 		return
 	}
 

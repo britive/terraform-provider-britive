@@ -87,7 +87,7 @@ resource "britive_resource_manager_resource_policy" "example" {
 
 The following arguments are supported:
 
-* `policy_name` - (Required) The name of the profile policy.
+* `policy_name` - (Required) The name of the profile policy. Only letters, numbers, spaces, hyphens (`-`), and underscores (`_`) are allowed, no other special characters.
 * `description` - (Optional) A description of the profile policy.
 * `members` - (Optional) Set of members under this policy. This is a JSON formatted string. Includes the usernames of `serviceIdentities`, `tags`, and `users`.
 * `condition` - (Optional) Set of conditions applied to this policy. This is a JSON formatted string.  

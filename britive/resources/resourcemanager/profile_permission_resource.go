@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -571,33 +572,43 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 	permission.ResourceTypeName = resourceTypePermission.ResourceTypeName
 
 	// Validate variables (use slice directly, no ElementsAs needed)
-	if len(plan.Variables) > 0 {
-		userVariables := plan.Variables
+	userVariables := plan.Variables
 
-		// Build map of valid permission variables. Variable names defined on the
-		// resource type permission may carry a "<name>:<type>" suffix (e.g. "test3:password")
-		// to declare the variable's type, so match on the base name only.
-		permissionVariableMap := make(map[string]bool)
-		for _, v := range resourceTypePermission.Variables {
-			if varName, ok := v.(string); ok {
-				baseName, _, _ := strings.Cut(varName, ":")
-				permissionVariableMap[baseName] = true
-			}
+	// Build set of valid permission variable names. Variable names defined on the
+	// resource type permission may carry a "<name>:<type>" suffix (e.g. "test3:password")
+	// to declare the variable's type, so match on the base name only.
+	permissionVariableMap := make(map[string]bool)
+	for _, v := range resourceTypePermission.Variables {
+		if varName, ok := v.(string); ok {
+			baseName, _, _ := strings.Cut(varName, ":")
+			permissionVariableMap[baseName] = true
 		}
+	}
 
-		// Validate user variables
-		for _, v := range userVariables {
-			varName := v.Name.ValueString()
-			if !permissionVariableMap[varName] {
-				return permission, fmt.Errorf("the variable '%s' is not valid for the '%s' permission", varName, permissionName)
-			}
+	// Validate user variables and track which declared variables were provided.
+	// Using a set (rather than comparing counts) also means a duplicate variable
+	// name can no longer mask a genuinely missing one.
+	providedVariableMap := make(map[string]bool, len(userVariables))
+	for _, v := range userVariables {
+		varName := v.Name.ValueString()
+		if !permissionVariableMap[varName] {
+			return permission, fmt.Errorf("the variable '%s' is not valid for the '%s' permission", varName, permissionName)
 		}
+		providedVariableMap[varName] = true
+	}
 
-		// Check if all required variables are provided
-		if len(userVariables) < len(resourceTypePermission.Variables) {
-			return permission, fmt.Errorf("missing required variables: all variables defined in the '%s' permission are mandatory and must be provided", permissionName)
+	var missingVariables []string
+	for varName := range permissionVariableMap {
+		if !providedVariableMap[varName] {
+			missingVariables = append(missingVariables, varName)
 		}
+	}
+	if len(missingVariables) > 0 {
+		sort.Strings(missingVariables)
+		return permission, fmt.Errorf("missing required variables for permission '%s': %s", permissionName, strings.Join(missingVariables, ", "))
+	}
 
+	if len(userVariables) > 0 {
 		// Convert variables to map format for API
 		for _, v := range userVariables {
 			varMap := map[string]interface{}{
@@ -630,8 +641,6 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 			}
 			permission.Variables = append(permission.Variables, varMap)
 		}
-	} else if len(resourceTypePermission.Variables) > 0 {
-		return permission, fmt.Errorf("missing required variables: all variables defined in the '%s' permission are mandatory and must be provided", permissionName)
 	}
 
 	return permission, nil

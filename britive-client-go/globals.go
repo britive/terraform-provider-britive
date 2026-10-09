@@ -25,6 +25,7 @@ const (
 	rotationTemplateLockName         = "rotationTemplate"
 	scanSettingsLockName             = "scanSettings"
 	scheduleScanLockName             = "scheduleScan"
+	applicationScanScheduleLockName  = "applicationScanSchedule"
 	resourceLabelLockName            = "resourceLabel"
 	resourceManagerProfileLock       = "resourceManagerProfile"
 	resourceManagerProfilePolicyLock = "resourceManagerProfilePolicy"
