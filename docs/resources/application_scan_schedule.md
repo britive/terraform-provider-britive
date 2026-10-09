@@ -22,12 +22,13 @@ Exactly one of `hour_interval`, `day_of_week`, or `day_of_month` applies, depend
 `frequency_type` (`Hourly`, `Weekly`, or `Monthly` respectively) - the others must be left
 unset. See the Argument Reference below for details.
 
--> Not every application supports `associations`/`org_scan` to the same extent. Support is
-derived per-application from two live catalog flags (`supportsEnvironmentScanning` and
-`requiresHierarchicalModel`), not from `application_type` - so this stays accurate for
-application types added after this provider version. The provider validates this on
-`terraform apply` and fails fast with a clear error before it would otherwise hit a less
-specific error from the backend.
+-> Not every application supports `associations`/`org_scan` to the same extent. The provider
+checks this automatically against the application's actual capabilities on `terraform apply`,
+so support stays accurate even for application types added after this provider version - there
+is no fixed list to consult. Using `associations` or `org_scan` against an application that
+doesn't support it fails the apply with an error such as `org_scan is not supported for
+application type "Azure" - leave it unset` (or the equivalent for `associations`), before any
+API call that would otherwise fail with a less specific error.
 
 ## Example Usage
 

@@ -1176,15 +1176,11 @@ depends on whether this resource has ever managed it before:
   omitting the argument does produce a diff.
 
 
-The backend registers an application's scan task service asynchronously after the
-application itself is created, so on rare occasions `terraform apply` can fail on a brand
-new application with an "Error Reading Application Scan Task Service" error if the lookup
-runs before the task service exists yet. When that happens, the application itself is not
-rolled back or deleted - it and everything else configured in that same apply (properties,
-user account mappings, etc.) are still saved to state, with `task_service_id` and
-`scan_enabled` left at their not-yet-resolved defaults (empty and `false`). Simply running
-`terraform apply` again once the backend has caught up resolves both automatically via this
-resource's normal refresh - there's no need to `terraform destroy`/recreate the application.
+On rare occasions, creating a brand new application can fail with an error such as "Error
+Reading Application Scan Task Service". Terraform marks the application tainted when this
+happens, so running `terraform apply` again destroys and recreates it - the recreated
+application then comes up fully configured, `task_service_id`/`scan_enabled` included. No
+manual cleanup is needed; a second apply resolves it by recreating the application.
 
 The application's scan task service (what `scan_enabled` actually toggles) is registered
 automatically as part of application creation, so `scan_enabled = true` can be set in the
