@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
@@ -30,6 +31,9 @@ func TestBritiveResourceManagerProfilePolicy(t *testing.T) {
 					testAccCheckBritiveResourceManagerProfilePolicyExists("britive_resource_manager_resource_label.resource_label_2"),
 					testAccCheckBritiveResourceManagerProfilePolicyExists("britive_resource_manager_profile.resource_profile_1"),
 					testAccCheckBritiveResourceManagerProfilePolicyExists("britive_resource_manager_profile_policy.resource_profile_policy_1"),
+					// policy_name contains spaces - positive case for the
+					// AlphanumericWithSpaces validator, which must accept them.
+					resource.TestCheckResourceAttr("britive_resource_manager_profile_policy.resource_profile_policy_1", "policy_name", "AT-Britive Resource Manager Test Resource Profile-Policy-1"),
 				),
 			},
 		},
@@ -90,7 +94,7 @@ func testAccCheckBritiveResourceManagerProfilePolicyConfig(resourceLabelName1, r
 
 	resource "britive_resource_manager_profile_policy" "resource_profile_policy_1" {
 		profile_id   = britive_resource_manager_profile.resource_profile_1.id
-		policy_name  = "AT-Britive_Resource_Manager_Test_Resource_Profile-Policy-1"
+		policy_name  = "AT-Britive Resource Manager Test Resource Profile-Policy-1"
 		description  = "AT-Britive_Resource_Manager_Test_Resource_Profile_Policy_Description-1"
 		members      = jsonencode(
 			{
@@ -195,4 +199,31 @@ func testAccCheckBritiveResourceManagerProfilePolicyExists(n string) resource.Te
 
 		return nil
 	}
+}
+
+// TestBritiveResourceManagerProfilePolicyInvalidName is a negative test: policy_name
+// values with characters outside the allowed set (letters, numbers, spaces, hyphens,
+// underscores) must be rejected at plan time by the AlphanumericWithSpaces schema
+// validator, before any API call is made. profile_id is a placeholder since the
+// plan never reaches apply.
+func TestBritiveResourceManagerProfilePolicyInvalidName(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccCheckBritiveResourceManagerProfilePolicyInvalidNameConfig(),
+				ExpectError: regexp.MustCompile(`(?s).*Invalid Characters.*`),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveResourceManagerProfilePolicyInvalidNameConfig() string {
+	return `
+	resource "britive_resource_manager_profile_policy" "invalid_name" {
+		profile_id  = "placeholder-profile-id"
+		policy_name = "Sudo Session - Recorded (Directory)"
+	}
+	`
 }

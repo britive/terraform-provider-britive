@@ -61,3 +61,57 @@ func (v alphanumericValidator) ValidateString(ctx context.Context, req validator
 func Alphanumeric() validator.String {
 	return alphanumericValidator{}
 }
+
+// alphanumericWithSpacesValidator validates that a string value contains only
+// alphanumeric characters, underscores, dashes, and spaces.
+type alphanumericWithSpacesValidator struct{}
+
+// Description returns a plain text description of the validator's behavior.
+func (v alphanumericWithSpacesValidator) Description(_ context.Context) string {
+	return "value must contain only alphanumeric characters, underscores, dashes, and spaces"
+}
+
+// MarkdownDescription returns a markdown formatted description of the validator's behavior.
+func (v alphanumericWithSpacesValidator) MarkdownDescription(_ context.Context) string {
+	return "value must contain only alphanumeric characters, underscores (`_`), dashes (`-`), and spaces"
+}
+
+// ValidateString performs the validation.
+func (v alphanumericWithSpacesValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	value := req.ConfigValue.ValueString()
+
+	// Check if string is empty or only whitespace
+	if strings.TrimSpace(value) == "" {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid Value",
+			"value must not be empty or whitespace",
+		)
+		return
+	}
+
+	// Check if string contains only allowed characters
+	for _, char := range value {
+		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '_' && char != '-' && char != ' ' {
+			resp.Diagnostics.AddAttributeError(
+				req.Path,
+				"Invalid Characters",
+				fmt.Sprintf("'%s' contains invalid characters. Allowed characters are: alphanumeric, spaces, and special characters: ['_', '-']", value),
+			)
+			return
+		}
+	}
+}
+
+// AlphanumericWithSpaces returns a validator which ensures that any configured
+// string value contains only alphanumeric characters, underscores, dashes, and
+// spaces.
+//
+// Null (unconfigured) and unknown (known after apply) values are skipped.
+func AlphanumericWithSpaces() validator.String {
+	return alphanumericWithSpacesValidator{}
+}

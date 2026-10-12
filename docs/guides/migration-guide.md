@@ -1,5 +1,5 @@
 ---
-page_title: "Migrating to the Terraform Plugin Framework (v3.0.3)"
+page_title: "Migrating to the Terraform Plugin Framework (v3.0.4)"
 subcategory: ""
 description: |-
   What changed in the Britive provider v3.x rewrite, which v3 release to upgrade to, what is new, the risks involved, how to back up your state before upgrading, what to expect on your first plan after upgrading, and how to roll back to the legacy SDK-based provider if you hit an issue.
@@ -7,7 +7,7 @@ description: |-
 
 
 
-# Migrating to the Terraform Plugin Framework (v3.0.3)
+# Migrating to the Terraform Plugin Framework (v3.0.4)
 
 
 
@@ -18,8 +18,9 @@ implementation used in v2.x releases (up to and including **v2.3.6**).
 
 
 
-**v3.0.3** is the current release and the recommended upgrade target — it is the same rewrite plus fixes
-accumulated across v3.0.1, v3.0.2, and v3.0.3 for issues found during early v3.x upgrades. See
+**v3.0.4** is the current release and the recommended upgrade target — it is the same rewrite plus fixes
+accumulated across v3.0.1, v3.0.2, v3.0.3, and v3.0.4 for issues found during early v3.x upgrades, plus the new
+functionality described in [What is new in v3.x](#what-is-new-in-v3x). See
 [Which v3 release to upgrade to](#which-v3-release-to-upgrade-to). Everything else in this guide applies to
 the whole v3.x series.
 
@@ -30,7 +31,7 @@ This guide explains:
 
 
 - Why this migration happened and what it means for you.
-- Which v3 release to upgrade to, and what v3.0.1, v3.0.2, and v3.0.3 fix.
+- Which v3 release to upgrade to, and what v3.0.1, v3.0.2, v3.0.3, and v3.0.4 fix.
 - What is unchanged, and what new functionality v3.x adds.
 - The risks involved, since this is a **full internal rewrite**, not an incremental change.
 - How to **back up your Terraform state** before upgrading.
@@ -67,8 +68,10 @@ Your existing configuration should not need any edits to work with v3.x.
 
 - **Existing schemas are unchanged.** Every resource and data source argument, attribute name, and nested
   block keeps the same name, type, and nesting as in v2.3.x. Nothing was renamed, retyped, or removed.
-- **The provider surface is unchanged.** v3.x registers the same **28 resources and 10 data sources** as
-  v2.3.x — none added, none removed.
+- **The provider surface matched v2.3.x through v3.0.2.** v3.0.0 through v3.0.2 registered the same
+  **28 resources and 10 data sources** as v2.3.x — none added, none removed. Starting with **v3.0.3**, new
+  optional resources have been added on top of that baseline (see
+  [What is new in v3.x](#what-is-new-in-v3x)) — purely additive, nothing existing was renamed or removed.
 - **Terraform state format is compatible.** You should not need to run `terraform state mv`, re-import
   resources, or otherwise manually migrate state.
 - **Provider configuration** (`tenant`, `token`, environment variables, etc.) is unchanged.
@@ -79,9 +82,9 @@ Your existing configuration should not need any edits to work with v3.x.
 
 
 
-The Plugin Framework rewrite first shipped in **v3.0.0**. **v3.0.3** is the current release and the
-recommended target — the same rewrite, plus the fixes below accumulated across v3.0.1, v3.0.2, and v3.0.3 for
-issues found during early v3.0.0 upgrades.
+The Plugin Framework rewrite first shipped in **v3.0.0**. **v3.0.4** is the current release and the
+recommended target — the same rewrite, plus the fixes below accumulated across v3.0.1, v3.0.2, v3.0.3, and
+v3.0.4 for issues found during early v3.0.0 upgrades.
 
 
 
@@ -137,6 +140,37 @@ apply.
 
 
 
+**v3.0.4** additionally fixed:
+
+
+
+- `britive_resource_manager_resource_type_schedule_scan`, `britive_resource_manager_resource_type_rotation_template`:
+  A `Value Conversion Error` (`Received unknown value, however the target type cannot handle unknown values`)
+  that could crash `terraform validate`/`terraform plan` when `resource_labels`/`variables` was driven by a
+  `for_each`/`count` `dynamic` block referencing `each.value`/`count.index` on the resource itself — the same
+  class of issue fixed for other resources in v3.0.1.
+- `britive_resource_manager_resource_type_permission`: A non-atomic `Create` that could leave an **orphaned
+  permission on the backend** if a later step (file/code upload, finalizing update) failed after the
+  permission itself had already been created — blocking both a re-apply (duplicate name) and the parent
+  resource type's `destroy` until the orphan was removed manually. The permission's ID is now persisted to
+  state immediately after creation, and error messages now include the resource's name/ID to make this easier
+  to diagnose if it recurs.
+- `britive_resource_manager_resource_type_permission`: The `checkin_time_limit`/`checkout_time_limit` argument
+  descriptions incorrectly documented the unit as minutes — the API has always used seconds, and no value
+  conversion was happening in the provider, so existing configurations are unaffected. Only the documented
+  unit was wrong; no action is needed on your part.
+
+
+
+Unlike the v3.0.2/v3.0.3 fixes above (which were purely local consistency-check issues with no real backend
+impact), the second v3.0.4 item is a genuine backend-state issue if you hit it on v3.0.3: the orphaned
+permission really exists on your tenant. **If a `britive_resource_manager_resource_type_permission` apply
+failed for you under v3.0.3,** check the Britive console/API for a permission matching the name in your
+configuration before upgrading and retrying, and delete it manually if it exists. The other two v3.0.4 fixes
+did not indicate any problem with your tenant.
+
+
+
 Pin it explicitly so `terraform init -upgrade` does not leave you on an older v3.x release:
 
 
@@ -146,7 +180,7 @@ terraform {
   required_providers {
     britive = {
       source  = "britive/britive"
-      version = "3.0.3"
+      version = "3.0.4"
     }
   }
 }
@@ -154,9 +188,11 @@ terraform {
 
 
 
-If you have already upgraded to v3.0.0, v3.0.1, or v3.0.2, move to v3.0.3: it is a bug-fix release on the same
-schemas and state format, so there is no additional migration work — change the version constraint and run
-`terraform init -upgrade`.
+If you have already upgraded to v3.0.0, v3.0.1, v3.0.2, or v3.0.3, move to v3.0.4: existing schemas and state
+format are unchanged, so there is no required migration work — change the version constraint and run
+`terraform init -upgrade`. v3.0.4 also adds new, optional functionality (see
+[What is new in v3.x](#what-is-new-in-v3x)); adopting it is a separate decision you can make later, not
+something this upgrade requires.
 
 
 
@@ -180,13 +216,25 @@ configurations continue to work untouched, and you do not need to adopt any of i
 - **Kubernetes applications (v3.0.2).** `britive_application` gains `Kubernetes` as a new `application_type`,
   including `entity_root_environment_group_id` support so `britive_entity_group` and
   `britive_entity_environment` can be used to manage Kubernetes environment groups and environments.
+- **Resource manager rotation templates, scan settings, and scheduled scans (v3.0.3).** Three new resources —
+  `britive_resource_manager_resource_type_rotation_template`, `britive_resource_manager_resource_type_scan_settings`,
+  and `britive_resource_manager_resource_type_schedule_scan` — manage rotation templates, scan settings, and
+  scheduled scans for a resource manager resource type. `britive_resource_manager_resource_type` also gains
+  optional `scan_enabled`/`rotation_enabled` arguments and a `task_service_id` computed attribute used
+  internally by the new schedule-scan resource; both arguments are unmanaged when omitted from config, so
+  upgrading does not affect existing resource types.
+- **Application scan scheduling (v3.0.4).** The new `britive_application_scan_schedule` resource manages
+  scheduled scans (`Hourly`/`Daily`/`Weekly`/`Monthly`) for an application, optionally restricted to specific
+  environments/environment groups via an `associations` block. `britive_application` gains a companion
+  optional `scan_enabled` argument to enable or disable all scheduled scans for the application as a whole,
+  unmanaged when omitted from config in the same way.
 
 
 
-**Adopting new functionality closes the rollback path.** These attributes do not exist in v2.3.x, so a
-configuration that uses them will fail validation if you pin the provider back down. If you want to keep
-rollback available during your upgrade window, upgrade first and confirm everything is stable, then adopt
-new functionality later as a separate change.
+**Adopting new functionality closes the rollback path.** These resources and attributes do not exist in
+v2.3.x, so a configuration that uses them will fail validation if you pin the provider back down. If you want
+to keep rollback available during your upgrade window, upgrade first and confirm everything is stable, then
+adopt new functionality later as a separate change.
 
 
 
@@ -221,7 +269,7 @@ This is materially different from a typical point release, and it carries more r
    This step is load-bearing, not precautionary: once v3.x has written state — even via a refresh with zero
    infrastructure changes — that state can no longer be read by v2.3.x, and the backup is the only rollback
    path.
-2. Upgrade a **non-production** workspace/environment first, pinning v3.0.3 (see
+2. Upgrade a **non-production** workspace/environment first, pinning v3.0.4 (see
    [Which v3 release to upgrade to](#which-v3-release-to-upgrade-to)).
 3. Run `terraform plan` and carefully review the output:
    - ✅ Expected: **no changes** (`No changes. Your infrastructure matches the configuration.`).

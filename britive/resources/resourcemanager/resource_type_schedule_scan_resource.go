@@ -9,7 +9,9 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
+	"github.com/britive/terraform-provider-britive/britive/helpers/schedulescan"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -36,39 +38,53 @@ type ScheduleScanResource struct {
 
 // ScheduleScanResourceModel describes the resource data model.
 type ScheduleScanResourceModel struct {
-	ID             types.String         `tfsdk:"id"`
-	ResourceTypeID types.String         `tfsdk:"resource_type_id"`
-	TaskID         types.String         `tfsdk:"task_id"`
-	Name           types.String         `tfsdk:"name"`
-	Description    types.String         `tfsdk:"description"`
-	FrequencyType  types.String         `tfsdk:"frequency_type"`
-	DayOfWeek      types.String         `tfsdk:"day_of_week"`
-	DayOfMonth     types.Int64          `tfsdk:"day_of_month"`
-	StartTime      types.String         `tfsdk:"start_time"`
-	ResourceLabels []ResourceLabelModel `tfsdk:"resource_labels"`
-	NextRun        types.Int64          `tfsdk:"next_run"`
+	ID             types.String `tfsdk:"id"`
+	ResourceTypeID types.String `tfsdk:"resource_type_id"`
+	TaskID         types.String `tfsdk:"task_id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	FrequencyType  types.String `tfsdk:"frequency_type"`
+	DayOfWeek      types.String `tfsdk:"day_of_week"`
+	DayOfMonth     types.Int64  `tfsdk:"day_of_month"`
+	StartTime      types.String `tfsdk:"start_time"`
+	// A types.Set, not a plain Go slice: resource_labels is a block populated via a nested
+	// "dynamic" block whose for_each is itself derived from this resource's own for_each
+	// (e.g. each.value.labels). Terraform core can't statically resolve that repetition count
+	// during validate/plan, so it represents the whole block collection as unknown - a plain
+	// []ResourceLabelModel can't hold that ("Value Conversion Error ... Suggested Type:
+	// basetypes.SetValue"), so keep it as the framework's own attr.Value and convert to/from
+	// []ResourceLabelModel manually (see resourceLabelsFromSet/resourceLabelsToSet) wherever
+	// concrete elements are needed.
+	ResourceLabels types.Set   `tfsdk:"resource_labels"`
+	NextRun        types.Int64 `tfsdk:"next_run"`
 }
 
-// weekdayToInterval maps a day_of_week value (case-insensitive, full name or abbreviation)
-// to the wire's frequencyInterval for Weekly schedules: Monday=1 ... Sunday=7 (ISO 8601
-// weekday numbering). Not evidenced by any capture (the captured UI flow only ever
-// exercised Weekly with an already-fixed interval of 1) - this mapping is taken from the
-// business rule as specified, and should be smoke-tested against the live API before
-// relying on it.
-var weekdayToInterval = map[string]int{
-	"monday": 1, "mon": 1,
-	"tuesday": 2, "tue": 2,
-	"wednesday": 3, "wed": 3,
-	"thursday": 4, "thu": 4,
-	"friday": 5, "fri": 5,
-	"saturday": 6, "sat": 6,
-	"sunday": 7, "sun": 7,
+// resourceLabelObjectType is the tftypes shape of one resource_labels block element, mirroring
+// ResourceLabelModel's tfsdk tags.
+var resourceLabelObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"label_key": types.StringType,
+		"values":    types.SetType{ElemType: types.StringType},
+	},
 }
 
-// intervalToWeekday is weekdayToInterval's inverse, used to render the wire's
-// frequencyInterval back into a canonical day name on Read/Import.
-var intervalToWeekday = map[int]string{
-	1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday",
+// resourceLabelsFromSet decodes a resource_labels set into concrete []ResourceLabelModel.
+// Returns nil without error for a null/unknown set (unknown occurs at plan time - see
+// ResourceLabels's doc comment - and is always fully resolved again by apply time).
+func resourceLabelsFromSet(ctx context.Context, set types.Set, diags *diag.Diagnostics) []ResourceLabelModel {
+	if set.IsNull() || set.IsUnknown() {
+		return nil
+	}
+	var labels []ResourceLabelModel
+	diags.Append(set.ElementsAs(ctx, &labels, false)...)
+	return labels
+}
+
+// resourceLabelsToSet is resourceLabelsFromSet's inverse.
+func resourceLabelsToSet(ctx context.Context, labels []ResourceLabelModel, diags *diag.Diagnostics) types.Set {
+	set, d := types.SetValueFrom(ctx, resourceLabelObjectType, labels)
+	diags.Append(d...)
+	return set
 }
 
 // NewScheduleScanResource is a helper function to simplify the provider implementation.
@@ -334,7 +350,7 @@ func (r *ScheduleScanResource) Read(ctx context.Context, req resource.ReadReques
 
 	r.mapModelToResource(ctx, task, &state, false, &resp.Diagnostics)
 	state.ResourceLabels = r.refreshResourceLabels(ctx, task.Properties, &resp.Diagnostics)
-	state.StartTime = formatStartTime(task.StartTime)
+	state.StartTime = schedulescan.FormatStartTime(task.StartTime)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -442,7 +458,7 @@ func (r *ScheduleScanResource) ImportState(ctx context.Context, req resource.Imp
 
 	r.mapModelToResource(ctx, task, &state, true, &resp.Diagnostics)
 	state.ResourceLabels = r.refreshResourceLabels(ctx, task.Properties, &resp.Diagnostics)
-	state.StartTime = formatStartTime(task.StartTime)
+	state.StartTime = schedulescan.FormatStartTime(task.StartTime)
 
 	log.Printf("[INFO] Imported schedule scan task: %s", taskID)
 
@@ -469,7 +485,7 @@ func (r *ScheduleScanResource) buildTaskPayload(ctx context.Context, plan *Sched
 	task := britive.ScheduleScanTask{
 		Name:          plan.Name.ValueString(),
 		Description:   plan.Description.ValueString(),
-		FrequencyType: canonicalFrequencyType(plan.FrequencyType.ValueString()),
+		FrequencyType: schedulescan.CanonicalCasing(plan.FrequencyType.ValueString(), "Daily", "Weekly", "Monthly"),
 		StartTime:     plan.StartTime.ValueString(),
 		// Always initialize the map so that removing all labels sends {} (not null) to the
 		// API - a nil map marshals as JSON null, which the API treats as "no change" rather
@@ -477,8 +493,9 @@ func (r *ScheduleScanResource) buildTaskPayload(ctx context.Context, plan *Sched
 		Properties: make(map[string][]string),
 	}
 
-	seen := make(map[string]bool, len(plan.ResourceLabels))
-	for _, label := range plan.ResourceLabels {
+	resourceLabels := resourceLabelsFromSet(ctx, plan.ResourceLabels, diags)
+	seen := make(map[string]bool, len(resourceLabels))
+	for _, label := range resourceLabels {
 		var values []string
 		diags.Append(label.Values.ElementsAs(ctx, &values, false)...)
 		labelKey := label.LabelKey.ValueString()
@@ -498,7 +515,7 @@ func (r *ScheduleScanResource) buildTaskPayload(ctx context.Context, plan *Sched
 
 	switch strings.ToLower(plan.FrequencyType.ValueString()) {
 	case "weekly":
-		interval := weekdayToInterval[strings.ToLower(plan.DayOfWeek.ValueString())]
+		interval := schedulescan.WeekdayToInterval[strings.ToLower(plan.DayOfWeek.ValueString())]
 		task.FrequencyInterval = &interval
 	case "monthly":
 		interval := int(plan.DayOfMonth.ValueInt64())
@@ -508,22 +525,6 @@ func (r *ScheduleScanResource) buildTaskPayload(ctx context.Context, plan *Sched
 	}
 
 	return task
-}
-
-// canonicalFrequencyType normalizes a case-insensitive frequency_type input to the exact
-// casing confirmed by capture ("Daily"/"Weekly"/"Monthly"), mirroring
-// RotationTemplateResource's canonicalVariableType.
-func canonicalFrequencyType(t string) string {
-	switch strings.ToLower(t) {
-	case "daily":
-		return "Daily"
-	case "weekly":
-		return "Weekly"
-	case "monthly":
-		return "Monthly"
-	default:
-		return t
-	}
 }
 
 // mapModelToResource maps the API's schedule scan task detail onto Terraform state, except
@@ -550,9 +551,9 @@ func (r *ScheduleScanResource) mapModelToResource(ctx context.Context, task *bri
 			state.DayOfWeek = types.StringNull()
 			break
 		}
-		canonical := intervalToWeekday[*task.FrequencyInterval]
+		canonical := schedulescan.IntervalToWeekday[*task.FrequencyInterval]
 		if !imported && !state.DayOfWeek.IsNull() &&
-			weekdayToInterval[strings.ToLower(state.DayOfWeek.ValueString())] == *task.FrequencyInterval {
+			schedulescan.WeekdayToInterval[strings.ToLower(state.DayOfWeek.ValueString())] == *task.FrequencyInterval {
 			// Prior state already resolves to the same day - keep the user's original
 			// casing/abbreviation (e.g. "Mon" vs "Monday").
 		} else {
@@ -582,7 +583,7 @@ func (r *ScheduleScanResource) mapModelToResource(ctx context.Context, task *bri
 // unrecognized label_key silently dropped) - Read/Import don't have that constraint, since
 // refreshing state to match live truth (and letting any difference show up as an ordinary
 // plan diff) is exactly their job.
-func (r *ScheduleScanResource) refreshResourceLabels(ctx context.Context, properties map[string][]string, diags *diag.Diagnostics) []ResourceLabelModel {
+func (r *ScheduleScanResource) refreshResourceLabels(ctx context.Context, properties map[string][]string, diags *diag.Diagnostics) types.Set {
 	resourceLabelsList := make([]ResourceLabelModel, 0, len(properties))
 	for labelKey, values := range properties {
 		valuesSet, diagsSet := types.SetValueFrom(ctx, types.StringType, values)
@@ -595,19 +596,7 @@ func (r *ScheduleScanResource) refreshResourceLabels(ctx context.Context, proper
 			Values:   valuesSet,
 		})
 	}
-	return resourceLabelsList
-}
-
-// formatStartTime renders the API's [hour, minute] pair as a "HH:MM" string. Used only by
-// Read/ImportState, for the same reason as refreshResourceLabels: start_time has no Computed
-// flag, so Create/Update must return exactly what was planned (already true by construction,
-// since they never touch it) rather than a reformatted value that could disagree with a
-// non-zero-padded input the user typed (e.g. "6:30").
-func formatStartTime(startTime []int) types.String {
-	if len(startTime) != 2 {
-		return types.StringNull()
-	}
-	return types.StringValue(fmt.Sprintf("%02d:%02d", startTime[0], startTime[1]))
+	return resourceLabelsToSet(ctx, resourceLabelsList, diags)
 }
 
 // scheduleScanCompositeID builds the resource's `id` value from resourceTypeID/taskID.
