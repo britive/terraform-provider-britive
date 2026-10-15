@@ -21,7 +21,7 @@ type Tag struct {
 	Description              string                    `json:"description"`
 	Status                   string                    `json:"status,omitempty"`
 	UserTagIdentityProviders []UserTagIdentityProvider `json:"userTagIdentityProviders,omitempty"`
-	External                 interface{}               `json:"external,omitempty"`
+	External                 bool                      `json:"external,omitempty"`
 	Requestable              bool                      `json:"requestable,omitempty"`
 	Attributes               []TagAttribute            `json:"attributes,omitempty"`
 }
@@ -54,6 +54,10 @@ type IdentityProvider struct {
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 	Type        string `json:"type,omitempty"`
+	// AllowEditingExternalTags mirrors the identity provider's SCIM setting
+	// "Allow tag name and description to be editable". When false, the API
+	// rejects name/description changes on connected external tags (UT-0010).
+	AllowEditingExternalTags bool `json:"allowEditingExternalTags,omitempty"`
 }
 
 // User - godoc

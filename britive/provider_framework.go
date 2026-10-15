@@ -186,6 +186,7 @@ func (p *BritiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 func (p *BritiveProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		resources.NewTagResource,
+		resources.NewExternalTagResource,
 		resources.NewTagOwnerResource,
 		resources.NewConstraintResource,
 		resources.NewTagMemberResource,

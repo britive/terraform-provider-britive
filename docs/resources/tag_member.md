@@ -10,6 +10,8 @@ description: |-
 
 This resource allows you to add or remove a member to the Britive tag.
 
+-> **External tags.** A member can be added to an external tag (`britive_external_tag`) only while the tag is an unconnected placeholder, and it does not survive the connection: when the identity provider pushes the group, SCIM replaces the tag's membership with the group's. From then on Britive reserves membership for the identity provider. A plan that adds a member to a connected tag fails with **Cannot Add Member To Connected External Tag**; a member that was replaced by the sync is reported with a warning on refresh and must be removed from the configuration. Manage membership in the identity provider's group instead.
+
 ## Example Usage
 
 ```hcl

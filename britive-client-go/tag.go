@@ -8,8 +8,9 @@ import (
 	"strings"
 )
 
-// GetTagByName - Returns a specifc tag by name
-func (c *Client) GetTagByName(name string) (*Tag, error) {
+// GetTagsByName - Returns every tag whose name matches exactly. Tag names are
+// unique per identity provider only, so several tags can share a name.
+func (c *Client) GetTagsByName(name string) ([]Tag, error) {
 	filter := fmt.Sprintf(`name eq "%s"`, name)
 	resourceURL := fmt.Sprintf(`%s/user-tags?filter=%s`, c.APIBaseURL, url.QueryEscape(filter))
 	req, err := http.NewRequest("GET", resourceURL, nil)
@@ -36,6 +37,16 @@ func (c *Client) GetTagByName(name string) (*Tag, error) {
 		return nil, ErrNotFound
 	}
 
+	return tags, nil
+}
+
+// GetTagByName - Returns the first tag matching the name. Prefer GetTagsByName
+// when the caller can disambiguate by identity provider.
+func (c *Client) GetTagByName(name string) (*Tag, error) {
+	tags, err := c.GetTagsByName(name)
+	if err != nil {
+		return nil, err
+	}
 	return &tags[0], nil
 }
 
