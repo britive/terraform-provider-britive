@@ -335,9 +335,24 @@ func (r *ExternalTagResource) Create(ctx context.Context, req resource.CreateReq
 
 	if !plan.Requestable.IsNull() && !plan.Requestable.IsUnknown() || len(plan.Attributes) > 0 {
 		if err := r.applyOverlay(createdTag.ID, &plan); err != nil {
+			// Roll back the placeholder so the failed create leaves nothing behind
+			// and the next apply creates the tag again. Keeping it as a tainted
+			// resource does not work: Terraform plans the replacement as a fresh
+			// create, and ModifyPlan would refuse it with "External Tag Already Exists".
+			if delErr := r.client.DeleteTag(createdTag.ID); delErr != nil {
+				resp.Diagnostics.AddError(
+					"Error Creating External Tag",
+					fmt.Sprintf("Tag '%s' was created but its requestable flag or attributes could not be set: %s\n\n"+
+						"Removing the partially created tag (%s) also failed: %s. Delete it in Britive, or import it, before applying again.",
+						plan.Name.ValueString(), r.explainExternalError(err), createdTag.ID, delErr.Error()),
+				)
+				return
+			}
 			resp.Diagnostics.AddError(
-				"Error Updating External Tag Attributes",
-				fmt.Sprintf("Tag '%s' was created but its attributes could not be set: %s", plan.Name.ValueString(), err.Error()),
+				"Error Creating External Tag",
+				fmt.Sprintf("Tag '%s' could not be created because its requestable flag or attributes could not be set: %s\n\n"+
+					"The partially created tag was removed, so the next apply starts clean.",
+					plan.Name.ValueString(), r.explainExternalError(err)),
 			)
 			return
 		}
@@ -561,10 +576,13 @@ func (r *ExternalTagResource) applyOverlay(tagID string, plan *ExternalTagResour
 		Description: current.Description,
 		Attributes:  buildTagAttributes(plan.Attributes),
 	}
+	// Always send requestable: the PATCH overwrites it, so leaving it out would
+	// reset it. Without a configured value, keep the tag's current one.
+	requestable := current.Requestable
 	if !plan.Requestable.IsNull() && !plan.Requestable.IsUnknown() {
-		b := plan.Requestable.ValueBool()
-		reqBody.Requestable = &b
+		requestable = plan.Requestable.ValueBool()
 	}
+	reqBody.Requestable = &requestable
 	_, err = r.client.UpdateTagAttributes(tagID, reqBody)
 	return err
 }
@@ -660,6 +678,10 @@ func (r *ExternalTagResource) requireNonDefaultIdentityProvider(identityProvider
 func (r *ExternalTagResource) explainExternalError(err error) string {
 	msg := err.Error()
 	switch {
+	case strings.HasPrefix(msg, errCodeExternalTagUpdate) && strings.Contains(strings.ToLower(msg), "requestable"):
+		// Same code, different rule: a tenant setting, not the SCIM edit flag.
+		return msg + " (requestable can only be changed when tag access requests are enabled for the tenant in Britive; " +
+			"enable it, or remove requestable from the configuration to keep the tag's current value)"
 	case strings.HasPrefix(msg, errCodeExternalTagUpdate):
 		return msg + " (the tag is connected through SCIM; turn on \"Allow tag name and description to be editable\" on the identity provider to change name or description)"
 	case strings.HasPrefix(msg, errCodeExternalTagAddUser):

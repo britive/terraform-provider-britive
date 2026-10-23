@@ -779,11 +779,15 @@ type TagOwnerRelationships struct {
 	Owners []TagOwnerEntity `json:"owners"`
 }
 
-// TagWithOwners - tag with owner relationships; used for GET /api/user-tags/{id} and PATCH /api/user-tags
+// TagWithOwners - tag with owner relationships; used for GET /api/user-tags/{id} and PATCH /api/user-tags.
+// PATCH /api/user-tags replaces requestable and attributes with whatever the body carries, so an
+// owners update must resend the tag's current values or they are cleared.
 type TagWithOwners struct {
 	TagID         string                `json:"userTagId"`
 	Name          string                `json:"name"`
 	Description   string                `json:"description"`
+	Requestable   *bool                 `json:"requestable,omitempty"`
+	Attributes    []TagAttribute        `json:"attributes"`
 	Relationships TagOwnerRelationships `json:"relationships"`
 }
 

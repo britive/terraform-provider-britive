@@ -262,14 +262,7 @@ func (r *TagOwnerResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	request := britive.TagWithOwners{
-		TagID:       tagID,
-		Name:        tag.Name,
-		Description: tag.Description,
-		Relationships: britive.TagOwnerRelationships{
-			Owners: []britive.TagOwnerEntity{},
-		},
-	}
+	request := tagWithOwnersRequest(tag, []britive.TagOwnerEntity{})
 	if _, err = r.client.UpdateTagOwners(request); err != nil {
 		resp.Diagnostics.AddError("Error Deleting Tag Owners", err.Error())
 		return
@@ -334,14 +327,31 @@ func (r *TagOwnerResource) applyOwners(tagID string, users, tags []TagOwnerEntit
 		owners = append(owners, owner)
 	}
 
-	request := britive.TagWithOwners{
-		TagID:         tagID,
+	_, err = r.client.UpdateTagOwners(tagWithOwnersRequest(tag, owners))
+	return err
+}
+
+// tagWithOwnersRequest builds the PATCH /user-tags body for an owners change.
+// The endpoint overwrites requestable and attributes too, so the tag's current
+// values are carried over; otherwise every owner change would clear them and
+// the next britive_tag / britive_external_tag apply would put them back.
+func tagWithOwnersRequest(tag *britive.Tag, owners []britive.TagOwnerEntity) britive.TagWithOwners {
+	requestable := tag.Requestable
+	attributes := make([]britive.TagAttribute, 0, len(tag.Attributes))
+	for _, a := range tag.Attributes {
+		attributes = append(attributes, britive.TagAttribute{
+			AttributeName:  a.AttributeName,
+			AttributeValue: a.AttributeValue,
+		})
+	}
+	return britive.TagWithOwners{
+		TagID:         tag.ID,
 		Name:          tag.Name,
 		Description:   tag.Description,
+		Requestable:   &requestable,
+		Attributes:    attributes,
 		Relationships: britive.TagOwnerRelationships{Owners: owners},
 	}
-	_, err = r.client.UpdateTagOwners(request)
-	return err
 }
 
 // readIntoModel fetches the current owner state from the API and populates the model.
