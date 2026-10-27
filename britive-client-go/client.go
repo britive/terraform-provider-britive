@@ -563,6 +563,41 @@ func ConditionEqual(old, new string) bool {
 	return true
 }
 
+// A policy fetched by ID returns tags, users, notification mediums, permissions and roles
+// as IDs, while the same policy fetched by name returns them as names. The *EqualAny
+// helpers report whether a configured value matches any of the given API responses, so a
+// value configured with either IDs or names is recognised as unchanged.
+
+// MembersEqualAny reports whether config is equal to any of the given API members values.
+func MembersEqualAny(config string, apiValues ...string) bool {
+	for _, apiValue := range apiValues {
+		if MembersEqual(apiValue, config) {
+			return true
+		}
+	}
+	return false
+}
+
+// ConditionEqualAny reports whether config is equal to any of the given API condition values.
+func ConditionEqualAny(config string, apiValues ...string) bool {
+	for _, apiValue := range apiValues {
+		if ConditionEqual(apiValue, config) {
+			return true
+		}
+	}
+	return false
+}
+
+// ArrayOfMapsEqualAny reports whether config is equal to any of the given API array values.
+func ArrayOfMapsEqualAny(config string, apiValues ...string) bool {
+	for _, apiValue := range apiValues {
+		if ArrayOfMapsEqual(apiValue, config) {
+			return true
+		}
+	}
+	return false
+}
+
 func ApprovalBlockEqual(old, new string) bool {
 
 	equalCount := 0

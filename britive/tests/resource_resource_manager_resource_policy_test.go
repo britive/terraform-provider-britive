@@ -9,6 +9,7 @@ import (
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
@@ -261,4 +262,61 @@ func testAccCheckBritiveResourceManagerResourcePolicyInvalidNameConfig() string 
 		policy_name = "Sudo Session - Recorded (Directory)"
 	}
 	`
+}
+
+// TestBritiveResourceManagerResourcePolicyMembersByID creates a resource manager resource
+// policy whose members reference the tag and user by ID. Create must leave members as
+// configured (no "Provider produced inconsistent result after apply") with an empty plan
+// after refresh, and the policy must import with both import ID formats.
+func TestBritiveResourceManagerResourcePolicyMembersByID(t *testing.T) {
+	n := "britive_resource_manager_resource_policy.test"
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: append([]resource.TestStep{
+			{
+				Config: testAccResourceManagerResourcePolicyByIDConfig("AT-Britive_RM_Resource_Policy_By_ID_Label", "AT-Britive RM Resource Policy By ID"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAttrContainsAttrOf(n, "members", "data.britive_tag.policy_tag", "tag_id"),
+					testAccCheckAttrContainsAttrOf(n, "members", "data.britive_user.policy_user", "user_id"),
+				),
+			},
+		}, testAccImportSteps(n, testAccResourceManagerResourcePolicyImportID, map[string]string{})...),
+	})
+}
+
+func testAccResourceManagerResourcePolicyByIDConfig(labelName, policyName string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_label" "policy_label" {
+		name        = %q
+		description = "Label for the by-ID resource policy test"
+		label_color = "#abc123"
+
+		values {
+			name = "Production"
+		}
+	}
+
+	resource "britive_resource_manager_resource_policy" "test" {
+		policy_name  = %q
+		description  = "By ID resource policy description"
+		members      = jsonencode(%s)
+		condition    = jsonencode({ ipAddress = "192.162.0.0/16,10.10.0.10" })
+		access_type  = "Allow"
+		access_level = "manage"
+		consumer     = "resourcemanager"
+		is_active    = true
+		is_draft     = false
+		is_read_only = false
+		resource_labels {
+			label_key = britive_resource_manager_resource_label.policy_label.name
+			values    = ["Production"]
+		}
+	}
+	%s`, labelName, policyName, testAccPolicyMembersByID, testAccPolicyByIDDataSources())
 }

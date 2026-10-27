@@ -241,7 +241,7 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	// Get policy by ID to get the name
+	// Get policy by ID: returns the name, and members/condition with IDs
 	policyInfo, err := r.client.GetPolicy(policyID)
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.State.RemoveResource(ctx)
@@ -255,7 +255,7 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	// Get full policy details by name
+	// Get full policy details by name: returns members/condition with names
 	policy, err := r.client.GetPolicyByName(policyInfo.Name)
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.State.RemoveResource(ctx)
@@ -282,9 +282,10 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.IsDraft = types.BoolValue(policy.IsDraft)
 	state.IsReadOnly = types.BoolValue(policy.IsReadOnly)
 
-	// Handle condition with comparison
+	// Handle condition with comparison. The configured value may use names (as returned
+	// by name) or IDs (as returned by ID), so compare against both responses.
 	newCondition := state.Condition.ValueString()
-	if britive.ConditionEqual(policy.Condition, newCondition) {
+	if britive.ConditionEqualAny(newCondition, policy.Condition, policyInfo.Condition) {
 		state.Condition = types.StringValue(newCondition)
 	} else {
 		state.Condition = types.StringValue(policy.Condition)
@@ -299,8 +300,16 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		)
 		return
 	}
+	membersByIDJSON, err := json.Marshal(policyInfo.Members)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Marshaling Members",
+			fmt.Sprintf("Could not marshal members: %s", err.Error()),
+		)
+		return
+	}
 	newMembers := state.Members.ValueString()
-	if britive.MembersEqual(string(membersJSON), newMembers) {
+	if britive.MembersEqualAny(newMembers, string(membersJSON), string(membersByIDJSON)) {
 		state.Members = types.StringValue(newMembers)
 	} else {
 		state.Members = types.StringValue(string(membersJSON))
@@ -315,8 +324,16 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		)
 		return
 	}
+	permissionsByIDJSON, err := json.Marshal(policyInfo.Permissions)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Marshaling Permissions",
+			fmt.Sprintf("Could not marshal permissions: %s", err.Error()),
+		)
+		return
+	}
 	newPermissions := state.Permissions.ValueString()
-	if britive.ArrayOfMapsEqual(string(permissionsJSON), newPermissions) {
+	if britive.ArrayOfMapsEqualAny(newPermissions, string(permissionsJSON), string(permissionsByIDJSON)) {
 		state.Permissions = types.StringValue(newPermissions)
 	} else {
 		state.Permissions = types.StringValue(string(permissionsJSON))
@@ -331,8 +348,16 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		)
 		return
 	}
+	rolesByIDJSON, err := json.Marshal(policyInfo.Roles)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Marshaling Roles",
+			fmt.Sprintf("Could not marshal roles: %s", err.Error()),
+		)
+		return
+	}
 	newRoles := state.Roles.ValueString()
-	if britive.ArrayOfMapsEqual(string(rolesJSON), newRoles) {
+	if britive.ArrayOfMapsEqualAny(newRoles, string(rolesJSON), string(rolesByIDJSON)) {
 		state.Roles = types.StringValue(newRoles)
 	} else {
 		state.Roles = types.StringValue(string(rolesJSON))
@@ -395,10 +420,10 @@ func (r *PolicyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// Get old name for update
-	oldName := state.Name.ValueString()
+	// Address the policy by ID or by its old name, matching how the body references members
+	policyIdentifier := policyUpdateIdentifier(policyID, state.Name.ValueString(), policy.Members, policy.Permissions, policy.Roles)
 
-	_, err = r.client.UpdatePolicy(policy, oldName)
+	_, err = r.client.UpdatePolicy(policy, policyIdentifier)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Policy",
@@ -532,13 +557,13 @@ func (r *PolicyResource) populateStateFromAPI(ctx context.Context, state *Policy
 		return err
 	}
 
-	// Get policy by ID to get the name
+	// Get policy by ID: returns the name, and members/condition with IDs
 	policyInfo, err := r.client.GetPolicy(policyID)
 	if err != nil {
 		return err
 	}
 
-	// Get full policy details by name
+	// Get full policy details by name: returns members/condition with names
 	policy, err := r.client.GetPolicyByName(policyInfo.Name)
 	if err != nil {
 		return err
@@ -557,9 +582,10 @@ func (r *PolicyResource) populateStateFromAPI(ctx context.Context, state *Policy
 	state.IsDraft = types.BoolValue(policy.IsDraft)
 	state.IsReadOnly = types.BoolValue(policy.IsReadOnly)
 
-	// Handle condition with comparison
+	// Handle condition with comparison. The configured value may use names (as returned
+	// by name) or IDs (as returned by ID), so compare against both responses.
 	newCondition := state.Condition.ValueString()
-	if britive.ConditionEqual(policy.Condition, newCondition) {
+	if britive.ConditionEqualAny(newCondition, policy.Condition, policyInfo.Condition) {
 		state.Condition = types.StringValue(newCondition)
 	} else {
 		state.Condition = types.StringValue(policy.Condition)
@@ -570,8 +596,12 @@ func (r *PolicyResource) populateStateFromAPI(ctx context.Context, state *Policy
 	if err != nil {
 		return err
 	}
+	membersByIDJSON, err := json.Marshal(policyInfo.Members)
+	if err != nil {
+		return err
+	}
 	newMembers := state.Members.ValueString()
-	if britive.MembersEqual(string(membersJSON), newMembers) {
+	if britive.MembersEqualAny(newMembers, string(membersJSON), string(membersByIDJSON)) {
 		state.Members = types.StringValue(newMembers)
 	} else {
 		state.Members = types.StringValue(string(membersJSON))
@@ -582,8 +612,12 @@ func (r *PolicyResource) populateStateFromAPI(ctx context.Context, state *Policy
 	if err != nil {
 		return err
 	}
+	permissionsByIDJSON, err := json.Marshal(policyInfo.Permissions)
+	if err != nil {
+		return err
+	}
 	newPermissions := state.Permissions.ValueString()
-	if britive.ArrayOfMapsEqual(string(permissionsJSON), newPermissions) {
+	if britive.ArrayOfMapsEqualAny(newPermissions, string(permissionsJSON), string(permissionsByIDJSON)) {
 		state.Permissions = types.StringValue(newPermissions)
 	} else {
 		state.Permissions = types.StringValue(string(permissionsJSON))
@@ -594,8 +628,12 @@ func (r *PolicyResource) populateStateFromAPI(ctx context.Context, state *Policy
 	if err != nil {
 		return err
 	}
+	rolesByIDJSON, err := json.Marshal(policyInfo.Roles)
+	if err != nil {
+		return err
+	}
 	newRoles := state.Roles.ValueString()
-	if britive.ArrayOfMapsEqual(string(rolesJSON), newRoles) {
+	if britive.ArrayOfMapsEqualAny(newRoles, string(rolesJSON), string(rolesByIDJSON)) {
 		state.Roles = types.StringValue(newRoles)
 	} else {
 		state.Roles = types.StringValue(string(rolesJSON))
@@ -605,6 +643,44 @@ func (r *PolicyResource) populateStateFromAPI(ctx context.Context, state *Policy
 }
 
 // Helper functions
+
+// policyUpdateIdentifier returns the identifier to address a policy by when updating it.
+// The API reads members, roles and permissions in the form of the identifier in the path:
+// addressed by name it expects names, and addressed by ID it expects IDs, rejecting
+// anything else with "PP-0005: Inconsistent request". So a body that references any of
+// them by ID is sent to the policy's ID, and otherwise to its name.
+func policyUpdateIdentifier(policyID, policyName string, references ...interface{}) string {
+	for _, ref := range references {
+		if referencesByID(ref) {
+			return policyID
+		}
+	}
+	return policyName
+}
+
+// referencesByID reports whether v, decoded JSON members, roles or permissions, contains
+// an entry identified by "id".
+func referencesByID(v interface{}) bool {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		if _, ok := t["id"]; ok {
+			return true
+		}
+		for _, e := range t {
+			if referencesByID(e) {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, e := range t {
+			if referencesByID(e) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func generatePolicyID(policyID string) string {
 	return fmt.Sprintf("policies/%s", policyID)
 }
