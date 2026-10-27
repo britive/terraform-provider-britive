@@ -1,3 +1,14 @@
+## 3.0.5 (Unreleased)
+
+ENHANCEMENTS:
+* **New Resource:** `britive_external_tag` : Create and manage external tags, i.e. tags on a non-default identity provider that the identity provider connects through SCIM. Terraform creates the placeholder (full lifecycle, including members via `britive_tag_member`) and, once connected, keeps managing `requestable`, `attributes` and, where the identity provider allows it, `description`. Changes the API reserves for the identity provider (`name`, status, members, delete) are refused at plan time with the reason; destroying a connected tag removes it from state with a warning instead of failing. A name that already exists on the provider (the identity-provider-first case) is refused at plan time with import guidance. Import by id or by unique name, including with `import` blocks.
+* **Resource:** `britive_tag_member` : Members can be added to an external tag while it is an unconnected placeholder. Adding a member to a connected external tag is refused at plan time with the reason (the API's `UT-0004`). A member added to a placeholder is replaced by the identity provider's group membership when the tag is connected; the next refresh reports it with a warning and the resource must be removed from the configuration.
+* **Data Source:** `data.britive_tag` : Added `identity_provider_id` to scope a `name` lookup to one identity provider, and new computed attributes `identity_provider_id`, `description`, `disabled`, `requestable`, `external`, `external_id` and `attributes`.
+
+BUG FIXES:
+* `data.britive_tag`: A `name` that matches tags on several identity providers now fails with the list of candidates instead of silently returning the first match. Set `identity_provider_id` or use `tag_id` to disambiguate.
+* `britive_tag`: The error for a non-default `identity_provider_id` now names the provider and points to `britive_external_tag`. Import of a tag on a non-default provider is refused with the same guidance.
+
 ## 3.0.4
 
 ENHANCEMENTS:
