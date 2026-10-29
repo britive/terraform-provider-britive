@@ -97,7 +97,7 @@ type Profile struct {
 	PolicyOrderingEnabled         bool                 `json:"policyOrderingEnabled,omitempty"`
 	// DelegationEnabled must NOT use omitempty: Go omits false for bool with omitempty,
 	// which would prevent the PATCH from ever setting delegation to false.
-	DelegationEnabled             bool                 `json:"delegationEnabled"`
+	DelegationEnabled bool `json:"delegationEnabled"`
 }
 
 // Application - godoc
@@ -821,4 +821,109 @@ type ResourceManagerResourcePolicy struct {
 	IsDraft        bool                `json:"isDraft"`
 	IsReadOnly     bool                `json:"isReadOnly"`
 	ResourceLabels map[string][]string `json:"resourceLabels"`
+}
+
+// AccessBuilderSettings - an application's access builder settings, including the
+// association approvers that are embedded in the same record.
+type AccessBuilderSettings struct {
+	AllowAccessRequest       bool                              `json:"allowAccessRequest"`
+	AssociationApprovers     []AssociationApprover             `json:"associationApprovers"`
+	ApprovalTimeOut          *string                           `json:"approvalTimeOut"`
+	ProfileExpirationTimeout FlexibleInt64                     `json:"profileExpirationTimeout"`
+	NotificationMediums      []AccessRequestNotificationMedium `json:"notificationMediums"`
+	MemberRules              []AccessRequestMemberRule         `json:"memberRules"`
+	ManagerApproval          *AccessRequestManagerApproval     `json:"managerApproval"`
+}
+
+// AccessBuilderSettingsPatch - partial update of access builder settings. Only non-nil fields
+// are sent; a non-nil pointer to an empty slice is sent as [] to clear that list.
+type AccessBuilderSettingsPatch struct {
+	AllowAccessRequest       *bool                              `json:"allowAccessRequest,omitempty"`
+	ApprovalTimeOut          *string                            `json:"approvalTimeOut,omitempty"`
+	ProfileExpirationTimeout *int64                             `json:"profileExpirationTimeout,omitempty"`
+	NotificationMediums      *[]AccessRequestNotificationMedium `json:"notificationMediums,omitempty"`
+	MemberRules              *[]AccessRequestMemberRule         `json:"memberRules,omitempty"`
+	ManagerApproval          *AccessRequestManagerApproval      `json:"managerApproval,omitempty"`
+	AssociationApprovers     *[]AssociationApprover             `json:"associationApprovers,omitempty"`
+}
+
+// AccessRequestManagerApproval - godoc
+type AccessRequestManagerApproval struct {
+	Required  bool   `json:"required"`
+	Condition string `json:"condition"`
+}
+
+// AccessRequestNotificationMedium - a notification medium reference. Only id is required when
+// sending; name is returned by the API.
+type AccessRequestNotificationMedium struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
+// AccessRequestMemberRule - a user or tag included in or excluded from access requests.
+type AccessRequestMemberRule struct {
+	ID         string `json:"id"`
+	Name       string `json:"name,omitempty"`
+	MemberType string `json:"memberType"`
+	Condition  string `json:"condition"`
+}
+
+// ApproversGroup - an application approvers group.
+type ApproversGroup struct {
+	ID        string                 `json:"id,omitempty"`
+	Name      string                 `json:"name,omitempty"`
+	Condition string                 `json:"condition,omitempty"`
+	Members   []ApproversGroupMember `json:"members,omitempty"`
+}
+
+// ApproversGroupPatch - partial update of an approvers group.
+type ApproversGroupPatch struct {
+	Name      string                  `json:"name,omitempty"`
+	Condition string                  `json:"condition,omitempty"`
+	Members   *[]ApproversGroupMember `json:"members,omitempty"`
+}
+
+// ApproversGroupMember - a user or tag in an approvers group. Only id and memberType are
+// required when sending; name is returned by the API (a user's username or a tag's name).
+type ApproversGroupMember struct {
+	ID         string `json:"id"`
+	Name       string `json:"name,omitempty"`
+	MemberType string `json:"memberType"`
+}
+
+// AssociationApprover - maps environments or environment groups to approvers groups.
+type AssociationApprover struct {
+	ID              string                           `json:"id,omitempty"`
+	Name            string                           `json:"name,omitempty"`
+	Associations    []AssociationApproverAssociation `json:"associations"`
+	AssociationTags interface{}                      `json:"associationTags"`
+	ApproversGroups []ApproversGroup                 `json:"approversGroups"`
+}
+
+// AssociationApproverPatch - partial update of an association approver. associationTags is
+// always sent as an empty list, matching the admin UI.
+type AssociationApproverPatch struct {
+	Name            string                            `json:"name,omitempty"`
+	Associations    *[]AssociationApproverAssociation `json:"associations,omitempty"`
+	ApproversGroups *[]ApproversGroup                 `json:"approversGroups,omitempty"`
+	AssociationTags []interface{}                     `json:"associationTags"`
+}
+
+// AssociationApproverAssociation - an environment (type 0) or environment group (type 1).
+type AssociationApproverAssociation struct {
+	ID   string `json:"id"`
+	Type int    `json:"type"`
+}
+
+// NotificationMedium - godoc
+type NotificationMedium struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+}
+
+// NotificationMediumList - the list response of GET notificationmediums.
+type NotificationMediumList struct {
+	Result []NotificationMedium `json:"result"`
 }

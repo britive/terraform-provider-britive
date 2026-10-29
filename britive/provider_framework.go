@@ -179,6 +179,7 @@ func (p *BritiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 		datasources.NewTagDataSource,
 		datasources.NewUserDataSource,
 		datasources.NewUserAttributeDataSource,
+		datasources.NewNotificationMediumDataSource,
 	}
 }
 
@@ -202,6 +203,8 @@ func (p *BritiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resources.NewProfilePolicyPrioritizationResource,
 		resources.NewApplicationResource,
 		resources.NewApplicationScanScheduleResource,
+		resources.NewApplicationApproversGroupResource,
+		resources.NewApplicationAccessBuilderSettingsResource,
 		resources.NewProfileResource,
 		// Resource Manager resources
 		resourcemanager.NewResourceTypeResource,
