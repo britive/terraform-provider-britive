@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 )
@@ -159,6 +160,31 @@ func (c *Client) UploadPermissionCodes(permissionId string, checkInCode string, 
 	}
 
 	return nil
+}
+
+// GetPermissionSystemDefinedValues - Returns the values a permission variable default may reference for a resource type
+func (c *Client) GetPermissionSystemDefinedValues(resourceTypeID string) ([]string, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/resource-manager/profiles/permissions/system-defined-values?resourceTypeId=%s", c.APIBaseURL, url.QueryEscape(resourceTypeID)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	values := make([]string, 0)
+	if string(body) == emptyString {
+		return values, nil
+	}
+
+	err = json.Unmarshal(body, &values)
+	if err != nil {
+		return nil, err
+	}
+
+	return values, nil
 }
 
 // CreateResourceTypePermission - Creates a new resource type permission

@@ -682,6 +682,18 @@ type ResourceTypePermission struct {
 	CheckinFileName   string        `json:"checkinFileName,omitempty"`
 	CheckoutFileName  string        `json:"checkoutFileName,omitempty"`
 	Variables         []interface{} `json:"variables,omitempty"`
+	// VariableDefaults is a pointer so the two cases the API needs can both be expressed:
+	// nil omits the key (required on create, which rejects variableDefaults), while a
+	// pointer to an empty slice sends [] on update so removed defaults are cleared.
+	VariableDefaults *[]ResourceTypePermissionVariableDefault `json:"variableDefaults,omitempty"`
+}
+
+// ResourceTypePermissionVariableDefault is the default value of one permission variable.
+// Type is sent as "string" on update and is not returned on read.
+type ResourceTypePermissionVariableDefault struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+	Type  string `json:"type,omitempty"`
 }
 
 type ResourceTypePermissiosUploadUrls struct {
@@ -755,7 +767,9 @@ type ResourceManagerProfilePermission struct {
 	Version          string                   `json:"version,omitempty"`
 	ResourceTypeId   string                   `json:"resourceTypeId,omitempty"`
 	ResourceTypeName string                   `json:"resourceTypeName,omitempty"`
-	Variables        []map[string]interface{} `json:"variables,omitempty"`
+	// Variables has no omitempty: an empty list must still be sent so that variables
+	// removed from the config are cleared on the backend.
+	Variables []map[string]interface{} `json:"variables"`
 }
 
 // Resource Manager Permissions - godoc

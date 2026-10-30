@@ -2,10 +2,12 @@ package tests
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
@@ -236,4 +238,355 @@ func testAccCheckBritiveResourceTypePermissionUnknownSetsFromDependencyConfig(tr
 		response_templates  = []
 		variables           = britive_resource_manager_resource_type.trigger.id == "" ? [] : ["test1"]
 	}`, triggerResourceTypeName, triggerResourceTypeDescription, resourceTypeName, resourceTypeDescription, permissionName, permissionDescription)
+}
+
+// TestBritiveResourceTypePermissionVariableDefaults covers the variable_defaults lifecycle:
+// create with defaults (the API rejects variableDefaults on create, so they must only go out
+// with the finalizing update), change a value, remove one default, import, then remove all.
+// Every step's post-apply refresh must produce an empty plan, which also confirms that
+// sending an empty variableDefaults list really clears the removed defaults on the backend.
+func TestBritiveResourceTypePermissionVariableDefaults(t *testing.T) {
+	resourceTypeName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults"
+	resourceTypeDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults_Description"
+	permissionName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults"
+	permissionDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults_Description"
+	resourceName := "britive_resource_manager_resource_type_permission.var_defaults"
+
+	config := func(defaults string) string {
+		return testAccCheckBritiveResourceTypePermissionVariableDefaultsConfig(resourceTypeName, resourceTypeDescription, permissionName, permissionDescription, defaults)
+	}
+	emptyPlan := resource.ConfigPlanChecks{
+		PostApplyPostRefresh: []plancheck.PlanCheck{
+			plancheck.ExpectEmptyPlan(),
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with two defaults.
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "test1"
+			value = "resource.name"
+		}
+		variable_defaults {
+			name  = "test2"
+			value = "user.email"
+		}`),
+				ConfigPlanChecks: emptyPlan,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveResourceTypePermissionExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName, "variable_defaults.#", "2"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "variable_defaults.*", map[string]string{
+						"name":  "test1",
+						"value": "resource.name",
+					}),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "variable_defaults.*", map[string]string{
+						"name":  "test2",
+						"value": "user.email",
+					}),
+				),
+			},
+			// Change one default's value in place.
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "test1"
+			value = "resource.name"
+		}
+		variable_defaults {
+			name  = "test2"
+			value = "profile.name"
+		}`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(resourceName, plancheck.ResourceActionUpdate),
+					},
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "variable_defaults.#", "2"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "variable_defaults.*", map[string]string{
+						"name":  "test2",
+						"value": "profile.name",
+					}),
+				),
+			},
+			// Remove one default.
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "test1"
+			value = "resource.name"
+		}`),
+				ConfigPlanChecks: emptyPlan,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "variable_defaults.#", "1"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "variable_defaults.*", map[string]string{
+						"name":  "test1",
+						"value": "resource.name",
+					}),
+				),
+			},
+			// Import must read the remaining default back. Inline code and the variables list
+			// are not returned by the API, and an empty response_templates reads back as null,
+			// so those cannot be verified on import.
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"checkin_code",
+					"checkout_code",
+					"code_language",
+					"variables",
+					"response_templates",
+				},
+			},
+			// Remove all defaults.
+			{
+				Config:           config(""),
+				ConfigPlanChecks: emptyPlan,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "variable_defaults.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+// TestBritiveResourceTypePermissionVariableDefaultsAddOnUpdate covers adding defaults to a
+// permission created without any, so they are first sent by an in-place update rather
+// than by the update that finalizes a create.
+func TestBritiveResourceTypePermissionVariableDefaultsAddOnUpdate(t *testing.T) {
+	resourceTypeName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults_Add"
+	resourceTypeDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults_Add_Description"
+	permissionName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults_Add"
+	permissionDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults_Add_Description"
+	resourceName := "britive_resource_manager_resource_type_permission.var_defaults"
+
+	config := func(defaults string) string {
+		return testAccCheckBritiveResourceTypePermissionVariableDefaultsConfig(resourceTypeName, resourceTypeDescription, permissionName, permissionDescription, defaults)
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create without defaults.
+			{
+				Config: config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBritiveResourceTypePermissionExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName, "variable_defaults.#", "0"),
+				),
+			},
+			// Add two defaults in place.
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "test1"
+			value = "resource.name"
+		}
+		variable_defaults {
+			name  = "test2"
+			value = "user.email"
+		}`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(resourceName, plancheck.ResourceActionUpdate),
+					},
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "variable_defaults.#", "2"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "variable_defaults.*", map[string]string{
+						"name":  "test1",
+						"value": "resource.name",
+					}),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "variable_defaults.*", map[string]string{
+						"name":  "test2",
+						"value": "user.email",
+					}),
+				),
+			},
+		},
+	})
+}
+
+// TestBritiveResourceTypePermissionVariableDefaultsInvalid covers the variable_defaults
+// errors: the config checks fail at plan time, before anything is created, and a value
+// outside the resource type's system-defined values fails at apply time.
+func TestBritiveResourceTypePermissionVariableDefaultsInvalid(t *testing.T) {
+	resourceTypeName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults_Invalid"
+	resourceTypeDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults_Invalid_Description"
+	permissionName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults_Invalid"
+	permissionDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults_Invalid_Description"
+
+	config := func(defaults string) string {
+		return testAccCheckBritiveResourceTypePermissionVariableDefaultsConfig(resourceTypeName, resourceTypeDescription, permissionName, permissionDescription, defaults)
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "undeclared"
+			value = "resource.name"
+		}`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`"undeclared"\s+is\s+not\s+declared\s+in\s+variables`),
+			},
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "test3"
+			value = "resource.name"
+		}`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`"test3"\s+is\s+a\s+password\s+variable\s+and\s+cannot\s+have\s+a\s+default\s+value`),
+			},
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "test1"
+			value = "resource.name"
+		}
+		variable_defaults {
+			name  = "test1"
+			value = "user.email"
+		}`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`"test1"\s+has\s+more\s+than\s+one\s+default\s+value`),
+			},
+			{
+				Config: config(`
+		variable_defaults {
+			name  = "test1"
+			value = "resource.not_a_field"
+		}`),
+				ExpectError: regexp.MustCompile(`"resource\.not_a_field"\s+is\s+not\s+a\s+valid\s+default\s+value\s+for\s+this\s+resource\s+type`),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveResourceTypePermissionVariableDefaultsConfig(resourceTypeName, resourceTypeDescription, permissionName, permissionDescription, variableDefaults string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_type" "var_defaults" {
+		name        = "%s"
+		description = "%s"
+		parameters {
+			param_name   = "testfield1"
+			param_type   = "string"
+			is_mandatory = false
+		}
+	}
+
+	resource "britive_resource_manager_resource_type_permission" "var_defaults" {
+		name                = "%s"
+		resource_type_id    = britive_resource_manager_resource_type.var_defaults.id
+		description         = "%s"
+		is_draft            = false
+		show_orig_creds     = true
+		response_templates  = []
+		variables           = ["test1", "test2", "test3:password"]
+		code_language       = "Text"
+		checkin_code        = "checkin"
+		checkout_code       = "checkout"
+		%s
+	}`, resourceTypeName, resourceTypeDescription, permissionName, permissionDescription, variableDefaults)
+}
+
+// TestBritiveResourceTypePermissionVariableDefaultsDynamic is a regression test: a
+// variable_defaults block built with `dynamic` inside a count resource is wholly unknown
+// while the un-expanded resource is validated, which a plain Go slice model cannot
+// represent. count is used rather than for_each for the reason given on
+// TestBritiveResourceTypePermissionForEachUnknownSets.
+func TestBritiveResourceTypePermissionVariableDefaultsDynamic(t *testing.T) {
+	resourceTypeName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults_Dynamic"
+	resourceTypeDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Var_Defaults_Dynamic_Description"
+	permissionName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults_Dynamic"
+	permissionDescription := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission_Var_Defaults_Dynamic_Description"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckBritiveResourceTypePermissionVariableDefaultsDynamicConfig(resourceTypeName, resourceTypeDescription, permissionName, permissionDescription),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("britive_resource_manager_resource_type_permission.var_defaults_dynamic.0", "variable_defaults.#", "2"),
+					resource.TestCheckResourceAttr("britive_resource_manager_resource_type_permission.var_defaults_dynamic.1", "variable_defaults.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckBritiveResourceTypePermissionVariableDefaultsDynamicConfig(resourceTypeName, resourceTypeDescription, permissionName, permissionDescription string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_resource_type" "var_defaults_dynamic" {
+		name        = "%s"
+		description = "%s"
+		parameters {
+			param_name   = "testfield1"
+			param_type   = "string"
+			is_mandatory = false
+		}
+	}
+
+	locals {
+		permissions = [
+			{
+				name     = "%s_0"
+				defaults = { test1 = "resource.name", test2 = "user.email" }
+			},
+			{
+				name     = "%s_1"
+				defaults = {}
+			},
+		]
+	}
+
+	resource "britive_resource_manager_resource_type_permission" "var_defaults_dynamic" {
+		count               = length(local.permissions)
+		name                = local.permissions[count.index].name
+		resource_type_id    = britive_resource_manager_resource_type.var_defaults_dynamic.id
+		description         = "%s"
+		show_orig_creds     = true
+		response_templates  = []
+		variables           = ["test1", "test2"]
+		code_language       = "Text"
+		checkin_code        = "checkin"
+		checkout_code       = "checkout"
+
+		dynamic "variable_defaults" {
+			for_each = local.permissions[count.index].defaults
+			content {
+				name  = variable_defaults.key
+				value = variable_defaults.value
+			}
+		}
+	}`, resourceTypeName, resourceTypeDescription, permissionName, permissionName, permissionDescription)
 }
