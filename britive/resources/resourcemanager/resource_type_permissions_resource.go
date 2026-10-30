@@ -14,6 +14,8 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -55,7 +57,49 @@ type ResourceTypePermissionsResourceModel struct {
 	CheckinFileName       types.String   `tfsdk:"checkin_file_name"`
 	CheckoutFileName      types.String   `tfsdk:"checkout_file_name"`
 	Variables             []types.String `tfsdk:"variables"`
+	// VariableDefaults is a types.Set rather than []VariableDefaultModel because a
+	// variable_defaults block built with a `dynamic` block inside a for_each/count
+	// resource is wholly unknown at validate/plan time, which a plain slice can't
+	// represent. Read and write it through variableDefaultsFromSet/variableDefaultsToSet.
+	VariableDefaults types.Set `tfsdk:"variable_defaults"`
 }
+
+// VariableDefaultModel describes one variable_defaults block.
+type VariableDefaultModel struct {
+	Name  types.String `tfsdk:"name"`
+	Value types.String `tfsdk:"value"`
+}
+
+// variableDefaultObjectType is the tftypes shape of one variable_defaults block element,
+// mirroring VariableDefaultModel's tfsdk tags.
+var variableDefaultObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"name":  types.StringType,
+		"value": types.StringType,
+	},
+}
+
+// variableDefaultsFromSet decodes a variable_defaults set into concrete []VariableDefaultModel.
+// Returns nil without error for a null/unknown set (unknown occurs at plan time - see
+// VariableDefaults's doc comment - and is always fully resolved again by apply time).
+func variableDefaultsFromSet(ctx context.Context, set types.Set, diags *diag.Diagnostics) []VariableDefaultModel {
+	if set.IsNull() || set.IsUnknown() {
+		return nil
+	}
+	var defaults []VariableDefaultModel
+	diags.Append(set.ElementsAs(ctx, &defaults, false)...)
+	return defaults
+}
+
+// variableDefaultsToSet is variableDefaultsFromSet's inverse.
+func variableDefaultsToSet(ctx context.Context, defaults []VariableDefaultModel, diags *diag.Diagnostics) types.Set {
+	set, d := types.SetValueFrom(ctx, variableDefaultObjectType, defaults)
+	diags.Append(d...)
+	return set
+}
+
+// passwordVariableSuffix marks a variables entry as a password variable.
+const passwordVariableSuffix = ":password"
 
 // NewResourceTypePermissionsResource is a helper function to simplify the provider implementation.
 func NewResourceTypePermissionsResource() resource.Resource {
@@ -212,6 +256,29 @@ func (r *ResourceTypePermissionsResource) Schema(_ context.Context, _ resource.S
 				ElementType: types.StringType,
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"variable_defaults": schema.SetNestedBlock{
+				Description: "Default values of permission variables",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Name of a variable declared in variables, without the :password suffix. Password variables cannot have a default value.",
+							Required:    true,
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
+						},
+						"value": schema.StringAttribute{
+							Description: "System-defined value used as the default, e.g. resource.name or user.email",
+							Required:    true,
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -235,6 +302,11 @@ func (r *ResourceTypePermissionsResource) Configure(_ context.Context, req resou
 
 // ValidateConfig validates the resource configuration.
 func (r *ResourceTypePermissionsResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// Checked before the fully-known guard below: it only needs variables and
+	// variable_defaults, and the rest of the config is often unknown (e.g. a
+	// resource_type_id from a resource type created in the same apply).
+	validateVariableDefaults(ctx, req, resp)
+
 	// Resources using for_each/count with response_templates/variables driven by
 	// each.value/count.index are validated once, pre-expansion, with those references
 	// left unknown. A List/Set containing any unknown element collapses to a wholly
@@ -286,6 +358,65 @@ func (r *ResourceTypePermissionsResource) ValidateConfig(ctx context.Context, re
 				"'checkin_code' and 'checkout_code' must be set together or left unset together",
 			)
 		}
+	}
+}
+
+// validateVariableDefaults checks that each variable default refers to a declared,
+// non-password variable, once. Whether the value is allowed needs an API call, so that
+// is checked at apply time. Anything still unknown is left to be checked once known.
+func validateVariableDefaults(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var defaultsSet, variablesSet types.Set
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("variable_defaults"), &defaultsSet)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("variables"), &variablesSet)...)
+	if resp.Diagnostics.HasError() || defaultsSet.IsUnknown() || variablesSet.IsUnknown() {
+		return
+	}
+
+	defaults := variableDefaultsFromSet(ctx, defaultsSet, &resp.Diagnostics)
+	if len(defaults) == 0 {
+		return
+	}
+	var variables []types.String
+	if !variablesSet.IsNull() {
+		resp.Diagnostics.Append(variablesSet.ElementsAs(ctx, &variables, false)...)
+	}
+	declared := make(map[string]bool, len(variables))
+	for _, v := range variables {
+		if v.IsUnknown() {
+			return
+		}
+		name := v.ValueString()
+		isPassword := strings.HasSuffix(name, passwordVariableSuffix)
+		declared[strings.TrimSuffix(name, passwordVariableSuffix)] = isPassword
+	}
+	seen := make(map[string]bool, len(defaults))
+	for _, d := range defaults {
+		if d.Name.IsUnknown() {
+			continue
+		}
+		name := d.Name.ValueString()
+		isPassword, ok := declared[name]
+		switch {
+		case !ok:
+			resp.Diagnostics.AddAttributeError(
+				path.Root("variable_defaults"),
+				"Invalid Configuration",
+				fmt.Sprintf("variable_defaults: %q is not declared in variables", name),
+			)
+		case isPassword:
+			resp.Diagnostics.AddAttributeError(
+				path.Root("variable_defaults"),
+				"Invalid Configuration",
+				fmt.Sprintf("variable_defaults: %q is a password variable and cannot have a default value", name),
+			)
+		case seen[name]:
+			resp.Diagnostics.AddAttributeError(
+				path.Root("variable_defaults"),
+				"Invalid Configuration",
+				fmt.Sprintf("variable_defaults: %q has more than one default value", name),
+			)
+		}
+		seen[name] = true
 	}
 }
 
@@ -377,7 +508,7 @@ func (r *ResourceTypePermissionsResource) Create(ctx context.Context, req resour
 	}
 
 	// Map resource to API model
-	permission, err := r.mapResourceToModel(&plan)
+	permission, err := r.mapResourceToModel(ctx, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Permission", err.Error())
 		return
@@ -385,8 +516,11 @@ func (r *ResourceTypePermissionsResource) Create(ctx context.Context, req resour
 
 	log.Printf("[INFO] Creating resource type permission draft: %#v", permission)
 
-	// Create draft permission
-	createdPerm, err := r.client.CreateResourceTypePermission(*permission)
+	// Create draft permission. The API rejects variableDefaults on create (they may only
+	// reference variables already declared), so they are sent with the finalizing update.
+	draft := *permission
+	draft.VariableDefaults = nil
+	createdPerm, err := r.client.CreateResourceTypePermission(draft)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Permission",
@@ -408,7 +542,7 @@ func (r *ResourceTypePermissionsResource) Create(ctx context.Context, req resour
 	plan.ID = types.StringValue(createdPerm.PermissionID)
 	plan.PermissionID = types.StringValue(createdPerm.PermissionID)
 	if createdState, readErr := r.client.GetResourceTypePermission(createdPerm.PermissionID); readErr == nil {
-		r.mapModelToResource(createdState, &plan)
+		resp.Diagnostics.Append(r.mapModelToResource(ctx, createdState, &plan)...)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -459,7 +593,7 @@ func (r *ResourceTypePermissionsResource) Create(ctx context.Context, req resour
 	}
 
 	// Map model to resource
-	r.mapModelToResource(permission, &plan)
+	resp.Diagnostics.Append(r.mapModelToResource(ctx, permission, &plan)...)
 
 	log.Printf("[INFO] Created resource type permission: %s", createdPerm.PermissionID)
 
@@ -489,7 +623,7 @@ func (r *ResourceTypePermissionsResource) Read(ctx context.Context, req resource
 	}
 
 	// Map model to resource
-	r.mapModelToResource(permission, &state)
+	resp.Diagnostics.Append(r.mapModelToResource(ctx, permission, &state)...)
 
 	log.Printf("[INFO] Retrieved resource type permission: %s", permissionID)
 
@@ -510,12 +644,18 @@ func (r *ResourceTypePermissionsResource) Update(ctx context.Context, req resour
 	permissionID := state.ID.ValueString()
 
 	// Map resource to API model
-	permission, err := r.mapResourceToModel(&plan)
+	permission, err := r.mapResourceToModel(ctx, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Permission", err.Error())
 		return
 	}
 	permission.PermissionID = permissionID
+
+	// The last variable_defaults block was removed from config: clear the defaults
+	// Terraform was managing.
+	if permission.VariableDefaults == nil && len(variableDefaultsFromSet(ctx, state.VariableDefaults, &resp.Diagnostics)) > 0 {
+		permission.VariableDefaults = &[]britive.ResourceTypePermissionVariableDefault{}
+	}
 
 	// Upload files or code
 	if !plan.CheckinCodeFile.IsNull() && plan.CheckinCodeFile.ValueString() != "" {
@@ -564,7 +704,7 @@ func (r *ResourceTypePermissionsResource) Update(ctx context.Context, req resour
 	}
 
 	// Map model to resource
-	r.mapModelToResource(permission, &plan)
+	resp.Diagnostics.Append(r.mapModelToResource(ctx, permission, &plan)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -629,9 +769,15 @@ func (r *ResourceTypePermissionsResource) ImportState(ctx context.Context, req r
 	// Set the state
 	var state ResourceTypePermissionsResourceModel
 	state.ID = types.StringValue(permission.PermissionID)
+	// Use the same format as britive_resource_manager_resource_type's id, which configs
+	// usually reference; resource_type_id forces replacement, so leaving it unset would
+	// replace the imported permission on the next apply.
+	state.ResourceTypeID = types.StringValue(fmt.Sprintf("resource-manager/resource-types/%s", permission.ResourceTypeID))
 
-	// Map model to resource
-	r.mapModelToResource(permission, &state)
+	// Map model to resource. Import always reads the defaults, so a config without
+	// variable_defaults shows them in the plan.
+	resp.Diagnostics.Append(r.mapModelToResource(ctx, permission, &state)...)
+	state.VariableDefaults = variableDefaultsFromAPI(ctx, permission, &resp.Diagnostics)
 
 	log.Printf("[INFO] Imported resource type permission: %s", permissionID)
 
@@ -640,7 +786,7 @@ func (r *ResourceTypePermissionsResource) ImportState(ctx context.Context, req r
 
 // Helper functions
 
-func (r *ResourceTypePermissionsResource) mapResourceToModel(plan *ResourceTypePermissionsResourceModel) (*britive.ResourceTypePermission, error) {
+func (r *ResourceTypePermissionsResource) mapResourceToModel(ctx context.Context, plan *ResourceTypePermissionsResourceModel) (*britive.ResourceTypePermission, error) {
 	// Apply defaults for time limits
 	checkinTimeLimit := int64(60)
 	if !plan.CheckinTimeLimit.IsNull() {
@@ -699,10 +845,48 @@ func (r *ResourceTypePermissionsResource) mapResourceToModel(plan *ResourceTypeP
 		}
 	}
 
+	// Handle variable defaults. When the config has no variable_defaults block they are
+	// left out of the request, as in provider versions without this block, so defaults
+	// set outside Terraform are kept. Update sends [] when the last block is removed.
+	if plan.VariableDefaults.IsNull() || plan.VariableDefaults.IsUnknown() {
+		return permission, nil
+	}
+	var diags diag.Diagnostics
+	defaults := variableDefaultsFromSet(ctx, plan.VariableDefaults, &diags)
+	if diags.HasError() {
+		return nil, fmt.Errorf("unable to read variable_defaults: %v", diags)
+	}
+	variableDefaultsList := make([]britive.ResourceTypePermissionVariableDefault, 0, len(defaults))
+	if len(defaults) > 0 {
+		allowedValues, err := r.client.GetPermissionSystemDefinedValues(permission.ResourceTypeID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to find system-defined values for resource type %s: %w", permission.ResourceTypeID, err)
+		}
+
+		allowed := make(map[string]bool, len(allowedValues))
+		for _, v := range allowedValues {
+			allowed[v] = true
+		}
+
+		for _, d := range defaults {
+			value := d.Value.ValueString()
+			if !allowed[value] {
+				return nil, fmt.Errorf("variable_defaults: %q is not a valid default value for this resource type. Allowed values: %s", value, strings.Join(allowedValues, ", "))
+			}
+			variableDefaultsList = append(variableDefaultsList, britive.ResourceTypePermissionVariableDefault{
+				Name:  d.Name.ValueString(),
+				Value: value,
+				Type:  "string",
+			})
+		}
+	}
+	permission.VariableDefaults = &variableDefaultsList
+
 	return permission, nil
 }
 
-func (r *ResourceTypePermissionsResource) mapModelToResource(permission *britive.ResourceTypePermission, state *ResourceTypePermissionsResourceModel) {
+func (r *ResourceTypePermissionsResource) mapModelToResource(ctx context.Context, permission *britive.ResourceTypePermission, state *ResourceTypePermissionsResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
 	state.PermissionID = types.StringValue(permission.PermissionID)
 	state.Name = types.StringValue(permission.Name)
 	state.Description = preserveOptionalString(permission.Description, state.Description)
@@ -731,6 +915,39 @@ func (r *ResourceTypePermissionsResource) mapModelToResource(permission *britive
 		}
 		state.ResponseTemplates = templateNames
 	}
+
+	// Map variable defaults only when Terraform manages them. A null set stays null: the
+	// config has no variable_defaults block (including state written by provider versions
+	// without it), so defaults set outside Terraform must not show up as drift. A managed
+	// set the API returns no defaults for becomes empty, so the post-apply value matches.
+	switch {
+	case state.VariableDefaults.IsNull():
+	case state.VariableDefaults.IsUnknown():
+		state.VariableDefaults = variableDefaultsFromAPI(ctx, permission, &diags)
+	default:
+		state.VariableDefaults = variableDefaultsFromAPI(ctx, permission, &diags)
+		if state.VariableDefaults.IsNull() {
+			state.VariableDefaults = variableDefaultsToSet(ctx, []VariableDefaultModel{}, &diags)
+		}
+	}
+
+	return diags
+}
+
+// variableDefaultsFromAPI maps the permission's variable defaults to a set, or a null set
+// when it has none.
+func variableDefaultsFromAPI(ctx context.Context, permission *britive.ResourceTypePermission, diags *diag.Diagnostics) types.Set {
+	if permission.VariableDefaults == nil || len(*permission.VariableDefaults) == 0 {
+		return types.SetNull(variableDefaultObjectType)
+	}
+	defaults := make([]VariableDefaultModel, 0, len(*permission.VariableDefaults))
+	for _, d := range *permission.VariableDefaults {
+		defaults = append(defaults, VariableDefaultModel{
+			Name:  types.StringValue(d.Name),
+			Value: types.StringValue(d.Value),
+		})
+	}
+	return variableDefaultsToSet(ctx, defaults, diags)
 }
 
 // staticInt64Default implements defaults.Int64 for a static integer value.

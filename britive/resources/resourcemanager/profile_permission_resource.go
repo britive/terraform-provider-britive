@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
@@ -585,29 +584,19 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 		}
 	}
 
-	// Validate user variables and track which declared variables were provided.
-	// Using a set (rather than comparing counts) also means a duplicate variable
-	// name can no longer mask a genuinely missing one.
-	providedVariableMap := make(map[string]bool, len(userVariables))
+	// Only reject variables the permission doesn't declare. Declared variables may be
+	// omitted: the platform accepts that, applying the variable's default value from the
+	// resource type permission if it has one.
 	for _, v := range userVariables {
 		varName := v.Name.ValueString()
 		if !permissionVariableMap[varName] {
 			return permission, fmt.Errorf("the variable '%s' is not valid for the '%s' permission", varName, permissionName)
 		}
-		providedVariableMap[varName] = true
 	}
 
-	var missingVariables []string
-	for varName := range permissionVariableMap {
-		if !providedVariableMap[varName] {
-			missingVariables = append(missingVariables, varName)
-		}
-	}
-	if len(missingVariables) > 0 {
-		sort.Strings(missingVariables)
-		return permission, fmt.Errorf("missing required variables for permission '%s': %s", permissionName, strings.Join(missingVariables, ", "))
-	}
-
+	// Always send the list, even empty: since variables may be omitted, an update
+	// dropping the last configured variable must send [] to clear it.
+	permission.Variables = make([]map[string]interface{}, 0, len(userVariables))
 	if len(userVariables) > 0 {
 		// Convert variables to map format for API
 		for _, v := range userVariables {

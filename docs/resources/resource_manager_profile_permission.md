@@ -73,6 +73,8 @@ In addition to the arguments above, the following attributes are exported:
 
 -> A password-type variable must have `prompt_at_checkout` set to `true` - the backend enforces this, independent of a variable's type. `prompt_at_checkout` splits a variable's `value`, `regex_pattern`, and `description` into two mutually exclusive modes on the Britive platform: when it is `true`, the value is supplied by the user at checkout instead of in this resource, so the platform does not allow `value` to be set - only `regex_pattern` (to validate what's entered at checkout) and `description` (shown to the user at checkout) are allowed. When it is `false`, the opposite holds: `value` is configured directly here, and the platform does not allow `regex_pattern` or `description` to be set, since there is no checkout-time prompt for them to apply to. This provider does not validate these combinations locally - each variable block is sent to the platform as configured, and the platform is responsible for accepting or rejecting it.
 
+-> A `variables` block may only name a variable declared on the associated resource type permission, but you don't need one for every declared variable. If you omit a variable that has a default value there (see `variable_defaults` on `britive_resource_manager_resource_type_permission`), the platform uses that default. Setting the variable here overrides the default for this profile.
+
 -> As the maximum payload size is limited to 8 KB, the number of variables as well as the size of their values must collectively remain within this limit.
 
 ## Import
