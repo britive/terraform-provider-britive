@@ -10,11 +10,13 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/planmodifiers"
 	"github.com/britive/terraform-provider-britive/britive/validators"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -33,6 +35,23 @@ type ProfilePermissionResourceModel struct {
 	ResourceTypeID   types.String                          `tfsdk:"resource_type_id"`
 	ResourceTypeName types.String                          `tfsdk:"resource_type_name"`
 	Variables        []PermissionVariableModel             `tfsdk:"variables"`
+	// EffectiveVariables is a types.Set rather than a slice because it is computed, and
+	// so unknown in the plan whenever the resource changes.
+	EffectiveVariables types.Set `tfsdk:"effective_variables"`
+}
+
+// effectiveVariableObjectType is the tftypes shape of one effective_variables element,
+// which has the same attributes as a variables block.
+var effectiveVariableObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"name":               types.StringType,
+		"value":              types.StringType,
+		"is_system_defined":  types.BoolType,
+		"prompt_at_checkout": types.BoolType,
+		"regex_pattern":      types.StringType,
+		"description":        types.StringType,
+		"type":               types.StringType,
+	},
 }
 
 type PermissionVariableModel struct {
@@ -111,6 +130,24 @@ func (r *ProfilePermissionResource) Schema(_ context.Context, _ resource.SchemaR
 				Description: "Name of ResourceType associated with this permission",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"effective_variables": schema.SetNestedAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
+				Description: "Every variable of the permission with the value the platform uses: the value set in variables, or else the variable's default from the resource type permission.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name":               schema.StringAttribute{Computed: true, Description: "Name of the variable"},
+						"value":              schema.StringAttribute{Computed: true, Description: "Value the platform uses for the variable"},
+						"is_system_defined":  schema.BoolAttribute{Computed: true, Description: "Whether the value is a system-defined value, such as a default like resource.name"},
+						"prompt_at_checkout": schema.BoolAttribute{Computed: true, Description: "Whether the value is supplied by the user at checkout"},
+						"regex_pattern":      schema.StringAttribute{Computed: true, Description: "Regex pattern used to validate the value supplied at checkout"},
+						"description":        schema.StringAttribute{Computed: true, Description: "Description shown to the user at checkout"},
+						"type":               schema.StringAttribute{Computed: true, Description: "Type of the variable"},
+					},
 				},
 			},
 		},
@@ -416,10 +453,18 @@ func (r *ProfilePermissionResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	plannedEffectiveVariables := plan.EffectiveVariables
 	err = r.mapModelToResource(ctx, permissions, permissionID, &plan, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Model to Resource", err.Error())
 		return
+	}
+	// effective_variables keeps its prior value in the plan (UseStateForUnknown), so that
+	// changing variables never lists it as changing. Terraform requires the applied value
+	// to match the plan, so keep the planned value here; the next refresh then reads the
+	// platform's actual values, which never causes a planned change for a computed attribute.
+	if !plannedEffectiveVariables.IsUnknown() {
+		plan.EffectiveVariables = plannedEffectiveVariables
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -659,6 +704,7 @@ func (r *ProfilePermissionResource) mapModelToResource(ctx context.Context, reso
 	if permission == nil {
 		// Permission not found, clear the state
 		state.PermissionID = types.StringNull()
+		state.EffectiveVariables = types.SetNull(effectiveVariableObjectType)
 		return nil
 	}
 
@@ -743,8 +789,56 @@ func (r *ProfilePermissionResource) mapModelToResource(ctx context.Context, reso
 
 	state.Variables = stateVariables
 
+	effectiveVariables, err := effectiveVariablesToSet(ctx, permission["effectiveVariables"])
+	if err != nil {
+		return err
+	}
+	state.EffectiveVariables = effectiveVariables
+
 	log.Printf("[INFO] Read resource manager profile permission: %#v", permission)
 	return nil
+}
+
+// effectiveVariablesToSet maps the API's effectiveVariables, which include variables left
+// out of the config with the default the platform applied, to the effective_variables set.
+func effectiveVariablesToSet(ctx context.Context, raw interface{}) (types.Set, error) {
+	optionalString := func(m map[string]interface{}, key string) types.String {
+		if s, ok := m[key].(string); ok {
+			return types.StringValue(s)
+		}
+		return types.StringNull()
+	}
+	optionalBool := func(m map[string]interface{}, key string) types.Bool {
+		if b, ok := m[key].(bool); ok {
+			return types.BoolValue(b)
+		}
+		return types.BoolNull()
+	}
+
+	variables := make([]PermissionVariableModel, 0)
+	if list, ok := raw.([]interface{}); ok {
+		for _, v := range list {
+			m, ok := v.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			variables = append(variables, PermissionVariableModel{
+				Name:             optionalString(m, "name"),
+				Value:            optionalString(m, "value"),
+				IsSystemDefined:  optionalBool(m, "isSystemDefined"),
+				PromptAtCheckout: optionalBool(m, "promptAtCheckout"),
+				RegexPattern:     optionalString(m, "regexPattern"),
+				Description:      optionalString(m, "description"),
+				Type:             optionalString(m, "type"),
+			})
+		}
+	}
+
+	set, diags := types.SetValueFrom(ctx, effectiveVariableObjectType, variables)
+	if diags.HasError() {
+		return types.SetNull(effectiveVariableObjectType), fmt.Errorf("unable to map effective variables: %v", diags)
+	}
+	return set, nil
 }
 
 func (r *ProfilePermissionResource) parseUniqueID(id string) (string, string) {

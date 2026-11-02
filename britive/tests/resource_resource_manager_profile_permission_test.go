@@ -330,6 +330,14 @@ func TestBritiveResourceManagerProfilePermissionVariableDefaults(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveResourceManagerProfilePermissionExists(resourceName),
 					resource.TestCheckResourceAttr(resourceName, "variables.#", "1"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "effective_variables.*", map[string]string{
+						"name":  "test1",
+						"value": "resource.name",
+					}),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "effective_variables.*", map[string]string{
+						"name":  "test2",
+						"value": "user.email",
+					}),
 					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "variables.*", map[string]string{
 						"name":               "test3",
 						"prompt_at_checkout": "true",
@@ -355,12 +363,31 @@ func TestBritiveResourceManagerProfilePermissionVariableDefaults(t *testing.T) {
 					}),
 				),
 			},
+			// An update keeps effective_variables' prior value until the next refresh.
+			{
+				RefreshState: true,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "effective_variables.*", map[string]string{
+						"name":  "test1",
+						"value": "t1",
+					}),
+				),
+			},
 			// Remove the override: test1 falls back to its default again.
 			{
 				Config:           config(test3),
 				ConfigPlanChecks: emptyPlan,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "variables.#", "1"),
+				),
+			},
+			{
+				RefreshState: true,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "effective_variables.*", map[string]string{
+						"name":  "test1",
+						"value": "resource.name",
+					}),
 				),
 			},
 			// test3 has no default, but the platform still accepts leaving it out.
@@ -416,6 +443,10 @@ func TestBritiveResourceManagerProfilePermissionAllVariablesDefaulted(t *testing
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveResourceManagerProfilePermissionExists(resourceName),
 					resource.TestCheckResourceAttr(resourceName, "variables.#", "0"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "effective_variables.*", map[string]string{
+						"name":  "test1",
+						"value": "resource.name",
+					}),
 				),
 			},
 			// Import must read back no variables: the defaulted variable shows only in the
@@ -484,6 +515,10 @@ func TestBritiveResourceManagerProfilePermissionDefaultChange(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveResourceManagerProfilePermissionExists(resourceName),
 					resource.TestCheckResourceAttr(resourceName, "variables.#", "0"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "effective_variables.*", map[string]string{
+						"name":  "test1",
+						"value": "resource.name",
+					}),
 				),
 			},
 			{
@@ -503,6 +538,17 @@ func TestBritiveResourceManagerProfilePermissionDefaultChange(t *testing.T) {
 						"value": "user.email",
 					}),
 					resource.TestCheckResourceAttr(resourceName, "variables.#", "0"),
+				),
+			},
+			// The profile permission was not changed by the previous apply, so its state is
+			// only refreshed now: effective_variables must show the new default.
+			{
+				Config: config("user.email"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "effective_variables.*", map[string]string{
+						"name":  "test1",
+						"value": "user.email",
+					}),
 				),
 			},
 		},
