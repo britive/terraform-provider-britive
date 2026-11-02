@@ -35,28 +35,28 @@ type ResourceTypePermissionsResource struct {
 
 // ResourceTypePermissionsResourceModel describes the resource data model.
 type ResourceTypePermissionsResourceModel struct {
-	ID                    types.String   `tfsdk:"id"`
-	PermissionID          types.String   `tfsdk:"permission_id"`
-	Name                  types.String   `tfsdk:"name"`
-	Version               types.String   `tfsdk:"version"`
-	ResourceTypeID        types.String   `tfsdk:"resource_type_id"`
-	Description           types.String   `tfsdk:"description"`
-	CheckinTimeLimit      types.Int64    `tfsdk:"checkin_time_limit"`
-	CheckoutTimeLimit     types.Int64    `tfsdk:"checkout_time_limit"`
-	IsDraft               types.Bool     `tfsdk:"is_draft"`
-	InlineFileExists      types.Bool     `tfsdk:"inline_file_exists"`
-	ResponseTemplates     []types.String `tfsdk:"response_templates"`
-	ShowOrigCreds         types.Bool     `tfsdk:"show_orig_creds"`
-	CheckinCodeFile       types.String   `tfsdk:"checkin_code_file"`
-	CheckoutCodeFile      types.String   `tfsdk:"checkout_code_file"`
-	CheckinCodeFileHash   types.String   `tfsdk:"checkin_code_file_hash"`
-	CheckoutCodeFileHash  types.String   `tfsdk:"checkout_code_file_hash"`
-	CheckinCode           types.String   `tfsdk:"checkin_code"`
-	CheckoutCode          types.String   `tfsdk:"checkout_code"`
-	CodeLanguage          types.String   `tfsdk:"code_language"`
-	CheckinFileName       types.String   `tfsdk:"checkin_file_name"`
-	CheckoutFileName      types.String   `tfsdk:"checkout_file_name"`
-	Variables             []types.String `tfsdk:"variables"`
+	ID                   types.String   `tfsdk:"id"`
+	PermissionID         types.String   `tfsdk:"permission_id"`
+	Name                 types.String   `tfsdk:"name"`
+	Version              types.String   `tfsdk:"version"`
+	ResourceTypeID       types.String   `tfsdk:"resource_type_id"`
+	Description          types.String   `tfsdk:"description"`
+	CheckinTimeLimit     types.Int64    `tfsdk:"checkin_time_limit"`
+	CheckoutTimeLimit    types.Int64    `tfsdk:"checkout_time_limit"`
+	IsDraft              types.Bool     `tfsdk:"is_draft"`
+	InlineFileExists     types.Bool     `tfsdk:"inline_file_exists"`
+	ResponseTemplates    []types.String `tfsdk:"response_templates"`
+	ShowOrigCreds        types.Bool     `tfsdk:"show_orig_creds"`
+	CheckinCodeFile      types.String   `tfsdk:"checkin_code_file"`
+	CheckoutCodeFile     types.String   `tfsdk:"checkout_code_file"`
+	CheckinCodeFileHash  types.String   `tfsdk:"checkin_code_file_hash"`
+	CheckoutCodeFileHash types.String   `tfsdk:"checkout_code_file_hash"`
+	CheckinCode          types.String   `tfsdk:"checkin_code"`
+	CheckoutCode         types.String   `tfsdk:"checkout_code"`
+	CodeLanguage         types.String   `tfsdk:"code_language"`
+	CheckinFileName      types.String   `tfsdk:"checkin_file_name"`
+	CheckoutFileName     types.String   `tfsdk:"checkout_file_name"`
+	Variables            []types.String `tfsdk:"variables"`
 	// VariableDefaults is a types.Set rather than []VariableDefaultModel because a
 	// variable_defaults block built with a `dynamic` block inside a for_each/count
 	// resource is wholly unknown at validate/plan time, which a plain slice can't
@@ -651,12 +651,6 @@ func (r *ResourceTypePermissionsResource) Update(ctx context.Context, req resour
 	}
 	permission.PermissionID = permissionID
 
-	// The last variable_defaults block was removed from config: clear the defaults
-	// Terraform was managing.
-	if permission.VariableDefaults == nil && len(variableDefaultsFromSet(ctx, state.VariableDefaults, &resp.Diagnostics)) > 0 {
-		permission.VariableDefaults = &[]britive.ResourceTypePermissionVariableDefault{}
-	}
-
 	// Upload files or code
 	if !plan.CheckinCodeFile.IsNull() && plan.CheckinCodeFile.ValueString() != "" {
 		checkInFilePath := plan.CheckinCodeFile.ValueString()
@@ -774,10 +768,8 @@ func (r *ResourceTypePermissionsResource) ImportState(ctx context.Context, req r
 	// replace the imported permission on the next apply.
 	state.ResourceTypeID = types.StringValue(fmt.Sprintf("resource-manager/resource-types/%s", permission.ResourceTypeID))
 
-	// Map model to resource. Import always reads the defaults, so a config without
-	// variable_defaults shows them in the plan.
+	// Map model to resource
 	resp.Diagnostics.Append(r.mapModelToResource(ctx, permission, &state)...)
-	state.VariableDefaults = variableDefaultsFromAPI(ctx, permission, &resp.Diagnostics)
 
 	log.Printf("[INFO] Imported resource type permission: %s", permissionID)
 
@@ -799,13 +791,13 @@ func (r *ResourceTypePermissionsResource) mapResourceToModel(ctx context.Context
 	}
 
 	permission := &britive.ResourceTypePermission{
-		Name:        plan.Name.ValueString(),
-		Description: plan.Description.ValueString(),
-		IsDraft:     plan.IsDraft.ValueBool(),
-		CheckinTimeLimit: int(checkinTimeLimit),
+		Name:              plan.Name.ValueString(),
+		Description:       plan.Description.ValueString(),
+		IsDraft:           plan.IsDraft.ValueBool(),
+		CheckinTimeLimit:  int(checkinTimeLimit),
 		CheckoutTimeLimit: int(checkoutTimeLimit),
-		ShowOrigCreds: plan.ShowOrigCreds.ValueBool(),
-		Variables:     make([]interface{}, 0),
+		ShowOrigCreds:     plan.ShowOrigCreds.ValueBool(),
+		Variables:         make([]interface{}, 0),
 		ResponseTemplates: make([]interface{}, 0),
 	}
 
@@ -845,12 +837,9 @@ func (r *ResourceTypePermissionsResource) mapResourceToModel(ctx context.Context
 		}
 	}
 
-	// Handle variable defaults. When the config has no variable_defaults block they are
-	// left out of the request, as in provider versions without this block, so defaults
-	// set outside Terraform are kept. Update sends [] when the last block is removed.
-	if plan.VariableDefaults.IsNull() || plan.VariableDefaults.IsUnknown() {
-		return permission, nil
-	}
+	// Handle variable defaults. The config is the source of truth: the list is always
+	// sent, as [] when there are no blocks, so defaults not in the config (removed
+	// blocks, or defaults set outside Terraform) are cleared.
 	var diags diag.Diagnostics
 	defaults := variableDefaultsFromSet(ctx, plan.VariableDefaults, &diags)
 	if diags.HasError() {
@@ -916,20 +905,14 @@ func (r *ResourceTypePermissionsResource) mapModelToResource(ctx context.Context
 		state.ResponseTemplates = templateNames
 	}
 
-	// Map variable defaults only when Terraform manages them. A null set stays null: the
-	// config has no variable_defaults block (including state written by provider versions
-	// without it), so defaults set outside Terraform must not show up as drift. A managed
-	// set the API returns no defaults for becomes empty, so the post-apply value matches.
-	switch {
-	case state.VariableDefaults.IsNull():
-	case state.VariableDefaults.IsUnknown():
-		state.VariableDefaults = variableDefaultsFromAPI(ctx, permission, &diags)
-	default:
-		state.VariableDefaults = variableDefaultsFromAPI(ctx, permission, &diags)
-		if state.VariableDefaults.IsNull() {
-			state.VariableDefaults = variableDefaultsToSet(ctx, []VariableDefaultModel{}, &diags)
-		}
+	// Map variable defaults, including ones set outside Terraform, so they show as drift.
+	// When the API returns none, keep a null set null (config has no blocks, or this is
+	// an import) and otherwise use an empty set, so the post-apply value matches the plan.
+	apiDefaults := variableDefaultsFromAPI(ctx, permission, &diags)
+	if apiDefaults.IsNull() && !state.VariableDefaults.IsNull() && !state.VariableDefaults.IsUnknown() {
+		apiDefaults = variableDefaultsToSet(ctx, []VariableDefaultModel{}, &diags)
 	}
+	state.VariableDefaults = apiDefaults
 
 	return diags
 }
