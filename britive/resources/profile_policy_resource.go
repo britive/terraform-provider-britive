@@ -298,7 +298,7 @@ func (r *ProfilePolicyResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	// Get policy by ID to get the name
+	// Get policy by ID: returns the name, and members/condition with IDs
 	policyInfo, err := r.client.GetProfilePolicy(profileID, policyID)
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.State.RemoveResource(ctx)
@@ -312,7 +312,7 @@ func (r *ProfilePolicyResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	// Get full policy details by name
+	// Get full policy details by name: returns members/condition with names
 	profilePolicy, err := r.client.GetProfilePolicyByName(profileID, policyInfo.Name)
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.State.RemoveResource(ctx)
@@ -337,9 +337,10 @@ func (r *ProfilePolicyResource) Read(ctx context.Context, req resource.ReadReque
 	state.IsDraft = types.BoolValue(profilePolicy.IsDraft)
 	state.IsReadOnly = types.BoolValue(profilePolicy.IsReadOnly)
 
-	// Handle condition with comparison
+	// Handle condition with comparison. The configured value may use names (as returned
+	// by name) or IDs (as returned by ID), so compare against both responses.
 	newCondition := state.Condition.ValueString()
-	if britive.ConditionEqual(profilePolicy.Condition, newCondition) {
+	if britive.ConditionEqualAny(newCondition, profilePolicy.Condition, policyInfo.Condition) {
 		state.Condition = types.StringValue(newCondition)
 	} else {
 		state.Condition = types.StringValue(profilePolicy.Condition)
@@ -354,8 +355,16 @@ func (r *ProfilePolicyResource) Read(ctx context.Context, req resource.ReadReque
 		)
 		return
 	}
+	membersByIDJSON, err := json.Marshal(policyInfo.Members)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Marshaling Members",
+			fmt.Sprintf("Could not marshal members: %s", err.Error()),
+		)
+		return
+	}
 	newMembers := state.Members.ValueString()
-	if britive.MembersEqual(string(membersJSON), newMembers) {
+	if britive.MembersEqualAny(newMembers, string(membersJSON), string(membersByIDJSON)) {
 		state.Members = types.StringValue(newMembers)
 	} else {
 		state.Members = types.StringValue(string(membersJSON))
@@ -429,10 +438,10 @@ func (r *ProfilePolicyResource) Update(ctx context.Context, req resource.UpdateR
 	}
 	profilePolicy.Associations = associations
 
-	// Get old name for update
-	oldName := state.PolicyName.ValueString()
+	// Address the policy by ID or by its old name, matching how the body references members
+	policyIdentifier := policyUpdateIdentifier(policyID, state.PolicyName.ValueString(), profilePolicy.Members)
 
-	_, err = r.client.UpdateProfilePolicy(profilePolicy, oldName)
+	_, err = r.client.UpdateProfilePolicy(profilePolicy, policyIdentifier)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Profile Policy",
@@ -767,13 +776,13 @@ func (r *ProfilePolicyResource) populateStateFromAPI(ctx context.Context, state 
 		return err
 	}
 
-	// Get policy by ID to get the name
+	// Get policy by ID: returns the name, and members/condition with IDs
 	policyInfo, err := r.client.GetProfilePolicy(profileID, policyID)
 	if err != nil {
 		return err
 	}
 
-	// Get full policy details by name
+	// Get full policy details by name: returns members/condition with names
 	profilePolicy, err := r.client.GetProfilePolicyByName(profileID, policyInfo.Name)
 	if err != nil {
 		return err
@@ -790,9 +799,10 @@ func (r *ProfilePolicyResource) populateStateFromAPI(ctx context.Context, state 
 	state.IsDraft = types.BoolValue(profilePolicy.IsDraft)
 	state.IsReadOnly = types.BoolValue(profilePolicy.IsReadOnly)
 
-	// Handle condition with comparison
+	// Handle condition with comparison. The configured value may use names (as returned
+	// by name) or IDs (as returned by ID), so compare against both responses.
 	newCondition := state.Condition.ValueString()
-	if britive.ConditionEqual(profilePolicy.Condition, newCondition) {
+	if britive.ConditionEqualAny(newCondition, profilePolicy.Condition, policyInfo.Condition) {
 		state.Condition = types.StringValue(newCondition)
 	} else {
 		state.Condition = types.StringValue(profilePolicy.Condition)
@@ -803,8 +813,12 @@ func (r *ProfilePolicyResource) populateStateFromAPI(ctx context.Context, state 
 	if err != nil {
 		return err
 	}
+	membersByIDJSON, err := json.Marshal(policyInfo.Members)
+	if err != nil {
+		return err
+	}
 	newMembers := state.Members.ValueString()
-	if britive.MembersEqual(string(membersJSON), newMembers) {
+	if britive.MembersEqualAny(newMembers, string(membersJSON), string(membersByIDJSON)) {
 		state.Members = types.StringValue(newMembers)
 	} else {
 		state.Members = types.StringValue(string(membersJSON))

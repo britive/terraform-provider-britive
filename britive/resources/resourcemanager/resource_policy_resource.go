@@ -188,7 +188,7 @@ func (r *ResourcePolicyResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	r.mapModelToResource(ctx, readResp, &plan, &resp.Diagnostics)
+	r.mapModelToResource(ctx, readResp, r.getPolicyByID(created.PolicyID), &plan, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -216,7 +216,7 @@ func (r *ResourcePolicyResource) Read(ctx context.Context, req resource.ReadRequ
 
 	log.Printf("[INFO] Received resource manager resource policy: %#v", resourceManagerResourcePolicy)
 
-	r.mapModelToResource(ctx, resourceManagerResourcePolicy, &state, &resp.Diagnostics)
+	r.mapModelToResource(ctx, resourceManagerResourcePolicy, r.getPolicyByID(r.parseUniqueID(state.ID.ValueString())), &state, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -259,7 +259,7 @@ func (r *ResourcePolicyResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	r.mapModelToResource(ctx, readResp, &plan, &resp.Diagnostics)
+	r.mapModelToResource(ctx, readResp, r.getPolicyByID(policyID), &plan, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -320,7 +320,7 @@ func (r *ResourcePolicyResource) ImportState(ctx context.Context, req resource.I
 	var state ResourcePolicyResourceModel
 	state.ID = types.StringValue(fmt.Sprintf("resource-manager/policies/%s", resourcePolicy.PolicyID))
 
-	r.mapModelToResource(ctx, resourcePolicy, &state, &resp.Diagnostics)
+	r.mapModelToResource(ctx, resourcePolicy, nil, &state, &resp.Diagnostics)
 
 	log.Printf("[INFO] Imported resource manager resource policy: %s", policyName)
 
@@ -375,7 +375,24 @@ func (r *ResourcePolicyResource) mapResourceToModel(ctx context.Context, plan *R
 	return policy, nil
 }
 
-func (r *ResourcePolicyResource) mapModelToResource(ctx context.Context, policy *britive.ResourceManagerResourcePolicy, state *ResourcePolicyResourceModel, diags *diag.Diagnostics) {
+// getPolicyByID fetches the policy by ID, which returns members and condition with IDs
+// rather than names. It returns nil if the policy can't be fetched by ID, in which case
+// the configured values are compared against the by-name response only.
+func (r *ResourcePolicyResource) getPolicyByID(policyID string) *britive.ResourceManagerResourcePolicy {
+	if policyID == "" {
+		return nil
+	}
+	policy, err := r.client.GetResourceManagerResourcePolicy(policyID)
+	if err != nil {
+		log.Printf("[WARN] Could not read resource manager resource policy by ID %s: %s", policyID, err)
+		return nil
+	}
+	return policy
+}
+
+// mapModelToResource maps policy, fetched by name, to state. policyByID is the same policy
+// fetched by ID, or nil; the configured condition and members are kept if they match either.
+func (r *ResourcePolicyResource) mapModelToResource(ctx context.Context, policy *britive.ResourceManagerResourcePolicy, policyByID *britive.ResourceManagerResourcePolicy, state *ResourcePolicyResourceModel, diags *diag.Diagnostics) {
 	state.PolicyName = types.StringValue(policy.Name)
 	state.Description = types.StringValue(policy.Description)
 	state.Consumer = types.StringValue(policy.Consumer)
@@ -397,8 +414,14 @@ func (r *ResourcePolicyResource) mapModelToResource(ctx context.Context, policy 
 		}
 	}
 
+	// The configured condition may use names (by-name response) or IDs (by-ID response)
+	conditionCandidates := []string{normalizedCondition}
+	if policyByID != nil {
+		conditionCandidates = append(conditionCandidates, policyByID.Condition)
+	}
+
 	// Use user's condition if it matches normalized API condition, otherwise use API's
-	if !state.Condition.IsNull() && britive.ConditionEqual(normalizedCondition, state.Condition.ValueString()) {
+	if !state.Condition.IsNull() && britive.ConditionEqualAny(state.Condition.ValueString(), conditionCandidates...) {
 		// Keep user's format
 	} else {
 		state.Condition = types.StringValue(normalizedCondition)
@@ -408,8 +431,15 @@ func (r *ResourcePolicyResource) mapModelToResource(ctx context.Context, policy 
 	if policy.Members != nil {
 		mem, err := json.Marshal(policy.Members)
 		if err == nil {
+			// The configured members may use names (by-name response) or IDs (by-ID response)
+			membersCandidates := []string{string(mem)}
+			if policyByID != nil && policyByID.Members != nil {
+				if memByID, err := json.Marshal(policyByID.Members); err == nil {
+					membersCandidates = append(membersCandidates, string(memByID))
+				}
+			}
 			// Use user's members if it matches normalized API members, otherwise use API's
-			if !state.Members.IsNull() && britive.MembersEqual(string(mem), state.Members.ValueString()) {
+			if !state.Members.IsNull() && britive.MembersEqualAny(state.Members.ValueString(), membersCandidates...) {
 				// Keep user's format
 			} else {
 				state.Members = types.StringValue(string(mem))
