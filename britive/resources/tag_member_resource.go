@@ -22,6 +22,7 @@ var (
 	_ resource.Resource                = &TagMemberResource{}
 	_ resource.ResourceWithConfigure   = &TagMemberResource{}
 	_ resource.ResourceWithImportState = &TagMemberResource{}
+	_ resource.ResourceWithModifyPlan  = &TagMemberResource{}
 )
 
 func NewTagMemberResource() resource.Resource {
@@ -109,6 +110,48 @@ func (r *TagMemberResource) Configure(_ context.Context, req resource.ConfigureR
 	r.client = client
 }
 
+// ModifyPlan refuses, at plan time, adding a member to a connected external
+// tag: once the identity provider has linked the tag through SCIM, Britive
+// reserves membership for the identity provider (the API answers UT-0004).
+// Only create and recreate plans are checked; the resource has no updatable
+// arguments.
+func (r *TagMemberResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || !req.State.Raw.IsNull() || r.client == nil {
+		return
+	}
+
+	var tagID types.String
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("tag_id"), &tagID)...)
+	if resp.Diagnostics.HasError() || tagID.IsNull() || tagID.IsUnknown() || tagID.ValueString() == "" {
+		return
+	}
+
+	tag, err := r.client.GetTag(tagID.ValueString())
+	if err != nil {
+		// Create reports lookup failures with the real error.
+		return
+	}
+	if tag.External {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("tag_id"),
+			"Cannot Add Member To Connected External Tag",
+			connectedTagMembershipGuidance(tag),
+		)
+	}
+}
+
+func connectedTagMembershipGuidance(tag *britive.Tag) string {
+	idpName := ""
+	if len(tag.UserTagIdentityProviders) > 0 {
+		idpName = tag.UserTagIdentityProviders[0].IdentityProvider.Name
+	}
+	return fmt.Sprintf("Tag '%s' (%s) is connected to identity provider '%s' through SCIM, and Britive reserves its membership "+
+		"for the identity provider. Add the user to the group in '%s' instead. If this member was added while the tag was still "+
+		"a placeholder, the identity provider's sync has since replaced the tag's membership with the group's; remove this "+
+		"britive_tag_member resource from the configuration (or use a removed block) and manage the membership in '%s'.",
+		tag.Name, tag.ID, idpName, idpName, idpName)
+}
+
 func (r *TagMemberResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan TagMemberResourceModel
 
@@ -139,6 +182,13 @@ func (r *TagMemberResource) Create(ctx context.Context, req resource.CreateReque
 
 	// Create tag member
 	err := r.client.CreateTagMember(tagID, userID)
+	if err != nil && strings.HasPrefix(err.Error(), errCodeExternalTagAddUser) {
+		// The tag was connected between plan and apply.
+		if tag, tagErr := r.client.GetTag(tagID); tagErr == nil {
+			resp.Diagnostics.AddAttributeError(path.Root("tag_id"), "Cannot Add Member To Connected External Tag", connectedTagMembershipGuidance(tag))
+			return
+		}
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Tag Member",
@@ -188,6 +238,21 @@ func (r *TagMemberResource) Read(ctx context.Context, req resource.ReadRequest, 
 	// Get tag member
 	user, err := r.client.GetTagMember(tagID, userID)
 	if errors.Is(err, britive.ErrNotFound) {
+		// A member added while the tag was a placeholder disappears when the
+		// identity provider connects the tag: SCIM replaces the membership with
+		// the group's. Say so, because the next plan will refuse to re-add it.
+		if tag, tagErr := r.client.GetTag(tagID); tagErr == nil && tag.External {
+			idpName := ""
+			if len(tag.UserTagIdentityProviders) > 0 {
+				idpName = tag.UserTagIdentityProviders[0].IdentityProvider.Name
+			}
+			resp.Diagnostics.AddWarning(
+				"Tag Member Replaced By Identity Provider Sync",
+				fmt.Sprintf("User '%s' is no longer a member of tag '%s' (%s). The tag is now connected to identity provider '%s' "+
+					"through SCIM, which owns its membership. The resource has been removed from state; remove it from the "+
+					"configuration too, since Britive will refuse to re-add the member.", state.Username.ValueString(), tag.Name, tagID, idpName),
+			)
+		}
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -233,6 +298,23 @@ func (r *TagMemberResource) Delete(ctx context.Context, req resource.DeleteReque
 
 	err = r.client.DeleteTagMember(tagID, userID)
 	if err != nil {
+		// A tag that was connected through SCIM after the member was added belongs
+		// to the identity provider; Britive refuses membership changes on it. The
+		// member stays in Britive (the identity provider decides) and only leaves
+		// Terraform state.
+		if tag, tagErr := r.client.GetTag(tagID); tagErr == nil && tag.External {
+			idpName := ""
+			if len(tag.UserTagIdentityProviders) > 0 {
+				idpName = tag.UserTagIdentityProviders[0].IdentityProvider.Name
+			}
+			resp.Diagnostics.AddWarning(
+				"Tag Member Not Removed From Connected External Tag",
+				fmt.Sprintf("Tag '%s' (%s) is now connected to identity provider '%s' through SCIM, which owns its membership. "+
+					"Britive refused the removal (%s). The member has been removed from Terraform state only; remove the user "+
+					"from the group in '%s' to change membership.", tag.Name, tagID, idpName, err.Error(), idpName),
+			)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Deleting Tag Member",
 			fmt.Sprintf("Could not delete tag member %s/%s: %s", tagID, userID, err.Error()),

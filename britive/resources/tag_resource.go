@@ -253,7 +253,7 @@ func (r *TagResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	state.Name = types.StringValue(tag.Name)
 	normalizeTagDescription(tag.Description, &state.Description)
 	state.Disabled = types.BoolValue(strings.EqualFold(tag.Status, "Inactive"))
-	state.External = types.BoolValue(tag.External.(bool))
+	state.External = types.BoolValue(tag.External)
 	state.Requestable = types.BoolValue(tag.Requestable)
 	state.Attributes = mapTagAttributesToModel(tag.Attributes)
 
@@ -286,7 +286,7 @@ func (r *TagResource) populateStateFromAPI(ctx context.Context, state *TagResour
 		state.Description = types.StringValue(tag.Description)
 	}
 	state.Disabled = types.BoolValue(strings.EqualFold(tag.Status, "Inactive"))
-	state.External = types.BoolValue(tag.External.(bool))
+	state.External = types.BoolValue(tag.External)
 	state.Requestable = types.BoolValue(tag.Requestable)
 	state.Attributes = mapTagAttributesToModel(tag.Attributes)
 
@@ -448,11 +448,11 @@ func (r *TagResource) ImportState(ctx context.Context, req resource.ImportStateR
 		return
 	}
 
-	// Check if tag is external
-	if external, ok := tag.External.(bool); ok && external {
+	// Tags on non-default identity providers belong to britive_external_tag
+	if tag.External || !isDefaultIdentityProviderTag(tag) {
 		resp.Diagnostics.AddError(
 			"Cannot Import External Tag",
-			fmt.Sprintf("Importing external tags is not supported. Attempted to import tag '%s'.", tagName),
+			fmt.Sprintf("Tag '%s' belongs to a non-default identity provider. Import it with the britive_external_tag resource instead.", tagName),
 		)
 		return
 	}
@@ -535,8 +535,17 @@ func (r *TagResource) validateForExternalTag(identityProviderID, tagName string)
 	}
 
 	if !strings.EqualFold(identityProvider.Type, "DEFAULT") {
-		return fmt.Errorf("managing external tags is not supported. Attempted to manage tag '%s'", tagName)
+		return fmt.Errorf("tag '%s' is on identity provider '%s' (type %s). Tags on non-default identity providers are external tags; manage them with the britive_external_tag resource", tagName, identityProvider.Name, identityProvider.Type)
 	}
 
 	return nil
+}
+
+// isDefaultIdentityProviderTag reports whether the tag's identity provider is
+// Britive's default provider. Tags on any other provider are external tags.
+func isDefaultIdentityProviderTag(tag *britive.Tag) bool {
+	if len(tag.UserTagIdentityProviders) == 0 {
+		return true
+	}
+	return strings.EqualFold(tag.UserTagIdentityProviders[0].IdentityProvider.Type, "DEFAULT")
 }

@@ -10,8 +10,7 @@ description: |-
 
 This resource allows you to create and configure a Britive tag.
 
-!> This resource does not allow you to add external tags. External tags are tags managed by Identity Providers other than the Britive Default Identity Provider.  
-If you try to add an external tag using this resource, an error message will be displayed.
+-> This resource manages tags on Britive's default identity provider only. Tags on any other identity provider (Okta, Entra ID, OneLogin, ...) are external tags and are managed with the [`britive_external_tag`](external_tag.md) resource. Using a non-default `identity_provider_id` here returns an error that points to that resource.
 
 ## Example Usage
 
