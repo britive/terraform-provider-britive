@@ -43,7 +43,7 @@ data "britive_tag" "example" {
 
 ```hcl
 data "britive_tag" "example" {
-    tag_id = "2utfgbi5320i2lnyhnmt"
+    tag_id = "{{tag_id}}"
 }
 
 output "tag_name" {

@@ -1,4 +1,4 @@
-## 3.0.5 (Unreleased)
+## 3.0.5
 
 ENHANCEMENTS:
 * **New Resource:** `britive_external_tag` : Create and manage external tags, i.e. tags on a non-default identity provider that the identity provider connects through SCIM. Terraform creates the placeholder (full lifecycle, including members via `britive_tag_member`) and, once connected, keeps managing `requestable`, `attributes` and, where the identity provider allows it, `description`. Changes the API reserves for the identity provider (`name`, status, members, delete) are refused at plan time with the reason; destroying a connected tag removes it from state with a warning instead of failing. A name that already exists on the provider (the identity-provider-first case) is refused at plan time with import guidance. Import by id or by unique name, including with `import` blocks.

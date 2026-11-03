@@ -67,7 +67,7 @@ When the group was pushed from the identity provider before Terraform ran, the t
 ```hcl
 import {
   to = britive_external_tag.platform_admins
-  id = "2utfgbi5320i2lnyhnmt"
+  id = "{{tag_id}}"
 }
 
 resource "britive_external_tag" "platform_admins" {
@@ -80,7 +80,7 @@ resource "britive_external_tag" "platform_admins" {
 or with the CLI:
 
 ```sh
-terraform import britive_external_tag.platform_admins 2utfgbi5320i2lnyhnmt
+terraform import britive_external_tag.platform_admins {{tag_id}}
 ```
 
 After the import the resource behaves exactly as a connected tag created from Terraform.
