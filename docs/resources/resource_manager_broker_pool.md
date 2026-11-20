@@ -65,8 +65,7 @@ resets it to its default.
 
 ~> **Important:** `tokens` is the exact set of tokens on the pool. A token in Britive that is
 not in the map is deleted. `tokens` must have at least one token, and when the pool is created
-it must include `default` token, for example `tokens = { default = { status = "ACTIVE" } }`. Britive
-allows at most 3 tokens per pool, at most 2 of them `ACTIVE`, and at least 1 `ACTIVE`.
+it must include `default` token, for example `tokens = { default = { status = "ACTIVE" } }`.
 
 ## Attribute Reference
 
@@ -82,7 +81,7 @@ In addition to the arguments above, the following attributes are exported:
 * `tokens.<name>.created` - When the token was created.
 
 ~> **Note:** Token values are not attributes of this resource and are never stored in the
-Terraform state or in a plan file. Read a value with the
+Terraform state. Read a value with the
 [`britive_resource_manager_broker_pool_token`](../ephemeral-resources/resource_manager_broker_pool_token.md)
 ephemeral resource (Terraform 1.10 or later) and pass it to a write-only argument, for example
 of a secret store.
@@ -102,24 +101,6 @@ The provider checks these rules in the plan, before any API call:
 * A token name allows letters, numbers, `_` and `-`.
 
 A token name cannot be changed: a new key is a new token with a new value.
-
-### The default token
-
-Britive creates a token named `default` with every pool. It is `ACTIVE` and its description is
-"default token for pool".
-
-When the pool is created, `tokens` must include `default`. The provider does not create a
-second token: it takes over the existing one and sets its status and description from the
-configuration. A missing description means an empty string. The plan fails if `default` is
-missing on create.
-
-After the pool exists, `default` is a normal token. You can change its status or description,
-or remove it from `tokens`, which deletes it from Britive like any other token (after the
-other tokens are created and activated). If the pool is later created again (for example,
-because it was deleted outside Terraform), `tokens` must include `default` again.
-
-A deleted default token is created again when `default` is added back to `tokens`. It gets a
-new value.
 
 ## Import
 

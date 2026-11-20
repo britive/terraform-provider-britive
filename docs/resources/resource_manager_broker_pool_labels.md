@@ -11,15 +11,6 @@ description: |-
 The `britive_resource_manager_broker_pool_labels` resource manages all labels of a broker pool
 in one resource. Each label key is one `resource_labels` block.
 
-This resource owns every label on the pool: label keys that are not in the configuration,
-including keys added outside Terraform, are removed on the next apply.
-
-The pool can already have labels when this resource is created, for example labels added in
-the UI. On create, configured keys that already exist get the configured values, and the other
-configured keys are added. Keys that are not in the configuration are not touched on create.
-The next plan shows them being removed, so you can add them to the configuration first if you
-want to keep them.
-
 ~> **Important:** A pool must have only one `britive_resource_manager_broker_pool_labels`
 resource. Put all of the pool's labels in that one resource as separate `resource_labels`
 blocks. If two of these resources point to the same pool, each one removes the other's labels

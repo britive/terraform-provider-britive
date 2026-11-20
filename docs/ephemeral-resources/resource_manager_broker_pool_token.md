@@ -9,14 +9,14 @@ description: |-
 # britive_resource_manager_broker_pool_token Ephemeral Resource
 
 The `britive_resource_manager_broker_pool_token` ephemeral resource reads the secret value of a
-broker pool token, including the pool's `default` token. Brokers use this value to join the
+broker pool token. Brokers use this value to join the
 pool.
 
 The [`britive_resource_manager_broker_pool`](../resources/resource_manager_broker_pool.md)
 resource manages the pool's tokens but does not store their values. Use this ephemeral resource
 to read a value. Terraform
 reads it again on every plan and apply and keeps the value in memory for that run only, so the
-value is never written to the state file or to a plan file.
+value is never written to the state file.
 
 ~> **Note:** Ephemeral resources need Terraform 1.10 or later. Write-only arguments, used in
 the examples below, need Terraform 1.11 or later. The other broker pool resources work on older
@@ -78,32 +78,43 @@ resource "vault_kv_secret_v2" "broker_token" {
 }
 ```
 
-### Pass the token to a script
+### Start a broker with the token
 
-Use this when the target has no Terraform resource with a write-only argument. This pattern
-needs only Terraform 1.10. Pass the token in the environment, not on the command line.
+Use this when the broker runs on the same host as Terraform. This pattern needs only Terraform
+1.10. The token is passed to the broker in the environment, not on the command line or in a
+file.
 
 ```hcl
-resource "terraform_data" "broker_token_secret" {
-  # The script runs on create and when one of these values changes.
+resource "terraform_data" "broker" {
+  # The broker is started on create and when one of these values changes. A new default token
+  # gets a new id, so the broker is restarted with it.
   triggers_replace = {
-    pool_id       = britive_resource_manager_broker_pool.east.pool_id
-    token_version = 1
+    default_token_id = britive_resource_manager_broker_pool.east.tokens["default"].id
+    version          = 1 # increase to restart the broker
   }
 
   provisioner "local-exec" {
-    command = "python3 ${path.module}/store_broker_token.py"
+    # Stop any running broker, then start the new one in the background so terraform apply
+    # does not wait for it. The last line fails the apply if the broker is not running.
+    command = <<-EOT
+      cd /opt/britive-broker
+      pkill -x britive-broker || true
+      sleep 2
+      nohup setsid ./britive-broker run > broker.log 2>&1 < /dev/null &
+      sleep 5
+      pgrep -x britive-broker > /dev/null
+    EOT
 
     environment = {
-      BROKER_POOL_TOKEN = ephemeral.britive_resource_manager_broker_pool_token.default.token_value
+      BRITIVE_BROKER_AUTH_TOKEN = ephemeral.britive_resource_manager_broker_pool_token.default.token_value
     }
   }
 }
 ```
 
-The script can store the token anywhere. Terraform does not detect later changes to the stored
-value and does not remove it on destroy. Terraform hides all output of a `local-exec` script
-that receives an ephemeral value.
+Terraform hides all output of a `local-exec` script that receives an ephemeral value, so check
+`broker.log` in the broker directory to see how the broker started. Terraform does not stop the
+broker on destroy.
 
 ## Argument Reference
 
@@ -121,25 +132,3 @@ that receives an ephemeral value.
 
 If the token does not exist, the plan or apply fails with the error "Broker Pool Token Not
 Found".
-
-## Usage Notes
-
-* Reference a token's `id` from the pool's `tokens` map in `token_id`. The `id` is unknown until
-  the token exists, so Terraform waits until the token is created before it reads the value. A
-  `token_id` written as a string is read during the plan, before a new token exists.
-* You can read only a token that is in the pool's `tokens`. If you remove a token from `tokens`,
-  the provider deletes it, so also remove the ephemeral resource that reads it. A reference to a
-  key that is not in `tokens`, such as `tokens["default"].id` after `default` was removed, fails
-  with Terraform's "Invalid index" error. A `token_id` written as a string fails with "Broker
-  Pool Token Not Found" instead.
-* The value cannot be shown with an `output`: Terraform rejects ephemeral values in root module
-  outputs, and hides all output of a `local-exec` that receives one. To check a value while
-  testing, compare a hash of it (for example `sha256sum` in a `local-exec`) with the token in
-  the Britive UI.
-* A write-only argument is sent again only when its version argument changes. Terraform cannot
-  compare the value, because the state holds `null`.
-* A token value cannot be changed. To rotate, add a new token to the pool's `tokens` with a new
-  name, increase the version argument, move the brokers to the new token, and then remove the
-  old token from `tokens`. A pool allows 3 tokens, 2 of them active.
-* Terraform rejects the token in normal arguments such as `user_data`, so it cannot leak into
-  the state through another resource.
