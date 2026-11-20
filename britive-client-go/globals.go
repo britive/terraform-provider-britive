@@ -32,6 +32,7 @@ const (
 	resourceManagerProfilePermission = "resourceManagerProfilePermission"
 	serverAccessLockName             = "serverAccess"
 	resourceManagerResourcePolicy    = "resourceManagerResourcePolicy"
+	brokerPoolLockName               = "brokerPool"
 )
 
 var (

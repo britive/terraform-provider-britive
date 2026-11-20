@@ -39,6 +39,14 @@ provider "britive" {
 }
 ```
 
+## Terraform Version Requirements
+
+Ephemeral resources, such as
+[`britive_resource_manager_broker_pool_token`](ephemeral-resources/resource_manager_broker_pool_token.md),
+need Terraform 1.10 or later. Write-only arguments, which accept ephemeral values, need
+Terraform 1.11 or later. All other resources and data sources of this provider also work on
+older Terraform versions.
+
 ## Authentication
 
 !>Hard-coded credentials are not recommended in the terraform configuration, as this risks secret leakage should this file ever be committed to a public version control system. This mode of authentication will be deprecated in future releases.
