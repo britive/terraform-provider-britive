@@ -1,5 +1,5 @@
 // Package brokerpool holds the pieces shared by the britive_resource_manager_broker_pool
-// resource and data source: the read-only "brokers" and "resources" lists, the checks on token
+// resource and data source: the read-only "brokers", "resources" and "tokens" values, the checks on token
 // and label names, and the planner that changes a pool's tokens one API call at a time.
 package brokerpool
 
@@ -85,6 +85,42 @@ func BrokersToList(ctx context.Context, brokers []britive.RemoteBroker, diags *d
 	list, d := types.ListValueFrom(ctx, BrokerObjectType, models)
 	diags.Append(d...)
 	return list
+}
+
+// TokenModel is one element of the "tokens" map of the pool resource and data source. The map
+// key is the token name. The token value is deliberately not part of it.
+type TokenModel struct {
+	Status      types.String `tfsdk:"status"`
+	Description types.String `tfsdk:"description"`
+	ID          types.String `tfsdk:"id"`
+	Created     types.String `tfsdk:"created"`
+}
+
+// TokenObjectType mirrors TokenModel.
+var TokenObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"status":      types.StringType,
+		"description": types.StringType,
+		"id":          types.StringType,
+		"created":     types.StringType,
+	},
+}
+
+// TokensToMap converts the API's tokens into the "tokens" map value. The token value is
+// deliberately not copied.
+func TokensToMap(ctx context.Context, poolID string, tokens []britive.RemoteBrokerPoolToken, diags *diag.Diagnostics) types.Map {
+	models := make(map[string]TokenModel, len(tokens))
+	for _, token := range tokens {
+		models[token.TokenName] = TokenModel{
+			Status:      types.StringValue(token.Status),
+			Description: types.StringValue(token.Description),
+			ID:          types.StringValue(TokenID(poolID, token.TokenName)),
+			Created:     types.StringValue(token.Created),
+		}
+	}
+	value, d := types.MapValueFrom(ctx, TokenObjectType, models)
+	diags.Append(d...)
+	return value
 }
 
 // LinkedResourcesToList converts the API's linked resources into the "resources" list value.

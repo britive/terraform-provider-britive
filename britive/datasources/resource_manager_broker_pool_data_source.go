@@ -22,7 +22,7 @@ func NewResourceManagerBrokerPoolDataSource() datasource.DataSource {
 }
 
 // ResourceManagerBrokerPoolDataSource looks up an existing broker pool by its exact name,
-// together with its active brokers and linked resources. It never returns token values.
+// together with its active brokers, linked resources and tokens. It never returns token values.
 type ResourceManagerBrokerPoolDataSource struct {
 	client *britive.Client
 }
@@ -38,6 +38,7 @@ type ResourceManagerBrokerPoolDataSourceModel struct {
 	BrokerCount       types.Int64  `tfsdk:"broker_count"`
 	Brokers           types.List   `tfsdk:"brokers"`
 	Resources         types.List   `tfsdk:"resources"`
+	Tokens            types.Map    `tfsdk:"tokens"`
 }
 
 // Metadata returns the data source type name.
@@ -102,6 +103,18 @@ func (d *ResourceManagerBrokerPoolDataSource) Schema(_ context.Context, _ dataso
 					},
 				},
 			},
+			"tokens": schema.MapNestedAttribute{
+				Computed:    true,
+				Description: "The tokens of the pool, as a map with the token name as the key. Token values are not returned; read one with the britive_resource_manager_broker_pool_token ephemeral resource.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"status":      schema.StringAttribute{Computed: true, Description: "ACTIVE or INACTIVE."},
+						"description": schema.StringAttribute{Computed: true, Description: "The token description."},
+						"id":          schema.StringAttribute{Computed: true, Description: "The token ID, in the form {pool_id}/{token_name}. Pass it to the token_id of the britive_resource_manager_broker_pool_token ephemeral resource."},
+						"created":     schema.StringAttribute{Computed: true, Description: "When the token was created."},
+					},
+				},
+			},
 		},
 	}
 }
@@ -124,7 +137,7 @@ func (d *ResourceManagerBrokerPoolDataSource) Configure(_ context.Context, req d
 	d.client = client
 }
 
-// Read finds the pool by exact name, then reads its active brokers and linked resources.
+// Read finds the pool by exact name, then reads its active brokers, linked resources and tokens.
 func (d *ResourceManagerBrokerPoolDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data ResourceManagerBrokerPoolDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -171,6 +184,12 @@ func (d *ResourceManagerBrokerPoolDataSource) Read(ctx context.Context, req data
 		return
 	}
 
+	tokens, err := d.client.GetBrokerPoolTokens(pool.PoolID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Reading Broker Pool Tokens", err.Error())
+		return
+	}
+
 	data.ID = types.StringValue(brokerpool.PoolCompositeID(pool.PoolID))
 	data.PoolID = types.StringValue(pool.PoolID)
 	data.Description = types.StringValue(pool.Description)
@@ -179,6 +198,7 @@ func (d *ResourceManagerBrokerPoolDataSource) Read(ctx context.Context, req data
 	data.BrokerCount = types.Int64Value(int64(pool.BrokerCount))
 	data.Brokers = brokerpool.BrokersToList(ctx, brokers, &resp.Diagnostics)
 	data.Resources = brokerpool.LinkedResourcesToList(ctx, linked, &resp.Diagnostics)
+	data.Tokens = brokerpool.TokensToMap(ctx, pool.PoolID, tokens, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

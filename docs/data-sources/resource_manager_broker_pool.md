@@ -9,7 +9,7 @@ description: |-
 # britive_resource_manager_broker_pool Data Source
 
 This data source retrieves an existing broker pool by its exact name, together with its active
-brokers and the resources linked to it. It does not return token values.
+brokers, the resources linked to it and its tokens. It does not return token values.
 
 ## Example Usage
 
@@ -25,6 +25,11 @@ resource "britive_resource_manager_resource_broker_pools" "db" {
 
 output "shared_pool_brokers" {
   value = data.britive_resource_manager_broker_pool.shared.brokers[*].broker_name
+}
+
+# Read the value of the pool's default token without storing it in the state.
+ephemeral "britive_resource_manager_broker_pool_token" "shared_default" {
+  token_id = data.britive_resource_manager_broker_pool.shared.tokens["default"].id
 }
 ```
 
@@ -46,3 +51,13 @@ The following attributes are exported:
 - `broker_count` – The number of brokers in the pool.
 - `brokers` – The active brokers in the pool. Each item has `broker_id`, `broker_name`, `status`, `status_timestamp` and `created`.
 - `resources` – The resources linked to the pool. Each item has `resource_id`, `name` and `resource_type_name`.
+- `tokens` – The tokens of the pool, as a map with the token name as the key. Each token has:
+  - `status` – `ACTIVE` or `INACTIVE`.
+  - `description` – The token description.
+  - `id` – The token ID, in the form `{pool_id}/{token_name}`. Pass it to the `token_id` of the [`britive_resource_manager_broker_pool_token`](../ephemeral-resources/resource_manager_broker_pool_token.md) ephemeral resource.
+  - `created` – When the token was created.
+
+~> **Note:** Token values are not attributes of this data source and are never stored in the
+Terraform state. Read a value with the
+[`britive_resource_manager_broker_pool_token`](../ephemeral-resources/resource_manager_broker_pool_token.md)
+ephemeral resource.

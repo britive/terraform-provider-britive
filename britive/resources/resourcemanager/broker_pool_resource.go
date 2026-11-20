@@ -11,7 +11,6 @@ import (
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/brokerpool"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -57,24 +56,6 @@ type BrokerPoolResourceModel struct {
 	DisconnectSeconds types.Int64  `tfsdk:"disconnect_seconds"`
 	BrokerCount       types.Int64  `tfsdk:"broker_count"`
 	Tokens            types.Map    `tfsdk:"tokens"`
-}
-
-// brokerPoolTokenModel is one element of the tokens map. The map key is the token name.
-type brokerPoolTokenModel struct {
-	Status      types.String `tfsdk:"status"`
-	Description types.String `tfsdk:"description"`
-	ID          types.String `tfsdk:"id"`
-	Created     types.String `tfsdk:"created"`
-}
-
-// brokerPoolTokenObjectType mirrors brokerPoolTokenModel.
-var brokerPoolTokenObjectType = types.ObjectType{
-	AttrTypes: map[string]attr.Type{
-		"status":      types.StringType,
-		"description": types.StringType,
-		"id":          types.StringType,
-		"created":     types.StringType,
-	},
 }
 
 // maxTokenSteps stops the token changes if they ever loop. Any valid change needs at most 6.
@@ -357,7 +338,7 @@ func (r *BrokerPoolResource) Read(ctx context.Context, req resource.ReadRequest,
 		resp.Diagnostics.AddError("Error Reading Broker Pool Tokens", err.Error())
 		return
 	}
-	state.Tokens = brokerPoolTokensToMap(ctx, poolID, tokens, &resp.Diagnostics)
+	state.Tokens = brokerpool.TokensToMap(ctx, poolID, tokens, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -457,7 +438,7 @@ func (r *BrokerPoolResource) ImportState(ctx context.Context, req resource.Impor
 // afterwards into plan.Tokens. If a call fails, plan.Tokens holds the tokens Britive really has
 // and an error is added, so the next plan shows what is left to change.
 func (r *BrokerPoolResource) applyTokens(ctx context.Context, poolID string, plan *BrokerPoolResourceModel, diags *diag.Diagnostics) {
-	desired := make(map[string]brokerPoolTokenModel, len(plan.Tokens.Elements()))
+	desired := make(map[string]brokerpool.TokenModel, len(plan.Tokens.Elements()))
 	diags.Append(plan.Tokens.ElementsAs(ctx, &desired, false)...)
 	if diags.HasError() {
 		return
@@ -468,7 +449,7 @@ func (r *BrokerPoolResource) applyTokens(ctx context.Context, poolID string, pla
 	}
 
 	held, err := r.syncTokens(poolID, specs)
-	plan.Tokens = brokerPoolTokensToMap(ctx, poolID, held, diags)
+	plan.Tokens = brokerpool.TokensToMap(ctx, poolID, held, diags)
 	if err != nil {
 		diags.AddError("Error Updating Broker Pool Tokens", err.Error())
 	}
@@ -580,23 +561,6 @@ func brokerPoolTokenSpecs(tokens []britive.RemoteBrokerPoolToken) map[string]bro
 		specs[token.TokenName] = brokerpool.TokenSpec{Status: token.Status, Description: token.Description}
 	}
 	return specs
-}
-
-// brokerPoolTokensToMap converts the API's tokens into the tokens map value. The token value is
-// deliberately not copied.
-func brokerPoolTokensToMap(ctx context.Context, poolID string, tokens []britive.RemoteBrokerPoolToken, diags *diag.Diagnostics) types.Map {
-	models := make(map[string]brokerPoolTokenModel, len(tokens))
-	for _, token := range tokens {
-		models[token.TokenName] = brokerPoolTokenModel{
-			Status:      types.StringValue(token.Status),
-			Description: types.StringValue(token.Description),
-			ID:          types.StringValue(brokerpool.TokenID(poolID, token.TokenName)),
-			Created:     types.StringValue(token.Created),
-		}
-	}
-	value, d := types.MapValueFrom(ctx, brokerPoolTokenObjectType, models)
-	diags.Append(d...)
-	return value
 }
 
 // refresh reads the pool into model.

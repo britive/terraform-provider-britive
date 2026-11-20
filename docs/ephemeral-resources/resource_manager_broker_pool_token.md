@@ -108,8 +108,8 @@ that receives an ephemeral value.
 ## Argument Reference
 
 * `token_id` - (Required) The token to read, as `{pool_id}/{token_name}`. This is the `id` of a
-  token in the `tokens` map of the `britive_resource_manager_broker_pool` resource. Use
-  `{pool_id}/default` for the pool's default token.
+  token in the `tokens` map of the `britive_resource_manager_broker_pool` resource or data
+  source. Use `{pool_id}/default` for the pool's default token.
 
 ## Attribute Reference
 

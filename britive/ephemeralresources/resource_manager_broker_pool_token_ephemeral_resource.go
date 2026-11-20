@@ -54,7 +54,7 @@ func (r *BrokerPoolTokenEphemeralResource) Schema(_ context.Context, _ ephemeral
 		Description: "Reads the value of a Britive resource manager broker pool token. The value is never stored in the state or in a plan file.",
 		Attributes: map[string]schema.Attribute{
 			"token_id": schema.StringAttribute{
-				Description: "The token to read, as {pool_id}/{token_name}: the id of a token in the tokens map of a britive_resource_manager_broker_pool resource. Use {pool_id}/default for the pool's default token.",
+				Description: "The token to read, as {pool_id}/{token_name}: the id of a token in the tokens map of the britive_resource_manager_broker_pool resource or data source. Use {pool_id}/default for the pool's default token.",
 				Required:    true,
 			},
 			"pool_id": schema.StringAttribute{

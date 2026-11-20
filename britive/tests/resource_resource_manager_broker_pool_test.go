@@ -1362,7 +1362,8 @@ func TestBritiveBrokerPoolLabelsExistingLabels(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestBritiveBrokerPoolDataSource covers D1, D2 and D8: looking up a pool created in the same
-// configuration, with no brokers and no linked resources.
+// configuration, with no brokers and no linked resources. It also checks the tokens map: every
+// token with its status, description, id and created, and no token value.
 func TestBritiveBrokerPoolDataSource(t *testing.T) {
 	client := testAccBritiveClient(t)
 	name := "AT-BP-Data-Source"
@@ -1379,7 +1380,10 @@ func TestBritiveBrokerPoolDataSource(t *testing.T) {
 					description        = "AT broker pool data source"
 					keep_alive_seconds = 120
 					disconnect_seconds = 3600
-					tokens = { default = { status = "ACTIVE" } }
+					tokens = {
+						default              = { status = "ACTIVE" }
+						"AT-token-data-source" = { status = "INACTIVE", description = "AT data source token" }
+					}
 				}
 
 				data "britive_resource_manager_broker_pool" "lookup" {
@@ -1395,6 +1399,17 @@ func TestBritiveBrokerPoolDataSource(t *testing.T) {
 					resource.TestCheckResourceAttr(bpData, "broker_count", "0"),
 					resource.TestCheckResourceAttr(bpData, "brokers.#", "0"),
 					resource.TestCheckResourceAttr(bpData, "resources.#", "0"),
+					resource.TestCheckResourceAttr(bpData, "tokens.%", "2"),
+					resource.TestCheckResourceAttr(bpData, "tokens.default.status", "ACTIVE"),
+					resource.TestCheckResourceAttr(bpData, "tokens.default.description", ""),
+					resource.TestCheckResourceAttrPair(bpData, "tokens.default.id", bpPool, "tokens.default.id"),
+					resource.TestCheckResourceAttrPair(bpData, "tokens.default.created", bpPool, "tokens.default.created"),
+					resource.TestCheckResourceAttr(bpData, "tokens.AT-token-data-source.status", "INACTIVE"),
+					resource.TestCheckResourceAttr(bpData, "tokens.AT-token-data-source.description", "AT data source token"),
+					resource.TestCheckResourceAttrPair(bpData, "tokens.AT-token-data-source.id", bpPool, "tokens.AT-token-data-source.id"),
+					resource.TestCheckResourceAttrSet(bpData, "tokens.AT-token-data-source.created"),
+					resource.TestCheckNoResourceAttr(bpData, "tokens.default.value"),
+					resource.TestCheckNoResourceAttr(bpData, "tokens.AT-token-data-source.value"),
 				),
 			},
 		},
@@ -1553,6 +1568,9 @@ func TestBritiveBrokerPoolEndToEnd(t *testing.T) {
 		resource.TestCheckResourceAttr(bpData, "resources.0.name", resourceName),
 		resource.TestCheckResourceAttrSet(bpData, "resources.0.resource_id"),
 		resource.TestCheckResourceAttr(bpData, "resources.0.resource_type_name", "AT-BP-End-To-End-Resource-Type"),
+		resource.TestCheckResourceAttr(bpData, "tokens.%", "3"),
+		resource.TestCheckResourceAttr(bpData, "tokens.AT-token-active.status", "ACTIVE"),
+		resource.TestCheckResourceAttr(bpData, "tokens.AT-token-inactive.status", "INACTIVE"),
 	)
 
 	resource.Test(t, resource.TestCase{
