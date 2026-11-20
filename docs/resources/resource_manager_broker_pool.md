@@ -35,6 +35,7 @@ resource "britive_resource_manager_broker_pool" "east" {
   name               = "pool-east"
   description        = "Brokers in the east data center"
   keep_alive_seconds = 120
+  disconnect_seconds = 90000
 
   # The exact set of tokens on the pool.
   tokens = {
@@ -55,12 +56,17 @@ ephemeral "britive_resource_manager_broker_pool_token" "ci" {
 * `description` - (Optional) The description of the broker pool. Defaults to an empty string.
 * `keep_alive_seconds` - (Optional) How often, in seconds, brokers check in with Britive. Defaults to `60`.
 * `disconnect_seconds` - (Optional) After how many seconds without a check-in a broker is marked disconnected. Defaults to `86400`.
-* `tokens` - (Required) The tokens of the pool, as a map with the token name as the key. It must have at least one token, and when the pool is created it must include `default`. Britive allows at most 3 tokens, at most 2 of them `ACTIVE`, and at least 1 `ACTIVE`. The map is the exact set of tokens: a token in Britive that is not in the map is deleted. To keep only the default token, set `tokens = { default = { status = "ACTIVE" } }`. See [Tokens](#tokens). Each token supports:
+* `tokens` - (Required) The tokens of the pool, as a map with the token name as the key. See [Tokens](#tokens). Each token supports:
   * `status` - (Required) `ACTIVE` or `INACTIVE`.
   * `description` - (Optional) The token description. Defaults to an empty string.
 
 Removing `description`, `keep_alive_seconds` or `disconnect_seconds` from the configuration
 resets it to its default.
+
+~> **Important:** `tokens` is the exact set of tokens on the pool. A token in Britive that is
+not in the map is deleted. `tokens` must have at least one token, and when the pool is created
+it must include `default` token, for example `tokens = { default = { status = "ACTIVE" } }`. Britive
+allows at most 3 tokens per pool, at most 2 of them `ACTIVE`, and at least 1 `ACTIVE`.
 
 ## Attribute Reference
 
@@ -95,14 +101,6 @@ The provider checks these rules in the plan, before any API call:
 * When the pool is created, `tokens` must include `default` (see below).
 * A token name allows letters, numbers, `_` and `-`.
 
-Britive also limits the tokens of every pool: at most 3 tokens, at most 2 of them `ACTIVE`, and
-at least 1 `ACTIVE`. The provider does not check these limits in the plan. If `tokens` breaks
-one, the provider first makes the changes Britive accepts, then Britive rejects the next one
-with its own error (for example, "There must be at least 1 remaining active token"). The state
-keeps the tokens Britive holds, and the next plan shows what is left to change. On a new pool,
-the pool is already created at that point, so it is saved as tainted and replaced on the next
-apply.
-
 A token name cannot be changed: a new key is a new token with a new value.
 
 ### The default token
@@ -122,26 +120,6 @@ because it was deleted outside Terraform), `tokens` must include `default` again
 
 A deleted default token is created again when `default` is added back to `tokens`. It gets a
 new value.
-
-### How the provider changes tokens
-
-On create and update, the provider reads the pool's tokens and makes one API call at a time
-until they match `tokens`. A new token is always `ACTIVE` before the token it replaces is
-deleted, so the pool never loses its last active token. When the pool has 3 tokens, its only
-`ACTIVE` token must be deleted and the other two stay `INACTIVE`, the provider activates one of
-the two for a short time and sets it back to `INACTIVE` at the end.
-
-If a call fails, the provider saves the tokens that Britive really holds and returns the error.
-The next plan shows what is left to change.
-
-Tokens changed outside Terraform are changed back on the next apply: an extra token is deleted,
-and a missing token is created again (with a new value).
-
-### Rotating a token
-
-1. Add the new token to `tokens` with status `ACTIVE` and apply.
-2. Move the brokers to the new token.
-3. Remove the old token from `tokens` and apply.
 
 ## Import
 

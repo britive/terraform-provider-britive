@@ -30,6 +30,7 @@ on every apply, and the plan never settles. The provider does not detect this.
 ```hcl
 resource "britive_resource_manager_broker_pool" "east" {
   name = "pool-east"
+  tokens = { default = { status = "ACTIVE" } }
 }
 
 resource "britive_resource_manager_broker_pool_labels" "east" {

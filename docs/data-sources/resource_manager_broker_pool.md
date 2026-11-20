@@ -16,6 +16,7 @@ brokers, the resources linked to it and its tokens. It does not return token val
 ```hcl
 data "britive_resource_manager_broker_pool" "shared" {
   name = "shared-pool"
+  tokens = { default = { status = "ACTIVE" } }
 }
 
 resource "britive_resource_manager_resource_broker_pools" "db" {
