@@ -23,8 +23,8 @@ var (
 )
 
 // BrokerPoolTokenEphemeralResource reads the value of a broker pool token, including the
-// pool's "default" token. The token resource does not keep the value in the state; this is the
-// only way to get it in Terraform.
+// pool's "default" token. The pool resource does not keep token values in the state; this is
+// the only way to get one in Terraform.
 type BrokerPoolTokenEphemeralResource struct {
 	client *britive.Client
 }
@@ -54,7 +54,7 @@ func (r *BrokerPoolTokenEphemeralResource) Schema(_ context.Context, _ ephemeral
 		Description: "Reads the value of a Britive resource manager broker pool token. The value is never stored in the state or in a plan file.",
 		Attributes: map[string]schema.Attribute{
 			"token_id": schema.StringAttribute{
-				Description: "The token to read: the id of a britive_resource_manager_broker_pool_token resource (resource-manager/broker-pools/{pool_id}/tokens/{name}), or {pool_id}/{name}. Use {pool_id}/default for the pool's default token.",
+				Description: "The token to read, as {pool_id}/{token_name}: the id of a token in the tokens map of a britive_resource_manager_broker_pool resource. Use {pool_id}/default for the pool's default token.",
 				Required:    true,
 			},
 			"pool_id": schema.StringAttribute{
@@ -120,7 +120,7 @@ func (r *BrokerPoolTokenEphemeralResource) Open(ctx context.Context, req ephemer
 	if errors.Is(err, britive.ErrNotFound) {
 		resp.Diagnostics.AddError(
 			"Broker Pool Token Not Found",
-			fmt.Sprintf("No token named %q in broker pool %s.", name, poolID),
+			fmt.Sprintf("Broker pool %s has no token named %q. Add it to the pool's tokens, or read a token that exists.", poolID, name),
 		)
 		return
 	}

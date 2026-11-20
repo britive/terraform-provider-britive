@@ -235,7 +235,6 @@ func (p *BritiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resourcemanager.NewResourceBrokerPoolsResource,
 		resourcemanager.NewRMProfilePolicyPrioritizationResource,
 		resourcemanager.NewBrokerPoolResource,
-		resourcemanager.NewBrokerPoolTokenResource,
 		resourcemanager.NewBrokerPoolLabelsResource,
 	}
 }

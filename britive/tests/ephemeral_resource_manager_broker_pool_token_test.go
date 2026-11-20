@@ -36,20 +36,26 @@ var testAccEphemeralProviderFactories = map[string]func() (tfprotov6.ProviderSer
 	"echo":    echoprovider.NewProviderServer(),
 }
 
-// testAccEphemeralTokenConfig builds a pool, an ACTIVE token, and two ephemeral reads: the new
-// token (token_id = tokenID) and the pool's default token ({pool_id}/default). Both results
-// are passed to the echo provider.
+// bpEphemeralTokenByID is the token_id of the test token taken from the pool resource's tokens
+// map. It is unknown until the token exists, so the ephemeral read waits for it.
+const bpEphemeralTokenByID = `britive_resource_manager_broker_pool.pool.tokens["AT-token-ephemeral"].id`
+
+// testAccEphemeralTokenConfig builds a pool with its default token and an ACTIVE token, and
+// two ephemeral reads: the new token (token_id = tokenID) and the pool's default token
+// ({pool_id}/default). Both results are passed to the echo provider.
 func testAccEphemeralTokenConfig(poolName, tokenID string) string {
 	return testAccEphemeralTokenConfigStatus(poolName, "ACTIVE", tokenID)
 }
 
 // testAccEphemeralTokenConfigStatus is testAccEphemeralTokenConfig with the token status set.
 func testAccEphemeralTokenConfigStatus(poolName, status, tokenID string) string {
-	return testAccBrokerPoolMinimal("pool", poolName) + fmt.Sprintf(`
-	resource "britive_resource_manager_broker_pool_token" "token" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "AT-token-ephemeral"
-		status  = %q
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_broker_pool" "pool" {
+		name = %q
+		tokens = {
+			default              = { status = "ACTIVE" }
+			"AT-token-ephemeral" = { status = %q }
+		}
 	}
 
 	ephemeral "britive_resource_manager_broker_pool_token" "token" {
@@ -73,7 +79,7 @@ func testAccEphemeralTokenConfigStatus(poolName, status, tokenID string) string 
 	# goes through terraform_data: its input is unknown while the token is being created, which
 	# plans an update of terraform_data, and that triggers the replace.
 	resource "terraform_data" "token_trigger" {
-		input = britive_resource_manager_broker_pool_token.token.id
+		input = britive_resource_manager_broker_pool.pool.tokens["AT-token-ephemeral"].id
 	}
 
 	resource "echo" "test" {
@@ -81,11 +87,11 @@ func testAccEphemeralTokenConfigStatus(poolName, status, tokenID string) string 
 			replace_triggered_by = [terraform_data.token_trigger]
 		}
 	}
-	`, status, tokenID)
+	`, poolName, status, tokenID)
 }
 
 // TestBritiveBrokerPoolTokenEphemeral covers the ephemeral resource:
-//  1. read a token created in the same apply, by the token resource's id, and the pool's
+//  1. read a token created in the same apply, by its id in the pool's tokens map, and the pool's
 //     default token by {pool_id}/default: the values match Britive, and no resource other than
 //     the echo test resource has them in the state
 //  2. read the same token by {pool_id}/{name}
@@ -115,14 +121,14 @@ func TestBritiveBrokerPoolTokenEphemeral(t *testing.T) {
 		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccEphemeralTokenConfig(poolName, "britive_resource_manager_broker_pool_token.token.id"),
+				Config: testAccEphemeralTokenConfig(poolName, bpEphemeralTokenByID),
 				ConfigStateChecks: []statecheck.StateCheck{
 					testAccCheckEphemeralTokens(client, "AT-token-ephemeral"),
 				},
 			},
 			{
 				Config: testAccEphemeralTokenConfig(poolName,
-					`"${britive_resource_manager_broker_pool.pool.pool_id}/${britive_resource_manager_broker_pool_token.token.name}"`),
+					`"${britive_resource_manager_broker_pool.pool.pool_id}/AT-token-ephemeral"`),
 				ConfigStateChecks: []statecheck.StateCheck{
 					testAccCheckEphemeralTokens(client, "AT-token-ephemeral"),
 				},
@@ -161,19 +167,19 @@ func TestBritiveBrokerPoolTokenEphemeral(t *testing.T) {
 
 // TestBritiveBrokerPoolTokenEphemeralInactiveAndDeleted covers an INACTIVE token and a token
 // deleted outside Terraform:
-//  1. read an INACTIVE token by the token resource's id: the value is returned and status is
+//  1. read an INACTIVE token by its id in the tokens map: the value is returned and status is
 //     INACTIVE
 //  2. delete the token through the API, with token_id written as "{pool_id}/{name}": the
 //     token_id is known at plan time, so Terraform reads the token during the plan, before the
-//     token resource can create it again, and the plan fails with "not found"
-//  3. same situation, with token_id = the token resource's id: the id is unknown until the token
-//     is created again, so the read waits for it and the apply succeeds
+//     pool resource can create it again, and the plan fails with "not found"
+//  3. same situation, with token_id = the id in the tokens map: the id is unknown until the
+//     token is created again, so the read waits for it and the apply succeeds
 func TestBritiveBrokerPoolTokenEphemeralInactiveAndDeleted(t *testing.T) {
 	client := testAccBritiveClient(t)
 	poolName := "AT-BP-Token-Ephemeral-Inactive"
 	tokenName := "AT-token-ephemeral"
 	byName := `"${britive_resource_manager_broker_pool.pool.pool_id}/AT-token-ephemeral"`
-	byID := "britive_resource_manager_broker_pool_token.token.id"
+	byID := bpEphemeralTokenByID
 	var poolID string
 
 	resource.Test(t, resource.TestCase{
@@ -205,7 +211,7 @@ func TestBritiveBrokerPoolTokenEphemeralInactiveAndDeleted(t *testing.T) {
 			{
 				Config: testAccEphemeralTokenConfigStatus(poolName, "INACTIVE", byID),
 				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
-					plancheck.ExpectResourceAction(bpToken, plancheck.ResourceActionCreate),
+					plancheck.ExpectResourceAction(bpPool, plancheck.ResourceActionUpdate),
 				}},
 				ConfigStateChecks: []statecheck.StateCheck{
 					testAccCheckEphemeralTokens(client, tokenName),

@@ -12,8 +12,9 @@ The `britive_resource_manager_broker_pool_token` ephemeral resource reads the se
 broker pool token, including the pool's `default` token. Brokers use this value to join the
 pool.
 
-The [`britive_resource_manager_broker_pool_token`](../resources/resource_manager_broker_pool_token.md)
-resource does not store the token value. Use this ephemeral resource to read it. Terraform
+The [`britive_resource_manager_broker_pool`](../resources/resource_manager_broker_pool.md)
+resource manages the pool's tokens but does not store their values. Use this ephemeral resource
+to read a value. Terraform
 reads it again on every plan and apply and keeps the value in memory for that run only, so the
 value is never written to the state file or to a plan file.
 
@@ -33,15 +34,18 @@ This is the preferred pattern. The token goes into a secret store through a writ
 argument, and the broker host reads it from the secret store when it starts.
 
 ```hcl
-resource "britive_resource_manager_broker_pool_token" "ci" {
-  pool_id = britive_resource_manager_broker_pool.east.pool_id
-  name    = "ci-token"
-  status  = "ACTIVE"
+resource "britive_resource_manager_broker_pool" "east" {
+  name = "pool-east"
+
+  tokens = {
+    default    = { status = "ACTIVE" } # required when the pool is created
+    "ci-token" = { status = "ACTIVE" }
+  }
 }
 
 # Read the token value. Nothing is stored in state.
 ephemeral "britive_resource_manager_broker_pool_token" "ci" {
-  token_id = britive_resource_manager_broker_pool_token.ci.id
+  token_id = britive_resource_manager_broker_pool.east.tokens["ci-token"].id
 }
 
 resource "aws_secretsmanager_secret" "broker_token" {
@@ -58,7 +62,7 @@ resource "aws_secretsmanager_secret_version" "broker_token" {
 ### Store the default token in HashiCorp Vault
 
 ```hcl
-# Read the default token of the pool. No token resource is needed for this.
+# Read the default token of the pool. This works when the pool keeps its default token.
 ephemeral "britive_resource_manager_broker_pool_token" "default" {
   token_id = "${britive_resource_manager_broker_pool.east.pool_id}/default"
 }
@@ -103,9 +107,8 @@ that receives an ephemeral value.
 
 ## Argument Reference
 
-* `token_id` - (Required) The token to read. Either the `id` of a
-  `britive_resource_manager_broker_pool_token` resource
-  (`resource-manager/broker-pools/{pool_id}/tokens/{name}`), or `{pool_id}/{name}`. Use
+* `token_id` - (Required) The token to read, as `{pool_id}/{token_name}`. This is the `id` of a
+  token in the `tokens` map of the `britive_resource_manager_broker_pool` resource. Use
   `{pool_id}/default` for the pool's default token.
 
 ## Attribute Reference
@@ -116,16 +119,27 @@ that receives an ephemeral value.
 * `token_value` - (Sensitive) The secret value brokers use to join the pool. Never stored in
   the state.
 
-If the token does not exist, the plan or apply fails with an error.
+If the token does not exist, the plan or apply fails with the error "Broker Pool Token Not
+Found".
 
 ## Usage Notes
 
-* Reference the token resource's `id` in `token_id`. The `id` is unknown until the token
-  exists, so Terraform waits until the token is created before it reads the value.
+* Reference a token's `id` from the pool's `tokens` map in `token_id`. The `id` is unknown until
+  the token exists, so Terraform waits until the token is created before it reads the value. A
+  `token_id` written as a string is read during the plan, before a new token exists.
+* You can read only a token that is in the pool's `tokens`. If you remove a token from `tokens`,
+  the provider deletes it, so also remove the ephemeral resource that reads it. A reference to a
+  key that is not in `tokens`, such as `tokens["default"].id` after `default` was removed, fails
+  with Terraform's "Invalid index" error. A `token_id` written as a string fails with "Broker
+  Pool Token Not Found" instead.
+* The value cannot be shown with an `output`: Terraform rejects ephemeral values in root module
+  outputs, and hides all output of a `local-exec` that receives one. To check a value while
+  testing, compare a hash of it (for example `sha256sum` in a `local-exec`) with the token in
+  the Britive UI.
 * A write-only argument is sent again only when its version argument changes. Terraform cannot
   compare the value, because the state holds `null`.
-* A token value cannot be changed. To rotate, create a new token with a new name, increase the
-  version argument, move the brokers to the new token, and then delete the old token. A pool
-  allows 3 tokens, 2 of them active.
+* A token value cannot be changed. To rotate, add a new token to the pool's `tokens` with a new
+  name, increase the version argument, move the brokers to the new token, and then remove the
+  old token from `tokens`. A pool allows 3 tokens, 2 of them active.
 * Terraform rejects the token in normal arguments such as `user_data`, so it cannot leak into
   the state through another resource.

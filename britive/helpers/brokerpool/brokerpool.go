@@ -1,6 +1,6 @@
 // Package brokerpool holds the pieces shared by the britive_resource_manager_broker_pool
-// resource and data source: the read-only "brokers" and "resources" lists, and the checks on
-// token and label names.
+// resource and data source: the read-only "brokers" and "resources" lists, the checks on token
+// and label names, and the planner that changes a pool's tokens one API call at a time.
 package brokerpool
 
 import (
@@ -107,15 +107,9 @@ func PoolCompositeID(poolID string) string {
 	return "resource-manager/broker-pools/" + poolID
 }
 
-// TokenCompositeID builds the token resource's `id` value:
-// resource-manager/broker-pools/{pool_id}/tokens/{name}.
-func TokenCompositeID(poolID, name string) string {
-	return fmt.Sprintf("%s/tokens/%s", PoolCompositeID(poolID), name)
-}
-
-// ParseTokenID extracts the pool ID and token name from
-// "resource-manager/broker-pools/{pool_id}/tokens/{name}" or "{pool_id}/{name}". It is used by
-// the token resource's import and by the token ephemeral resource's token_id.
+// ParseTokenID extracts the pool ID and token name from "{pool_id}/{name}" (the id of a token
+// in the pool resource's tokens map) or "resource-manager/broker-pools/{pool_id}/tokens/{name}".
+// It is used by the token ephemeral resource's token_id.
 func ParseTokenID(id string) (string, string, error) {
 	return ParseChildID(id, "tokens", "name")
 }

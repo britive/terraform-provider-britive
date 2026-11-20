@@ -12,13 +12,16 @@ import (
 	britive "github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/helpers/errs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
-// Acceptance tests for broker pools: britive_resource_manager_broker_pool,
-// britive_resource_manager_broker_pool_token, britive_resource_manager_broker_pool_labels and
-// the britive_resource_manager_broker_pool data source.
+// Acceptance tests for broker pools: britive_resource_manager_broker_pool (with its tokens
+// map), britive_resource_manager_broker_pool_labels and the britive_resource_manager_broker_pool
+// data source. The token ephemeral resource is tested in
+// ephemeral_resource_manager_broker_pool_token_test.go.
 //
 // Every test needs BRITIVE_TENANT and BRITIVE_TOKEN: besides running Terraform, the tests call
 // the API directly to change things "outside Terraform" (drift) and to check what Terraform
@@ -31,7 +34,6 @@ import (
 const (
 	bpPool       = "britive_resource_manager_broker_pool.pool"
 	bpPoolB      = "britive_resource_manager_broker_pool.pool_b"
-	bpToken      = "britive_resource_manager_broker_pool_token.token"
 	bpLabels     = "britive_resource_manager_broker_pool_labels.labels"
 	bpData       = "data.britive_resource_manager_broker_pool.lookup"
 	bpPoolType   = "britive_resource_manager_broker_pool"
@@ -50,8 +52,8 @@ const (
 //  5. import by the resource id, and by the bare pool ID
 //  6. refresh-only: no changes
 //
-// The pool resource does not touch the default token; that is covered by the default token
-// tests. Destroy is checked by CheckDestroy.
+// The configuration keeps only the default token; tokens are covered by the B tests. Destroy
+// is checked by CheckDestroy.
 func TestBritiveBrokerPool(t *testing.T) {
 	client := testAccBritiveClient(t)
 	name := "AT-BP-Lifecycle"
@@ -65,6 +67,7 @@ func TestBritiveBrokerPool(t *testing.T) {
 			description        = %q
 			keep_alive_seconds = %d
 			disconnect_seconds = %d
+			tokens = { default = { status = "ACTIVE" } }
 		}`, n, desc, keepAlive, disconnect)
 	}
 
@@ -83,8 +86,9 @@ func TestBritiveBrokerPool(t *testing.T) {
 					resource.TestCheckResourceAttr(bpPool, "keep_alive_seconds", "60"),
 					resource.TestCheckResourceAttr(bpPool, "disconnect_seconds", "86400"),
 					resource.TestCheckResourceAttr(bpPool, "broker_count", "0"),
-					// Britive still creates the default token with the pool.
+					// The default token Britive creates with the pool is taken over.
 					testAccCheckTokenNamesAPI(client, &poolID, "default"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.default.status", "ACTIVE"),
 				),
 			},
 			{
@@ -145,6 +149,7 @@ func TestBritiveBrokerPoolValidation(t *testing.T) {
 		return fmt.Sprintf(`
 		resource "britive_resource_manager_broker_pool" "pool" {
 			name = "AT-BP-Validation"
+			tokens = { default = { status = "ACTIVE" } }
 			%s
 		}`, attr)
 	}
@@ -153,6 +158,15 @@ func TestBritiveBrokerPoolValidation(t *testing.T) {
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			{
+				// tokens is required.
+				Config: `
+				resource "britive_resource_manager_broker_pool" "pool" {
+					name = "AT-BP-Validation"
+				}`,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?i)Missing required argument`),
+			},
 			{
 				Config:      pool(`disconnect_seconds = 0`),
 				PlanOnly:    true,
@@ -213,8 +227,8 @@ func TestBritiveBrokerPoolDuplicateName(t *testing.T) {
 
 // TestBritiveBrokerPoolDrift covers A20 and A21:
 //  1. create the pool
-//  2. change it through the API: the plan updates it back. The default token is also changed
-//     through the API; the pool resource ignores it and leaves it as it is
+//  2. change it through the API: the plan updates it back, including the default token's
+//     description, which is also changed through the API
 //  3. delete it through the API: the plan creates it again
 func TestBritiveBrokerPoolDrift(t *testing.T) {
 	client := testAccBritiveClient(t)
@@ -227,6 +241,7 @@ func TestBritiveBrokerPoolDrift(t *testing.T) {
 		description        = "AT drift"
 		keep_alive_seconds = 120
 		disconnect_seconds = 3600
+		tokens = { default = { status = "ACTIVE" } }
 	}`, name)
 
 	resource.Test(t, resource.TestCase{
@@ -256,7 +271,7 @@ func TestBritiveBrokerPoolDrift(t *testing.T) {
 				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionUpdate),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBrokerPoolAPI(client, &poolID, name, "AT drift", 120, 3600),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", "changed outside Terraform"),
+					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
 				),
 			},
 			{
@@ -278,7 +293,7 @@ func TestBritiveBrokerPoolDrift(t *testing.T) {
 	})
 }
 
-// TestBritiveBrokerPoolImportErrors covers A23, B19 and invalid label import IDs.
+// TestBritiveBrokerPoolImportErrors covers A23 and invalid label import IDs.
 func TestBritiveBrokerPoolImportErrors(t *testing.T) {
 	client := testAccBritiveClient(t)
 	name := "AT-BP-Import-Errors"
@@ -287,12 +302,7 @@ func TestBritiveBrokerPoolImportErrors(t *testing.T) {
 	withChildren := base + `
 	resource "britive_resource_manager_broker_pool" "missing" {
 		name = "AT-BP-Import-Errors-Missing"
-	}
-
-	resource "britive_resource_manager_broker_pool_token" "token" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "AT-import-token"
-		status  = "INACTIVE"
+		tokens = { default = { status = "ACTIVE" } }
 	}
 
 	resource "britive_resource_manager_broker_pool_labels" "labels" {
@@ -302,16 +312,6 @@ func TestBritiveBrokerPoolImportErrors(t *testing.T) {
 			values    = []
 		}
 	}`
-
-	poolIDThen := func(suffix string) resource.ImportStateIdFunc {
-		return func(s *terraform.State) (string, error) {
-			rs, ok := s.RootModule().Resources[bpPool]
-			if !ok {
-				return "", errs.NewNotFoundErrorf("%s in state", bpPool)
-			}
-			return rs.Primary.Attributes["pool_id"] + suffix, nil
-		}
-	}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -330,22 +330,6 @@ func TestBritiveBrokerPoolImportErrors(t *testing.T) {
 				ExpectError:   regexp.MustCompile(bpNotFoundRe),
 			},
 			{
-				// B19: token import ID without a token name.
-				Config:            withChildren,
-				ResourceName:      bpToken,
-				ImportState:       true,
-				ImportStateIdFunc: poolIDThen(""),
-				ExpectError:       regexp.MustCompile(`Invalid Import ID`),
-			},
-			{
-				// B19: token that does not exist.
-				Config:            withChildren,
-				ResourceName:      bpToken,
-				ImportState:       true,
-				ImportStateIdFunc: poolIDThen("/AT-no-such-token"),
-				ExpectError:       regexp.MustCompile(bpNotFoundRe + `|Error Reading Broker Pool Token`),
-			},
-			{
 				Config:        withChildren,
 				ResourceName:  bpLabels,
 				ImportState:   true,
@@ -357,29 +341,36 @@ func TestBritiveBrokerPoolImportErrors(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// B. Broker pool token resource
+// B. Tokens in the broker pool resource
 // ---------------------------------------------------------------------------
 
-// TestBritiveBrokerPoolToken covers B1–B8, B17 and B20:
-//  1. create INACTIVE with a description: POST only, no PATCH needed
-//  2. set ACTIVE and change the description: updated in place
-//  3. set INACTIVE and remove the description: the description is cleared
-//  4. rename: replaced
-//  5. import by {pool_id}/{name}, and by the resource id
-//  6. remove the token resource: the token is deleted, the pool keeps only its default token
-func TestBritiveBrokerPoolToken(t *testing.T) {
-	client := testAccBritiveClient(t)
-	poolName := "AT-BP-Token"
-	var poolID string
-
-	token := func(name, attrs string) string {
-		return testAccBrokerPoolMinimal("pool", poolName) + fmt.Sprintf(`
-		resource "britive_resource_manager_broker_pool_token" "token" {
-			pool_id = britive_resource_manager_broker_pool.pool.pool_id
-			name    = %q
+// testAccBrokerPoolWithTokens builds the pool "pool" with the given tokens map entries, each
+// written as `name = { status = "...", ... }`.
+func testAccBrokerPoolWithTokens(poolName string, tokens ...string) string {
+	return fmt.Sprintf(`
+	resource "britive_resource_manager_broker_pool" "pool" {
+		name = %q
+		tokens = {
 			%s
-		}`, name, attrs)
+		}
 	}
+	`, poolName, strings.Join(tokens, "\n\t\t\t"))
+}
+
+// TestBritiveBrokerPoolTokens covers the tokens map:
+//  1. tokens = { default }: the existing default token is taken over (not created again), and
+//     its description is set to "" (no description configured)
+//  2. add an INACTIVE token with a description: created, default unchanged
+//  3. set it ACTIVE and change its description: updated in place, same value
+//  4. remove default: the other token is ACTIVE, so default is deleted
+//  5. rotate in one apply: replace the token with a new one; the new token is created and
+//     activated before the old one is deleted
+//  6. import by pool ID: the tokens are read into the state, without values
+//  7. refresh-only: no changes
+func TestBritiveBrokerPoolTokens(t *testing.T) {
+	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens"
+	var poolID, defaultValue, ciValue string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -387,87 +378,84 @@ func TestBritiveBrokerPoolToken(t *testing.T) {
 		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: token("AT-token-a", `status = "INACTIVE"`+"\n"+`description = "AT token"`),
+				Config: testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE" }`),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCaptureAttr(bpPool, "pool_id", &poolID),
-					resource.TestCheckResourceAttrPair(bpToken, "pool_id", bpPool, "pool_id"),
-					resource.TestCheckResourceAttr(bpToken, "status", "INACTIVE"),
-					resource.TestCheckResourceAttr(bpToken, "description", "AT token"),
-					// The token value is never stored in the state.
-					resource.TestCheckNoResourceAttr(bpToken, "token_value"),
-					resource.TestCheckResourceAttrSet(bpToken, "created"),
-					testAccCheckTokenAPI(client, &poolID, "AT-token-a", "INACTIVE", "AT token"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.%", "1"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.default.status", "ACTIVE"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.default.description", ""),
+					resource.TestCheckResourceAttrSet(bpPool, "tokens.default.created"),
+					testAccCheckTokenIDAttr(bpPool, "default", &poolID),
+					testAccCheckTokenNamesAPI(client, &poolID, "default"),
+					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+					testAccCaptureTokenValueAPI(client, &poolID, "default", &defaultValue),
 				),
 			},
 			{
-				Config:           token("AT-token-a", `status = "ACTIVE"`+"\n"+`description = "AT token updated"`),
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionUpdate),
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`default = { status = "ACTIVE" }`,
+					`"AT-ci" = { status = "INACTIVE", description = "AT CI token" }`),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionUpdate),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(bpToken, "status", "ACTIVE"),
-					resource.TestCheckResourceAttr(bpToken, "description", "AT token updated"),
-					testAccCheckTokenAPI(client, &poolID, "AT-token-a", "ACTIVE", "AT token updated"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.%", "2"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.AT-ci.status", "INACTIVE"),
+					testAccCheckTokenIDAttr(bpPool, "AT-ci", &poolID),
+					testAccCheckTokenAPI(client, &poolID, "AT-ci", "INACTIVE", "AT CI token"),
+					testAccCheckTokenValueAPI(client, &poolID, "default", &defaultValue),
+					testAccCaptureTokenValueAPI(client, &poolID, "AT-ci", &ciValue),
 				),
 			},
 			{
-				Config:           token("AT-token-a", `status = "INACTIVE"`),
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionUpdate),
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`default = { status = "ACTIVE" }`,
+					`"AT-ci" = { status = "ACTIVE", description = "AT CI token updated" }`),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionUpdate),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(bpToken, "status", "INACTIVE"),
-					resource.TestCheckNoResourceAttr(bpToken, "description"),
-					testAccCheckTokenAPI(client, &poolID, "AT-token-a", "INACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-ci", "ACTIVE", "AT CI token updated"),
+					testAccCheckTokenValueAPI(client, &poolID, "AT-ci", &ciValue),
 				),
 			},
 			{
-				Config:           token("AT-token-b", `status = "INACTIVE"`),
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionReplace),
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`"AT-ci" = { status = "ACTIVE", description = "AT CI token updated" }`),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionUpdate),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(bpToken, "name", "AT-token-b"),
-					testAccCheckTokenNamesAPI(client, &poolID, "AT-token-b", "default"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.%", "1"),
+					testAccCheckTokenNamesAPI(client, &poolID, "AT-ci"),
 				),
 			},
 			{
-				ResourceName:      bpToken,
-				ImportState:       true,
-				ImportStateVerify: true,
-				ImportStateIdFunc: func(s *terraform.State) (string, error) {
-					rs, ok := s.RootModule().Resources[bpToken]
-					if !ok {
-						return "", errs.NewNotFoundErrorf("%s in state", bpToken)
-					}
-					return fmt.Sprintf("%s/%s", rs.Primary.Attributes["pool_id"], rs.Primary.Attributes["name"]), nil
-				},
-			},
-			{
-				// Import by the resource id: resource-manager/broker-pools/{pool_id}/tokens/{name}.
-				ResourceName:      bpToken,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: testAccBrokerPoolMinimal("pool", poolName),
+				Config: testAccBrokerPoolWithTokens(poolName, `"AT-ops" = { status = "ACTIVE" }`),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAttrEquals(bpPool, "pool_id", &poolID),
-					testAccCheckTokenNamesAPI(client, &poolID, "default"),
+					testAccCheckTokenNamesAPI(client, &poolID, "AT-ops"),
+					testAccCheckTokenAPI(client, &poolID, "AT-ops", "ACTIVE", ""),
 				),
+			},
+			{
+				ResourceName:      bpPool,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(*terraform.State) (string, error) { return poolID, nil },
+			},
+			{
+				RefreshState: true,
 			},
 		},
 	})
 }
 
-// TestBritiveBrokerPoolTokenChangePool covers B9: moving a token to another pool replaces it.
-func TestBritiveBrokerPoolTokenChangePool(t *testing.T) {
+// TestBritiveBrokerPoolTokensWithoutDefault: the default token is required only when the
+// pool is created:
+//  1. create without default: fails in the plan, nothing is created
+//  2. create with default and two more tokens
+//  3. remove default: the pool already exists, so default is deleted like any other token
+func TestBritiveBrokerPoolTokensWithoutDefault(t *testing.T) {
 	client := testAccBritiveClient(t)
-	var poolA, poolB string
-
-	config := func(target string) string {
-		return testAccBrokerPoolMinimal("pool", "AT-BP-Token-Move-A") +
-			testAccBrokerPoolMinimal("pool_b", "AT-BP-Token-Move-B") + fmt.Sprintf(`
-		resource "britive_resource_manager_broker_pool_token" "token" {
-			pool_id = britive_resource_manager_broker_pool.%s.pool_id
-			name    = "AT-token-move"
-			status  = "INACTIVE"
-		}`, target)
-	}
+	poolName := "AT-BP-Tokens-No-Default"
+	var poolID string
+	ci := `"AT-ci" = { status = "ACTIVE", description = "AT CI token" }`
+	spare := `"AT-spare" = { status = "INACTIVE" }`
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -475,36 +463,175 @@ func TestBritiveBrokerPoolTokenChangePool(t *testing.T) {
 		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: config("pool"),
+				Config:      testAccBrokerPoolWithTokens(poolName, ci, spare),
+				ExpectError: regexp.MustCompile(`Missing Default Broker Pool Token`),
+			},
+			{
+				Config: testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE" }`, ci, spare),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCaptureAttr(bpPool, "pool_id", &poolA),
-					testAccCaptureAttr(bpPoolB, "pool_id", &poolB),
-					testAccCheckTokenNamesAPI(client, &poolA, "AT-token-move", "default"),
+					testAccCaptureAttr(bpPool, "pool_id", &poolID),
+					testAccCheckTokenNamesAPI(client, &poolID, "default", "AT-ci", "AT-spare"),
 				),
 			},
 			{
-				Config:           config("pool_b"),
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionReplace),
+				Config:           testAccBrokerPoolWithTokens(poolName, ci, spare),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionUpdate),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrPair(bpToken, "pool_id", bpPoolB, "pool_id"),
-					testAccCheckTokenNamesAPI(client, &poolA, "default"),
-					testAccCheckTokenNamesAPI(client, &poolB, "AT-token-move", "default"),
+					resource.TestCheckResourceAttr(bpPool, "tokens.%", "2"),
+					testAccCheckTokenNamesAPI(client, &poolID, "AT-ci", "AT-spare"),
+					testAccCheckTokenAPI(client, &poolID, "AT-ci", "ACTIVE", "AT CI token"),
+					testAccCheckTokenAPI(client, &poolID, "AT-spare", "INACTIVE", ""),
 				),
 			},
 		},
 	})
 }
 
-// TestBritiveBrokerPoolTokenValidation covers B11, a missing status and an invalid status
-// (plan-only, no API call). The name "default" is allowed.
-func TestBritiveBrokerPoolTokenValidation(t *testing.T) {
-	token := func(name, attrs string) string {
-		return fmt.Sprintf(`
-		resource "britive_resource_manager_broker_pool_token" "token" {
-			pool_id = "unused"
-			name    = %q
-			%s
-		}`, name, attrs)
+// TestBritiveBrokerPoolTokensNoActive: tokens without an ACTIVE token pass the plan, and
+// Britive rejects them with its own error:
+//  1. create with default ACTIVE and AT-ci INACTIVE
+//  2. set default INACTIVE: Britive rejects it ("at least 1 remaining active token"); the state
+//     keeps the tokens Britive really holds
+//  3. back to the first configuration: nothing to change, default is still ACTIVE in Britive
+func TestBritiveBrokerPoolTokensNoActive(t *testing.T) {
+	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens-No-Active"
+	var poolID string
+	ci := `"AT-ci" = { status = "INACTIVE" }`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE" }`, ci),
+				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
+			},
+			{
+				Config:      testAccBrokerPoolWithTokens(poolName, `default = { status = "INACTIVE" }`, ci),
+				ExpectError: regexp.MustCompile(`(?i)(E1003|remaining active token)`),
+			},
+			{
+				Config:           testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE" }`, ci),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionNoop),
+				Check:            testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+			},
+		},
+	})
+}
+
+// TestBritiveBrokerPoolTokensOverLimit: more than 2 ACTIVE tokens or more than 3 tokens pass
+// the plan, and Britive rejects them during apply. The provider makes the changes Britive
+// accepts first, then saves what Britive holds:
+//  1. create with default ACTIVE
+//  2. 3 ACTIVE tokens: Britive rejects the third activation
+//  3. 4 tokens: Britive rejects the fourth token
+//  4. back to default only: the extra tokens are deleted
+func TestBritiveBrokerPoolTokensOverLimit(t *testing.T) {
+	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens-Over-Limit"
+	var poolID string
+	def := `default = { status = "ACTIVE" }`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccBrokerPoolWithTokens(poolName, def),
+				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
+			},
+			{
+				Config: testAccBrokerPoolWithTokens(poolName, def,
+					`"AT-a" = { status = "ACTIVE" }`, `"AT-b" = { status = "ACTIVE" }`),
+				ExpectError: regexp.MustCompile(`Error Updating Broker Pool Tokens`),
+			},
+			{
+				Config: testAccBrokerPoolWithTokens(poolName, def,
+					`"AT-a" = { status = "INACTIVE" }`, `"AT-b" = { status = "INACTIVE" }`, `"AT-c" = { status = "INACTIVE" }`),
+				ExpectError: regexp.MustCompile(`Error Updating Broker Pool Tokens`),
+			},
+			{
+				Config: testAccBrokerPoolWithTokens(poolName, def),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(bpPool, "tokens.%", "1"),
+					testAccCheckTokenNamesAPI(client, &poolID, "default"),
+					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+				),
+			},
+		},
+	})
+}
+
+// TestBritiveBrokerPoolTokensNoActiveOnCreate: a new pool with default INACTIVE as its only
+// token. The plan passes; Britive rejects the change after the pool is created, so the apply
+// fails and the pool is saved as tainted. The test's destroy deletes it (checked by
+// CheckDestroy).
+func TestBritiveBrokerPoolTokensNoActiveOnCreate(t *testing.T) {
+	client := testAccBritiveClient(t)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccBrokerPoolWithTokens("AT-BP-Tokens-No-Active-Create", `default = { status = "INACTIVE" }`),
+				ExpectError: regexp.MustCompile(`(?i)(E1003|remaining active token)`),
+			},
+		},
+	})
+}
+
+// TestBritiveBrokerPoolTokensFullPool covers the one case that needs an extra step: the pool
+// has 3 tokens, its only ACTIVE token must be deleted, and the other two stay INACTIVE. The
+// provider activates one of the two for a short time, and the apply succeeds.
+func TestBritiveBrokerPoolTokensFullPool(t *testing.T) {
+	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens-Full"
+	var poolID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`default = { status = "ACTIVE" }`,
+					`"AT-b" = { status = "INACTIVE" }`,
+					`"AT-c" = { status = "INACTIVE" }`),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCaptureAttr(bpPool, "pool_id", &poolID),
+					testAccCheckTokenNamesAPI(client, &poolID, "default", "AT-b", "AT-c"),
+				),
+			},
+			{
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`"AT-b" = { status = "INACTIVE" }`,
+					`"AT-c" = { status = "INACTIVE" }`,
+					`"AT-d" = { status = "ACTIVE" }`),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionUpdate),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckTokenNamesAPI(client, &poolID, "AT-b", "AT-c", "AT-d"),
+					testAccCheckTokenAPI(client, &poolID, "AT-b", "INACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-c", "INACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-d", "ACTIVE", ""),
+				),
+			},
+		},
+	})
+}
+
+// TestBritiveBrokerPoolTokensValidation: these configurations fail in the plan, before any API
+// call. Britive's limits (no ACTIVE token, more than 3 tokens, more than 2 ACTIVE) are not
+// checked here: Britive rejects them (see TestBritiveBrokerPoolTokensNoActive and
+// TestBritiveBrokerPoolTokensOverLimit).
+func TestBritiveBrokerPoolTokensValidation(t *testing.T) {
+	config := func(tokens ...string) string {
+		return testAccBrokerPoolWithTokens("AT-BP-Tokens-Validation", tokens...)
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -512,22 +639,23 @@ func TestBritiveBrokerPoolTokenValidation(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:             token("default", `status = "ACTIVE"`),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: true,
-			},
-			{
-				Config:      token("AT-token", ""),
+				// A new pool must include the default token.
+				Config:      config(`"AT-ci" = { status = "ACTIVE" }`),
 				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`The argument "status" is required`),
+				ExpectError: regexp.MustCompile(`Missing Default Broker Pool Token`),
 			},
 			{
-				Config:      token("my token!", `status = "INACTIVE"`),
+				Config:      config(),
 				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`must contain only letters, numbers, underscore\s+and\s+hyphen`),
+				ExpectError: regexp.MustCompile(`at least one token`),
 			},
 			{
-				Config:      token("AT-token", `status = "enabled"`),
+				Config:      config(`"bad name!" = { status = "ACTIVE" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`only letters, numbers,\s+underscore\s+and\s+hyphen`),
+			},
+			{
+				Config:      config(`default = { status = "active" }`),
 				PlanOnly:    true,
 				ExpectError: regexp.MustCompile(`value must be one of`),
 			},
@@ -535,82 +663,36 @@ func TestBritiveBrokerPoolTokenValidation(t *testing.T) {
 	})
 }
 
-// TestBritiveBrokerPoolTokenDuplicateName covers B12: two token resources with the same name
-// on one pool. The second create fails and nothing extra is left in Britive.
-func TestBritiveBrokerPoolTokenDuplicateName(t *testing.T) {
-	testAccBrokerPoolTokenLimit(t, "AT-BP-Token-Duplicate", `
-	resource "britive_resource_manager_broker_pool_token" "one" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "AT-token-same"
-		status  = "INACTIVE"
+// TestBritiveBrokerPoolTokensDrift: tokens changed outside Terraform are changed back:
+//  1. create default + AT-ci
+//  2. add a token through the API: the plan deletes it
+//  3. change AT-ci's status and description through the API: the plan changes them back
+//  4. delete default through the API: the plan creates it again (with a new value)
+//  5. delete the pool through the API: the plan creates the pool and its tokens again
+func TestBritiveBrokerPoolTokensDrift(t *testing.T) {
+	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens-Drift"
+	var poolID string
+	config := testAccBrokerPoolWithTokens(poolName,
+		`default = { status = "ACTIVE" }`,
+		`"AT-ci" = { status = "INACTIVE", description = "AT CI token" }`)
+
+	driftStep := func(what string, change func() error) resource.TestStep {
+		return resource.TestStep{
+			PreConfig: func() {
+				if err := change(); err != nil {
+					t.Fatalf("%s outside Terraform: %v", what, err)
+				}
+			},
+			Config:           config,
+			ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionUpdate),
+			Check: resource.ComposeTestCheckFunc(
+				testAccCheckTokenNamesAPI(client, &poolID, "default", "AT-ci"),
+				testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+				testAccCheckTokenAPI(client, &poolID, "AT-ci", "INACTIVE", "AT CI token"),
+			),
+		}
 	}
-
-	resource "britive_resource_manager_broker_pool_token" "two" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "AT-token-same"
-		status  = "INACTIVE"
-	}`, `Error Creating Broker Pool Token`)
-}
-
-// TestBritiveBrokerPoolTokenMaxTokens covers B13: a pool allows at most 3 tokens, the default
-// token included, so a third extra token fails.
-func TestBritiveBrokerPoolTokenMaxTokens(t *testing.T) {
-	testAccBrokerPoolTokenLimit(t, "AT-BP-Token-Max", testAccBrokerPoolTokens("INACTIVE", 3),
-		`Error Creating Broker Pool Token`)
-}
-
-// TestBritiveBrokerPoolTokenMaxActive covers B14: at most 2 tokens can be ACTIVE. The default
-// token is ACTIVE, so the second extra ACTIVE token fails, and the provider deletes the token
-// it created before failing (no orphan is left in Britive).
-func TestBritiveBrokerPoolTokenMaxActive(t *testing.T) {
-	testAccBrokerPoolTokenLimit(t, "AT-BP-Token-Max-Active", testAccBrokerPoolTokens("ACTIVE", 2),
-		`Error (Setting Broker Pool Token Status|Creating Broker Pool Token)`)
-}
-
-// testAccBrokerPoolTokenLimit applies a pool plus tokens that must fail with errPattern, then
-// removes the tokens and checks Britive is left with only the default token.
-func testAccBrokerPoolTokenLimit(t *testing.T, poolName, tokens, errPattern string) {
-	client := testAccBritiveClient(t)
-	var poolID string
-	pool := testAccBrokerPoolMinimal("pool", poolName)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheckFramework(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
-		Steps: []resource.TestStep{
-			{
-				Config: pool,
-				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
-			},
-			{
-				Config:      pool + tokens,
-				ExpectError: regexp.MustCompile(errPattern),
-			},
-			{
-				Config: pool,
-				Check:  testAccCheckTokenNamesAPI(client, &poolID, "default"),
-			},
-		},
-	})
-}
-
-// TestBritiveBrokerPoolTokenDrift covers B15 and B16:
-//  1. create the token
-//  2. change its status and description through the API: the plan updates it back
-//  3. delete it through the API: the plan creates it again
-func TestBritiveBrokerPoolTokenDrift(t *testing.T) {
-	client := testAccBritiveClient(t)
-	var poolID string
-	tokenName := "AT-token-drift"
-
-	config := testAccBrokerPoolMinimal("pool", "AT-BP-Token-Drift") + fmt.Sprintf(`
-	resource "britive_resource_manager_broker_pool_token" "token" {
-		pool_id     = britive_resource_manager_broker_pool.pool.pool_id
-		name        = %q
-		description = "AT token drift"
-		status      = "ACTIVE"
-	}`, tokenName)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -621,48 +703,231 @@ func TestBritiveBrokerPoolTokenDrift(t *testing.T) {
 				Config: config,
 				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
 			},
+			driftStep("adding a token", func() error {
+				_, err := client.CreateBrokerPoolToken(poolID, britive.RemoteBrokerPoolTokenCreateRequest{TokenName: "AT-extra"})
+				return err
+			}),
+			driftStep("changing a token", func() error {
+				status, desc := "ACTIVE", "changed outside Terraform"
+				_, err := client.UpdateBrokerPoolToken(poolID, "AT-ci", britive.RemoteBrokerPoolTokenUpdateRequest{Status: &status, Description: &desc})
+				return err
+			}),
+			driftStep("deleting the default token", func() error {
+				status := "ACTIVE"
+				if _, err := client.UpdateBrokerPoolToken(poolID, "AT-ci", britive.RemoteBrokerPoolTokenUpdateRequest{Status: &status}); err != nil {
+					return err
+				}
+				return client.DeleteBrokerPoolToken(poolID, "default")
+			}),
 			{
 				PreConfig: func() {
-					status, desc := "INACTIVE", "changed outside Terraform"
-					if _, err := client.UpdateBrokerPoolToken(poolID, tokenName, britive.RemoteBrokerPoolTokenUpdateRequest{
-						Status: &status, Description: &desc,
-					}); err != nil {
-						t.Fatalf("changing token outside Terraform: %v", err)
+					if err := client.DeleteBrokerPool(poolID); err != nil {
+						t.Fatalf("deleting pool outside Terraform: %v", err)
 					}
 				},
 				Config:           config,
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionUpdate),
-				Check:            testAccCheckTokenAPI(client, &poolID, tokenName, "ACTIVE", "AT token drift"),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionCreate),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCaptureAttr(bpPool, "pool_id", &poolID),
+					testAccCheckTokenNamesAPI(client, &poolID, "default", "AT-ci"),
+					testAccCheckTokenAPI(client, &poolID, "AT-ci", "INACTIVE", "AT CI token"),
+				),
+			},
+		},
+	})
+}
+
+// TestBritiveBrokerPoolTokensImport: a pool with 2 tokens, created through the API, is
+// imported. The state gets each token's name, status and description, and no token value.
+func TestBritiveBrokerPoolTokensImport(t *testing.T) {
+	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens-Import"
+	var poolID string
+
+	config := testAccBrokerPoolWithTokens(poolName,
+		`default = { status = "ACTIVE", description = "default token for pool" }`,
+		`"AT-ci" = { status = "INACTIVE", description = "AT CI token" }`)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
+		Steps: []resource.TestStep{
+			{
+				PreConfig: func() {
+					pool, err := client.CreateBrokerPool(britive.RemoteBrokerPoolCreateRequest{Name: poolName})
+					if err != nil {
+						t.Fatalf("creating pool outside Terraform: %v", err)
+					}
+					poolID = pool.PoolID
+					if _, err := client.CreateBrokerPoolToken(poolID, britive.RemoteBrokerPoolTokenCreateRequest{TokenName: "AT-ci", Description: "AT CI token"}); err != nil {
+						t.Fatalf("creating token outside Terraform: %v", err)
+					}
+				},
+				Config:             config,
+				ResourceName:       bpPool,
+				ImportState:        true,
+				ImportStatePersist: true,
+				ImportStateIdFunc:  func(*terraform.State) (string, error) { return poolID, nil },
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					if len(states) != 1 {
+						return fmt.Errorf("imported %d resources, want 1", len(states))
+					}
+					attrs := states[0].Attributes
+					want := map[string]string{
+						"tokens.%":                 "2",
+						"tokens.default.status":    "ACTIVE",
+						"tokens.AT-ci.status":      "INACTIVE",
+						"tokens.AT-ci.description": "AT CI token",
+						"tokens.AT-ci.id":          poolID + "/AT-ci",
+					}
+					for k, v := range want {
+						if attrs[k] != v {
+							return fmt.Errorf("%s = %q, want %q", k, attrs[k], v)
+						}
+					}
+					for k := range attrs {
+						if strings.Contains(strings.ToLower(k), "value") {
+							return fmt.Errorf("imported state has %s", k)
+						}
+					}
+					return nil
+				},
+			},
+			{
+				// The configuration matches what was imported, so there is nothing to change.
+				Config:   config,
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// tokenPath is the plan/state path of a field of one token in the tokens map.
+func tokenPath(name, field string) tfjsonpath.Path {
+	return tfjsonpath.New("tokens").AtMapKey(name).AtMapKey(field)
+}
+
+// expectNewToken checks the plan adds the token with id and created unknown ("known after
+// apply"), not null. A null there makes Terraform fail the apply with "Provider produced
+// inconsistent result".
+func expectNewToken(name string) []plancheck.PlanCheck {
+	return []plancheck.PlanCheck{
+		plancheck.ExpectUnknownValue(bpPool, tokenPath(name, "id")),
+		plancheck.ExpectUnknownValue(bpPool, tokenPath(name, "created")),
+	}
+}
+
+// expectKeptToken checks the plan keeps the token's id and created from the state.
+func expectKeptToken(name string) []plancheck.PlanCheck {
+	return []plancheck.PlanCheck{
+		plancheck.ExpectKnownValue(bpPool, tokenPath(name, "id"), knownvalue.NotNull()),
+		plancheck.ExpectKnownValue(bpPool, tokenPath(name, "created"), knownvalue.NotNull()),
+	}
+}
+
+func planChecks(action plancheck.ResourceActionType, groups ...[]plancheck.PlanCheck) resource.ConfigPlanChecks {
+	checks := []plancheck.PlanCheck{plancheck.ExpectResourceAction(bpPool, action)}
+	for _, g := range groups {
+		checks = append(checks, g...)
+	}
+	return resource.ConfigPlanChecks{PreApply: checks}
+}
+
+// TestBritiveBrokerPoolTokensAddToExistingPool covers adding tokens to a pool that already
+// exists. The plan must show id and created of a new token as unknown, and keep them for
+// existing tokens:
+//  1. create with default only
+//  2. add ci-token and remove default in one apply
+//  3. add ops: ops is new, ci-token keeps its id and created
+//  4. change only ci-token's description: no token gets an unknown id
+//  5. delete ops through the API: the plan creates it again with an unknown id
+//  6. remove ops
+//  7. add ops back: it is a new token with a new value
+func TestBritiveBrokerPoolTokensAddToExistingPool(t *testing.T) {
+	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens-Add"
+	var poolID, opsValue string
+	ci := `"ci-token" = { status = "ACTIVE" }`
+	ciDesc := `"ci-token" = { status = "ACTIVE", description = "AT CI token" }`
+	ops := `"ops_token-2" = { status = "INACTIVE" }`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE", description = "AT default token" }`),
+				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
+			},
+			{
+				Config:           testAccBrokerPoolWithTokens(poolName, ci),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate, expectNewToken("ci-token")),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAttrEquals(bpPool, "pool_id", &poolID),
+					testAccCheckTokenIDAttr(bpPool, "ci-token", &poolID),
+					resource.TestCheckResourceAttrSet(bpPool, "tokens.ci-token.created"),
+					testAccCheckTokenNamesAPI(client, &poolID, "ci-token"),
+					testAccCheckTokenAPI(client, &poolID, "ci-token", "ACTIVE", ""),
+				),
+			},
+			{
+				Config:           testAccBrokerPoolWithTokens(poolName, ci, ops),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate, expectNewToken("ops_token-2"), expectKeptToken("ci-token")),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckTokenIDAttr(bpPool, "ops_token-2", &poolID),
+					testAccCheckTokenNamesAPI(client, &poolID, "ci-token", "ops_token-2"),
+					testAccCheckTokenAPI(client, &poolID, "ops_token-2", "INACTIVE", ""),
+					testAccCaptureTokenValueAPI(client, &poolID, "ops_token-2", &opsValue),
+				),
+			},
+			{
+				Config:           testAccBrokerPoolWithTokens(poolName, ciDesc, ops),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate, expectKeptToken("ci-token"), expectKeptToken("ops_token-2")),
+				Check:            testAccCheckTokenAPI(client, &poolID, "ci-token", "ACTIVE", "AT CI token"),
 			},
 			{
 				PreConfig: func() {
-					if err := client.DeleteBrokerPoolToken(poolID, tokenName); err != nil {
+					if err := client.DeleteBrokerPoolToken(poolID, "ops_token-2"); err != nil {
 						t.Fatalf("deleting token outside Terraform: %v", err)
 					}
 				},
-				Config:           config,
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionCreate),
-				Check:            testAccCheckTokenAPI(client, &poolID, tokenName, "ACTIVE", "AT token drift"),
+				Config:           testAccBrokerPoolWithTokens(poolName, ciDesc, ops),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate, expectNewToken("ops_token-2"), expectKeptToken("ci-token")),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckTokenNamesAPI(client, &poolID, "ci-token", "ops_token-2"),
+					testAccCheckTokenValueChangedAPI(client, &poolID, "ops_token-2", &opsValue),
+					testAccCaptureTokenValueAPI(client, &poolID, "ops_token-2", &opsValue),
+				),
+			},
+			{
+				Config:           testAccBrokerPoolWithTokens(poolName, ciDesc),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate, expectKeptToken("ci-token")),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(bpPool, "tokens.%", "1"),
+					testAccCheckTokenNamesAPI(client, &poolID, "ci-token"),
+				),
+			},
+			{
+				Config:           testAccBrokerPoolWithTokens(poolName, ciDesc, ops),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate, expectNewToken("ops_token-2"), expectKeptToken("ci-token")),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckTokenNamesAPI(client, &poolID, "ci-token", "ops_token-2"),
+					testAccCheckTokenValueChangedAPI(client, &poolID, "ops_token-2", &opsValue),
+				),
 			},
 		},
 	})
 }
 
-// TestBritiveBrokerPoolTokenPoolDeletedOutside: the pool is deleted through the API while a
-// token resource exists. Reading the token of a deleted pool must count as "not found", so the
-// next plan creates the pool and the token again without errors.
-func TestBritiveBrokerPoolTokenPoolDeletedOutside(t *testing.T) {
+// TestBritiveBrokerPoolTokensStatusSwap: the ACTIVE and INACTIVE tokens swap in one apply.
+// The INACTIVE token must be activated before the ACTIVE one is set INACTIVE; the token values
+// do not change.
+func TestBritiveBrokerPoolTokensStatusSwap(t *testing.T) {
 	client := testAccBritiveClient(t)
-	var poolID, oldPoolID string
-	tokenName := "AT-token-pool-deleted"
-
-	config := testAccBrokerPoolMinimal("pool", "AT-BP-Token-Pool-Deleted") + fmt.Sprintf(`
-	resource "britive_resource_manager_broker_pool_token" "token" {
-		pool_id     = britive_resource_manager_broker_pool.pool.pool_id
-		name        = %q
-		description = "AT token pool deleted"
-		status      = "ACTIVE"
-	}`, tokenName)
+	poolName := "AT-BP-Tokens-Swap"
+	var poolID, defaultValue, ciValue string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -670,219 +935,41 @@ func TestBritiveBrokerPoolTokenPoolDeletedOutside(t *testing.T) {
 		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: config,
-				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
-			},
-			{
-				PreConfig: func() {
-					oldPoolID = poolID
-					if err := client.DeleteBrokerPool(poolID); err != nil {
-						t.Fatalf("deleting pool outside Terraform: %v", err)
-					}
-				},
-				Config: config,
-				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
-					plancheck.ExpectResourceAction(bpPool, plancheck.ResourceActionCreate),
-					plancheck.ExpectResourceAction(bpToken, plancheck.ResourceActionCreate),
-				}},
+				Config: testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE" }`, `"AT-ci" = { status = "INACTIVE" }`),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCaptureAttr(bpPool, "pool_id", &poolID),
-					testAccCheckAttrNotEquals(bpPool, "pool_id", &oldPoolID),
-					resource.TestCheckResourceAttrPair(bpToken, "pool_id", bpPool, "pool_id"),
-					testAccCheckTokenNamesAPI(client, &poolID, tokenName, "default"),
-					testAccCheckTokenAPI(client, &poolID, tokenName, "ACTIVE", "AT token pool deleted"),
-				),
-			},
-		},
-	})
-}
-
-// TestBritiveBrokerPoolTokenActivateOverLimit: a pool allows 2 ACTIVE tokens. With the
-// default token and one other token ACTIVE, changing a third token from INACTIVE to ACTIVE is
-// rejected: the apply fails, Britive and the state keep INACTIVE, and setting INACTIVE again in
-// the configuration gives an empty plan.
-func TestBritiveBrokerPoolTokenActivateOverLimit(t *testing.T) {
-	client := testAccBritiveClient(t)
-	var poolID string
-
-	config := func(thirdStatus string) string {
-		return testAccBrokerPoolMinimal("pool", "AT-BP-Token-Activate-Limit") + fmt.Sprintf(`
-		resource "britive_resource_manager_broker_pool_token" "active" {
-			pool_id = britive_resource_manager_broker_pool.pool.pool_id
-			name    = "AT-token-active"
-			status  = "ACTIVE"
-		}
-
-		resource "britive_resource_manager_broker_pool_token" "token" {
-			pool_id = britive_resource_manager_broker_pool.pool.pool_id
-			name    = "AT-token-third"
-			status  = %q
-		}`, thirdStatus)
-	}
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheckFramework(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
-		Steps: []resource.TestStep{
-			{
-				Config: config("INACTIVE"),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCaptureAttr(bpPool, "pool_id", &poolID),
-					testAccCheckTokenAPI(client, &poolID, "AT-token-third", "INACTIVE", ""),
+					testAccCaptureTokenValueAPI(client, &poolID, "default", &defaultValue),
+					testAccCaptureTokenValueAPI(client, &poolID, "AT-ci", &ciValue),
 				),
 			},
 			{
-				Config:           config("ACTIVE"),
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionUpdate),
-				ExpectError:      regexp.MustCompile(`Error Updating Broker Pool Token`),
-			},
-			{
-				// The failed update left the state at INACTIVE, so this plan is empty.
-				Config:           config("INACTIVE"),
-				ConfigPlanChecks: expectAction(bpToken, plancheck.ResourceActionNoop),
+				Config:           testAccBrokerPoolWithTokens(poolName, `default = { status = "INACTIVE" }`, `"AT-ci" = { status = "ACTIVE" }`),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate, expectKeptToken("default"), expectKeptToken("AT-ci")),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(bpToken, "status", "INACTIVE"),
-					testAccCheckTokenAPI(client, &poolID, "AT-token-third", "INACTIVE", ""),
-					testAccCheckTokenAPI(client, &poolID, "AT-token-active", "ACTIVE", ""),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", "default token for pool"),
-				),
-			},
-		},
-	})
-}
-
-// ---------------------------------------------------------------------------
-// B2. Default token (britive_resource_manager_broker_pool_token with name = "default")
-// ---------------------------------------------------------------------------
-
-const bpDefaultToken = "britive_resource_manager_broker_pool_token.default"
-
-// testAccDefaultTokenConfig builds a pool, an optional extra token and a "default" token
-// resource. The default token depends on the extra token, so it is updated after the extra
-// token exists and destroyed before it.
-func testAccDefaultTokenConfig(poolName, defaultAttrs, otherStatus string) string {
-	config := testAccBrokerPoolMinimal("pool", poolName)
-	dependsOn := ""
-	if otherStatus != "" {
-		config += fmt.Sprintf(`
-	resource "britive_resource_manager_broker_pool_token" "token" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "AT-token-other"
-		status  = %q
-	}
-	`, otherStatus)
-		dependsOn = "depends_on = [britive_resource_manager_broker_pool_token.token]"
-	}
-	if defaultAttrs != "" {
-		config += fmt.Sprintf(`
-	resource "britive_resource_manager_broker_pool_token" "default" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "default"
-		%s
-		%s
-	}
-	`, defaultAttrs, dependsOn)
-	}
-	return config
-}
-
-// TestBritiveBrokerPoolDefaultToken covers taking over and managing the default token:
-//  1. take over the default token of a new pool (ACTIVE + description): no second token is
-//     created, the existing token is updated
-//  2. remove the description: it is cleared in Britive
-//  3. import with {pool_id}/default
-//  4. add another ACTIVE token and set the default token INACTIVE: updated in place
-//  5. remove the default token resource while another token is ACTIVE: the token is deleted
-//  6. add the default token resource again: the token is created again with POST
-//  7. set the other token INACTIVE, so the final destroy hits the "last active token" rule on
-//     the default token: it is removed from the state with a warning, and the pool delete
-//     removes it from Britive (checked by CheckDestroy)
-func TestBritiveBrokerPoolDefaultToken(t *testing.T) {
-	client := testAccBritiveClient(t)
-	poolName := "AT-BP-Default-Token"
-	var poolID string
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheckFramework(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDefaultTokenConfig(poolName, `status = "ACTIVE"`+"\n"+`description = "AT default token"`, ""),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCaptureAttr(bpPool, "pool_id", &poolID),
-					resource.TestCheckResourceAttr(bpDefaultToken, "name", "default"),
-					resource.TestCheckResourceAttr(bpDefaultToken, "status", "ACTIVE"),
-					resource.TestCheckResourceAttr(bpDefaultToken, "description", "AT default token"),
-					resource.TestCheckNoResourceAttr(bpDefaultToken, "token_value"),
-					resource.TestCheckResourceAttrSet(bpDefaultToken, "created"),
-					testAccCheckTokenNamesAPI(client, &poolID, "default"),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", "AT default token"),
-				),
-			},
-			{
-				Config:           testAccDefaultTokenConfig(poolName, `status = "ACTIVE"`, ""),
-				ConfigPlanChecks: expectAction(bpDefaultToken, plancheck.ResourceActionUpdate),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckNoResourceAttr(bpDefaultToken, "description"),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
-				),
-			},
-			{
-				ResourceName:      bpDefaultToken,
-				ImportState:       true,
-				ImportStateVerify: true,
-				ImportStateIdFunc: func(s *terraform.State) (string, error) {
-					return poolID + "/default", nil
-				},
-			},
-			{
-				Config: testAccDefaultTokenConfig(poolName, `status = "INACTIVE"`, "ACTIVE"),
-				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
-					plancheck.ExpectResourceAction(bpDefaultToken, plancheck.ResourceActionUpdate),
-					plancheck.ExpectResourceAction(bpToken, plancheck.ResourceActionCreate),
-				}},
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(bpDefaultToken, "status", "INACTIVE"),
 					testAccCheckDefaultTokenAPI(client, &poolID, "INACTIVE", ""),
-					testAccCheckTokenAPI(client, &poolID, "AT-token-other", "ACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-ci", "ACTIVE", ""),
+					testAccCheckTokenValueAPI(client, &poolID, "default", &defaultValue),
+					testAccCheckTokenValueAPI(client, &poolID, "AT-ci", &ciValue),
 				),
 			},
 			{
-				Config: testAccDefaultTokenConfig(poolName, "", "ACTIVE"),
-				Check:  testAccCheckTokenNamesAPI(client, &poolID, "AT-token-other"),
-			},
-			{
-				Config:           testAccDefaultTokenConfig(poolName, `status = "ACTIVE"`+"\n"+`description = "AT recreated"`, "ACTIVE"),
-				ConfigPlanChecks: expectAction(bpDefaultToken, plancheck.ResourceActionCreate),
+				Config: testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE" }`, `"AT-ci" = { status = "INACTIVE" }`),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckTokenNamesAPI(client, &poolID, "AT-token-other", "default"),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", "AT recreated"),
+					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-ci", "INACTIVE", ""),
 				),
-			},
-			{
-				Config: testAccDefaultTokenConfig(poolName, `status = "ACTIVE"`+"\n"+`description = "AT recreated"`, "INACTIVE"),
-				Check:  testAccCheckTokenAPI(client, &poolID, "AT-token-other", "INACTIVE", ""),
 			},
 		},
 	})
 }
 
-// TestBritiveBrokerPoolDefaultTokenRejected covers changes to the default token that Britive
-// rejects:
-//  1. create the pool only
-//  2. take over the default token with status INACTIVE. It is the pool's only active token, so
-//     Britive rejects it: the apply fails and the resource is not saved
-//  3. Britive left the token as it was (ACTIVE, "default token for pool"); the next plan creates
-//     the resource again, and with status ACTIVE the takeover succeeds with the same token
-//  4. set status INACTIVE: the update is rejected with an error and the state keeps ACTIVE
-//  5. remove the default token resource while it is the last active token: Britive rejects the
-//     delete, the resource is removed from the state with a warning, and the token stays
-func TestBritiveBrokerPoolDefaultTokenRejected(t *testing.T) {
+// TestBritiveBrokerPoolTokensReplaceAll: a full pool (3 tokens) is replaced by 3 tokens with
+// other names in one apply. Every new token is unknown in the plan, and the pool never drops
+// below one ACTIVE token, so Britive accepts every call.
+func TestBritiveBrokerPoolTokensReplaceAll(t *testing.T) {
 	client := testAccBritiveClient(t)
-	poolName := "AT-BP-Default-Token-Rejected"
-	var poolID, tokenValue string
+	poolName := "AT-BP-Tokens-Replace-All"
+	var poolID string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -890,100 +977,67 @@ func TestBritiveBrokerPoolDefaultTokenRejected(t *testing.T) {
 		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDefaultTokenConfig(poolName, "", ""),
-				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`default = { status = "ACTIVE" }`,
+					`"AT-b" = { status = "ACTIVE" }`,
+					`"AT-c" = { status = "INACTIVE" }`),
+				Check: testAccCaptureAttr(bpPool, "pool_id", &poolID),
 			},
 			{
-				Config:      testAccDefaultTokenConfig(poolName, `status = "INACTIVE"`, ""),
-				ExpectError: regexp.MustCompile(`Error Updating Broker Pool Default Token`),
-			},
-			{
-				PreConfig: func() {
-					// The rejected takeover changed nothing in Britive.
-					if err := testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", "default token for pool")(nil); err != nil {
-						t.Fatal(err)
-					}
-					token, err := client.GetBrokerPoolToken(poolID, "default")
-					if err != nil {
-						t.Fatalf("reading default token: %v", err)
-					}
-					tokenValue = token.TokenValue
-				},
-				Config:           testAccDefaultTokenConfig(poolName, `status = "ACTIVE"`, ""),
-				ConfigPlanChecks: expectAction(bpDefaultToken, plancheck.ResourceActionCreate),
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`"AT-x" = { status = "ACTIVE" }`,
+					`"AT-y" = { status = "INACTIVE" }`,
+					`"AT-z" = { status = "INACTIVE" }`),
+				ConfigPlanChecks: planChecks(plancheck.ResourceActionUpdate,
+					expectNewToken("AT-x"), expectNewToken("AT-y"), expectNewToken("AT-z")),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(bpDefaultToken, "status", "ACTIVE"),
-					// Same token as before: it was never deleted and created again.
-					testAccCheckTokenValueAPI(client, &poolID, "default", &tokenValue),
-					testAccCheckTokenNamesAPI(client, &poolID, "default"),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+					testAccCheckAttrEquals(bpPool, "pool_id", &poolID),
+					testAccCheckTokenNamesAPI(client, &poolID, "AT-x", "AT-y", "AT-z"),
+					testAccCheckTokenAPI(client, &poolID, "AT-x", "ACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-y", "INACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-z", "INACTIVE", ""),
 				),
-			},
-			{
-				Config:           testAccDefaultTokenConfig(poolName, `status = "INACTIVE"`, ""),
-				ConfigPlanChecks: expectAction(bpDefaultToken, plancheck.ResourceActionUpdate),
-				ExpectError:      regexp.MustCompile(`Error Updating Broker Pool Token`),
-			},
-			{
-				Config: testAccDefaultTokenConfig(poolName, `status = "ACTIVE"`, ""),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(bpDefaultToken, "status", "ACTIVE"),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
-				),
-			},
-			{
-				Config: testAccDefaultTokenConfig(poolName, "", ""),
-				Check:  testAccCheckTokenNamesAPI(client, &poolID, "default"),
 			},
 		},
 	})
 }
 
-// TestBritiveBrokerPoolDefaultTokenPoolDeletedOutside: the pool is deleted through the API
-// while a "default" token resource exists. The next plan creates the pool again, and the
-// default token resource takes over the new pool's default token: no second token is created,
-// and the configured description is applied to it.
-func TestBritiveBrokerPoolDefaultTokenPoolDeletedOutside(t *testing.T) {
-	client := testAccBritiveClient(t)
-	var poolID, oldPoolID string
-	config := testAccDefaultTokenConfig("AT-BP-Default-Token-Pool-Deleted",
-		`status = "ACTIVE"`+"\n"+`description = "AT default token pool deleted"`, "")
+// testAccCheckTokenValueChangedAPI checks the token's value in Britive is no longer old, which
+// shows the token was created again.
+func testAccCheckTokenValueChangedAPI(client *britive.Client, poolID *string, tokenName string, old *string) resource.TestCheckFunc {
+	return func(_ *terraform.State) error {
+		token, err := client.GetBrokerPoolToken(*poolID, tokenName)
+		if err != nil {
+			return fmt.Errorf("reading token %s of pool %s: %w", tokenName, *poolID, err)
+		}
+		if token.TokenValue == *old {
+			return fmt.Errorf("token %s of pool %s still has its old value: it was not created again", tokenName, *poolID)
+		}
+		return nil
+	}
+}
 
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheckFramework(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
-		Steps: []resource.TestStep{
-			{
-				Config: config,
-				Check: resource.ComposeTestCheckFunc(
-					testAccCaptureAttr(bpPool, "pool_id", &poolID),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", "AT default token pool deleted"),
-				),
-			},
-			{
-				PreConfig: func() {
-					oldPoolID = poolID
-					if err := client.DeleteBrokerPool(poolID); err != nil {
-						t.Fatalf("deleting pool outside Terraform: %v", err)
-					}
-				},
-				Config: config,
-				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
-					plancheck.ExpectResourceAction(bpPool, plancheck.ResourceActionCreate),
-					plancheck.ExpectResourceAction(bpDefaultToken, plancheck.ResourceActionCreate),
-				}},
-				Check: resource.ComposeTestCheckFunc(
-					testAccCaptureAttr(bpPool, "pool_id", &poolID),
-					testAccCheckAttrNotEquals(bpPool, "pool_id", &oldPoolID),
-					resource.TestCheckResourceAttrPair(bpDefaultToken, "pool_id", bpPool, "pool_id"),
-					resource.TestCheckResourceAttr(bpDefaultToken, "status", "ACTIVE"),
-					testAccCheckTokenNamesAPI(client, &poolID, "default"),
-					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", "AT default token pool deleted"),
-				),
-			},
-		},
+// testAccCheckTokenIDAttr checks tokens.<name>.id is {pool_id}/{name}.
+func testAccCheckTokenIDAttr(res, name string, poolID *string) resource.TestCheckFunc {
+	return resource.TestCheckResourceAttrWith(res, "tokens."+name+".id", func(v string) error {
+		if want := *poolID + "/" + name; v != want {
+			return fmt.Errorf("tokens.%s.id = %q, want %q", name, v, want)
+		}
+		return nil
 	})
+}
+
+// testAccCaptureTokenValueAPI stores a token's value in Britive, so later steps can check the
+// token was not deleted and created again.
+func testAccCaptureTokenValueAPI(client *britive.Client, poolID *string, tokenName string, dst *string) resource.TestCheckFunc {
+	return func(_ *terraform.State) error {
+		token, err := client.GetBrokerPoolToken(*poolID, tokenName)
+		if err != nil {
+			return fmt.Errorf("reading token %s of pool %s: %w", tokenName, *poolID, err)
+		}
+		*dst = token.TokenValue
+		return nil
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1325,6 +1379,7 @@ func TestBritiveBrokerPoolDataSource(t *testing.T) {
 					description        = "AT broker pool data source"
 					keep_alive_seconds = 120
 					disconnect_seconds = 3600
+					tokens = { default = { status = "ACTIVE" } }
 				}
 
 				data "britive_resource_manager_broker_pool" "lookup" {
@@ -1426,7 +1481,7 @@ func TestBritiveBrokerPoolDataSourceWithBrokers(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestBritiveBrokerPoolEndToEnd covers E1–E4, E6 and D4:
-//  1. pool + labels + two tokens, linked to a new resource, read back through the data source
+//  1. pool with two tokens + labels, linked to a new resource, read back through the data source
 //     (which lists the linked resource)
 //  2. destroy everything
 //  3. apply the same configuration again
@@ -1460,6 +1515,11 @@ func TestBritiveBrokerPoolEndToEnd(t *testing.T) {
 		name               = %q
 		description        = "AT broker pool end to end"
 		keep_alive_seconds = 120
+		tokens = {
+			default             = { status = "ACTIVE" }
+			"AT-token-active"   = { status = "ACTIVE", description = "AT active token" }
+			"AT-token-inactive" = { status = "INACTIVE" }
+		}
 	}
 
 	resource "britive_resource_manager_broker_pool_labels" "labels" {
@@ -1472,19 +1532,6 @@ func TestBritiveBrokerPoolEndToEnd(t *testing.T) {
 			label_key = "Team"
 			values    = []
 		}
-	}
-
-	resource "britive_resource_manager_broker_pool_token" "token" {
-		pool_id     = britive_resource_manager_broker_pool.pool.pool_id
-		name        = "AT-token-active"
-		description = "AT active token"
-		status      = "ACTIVE"
-	}
-
-	resource "britive_resource_manager_broker_pool_token" "token_inactive" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "AT-token-inactive"
-		status  = "INACTIVE"
 	}
 
 	resource "britive_resource_manager_resource_broker_pools" "link" {
@@ -1500,8 +1547,8 @@ func TestBritiveBrokerPoolEndToEnd(t *testing.T) {
 	check := resource.ComposeTestCheckFunc(
 		resource.TestCheckResourceAttrPair(bpData, "pool_id", bpPool, "pool_id"),
 		resource.TestCheckResourceAttr(bpLabels, "resource_labels.#", "2"),
-		resource.TestCheckResourceAttr(bpToken, "status", "ACTIVE"),
-		resource.TestCheckResourceAttr("britive_resource_manager_broker_pool_token.token_inactive", "status", "INACTIVE"),
+		resource.TestCheckResourceAttr(bpPool, "tokens.AT-token-active.status", "ACTIVE"),
+		resource.TestCheckResourceAttr(bpPool, "tokens.AT-token-inactive.status", "INACTIVE"),
 		resource.TestCheckResourceAttr(bpData, "resources.#", "1"),
 		resource.TestCheckResourceAttr(bpData, "resources.0.name", resourceName),
 		resource.TestCheckResourceAttrSet(bpData, "resources.0.resource_id"),
@@ -1564,6 +1611,7 @@ func TestBritiveBrokerPoolDeleteLinked(t *testing.T) {
 
 	resource "britive_resource_manager_broker_pool" "pool" {
 		name = %q
+		tokens = { default = { status = "ACTIVE" } }
 	}
 
 	resource "britive_resource_manager_resource_broker_pools" "link" {
@@ -1621,26 +1669,15 @@ func TestBritiveBrokerPoolDeleteLinked(t *testing.T) {
 // Config helpers
 // ---------------------------------------------------------------------------
 
+// testAccBrokerPoolMinimal builds a pool with only a name and the required tokens, which keep
+// the default token ACTIVE.
 func testAccBrokerPoolMinimal(resName, name string) string {
 	return fmt.Sprintf(`
 	resource "britive_resource_manager_broker_pool" %q {
 		name = %q
+		tokens = { default = { status = "ACTIVE" } }
 	}
 	`, resName, name)
-}
-
-func testAccBrokerPoolTokens(status string, count int) string {
-	var b strings.Builder
-	for i := 1; i <= count; i++ {
-		fmt.Fprintf(&b, `
-	resource "britive_resource_manager_broker_pool_token" "t%d" {
-		pool_id = britive_resource_manager_broker_pool.pool.pool_id
-		name    = "AT-token-%d"
-		status  = %q
-	}
-	`, i, i, status)
-	}
-	return b.String()
 }
 
 // testAccBrokerPoolLabelsConfig builds a pool named poolName plus a labels resource on it.
