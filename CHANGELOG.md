@@ -1,11 +1,13 @@
 ## 3.0.6
 
-ENHANCEMENTS:
+FEATURES:
 * **New Resource:** `britive_resource_manager_broker_pool` : Create, update, and manage resource manager broker pools and their tokens (`ACTIVE`/`INACTIVE`). Token values are never stored in state.
 * **New Resource:** `britive_resource_manager_broker_pool_labels` : Manage the resource labels of a broker pool.
 * **New Ephemeral Resource:** `britive_resource_manager_broker_pool_token` : Read a broker pool token's value without storing it in state. Requires Terraform 1.10 or later.
 * **New Data Source:** `data.britive_resource_manager_broker_pool` : Look up a broker pool by name, with its settings, brokers, resources and tokens.
 * **New Data Source:** `data.britive_saml_metadata` : Get the tenant's SAML metadata XML and certificates, for example to onboard AWS with `aws_iam_saml_provider`.
+
+ENHANCEMENTS:
 * **Resource:** `britive_resource_manager_resource_type_permission` : Added a `variable_defaults` block to set default values for permission variables. Defaults set in the Britive UI but not in the configuration are removed on the next apply.
 * **Resource:** `britive_resource_manager_profile_permission` : Variables can now be left out of `variables` to use their default values. Added a read-only `effective_variables` attribute showing the value used for each variable.
 
