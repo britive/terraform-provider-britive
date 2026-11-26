@@ -101,7 +101,7 @@ type Profile struct {
 	PolicyOrderingEnabled         bool                 `json:"policyOrderingEnabled,omitempty"`
 	// DelegationEnabled must NOT use omitempty: Go omits false for bool with omitempty,
 	// which would prevent the PATCH from ever setting delegation to false.
-	DelegationEnabled             bool                 `json:"delegationEnabled"`
+	DelegationEnabled bool `json:"delegationEnabled"`
 }
 
 // Application - godoc
@@ -764,13 +764,13 @@ type ResourceManagerProfilePolicy struct {
 
 // Resource Manager Profile Permission - godoc
 type ResourceManagerProfilePermission struct {
-	ProfilID         string                   `json:"profileID,omitempty"`
-	PermissionID     string                   `json:"permissionId,omitempty"`
-	PermissionName   string                   `json:"permissionName,omitempty"`
-	Description      string                   `json:"description,omitempty"`
-	Version          string                   `json:"version,omitempty"`
-	ResourceTypeId   string                   `json:"resourceTypeId,omitempty"`
-	ResourceTypeName string                   `json:"resourceTypeName,omitempty"`
+	ProfilID         string `json:"profileID,omitempty"`
+	PermissionID     string `json:"permissionId,omitempty"`
+	PermissionName   string `json:"permissionName,omitempty"`
+	Description      string `json:"description,omitempty"`
+	Version          string `json:"version,omitempty"`
+	ResourceTypeId   string `json:"resourceTypeId,omitempty"`
+	ResourceTypeName string `json:"resourceTypeName,omitempty"`
 	// Variables has no omitempty: an empty list must still be sent so that variables
 	// removed from the config are cleared on the backend.
 	Variables []map[string]interface{} `json:"variables"`
@@ -948,4 +948,13 @@ type BrokerPoolLinkedResourcePage struct {
 	Page  int                        `json:"page"`
 	Size  int                        `json:"size"`
 	Data  []BrokerPoolLinkedResource `json:"data"`
+}
+
+// SAMLSettings - a SAML identity provider configuration of the tenant
+type SAMLSettings struct {
+	ID                     int64  `json:"id"`
+	Issuer                 string `json:"issuer"`
+	X509CertExpirationDate string `json:"x509CertExpirationDate"`
+	SignInURL              string `json:"signInUrl"`
+	SignOutURL             string `json:"signOutUrl"`
 }
