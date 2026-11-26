@@ -14,14 +14,25 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-// External tag tests need a non-default (SAML) identity provider on the test
-// tenant. Set BRITIVE_EXTERNAL_TAG_IDP_ID to its id to enable them.
-func testAccExternalTagIdentityProvider(t *testing.T) string {
-	id := os.Getenv("BRITIVE_EXTERNAL_TAG_IDP_ID")
-	if id == "" {
-		t.Skip("BRITIVE_EXTERNAL_TAG_IDP_ID not set; skipping external tag tests")
+// Fixtures that must exist on the test tenant and must never be deleted:
+//   - a non-default (SAML) identity provider for placeholder tags,
+//   - a tag on an identity provider that SCIM has already connected, which must
+//     be requestable,
+//   - a user that is not an owner of the connected tag.
+const (
+	externalTagIdentityProviderName = "DO_NOT_DELETE_TF_AT"
+	connectedExternalTagName        = "DO_NOT_DELETE_EXT_TAG"
+	externalTagMemberUsername       = "britiveprovideracceptancetest"
+)
+
+// testAccExternalTagIdentityProviderData looks up the SAML identity provider;
+// configs reference it as data.britive_identity_provider.external.id.
+func testAccExternalTagIdentityProviderData() string {
+	return fmt.Sprintf(`
+	data "britive_identity_provider" "external" {
+		name = %q
 	}
-	return id
+`, externalTagIdentityProviderName)
 }
 
 // testAccBritiveClient builds an API client from BRITIVE_TENANT and
@@ -42,22 +53,28 @@ func testAccBritiveClient(t *testing.T) *britive.Client {
 	return client
 }
 
-// Connected-tag tests need an existing SCIM-connected tag; set
-// BRITIVE_EXTERNAL_TAG_CONNECTED_ID to its id. The tag is read up front so the
+// testAccConnectedExternalTag reads the connected fixture tag up front so the
 // configs can mirror its current values: importing it then plans no changes,
 // and the tests never alter the shared tag by accident.
 func testAccConnectedExternalTag(t *testing.T) (*britive.Client, *britive.Tag) {
-	id := os.Getenv("BRITIVE_EXTERNAL_TAG_CONNECTED_ID")
-	if id == "" {
-		t.Skip("BRITIVE_EXTERNAL_TAG_CONNECTED_ID not set; skipping connected external tag test")
-	}
 	client := testAccBritiveClient(t)
-	tag, err := client.GetTag(id)
+	tags, err := client.GetTagsByName(connectedExternalTagName)
 	if err != nil {
-		t.Fatalf("reading connected tag %s: %v", id, err)
+		t.Fatalf("looking up connected tag %s: %v", connectedExternalTagName, err)
 	}
-	if !tag.External || len(tag.UserTagIdentityProviders) == 0 {
-		t.Fatalf("tag %s is not connected through SCIM; BRITIVE_EXTERNAL_TAG_CONNECTED_ID must be a connected external tag", id)
+	var connected []britive.Tag
+	for _, tag := range tags {
+		if tag.External && len(tag.UserTagIdentityProviders) > 0 {
+			connected = append(connected, tag)
+		}
+	}
+	if len(connected) != 1 {
+		t.Fatalf("expected exactly one SCIM-connected tag named %s, found %d", connectedExternalTagName, len(connected))
+	}
+	// Re-read by id: the list view may not carry every field.
+	tag, err := client.GetTag(connected[0].ID)
+	if err != nil {
+		t.Fatalf("reading connected tag %s: %v", connected[0].ID, err)
 	}
 	return client, tag
 }
@@ -74,7 +91,6 @@ func testAccRequireRequestable(t *testing.T, tag *britive.Tag) {
 // description (the API's "No Description" default must not drift), import,
 // and confirm destroy deletes the tag from Britive.
 func TestBritiveExternalTagPlaceholder(t *testing.T) {
-	idpID := testAccExternalTagIdentityProvider(t)
 	client := testAccBritiveClient(t)
 	name := "AT - External Tag Placeholder"
 	resource.Test(t, resource.TestCase{
@@ -83,20 +99,20 @@ func TestBritiveExternalTagPlaceholder(t *testing.T) {
 		CheckDestroy:             testAccCheckBritiveExternalTagDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccExternalTagConfig(name, "AT description", idpID, "v1"),
+				Config: testAccExternalTagConfig(name, "AT description", "v1"),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveExternalTagExists("britive_external_tag.new"),
 					resource.TestCheckResourceAttr("britive_external_tag.new", "name", name),
 					resource.TestCheckResourceAttr("britive_external_tag.new", "external", "false"),
 					resource.TestCheckResourceAttr("britive_external_tag.new", "external_id", ""),
 					resource.TestCheckResourceAttr("britive_external_tag.new", "requestable", "true"),
-					resource.TestCheckResourceAttr("britive_external_tag.new", "identity_provider_id", idpID),
+					resource.TestCheckResourceAttrPair("britive_external_tag.new", "identity_provider_id", "data.britive_identity_provider.external", "id"),
 					resource.TestCheckResourceAttr("britive_external_tag.new", "attributes.#", "1"),
 				),
 			},
 			{
 				// Rename, change description and the attribute value.
-				Config: testAccExternalTagConfig(name+" Renamed", "AT description 2", idpID, "v2"),
+				Config: testAccExternalTagConfig(name+" Renamed", "AT description 2", "v2"),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("britive_external_tag.new", "name", name+" Renamed"),
 					resource.TestCheckResourceAttr("britive_external_tag.new", "description", "AT description 2"),
@@ -109,13 +125,13 @@ func TestBritiveExternalTagPlaceholder(t *testing.T) {
 			},
 			{
 				// Omitting description must not produce drift against the API default.
-				Config: testAccExternalTagConfigNoDescription(name+" Renamed", idpID),
+				Config: testAccExternalTagConfigNoDescription(name + " Renamed"),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckNoResourceAttr("britive_external_tag.new", "description"),
 				),
 			},
 			{
-				Config:   testAccExternalTagConfigNoDescription(name+" Renamed", idpID),
+				Config:   testAccExternalTagConfigNoDescription(name + " Renamed"),
 				PlanOnly: true,
 			},
 			{
@@ -129,7 +145,6 @@ func TestBritiveExternalTagPlaceholder(t *testing.T) {
 
 // The default identity provider is refused at plan time.
 func TestBritiveExternalTagRefusesDefaultIdentityProvider(t *testing.T) {
-	testAccExternalTagIdentityProvider(t)
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -153,17 +168,16 @@ func TestBritiveExternalTagRefusesDefaultIdentityProvider(t *testing.T) {
 
 // britive_tag refuses the non-default provider and points at this resource.
 func TestBritiveTagRefusesExternalIdentityProvider(t *testing.T) {
-	idpID := testAccExternalTagIdentityProvider(t)
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(`
+				Config: testAccExternalTagIdentityProviderData() + `
 	resource "britive_tag" "bad" {
 		name                 = "AT - Britive Tag On SAML IdP"
-		identity_provider_id = %q
-	}`, idpID),
+		identity_provider_id = data.britive_identity_provider.external.id
+	}`,
 				ExpectError: regexp.MustCompile(`britive_external_tag`),
 			},
 		},
@@ -172,26 +186,21 @@ func TestBritiveTagRefusesExternalIdentityProvider(t *testing.T) {
 
 // A placeholder can take members through britive_tag_member.
 func TestBritiveExternalTagPlaceholderMember(t *testing.T) {
-	idpID := testAccExternalTagIdentityProvider(t)
-	username := os.Getenv("BRITIVE_EXTERNAL_TAG_MEMBER_USERNAME")
-	if username == "" {
-		t.Skip("BRITIVE_EXTERNAL_TAG_MEMBER_USERNAME not set; skipping member test")
-	}
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(`
+				Config: testAccExternalTagIdentityProviderData() + fmt.Sprintf(`
 	resource "britive_external_tag" "new" {
 		name                 = "AT - External Tag With Member"
-		identity_provider_id = %q
+		identity_provider_id = data.britive_identity_provider.external.id
 	}
 
 	resource "britive_tag_member" "new" {
 		tag_id   = britive_external_tag.new.id
 		username = %q
-	}`, idpID, username),
+	}`, externalTagMemberUsername),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBritiveExternalTagExists("britive_external_tag.new"),
 					resource.TestCheckResourceAttrPair("britive_tag_member.new", "tag_id", "britive_external_tag.new", "id"),
@@ -203,7 +212,6 @@ func TestBritiveExternalTagPlaceholderMember(t *testing.T) {
 
 // The data source refuses an ambiguous name and resolves it with a provider id.
 func TestBritiveTagDataSourceDisambiguation(t *testing.T) {
-	idpID := testAccExternalTagIdentityProvider(t)
 	name := "AT - Duplicate Tag Name"
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -211,10 +219,10 @@ func TestBritiveTagDataSourceDisambiguation(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				// Same name on the default provider (britive_tag) and the SAML provider.
-				Config: testAccDuplicateTagNameConfig(name, idpID),
+				Config: testAccDuplicateTagNameConfig(name),
 			},
 			{
-				Config: testAccDuplicateTagNameConfig(name, idpID) + fmt.Sprintf(`
+				Config: testAccDuplicateTagNameConfig(name) + fmt.Sprintf(`
 	data "britive_tag" "ambiguous" {
 		name = %q
 		depends_on = [britive_tag.dup, britive_external_tag.dup]
@@ -222,12 +230,12 @@ func TestBritiveTagDataSourceDisambiguation(t *testing.T) {
 				ExpectError: regexp.MustCompile(`Ambiguous Tag Name`),
 			},
 			{
-				Config: testAccDuplicateTagNameConfig(name, idpID) + fmt.Sprintf(`
+				Config: testAccDuplicateTagNameConfig(name) + fmt.Sprintf(`
 	data "britive_tag" "resolved" {
 		name                 = %q
-		identity_provider_id = %q
+		identity_provider_id = data.britive_identity_provider.external.id
 		depends_on           = [britive_tag.dup, britive_external_tag.dup]
-	}`, name, idpID),
+	}`, name),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttrPair("data.britive_tag.resolved", "id", "britive_external_tag.dup", "id"),
 					resource.TestCheckResourceAttr("data.britive_tag.resolved", "external", "false"),
@@ -240,22 +248,21 @@ func TestBritiveTagDataSourceDisambiguation(t *testing.T) {
 // A second resource for a name that already exists on the same provider is
 // refused at plan time with import guidance (the identity-provider-first case).
 func TestBritiveExternalTagAlreadyExists(t *testing.T) {
-	idpID := testAccExternalTagIdentityProvider(t)
 	name := "AT - External Tag Already Exists"
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccExternalTagConfigNoDescription(name, idpID),
+				Config: testAccExternalTagConfigNoDescription(name),
 			},
 			{
-				Config: testAccExternalTagConfigNoDescription(name, idpID) + fmt.Sprintf(`
+				Config: testAccExternalTagConfigNoDescription(name) + fmt.Sprintf(`
 	resource "britive_external_tag" "second" {
 		name                 = %q
-		identity_provider_id = %q
+		identity_provider_id = data.britive_identity_provider.external.id
 		depends_on           = [britive_external_tag.new]
-	}`, name, idpID),
+	}`, name),
 				PlanOnly:    true,
 				ExpectError: regexp.MustCompile(`(?s)External Tag Already Exists.*terraform\s+import`),
 			},
@@ -263,25 +270,22 @@ func TestBritiveExternalTagAlreadyExists(t *testing.T) {
 	})
 }
 
-// Adding a member to a connected external tag is refused at plan time. Needs
-// an existing SCIM-connected tag id in BRITIVE_EXTERNAL_TAG_CONNECTED_ID.
+// Adding a member to a connected external tag is refused at plan time.
 func TestBritiveTagMemberRefusesConnectedExternalTag(t *testing.T) {
-	testAccExternalTagIdentityProvider(t)
-	connectedID := os.Getenv("BRITIVE_EXTERNAL_TAG_CONNECTED_ID")
-	username := os.Getenv("BRITIVE_EXTERNAL_TAG_MEMBER_USERNAME")
-	if connectedID == "" || username == "" {
-		t.Skip("BRITIVE_EXTERNAL_TAG_CONNECTED_ID or BRITIVE_EXTERNAL_TAG_MEMBER_USERNAME not set; skipping")
-	}
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(`
+	data "britive_tag" "connected" {
+		name = %q
+	}
+
 	resource "britive_tag_member" "connected" {
-		tag_id   = %q
+		tag_id   = data.britive_tag.connected.id
 		username = %q
-	}`, connectedID, username),
+	}`, connectedExternalTagName, externalTagMemberUsername),
 				PlanOnly:    true,
 				ExpectError: regexp.MustCompile(`Cannot Add Member To Connected External Tag`),
 			},
@@ -394,10 +398,7 @@ func TestBritiveExternalTagUpdateConnected(t *testing.T) {
 // leave the tag's requestable flag and attributes untouched.
 func TestBritiveTagOwnerConnectedExternalTag(t *testing.T) {
 	client, tag := testAccConnectedExternalTag(t)
-	username := os.Getenv("BRITIVE_EXTERNAL_TAG_MEMBER_USERNAME")
-	if username == "" {
-		t.Skip("BRITIVE_EXTERNAL_TAG_MEMBER_USERNAME not set; skipping connected tag owner test")
-	}
+	username := externalTagMemberUsername
 	current, err := client.GetTagWithOwners(tag.ID)
 	if err != nil {
 		t.Fatalf("reading owners of tag %s: %v", tag.ID, err)
@@ -408,7 +409,7 @@ func TestBritiveTagOwnerConnectedExternalTag(t *testing.T) {
 		switch o.RelatedEntityType {
 		case "User":
 			if strings.EqualFold(o.RelatedEntityName, username) {
-				t.Skipf("user %s is already an owner of connected tag %s; set BRITIVE_EXTERNAL_TAG_MEMBER_USERNAME to a user that is not", username, tag.ID)
+				t.Fatalf("user %s is already an owner of connected tag %s; remove that owner so the test can add and remove it", username, tag.ID)
 			}
 			existingUsers++
 		case "Tag":
@@ -481,37 +482,37 @@ func TestBritiveTagOwnerConnectedExternalTag(t *testing.T) {
 	})
 }
 
-func testAccExternalTagConfig(name, description, idpID, attrValue string) string {
-	return fmt.Sprintf(`
+func testAccExternalTagConfig(name, description, attrValue string) string {
+	return testAccExternalTagIdentityProviderData() + fmt.Sprintf(`
 	resource "britive_external_tag" "new" {
 		name                 = %q
 		description          = %q
-		identity_provider_id = %q
+		identity_provider_id = data.britive_identity_provider.external.id
 		requestable          = true
 
 		attributes {
 			attribute_name  = "Owner"
 			attribute_value = %q
 		}
-	}`, name, description, idpID, attrValue)
+	}`, name, description, attrValue)
 }
 
-func testAccExternalTagConfigNoDescription(name, idpID string) string {
-	return fmt.Sprintf(`
+func testAccExternalTagConfigNoDescription(name string) string {
+	return testAccExternalTagIdentityProviderData() + fmt.Sprintf(`
 	resource "britive_external_tag" "new" {
 		name                 = %q
-		identity_provider_id = %q
+		identity_provider_id = data.britive_identity_provider.external.id
 		requestable          = true
 
 		attributes {
 			attribute_name  = "Owner"
 			attribute_value = "v2"
 		}
-	}`, name, idpID)
+	}`, name)
 }
 
-func testAccDuplicateTagNameConfig(name, idpID string) string {
-	return fmt.Sprintf(`
+func testAccDuplicateTagNameConfig(name string) string {
+	return testAccExternalTagIdentityProviderData() + fmt.Sprintf(`
 	data "britive_identity_provider" "default" {
 		name = "Britive"
 	}
@@ -523,8 +524,8 @@ func testAccDuplicateTagNameConfig(name, idpID string) string {
 
 	resource "britive_external_tag" "dup" {
 		name                 = %q
-		identity_provider_id = %q
-	}`, name, name, idpID)
+		identity_provider_id = data.britive_identity_provider.external.id
+	}`, name, name)
 }
 
 // testAccConnectedExternalTagConfig imports the connected tag and declares it
@@ -667,6 +668,10 @@ func testAccConnectedTagOwnerConfig(tagID string, existing []britive.TagOwnerEnt
 
 // testAccRestoreTagOwners puts the tag's original owners back through the API.
 func testAccRestoreTagOwners(t *testing.T, client *britive.Client, tag *britive.Tag, owners []britive.TagOwnerEntity) {
+	if owners == nil {
+		// A tag without owners must be sent "owners": [], not null.
+		owners = []britive.TagOwnerEntity{}
+	}
 	requestable := tag.Requestable
 	attributes := make([]britive.TagAttribute, 0, len(tag.Attributes))
 	for _, a := range tag.Attributes {
