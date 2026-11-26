@@ -830,3 +830,108 @@ type ResourceManagerResourcePolicy struct {
 	IsReadOnly     bool                `json:"isReadOnly"`
 	ResourceLabels map[string][]string `json:"resourceLabels"`
 }
+
+// RemoteBrokerPool - a broker pool as returned by the remote-broker pools API
+// (GET/PUT /resource-manager/remote-broker/pools/{pool-id} and the pools list).
+type RemoteBrokerPool struct {
+	PoolID            string `json:"pool-id,omitempty"`
+	Name              string `json:"name"`
+	Description       string `json:"description,omitempty"`
+	BrokerCount       int    `json:"broker-count,omitempty"`
+	KeepAliveSeconds  int    `json:"keep-alive-seconds,omitempty"`
+	DisconnectSeconds int    `json:"disconnect-seconds,omitempty"`
+	// AuthenticationToken is only returned by the create call: it holds the value of the
+	// pool's automatically created "default" token.
+	AuthenticationToken string `json:"authentication-token,omitempty"`
+}
+
+// RemoteBrokerPoolCreateRequest - body of POST /resource-manager/remote-broker/pools.
+// The timings are optional: when left at zero they are not sent and Britive applies its
+// defaults (60 and 86400).
+type RemoteBrokerPoolCreateRequest struct {
+	Name              string `json:"name"`
+	Description       string `json:"description,omitempty"`
+	KeepAliveSeconds  int    `json:"keep-alive-seconds,omitempty"`
+	DisconnectSeconds int    `json:"disconnect-seconds,omitempty"`
+}
+
+// RemoteBrokerPoolUpdateRequest - body of PUT /resource-manager/remote-broker/pools/{pool-id}.
+// The API replaces the whole pool, and name, keep-alive-seconds and disconnect-seconds are
+// required, so they are always sent.
+type RemoteBrokerPoolUpdateRequest struct {
+	Name              string `json:"name"`
+	Description       string `json:"description"`
+	KeepAliveSeconds  int    `json:"keep-alive-seconds"`
+	DisconnectSeconds int    `json:"disconnect-seconds"`
+}
+
+// RemoteBrokerPoolPage - one page of GET /resource-manager/remote-broker/pools.
+type RemoteBrokerPoolPage struct {
+	Data             []RemoteBrokerPool `json:"data"`
+	LastEvaluatedKey string             `json:"lastEvaluatedKey,omitempty"`
+	ResultSize       int                `json:"resultSize"`
+}
+
+// RemoteBrokerPoolToken - an authentication token of a broker pool.
+type RemoteBrokerPoolToken struct {
+	PoolID       string `json:"pool-id,omitempty"`
+	TokenName    string `json:"token-name"`
+	Description  string `json:"description,omitempty"`
+	TokenValue   string `json:"token-value,omitempty"`
+	Created      string `json:"created,omitempty"`
+	LastAccessed string `json:"lastAccessed,omitempty"`
+	Status       string `json:"status,omitempty"`
+}
+
+// RemoteBrokerPoolTokenCreateRequest - body of POST .../pools/{pool-id}/tokens.
+type RemoteBrokerPoolTokenCreateRequest struct {
+	TokenName   string `json:"token-name"`
+	Description string `json:"description,omitempty"`
+}
+
+// RemoteBrokerPoolTokenUpdateRequest - body of PATCH .../pools/{pool-id}/tokens/{token-name}.
+// Only the fields that are set are sent; status and description can be sent together.
+type RemoteBrokerPoolTokenUpdateRequest struct {
+	Status      *string `json:"status,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// RemoteBrokerPoolLabel - a label (key and values) assigned to a broker pool.
+type RemoteBrokerPoolLabel struct {
+	Key         string   `json:"key,omitempty"`
+	LabelValues []string `json:"label-values"`
+}
+
+// RemoteBroker - a broker registered in a broker pool.
+type RemoteBroker struct {
+	PoolID          string `json:"pool-id"`
+	PoolName        string `json:"pool-name"`
+	BrokerID        string `json:"broker-id"`
+	BrokerName      string `json:"broker-name"`
+	Status          string `json:"status"`
+	StatusTimestamp string `json:"status-timestamp"`
+	Created         string `json:"created"`
+}
+
+// RemoteBrokerPage - one page of GET .../pools/{pool-id}/brokers/paginated.
+type RemoteBrokerPage struct {
+	Data             []RemoteBroker `json:"data"`
+	LastEvaluatedKey string         `json:"lastEvaluatedKey,omitempty"`
+	ResultSize       int            `json:"resultSize"`
+}
+
+// BrokerPoolLinkedResource - a resource linked to a broker pool, as returned by
+// GET /resource-manager/resources?filter=brokerPool eq {pool-id}.
+type BrokerPoolLinkedResource struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	ResourceTypeName string `json:"resourceTypeName"`
+}
+
+// BrokerPoolLinkedResourcePage - one page of the linked-resources query.
+type BrokerPoolLinkedResourcePage struct {
+	Count int                        `json:"count"`
+	Page  int                        `json:"page"`
+	Size  int                        `json:"size"`
+	Data  []BrokerPoolLinkedResource `json:"data"`
+}
