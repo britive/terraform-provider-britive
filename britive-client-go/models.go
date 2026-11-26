@@ -830,3 +830,12 @@ type ResourceManagerResourcePolicy struct {
 	IsReadOnly     bool                `json:"isReadOnly"`
 	ResourceLabels map[string][]string `json:"resourceLabels"`
 }
+
+// SAMLSettings - a SAML identity provider configuration of the tenant
+type SAMLSettings struct {
+	ID                     int64  `json:"id"`
+	Issuer                 string `json:"issuer"`
+	X509CertExpirationDate string `json:"x509CertExpirationDate"`
+	SignInURL              string `json:"signInUrl"`
+	SignOutURL             string `json:"signOutUrl"`
+}

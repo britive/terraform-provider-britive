@@ -179,6 +179,7 @@ func (p *BritiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 		datasources.NewTagDataSource,
 		datasources.NewUserDataSource,
 		datasources.NewUserAttributeDataSource,
+		datasources.NewSAMLMetadataDataSource,
 	}
 }
 
