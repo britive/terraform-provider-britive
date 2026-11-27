@@ -128,6 +128,8 @@ In addition to the arguments above, the following attributes are exported:
 
 Variables can have default values defined in the associated resource type permission using `variable_defaults`. You do not need to configure every variable. If a variable is not provided, the platform uses its default value, if available. Setting a variable in `variables` overrides its default. Removing a variable clears its configured value, and the platform uses the default again. Variables not defined in the resource type permission cause an error. The `variables` attribute contains only user-configured values, while the read-only `effective_variables` attribute shows all values actually used by the platform, including defaults. `effective_variables` updates during the next refresh after changes are applied.
 
+~> If you leave out a variable that has no default value and is not prompted at checkout, the checkout script receives it empty. `terraform apply` succeeds but shows a `Permission Variables Without a Value` warning naming those variables. To fix it, add a `variables` block for each one, or a `variable_defaults` block on the resource type permission.
+
 ## Import
 
 Profile permissions can be imported using their unique identifier:

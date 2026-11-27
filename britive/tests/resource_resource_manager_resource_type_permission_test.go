@@ -19,7 +19,7 @@ func TestBritiveResourceTypePermission(t *testing.T) {
 	permissionName := "AT-Britive_Resource_Manager_Tests_Resource_Type_Permission"
 	permissionDescription := "At-Britive_Resource_Manager_Tests_ResourceType_Permision_Description"
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheckFramework(t) },
+		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
