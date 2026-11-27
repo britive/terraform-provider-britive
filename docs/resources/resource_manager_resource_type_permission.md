@@ -60,6 +60,30 @@ resource "britive_resource_manager_resource_type_permission" "example_inline" {
 }
 ```
 
+### Example 3: Variable Default Values
+
+```hcl
+resource "britive_resource_manager_resource_type_permission" "example_defaults" {
+    name                = "ys-example-permission-defaults"
+    resource_type_id    = "iwau98weuwiodja98du3w9sid98"
+    show_orig_creds     = true
+    variables           = ["db_password:password", "db_host", "db_user"]
+    code_language       = "Text"
+    checkin_code        = "checkin"
+    checkout_code       = "checkout"
+
+    variable_defaults {
+        name  = "db_host"
+        value = "resource.name"
+    }
+
+    variable_defaults {
+        name  = "db_user"
+        value = "user.username"
+    }
+}
+```
+
 ## Argument Reference
 
 The following arguments are supported:
@@ -78,12 +102,18 @@ The following arguments are supported:
 * `checkout_code` - (Optional) The inline check-out code. Conflicts with `checkin_code_file` and `checkout_code_file`.
 * `code_language` - (Optional) The inline code language. Select one of `Text`, `Batch`, `Node`, `PowerShell`, `Python`, `Shell`. Default is `Text`.
 * `response_templates` - (Optional) List of response template names.
+* `variable_defaults` - (Optional) Defines default values for variables. You can add multiple blocks, one for each variable. Each block supports:
+  * `name` - (Required) The name of a variable declared in `variables`. Do not include the `:password` suffix. Password variables cannot have default values.
+  * `value` - (Required) A system-defined value for the resource type, such as `resource.name`, `profile.name`, or `user.email`. The platform checks whether the value is allowed by the resource type when the permission is created or updated.
 
 > **Note:**  
 > - `checkin_code_file` and `checkout_code_file` must both be set together or both left unset.  
 > - `checkin_code` and `checkout_code` must both be set together or both left unset.  
 > - You cannot set both file-based (`checkin_code_file`, `checkout_code_file`) and inline code (`checkin_code`, `checkout_code`, `code_language`) options at the same time.  
-> - `show_orig_creds` must be `true` or at least one `response_templates` value must be set. Both `show_orig_creds` and `response_templates` cannot be empty or false at the same time.
+> - `show_orig_creds` must be `true` or at least one `response_templates` value must be set. Both `show_orig_creds` and `response_templates` cannot be empty or false at the same time.  
+> - Each `variable_defaults` block must use a different variable name. Removing a block clears its default value on the next apply.
+> - Adding, updating, or removing a `variable_defaults` block updates the existing permission and creates a new version.
+> - The configuration manages all default values. Defaults set in the Britive UI without matching `variable_defaults` blocks are removed on the next apply. To keep defaults set in the UI, add a matching `variable_defaults` block for each one.
 
 ## Attribute Reference
 

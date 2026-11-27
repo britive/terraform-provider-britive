@@ -5,17 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/planmodifiers"
 	"github.com/britive/terraform-provider-britive/britive/validators"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -34,6 +36,23 @@ type ProfilePermissionResourceModel struct {
 	ResourceTypeID   types.String                          `tfsdk:"resource_type_id"`
 	ResourceTypeName types.String                          `tfsdk:"resource_type_name"`
 	Variables        []PermissionVariableModel             `tfsdk:"variables"`
+	// EffectiveVariables is a types.Set rather than a slice because it is computed, and
+	// so unknown in the plan whenever the resource changes.
+	EffectiveVariables types.Set `tfsdk:"effective_variables"`
+}
+
+// effectiveVariableObjectType is the tftypes shape of one effective_variables element,
+// which has the same attributes as a variables block.
+var effectiveVariableObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"name":               types.StringType,
+		"value":              types.StringType,
+		"is_system_defined":  types.BoolType,
+		"prompt_at_checkout": types.BoolType,
+		"regex_pattern":      types.StringType,
+		"description":        types.StringType,
+		"type":               types.StringType,
+	},
 }
 
 type PermissionVariableModel struct {
@@ -112,6 +131,24 @@ func (r *ProfilePermissionResource) Schema(_ context.Context, _ resource.SchemaR
 				Description: "Name of ResourceType associated with this permission",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"effective_variables": schema.SetNestedAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
+				Description: "Every variable of the permission with the value the platform uses: the value set in variables, or else the variable's default from the resource type permission.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name":               schema.StringAttribute{Computed: true, Description: "Name of the variable"},
+						"value":              schema.StringAttribute{Computed: true, Description: "Value the platform uses for the variable"},
+						"is_system_defined":  schema.BoolAttribute{Computed: true, Description: "Whether the value is a system-defined value, such as a default like resource.name"},
+						"prompt_at_checkout": schema.BoolAttribute{Computed: true, Description: "Whether the value is supplied by the user at checkout"},
+						"regex_pattern":      schema.StringAttribute{Computed: true, Description: "Regex pattern used to validate the value supplied at checkout"},
+						"description":        schema.StringAttribute{Computed: true, Description: "Description shown to the user at checkout"},
+						"type":               schema.StringAttribute{Computed: true, Description: "Type of the variable"},
+					},
 				},
 			},
 		},
@@ -298,7 +335,7 @@ func (r *ProfilePermissionResource) Create(ctx context.Context, req resource.Cre
 
 	log.Printf("[INFO] Mapping resource to permission model")
 
-	resourceManagerProfilePermission, err := r.mapResourceToModel(ctx, &plan, "")
+	resourceManagerProfilePermission, declaredVariables, err := r.mapResourceToModel(ctx, &plan, "")
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Resource", err.Error())
 		return
@@ -329,6 +366,7 @@ func (r *ProfilePermissionResource) Create(ctx context.Context, req resource.Cre
 		resp.Diagnostics.AddError("Error Mapping Model to Resource", err.Error())
 		return
 	}
+	warnUnsetVariables(ctx, &plan, declaredVariables, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -392,7 +430,7 @@ func (r *ProfilePermissionResource) Update(ctx context.Context, req resource.Upd
 
 	profileID, permissionID := r.parseUniqueID(state.ID.ValueString())
 
-	resourceManagerProfilePermission, err := r.mapResourceToModel(ctx, &plan, permissionID)
+	resourceManagerProfilePermission, declaredVariables, err := r.mapResourceToModel(ctx, &plan, permissionID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Resource", err.Error())
 		return
@@ -417,10 +455,20 @@ func (r *ProfilePermissionResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	plannedEffectiveVariables := plan.EffectiveVariables
 	err = r.mapModelToResource(ctx, permissions, permissionID, &plan, true)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Mapping Model to Resource", err.Error())
 		return
+	}
+	// Check the platform's actual values before the planned value replaces them below.
+	warnUnsetVariables(ctx, &plan, declaredVariables, &resp.Diagnostics)
+	// effective_variables keeps its prior value in the plan (UseStateForUnknown), so that
+	// changing variables never lists it as changing. Terraform requires the applied value
+	// to match the plan, so keep the planned value here; the next refresh then reads the
+	// platform's actual values, which never causes a planned change for a computed attribute.
+	if !plannedEffectiveVariables.IsUnknown() {
+		plan.EffectiveVariables = plannedEffectiveVariables
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -517,7 +565,9 @@ func (r *ProfilePermissionResource) ImportState(ctx context.Context, req resourc
 
 // Helper functions
 
-func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan *ProfilePermissionResourceModel, existingPermissionID string) (britive.ResourceManagerProfilePermission, error) {
+// mapResourceToModel builds the API request from the plan. It also returns the names of
+// the variables the permission declares, for warnUnsetVariables.
+func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan *ProfilePermissionResourceModel, existingPermissionID string) (britive.ResourceManagerProfilePermission, []string, error) {
 	permission := britive.ResourceManagerProfilePermission{}
 
 	// Extract profile ID from potential composite ID
@@ -538,7 +588,7 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 		// Get available permissions to find permission ID by name
 		rawPermissions, err := r.client.GetAvailablePermissions(profileID)
 		if err != nil {
-			return permission, fmt.Errorf("error getting available permissions: %v", err)
+			return permission, nil, fmt.Errorf("error getting available permissions: %v", err)
 		}
 
 		for _, perm := range rawPermissions.Permissions {
@@ -551,7 +601,7 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 		}
 
 		if permission.PermissionID == "" {
-			return permission, fmt.Errorf("permission '%s' is invalid or already associated with the profile", permissionName)
+			return permission, nil, fmt.Errorf("permission '%s' is invalid or already associated with the profile", permissionName)
 		}
 	}
 
@@ -564,7 +614,7 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 	// Get specified version permission to validate version and variables
 	resourceTypePermission, err := r.client.GetSpecifiedVersionPermission(permission.PermissionID, version)
 	if err != nil {
-		return permission, fmt.Errorf("permission with version: %s not found: %v", version, err)
+		return permission, nil, fmt.Errorf("permission with version: %s not found: %v", version, err)
 	}
 
 	permission.Version = version
@@ -578,36 +628,28 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 	// resource type permission may carry a "<name>:<type>" suffix (e.g. "test3:password")
 	// to declare the variable's type, so match on the base name only.
 	permissionVariableMap := make(map[string]bool)
+	declaredVariables := make([]string, 0, len(resourceTypePermission.Variables))
 	for _, v := range resourceTypePermission.Variables {
 		if varName, ok := v.(string); ok {
 			baseName, _, _ := strings.Cut(varName, ":")
 			permissionVariableMap[baseName] = true
+			declaredVariables = append(declaredVariables, baseName)
 		}
 	}
 
-	// Validate user variables and track which declared variables were provided.
-	// Using a set (rather than comparing counts) also means a duplicate variable
-	// name can no longer mask a genuinely missing one.
-	providedVariableMap := make(map[string]bool, len(userVariables))
+	// Only reject variables the permission doesn't declare. Declared variables may be
+	// omitted: the platform accepts that, applying the variable's default value from the
+	// resource type permission if it has one.
 	for _, v := range userVariables {
 		varName := v.Name.ValueString()
 		if !permissionVariableMap[varName] {
-			return permission, fmt.Errorf("the variable '%s' is not valid for the '%s' permission", varName, permissionName)
-		}
-		providedVariableMap[varName] = true
-	}
-
-	var missingVariables []string
-	for varName := range permissionVariableMap {
-		if !providedVariableMap[varName] {
-			missingVariables = append(missingVariables, varName)
+			return permission, nil, fmt.Errorf("the variable '%s' is not valid for the '%s' permission", varName, permissionName)
 		}
 	}
-	if len(missingVariables) > 0 {
-		sort.Strings(missingVariables)
-		return permission, fmt.Errorf("missing required variables for permission '%s': %s", permissionName, strings.Join(missingVariables, ", "))
-	}
 
+	// Always send the list, even empty: since variables may be omitted, an update
+	// dropping the last configured variable must send [] to clear it.
+	permission.Variables = make([]map[string]interface{}, 0, len(userVariables))
 	if len(userVariables) > 0 {
 		// Convert variables to map format for API
 		for _, v := range userVariables {
@@ -643,7 +685,7 @@ func (r *ProfilePermissionResource) mapResourceToModel(ctx context.Context, plan
 		}
 	}
 
-	return permission, nil
+	return permission, declaredVariables, nil
 }
 
 // mapModelToResource maps the API's permission representation onto state.
@@ -670,6 +712,7 @@ func (r *ProfilePermissionResource) mapModelToResource(ctx context.Context, reso
 	if permission == nil {
 		// Permission not found, clear the state
 		state.PermissionID = types.StringNull()
+		state.EffectiveVariables = types.SetNull(effectiveVariableObjectType)
 		return nil
 	}
 
@@ -754,8 +797,105 @@ func (r *ProfilePermissionResource) mapModelToResource(ctx context.Context, reso
 
 	state.Variables = stateVariables
 
+	effectiveVariables, err := effectiveVariablesToSet(ctx, permission["effectiveVariables"])
+	if err != nil {
+		return err
+	}
+	state.EffectiveVariables = effectiveVariables
+
 	log.Printf("[INFO] Read resource manager profile permission: %#v", permission)
 	return nil
+}
+
+// effectiveVariablesToSet maps the API's effectiveVariables, which include variables left
+// out of the config with the default the platform applied, to the effective_variables set.
+func effectiveVariablesToSet(ctx context.Context, raw interface{}) (types.Set, error) {
+	optionalString := func(m map[string]interface{}, key string) types.String {
+		if s, ok := m[key].(string); ok {
+			return types.StringValue(s)
+		}
+		return types.StringNull()
+	}
+	optionalBool := func(m map[string]interface{}, key string) types.Bool {
+		if b, ok := m[key].(bool); ok {
+			return types.BoolValue(b)
+		}
+		return types.BoolNull()
+	}
+
+	variables := make([]PermissionVariableModel, 0)
+	if list, ok := raw.([]interface{}); ok {
+		for _, v := range list {
+			m, ok := v.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			variables = append(variables, PermissionVariableModel{
+				Name:             optionalString(m, "name"),
+				Value:            optionalString(m, "value"),
+				IsSystemDefined:  optionalBool(m, "isSystemDefined"),
+				PromptAtCheckout: optionalBool(m, "promptAtCheckout"),
+				RegexPattern:     optionalString(m, "regexPattern"),
+				Description:      optionalString(m, "description"),
+				Type:             optionalString(m, "type"),
+			})
+		}
+	}
+
+	set, diags := types.SetValueFrom(ctx, effectiveVariableObjectType, variables)
+	if diags.HasError() {
+		return types.SetNull(effectiveVariableObjectType), fmt.Errorf("unable to map effective variables: %v", diags)
+	}
+	return set, nil
+}
+
+// warnUnsetVariables warns about declared variables that reach the checkout script with no
+// value: left out of variables, with no default on the resource type permission, and not
+// prompted at checkout. Leaving a variable out is allowed so that it can use its default,
+// so this is a warning rather than an error. It reads effective_variables, the values the
+// platform applied, so it must run before Update replaces them with the planned value.
+func warnUnsetVariables(ctx context.Context, state *ProfilePermissionResourceModel, declaredVariables []string, diags *diag.Diagnostics) {
+	if state.EffectiveVariables.IsNull() || state.EffectiveVariables.IsUnknown() {
+		return
+	}
+	var effective []PermissionVariableModel
+	if d := state.EffectiveVariables.ElementsAs(ctx, &effective, false); d.HasError() || len(effective) == 0 {
+		// No effective variables returned: nothing to check against.
+		return
+	}
+
+	configured := make(map[string]bool, len(state.Variables))
+	for _, v := range state.Variables {
+		configured[v.Name.ValueString()] = true
+	}
+	effectiveByName := make(map[string]PermissionVariableModel, len(effective))
+	for _, v := range effective {
+		effectiveByName[v.Name.ValueString()] = v
+	}
+
+	var unset []string
+	for _, name := range declaredVariables {
+		if configured[name] {
+			continue
+		}
+		v, ok := effectiveByName[name]
+		if ok && (v.Value.ValueString() != "" || v.PromptAtCheckout.ValueBool()) {
+			continue
+		}
+		unset = append(unset, fmt.Sprintf("%q", name))
+	}
+	if len(unset) == 0 {
+		return
+	}
+
+	diags.AddWarning(
+		"Permission Variables Without a Value",
+		fmt.Sprintf("Variables %s of permission %q have no value: they are not set in variables, have no default "+
+			"value on the resource type permission, and are not prompted at checkout. The checkout script receives "+
+			"them empty. Add a variables block for each one, or a variable_defaults block on "+
+			"britive_resource_manager_resource_type_permission.",
+			strings.Join(unset, ", "), state.Name.ValueString()),
+	)
 }
 
 func (r *ProfilePermissionResource) parseUniqueID(id string) (string, string) {

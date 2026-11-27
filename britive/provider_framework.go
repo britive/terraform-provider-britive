@@ -9,9 +9,11 @@ import (
 
 	"github.com/britive/terraform-provider-britive/britive-client-go"
 	"github.com/britive/terraform-provider-britive/britive/datasources"
+	"github.com/britive/terraform-provider-britive/britive/ephemeralresources"
 	"github.com/britive/terraform-provider-britive/britive/resources"
 	"github.com/britive/terraform-provider-britive/britive/resources/resourcemanager"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -20,7 +22,10 @@ import (
 )
 
 // Ensure the implementation satisfies the provider.Provider interface.
-var _ provider.Provider = &BritiveProvider{}
+var (
+	_ provider.Provider                       = &BritiveProvider{}
+	_ provider.ProviderWithEphemeralResources = &BritiveProvider{}
+)
 
 // BritiveProvider defines the provider implementation.
 type BritiveProvider struct {
@@ -31,10 +36,10 @@ type BritiveProvider struct {
 
 // BritiveProviderModel describes the provider data model.
 type BritiveProviderModel struct {
-	Tenant        types.String `tfsdk:"tenant"`
-	Token         types.String `tfsdk:"token"`
-	ConfigPath    types.String `tfsdk:"config_path"`
-	MaxRetries types.Int64 `tfsdk:"max_retries"`
+	Tenant     types.String `tfsdk:"tenant"`
+	Token      types.String `tfsdk:"token"`
+	ConfigPath types.String `tfsdk:"config_path"`
+	MaxRetries types.Int64  `tfsdk:"max_retries"`
 }
 
 // Metadata returns the provider type name.
@@ -53,8 +58,8 @@ func (p *BritiveProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Description: "This is the Britive Tenant URL. Can also be set with the BRITIVE_TENANT environment variable.",
 			},
 			"token": schema.StringAttribute{
-				Optional:    true,
-				Sensitive:   true,
+				Optional:  true,
+				Sensitive: true,
 				Description: "This is the API Token to interact with your Britive API. Can also be set with the BRITIVE_TOKEN environment variable. " +
 					"The token's auth scheme is auto-discovered: a legacy API token (< 50 characters) is sent as `TOKEN <token>`, " +
 					"a workload identity token (e.g. `OIDC::<id token>` or `AWS::<id token>`) is sent as-is, and any other token is sent as a `Bearer <token>` JWT.",
@@ -160,10 +165,19 @@ func (p *BritiveProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	// Make the Britive client available during DataSource and Resource
-	// type Configure methods.
+	// Make the Britive client available during DataSource, Resource and
+	// EphemeralResource type Configure methods.
 	resp.DataSourceData = client
 	resp.ResourceData = client
+	resp.EphemeralResourceData = client
+}
+
+// EphemeralResources defines the ephemeral resources implemented in the provider. They need
+// Terraform 1.10 or later; the rest of the provider still works on older versions.
+func (p *BritiveProvider) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
+	return []func() ephemeral.EphemeralResource{
+		ephemeralresources.NewBrokerPoolTokenEphemeralResource,
+	}
 }
 
 // DataSources defines the data sources implemented in the provider.
@@ -179,6 +193,8 @@ func (p *BritiveProvider) DataSources(_ context.Context) []func() datasource.Dat
 		datasources.NewTagDataSource,
 		datasources.NewUserDataSource,
 		datasources.NewUserAttributeDataSource,
+		datasources.NewResourceManagerBrokerPoolDataSource,
+		datasources.NewSAMLMetadataDataSource,
 	}
 }
 
@@ -219,6 +235,8 @@ func (p *BritiveProvider) Resources(_ context.Context) []func() resource.Resourc
 		resourcemanager.NewProfilePolicyResource,
 		resourcemanager.NewResourceBrokerPoolsResource,
 		resourcemanager.NewRMProfilePolicyPrioritizationResource,
+		resourcemanager.NewBrokerPoolResource,
+		resourcemanager.NewBrokerPoolLabelsResource,
 	}
 }
 
