@@ -105,6 +105,20 @@ If `tokens` breaks a rule, the plan fails and the pool's tokens are not changed.
 
 A token name cannot be changed: a new key is a new token with a new value.
 
+### Replacing a token
+
+Britive does not change a token's value in place: a token keeps its value for its lifetime. To
+replace a token, add a new one, move the brokers to it, then remove the old one. Removing a token
+from `tokens`, or setting it `INACTIVE`, takes it away from the brokers that joined with it, so
+keep this order:
+
+1. Add the new token (a new key) as `ACTIVE` next to the current one, and apply. A pool allows
+   at most 2 `ACTIVE` tokens, so the current token must be the only other `ACTIVE` one. Send the
+   new value to your secret store (see
+   [When the token value changes](../ephemeral-resources/resource_manager_broker_pool_token.md#when-the-token-value-changes)).
+2. Restart every broker with the new token.
+3. Remove the old token from `tokens` (or set it `INACTIVE`), and apply again.
+
 ## Import
 
 Broker pools can be imported using the pool ID or the full ID:
