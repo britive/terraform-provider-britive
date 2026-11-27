@@ -94,8 +94,8 @@ func (c *Client) CreatePolicy(policy Policy) (*Policy, error) {
 	return &policy, nil
 }
 
-// UpdatePolicy - Update policy
-func (c *Client) UpdatePolicy(policy Policy, policyName string) (*Policy, error) {
+// UpdatePolicy - Update policy, addressed by its name or ID
+func (c *Client) UpdatePolicy(policy Policy, policyIdentifier string) (*Policy, error) {
 	var policyBody []byte
 	var err error
 	policyBody, err = json.Marshal(policy)
@@ -103,7 +103,7 @@ func (c *Client) UpdatePolicy(policy Policy, policyName string) (*Policy, error)
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/v1/policy-admin/policies/%s", c.APIBaseURL, policyName), strings.NewReader(string(policyBody)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/v1/policy-admin/policies/%s", c.APIBaseURL, policyIdentifier), strings.NewReader(string(policyBody)))
 	if err != nil {
 		return nil, err
 	}

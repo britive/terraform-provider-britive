@@ -187,7 +187,7 @@ func (r *ProfilePolicyResource) Create(ctx context.Context, req resource.CreateR
 	}
 	readResp.ProfileID = plan.ProfileID.ValueString()
 
-	r.mapModelToResource(ctx, readResp, &plan, &resp.Diagnostics)
+	r.mapModelToResource(ctx, readResp, r.getPolicyByID(created.ProfileID, created.PolicyID), &plan, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -199,7 +199,7 @@ func (r *ProfilePolicyResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	profileID, _ := r.parseUniqueID(state.ID.ValueString())
+	profileID, policyID := r.parseUniqueID(state.ID.ValueString())
 	policyName := state.PolicyName.ValueString()
 
 	log.Printf("[INFO] Reading resource manager profile policy: %s/%s", profileID, policyName)
@@ -218,7 +218,7 @@ func (r *ProfilePolicyResource) Read(ctx context.Context, req resource.ReadReque
 
 	resourceManagerProfilePolicy.ProfileID = state.ProfileID.ValueString()
 
-	r.mapModelToResource(ctx, resourceManagerProfilePolicy, &state, &resp.Diagnostics)
+	r.mapModelToResource(ctx, resourceManagerProfilePolicy, r.getPolicyByID(profileID, policyID), &state, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -263,7 +263,7 @@ func (r *ProfilePolicyResource) Update(ctx context.Context, req resource.UpdateR
 	}
 	readResp.ProfileID = plan.ProfileID.ValueString()
 
-	r.mapModelToResource(ctx, readResp, &plan, &resp.Diagnostics)
+	r.mapModelToResource(ctx, readResp, r.getPolicyByID(profileID, policyID), &plan, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -333,7 +333,7 @@ func (r *ProfilePolicyResource) ImportState(ctx context.Context, req resource.Im
 	state.ProfileID = types.StringValue(profileID)
 	policy.ProfileID = profileID
 
-	r.mapModelToResource(ctx, policy, &state, &resp.Diagnostics)
+	r.mapModelToResource(ctx, policy, nil, &state, &resp.Diagnostics)
 
 	log.Printf("[INFO] Imported resource manager profile policy: %s/%s", profileID, policyName)
 
@@ -393,7 +393,24 @@ func (r *ProfilePolicyResource) mapResourceToModel(ctx context.Context, plan *Pr
 	return policy, nil
 }
 
-func (r *ProfilePolicyResource) mapModelToResource(ctx context.Context, policy *britive.ResourceManagerProfilePolicy, state *ProfilePolicyResourceModel, diags *diag.Diagnostics) {
+// getPolicyByID fetches the policy by ID, which returns members and condition with IDs
+// rather than names. It returns nil if the policy can't be fetched by ID, in which case
+// the configured values are compared against the by-name response only.
+func (r *ProfilePolicyResource) getPolicyByID(profileID, policyID string) *britive.ResourceManagerProfilePolicy {
+	if profileID == "" || policyID == "" {
+		return nil
+	}
+	policy, err := r.client.GetResourceManagerProfilePolicy(profileID, policyID)
+	if err != nil {
+		log.Printf("[WARN] Could not read resource manager profile policy by ID %s/%s: %s", profileID, policyID, err)
+		return nil
+	}
+	return policy
+}
+
+// mapModelToResource maps policy, fetched by name, to state. policyByID is the same policy
+// fetched by ID, or nil; the configured condition and members are kept if they match either.
+func (r *ProfilePolicyResource) mapModelToResource(ctx context.Context, policy *britive.ResourceManagerProfilePolicy, policyByID *britive.ResourceManagerProfilePolicy, state *ProfilePolicyResourceModel, diags *diag.Diagnostics) {
 	state.ProfileID = types.StringValue(policy.ProfileID)
 	state.PolicyName = types.StringValue(policy.Name)
 	state.Description = types.StringValue(policy.Description)
@@ -415,7 +432,13 @@ func (r *ProfilePolicyResource) mapModelToResource(ctx context.Context, policy *
 		}
 	}
 
-	if !state.Condition.IsNull() && britive.ConditionEqual(normalizedCondition, state.Condition.ValueString()) {
+	// The configured condition may use names (by-name response) or IDs (by-ID response)
+	conditionCandidates := []string{normalizedCondition}
+	if policyByID != nil {
+		conditionCandidates = append(conditionCandidates, policyByID.Condition)
+	}
+
+	if !state.Condition.IsNull() && britive.ConditionEqualAny(state.Condition.ValueString(), conditionCandidates...) {
 		// Keep user's format
 	} else {
 		state.Condition = types.StringValue(normalizedCondition)
@@ -425,7 +448,14 @@ func (r *ProfilePolicyResource) mapModelToResource(ctx context.Context, policy *
 	if policy.Members != nil {
 		mem, err := json.Marshal(policy.Members)
 		if err == nil {
-			if !state.Members.IsNull() && britive.MembersEqual(string(mem), state.Members.ValueString()) {
+			// The configured members may use names (by-name response) or IDs (by-ID response)
+			membersCandidates := []string{string(mem)}
+			if policyByID != nil && policyByID.Members != nil {
+				if memByID, err := json.Marshal(policyByID.Members); err == nil {
+					membersCandidates = append(membersCandidates, string(memByID))
+				}
+			}
+			if !state.Members.IsNull() && britive.MembersEqualAny(state.Members.ValueString(), membersCandidates...) {
 				// Keep user's format
 			} else {
 				state.Members = types.StringValue(string(mem))
