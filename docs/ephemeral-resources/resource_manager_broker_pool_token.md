@@ -18,10 +18,7 @@ to read a value. Terraform
 reads it again on every plan and apply and keeps the value in memory for that run only, so the
 value is never written to the state file.
 
-~> **Note:** Ephemeral resources need Terraform 1.10 or later. Write-only arguments, used in
-the examples below, need Terraform 1.11 or later, and a provider version that supports them:
-`hashicorp/aws` 5.88.0 or later for `secret_string_wo`, and `hashicorp/vault` 5.0.0 or later for
-`data_json_wo`. The other broker pool resources work on older versions too.
+~> **Note:** Ephemeral resources need Terraform 1.10 or later. Write-only arguments, used in the examples below, need Terraform 1.11 or later.
 
 Terraform accepts an ephemeral value only in write-only arguments of other resources, in
 `provider` blocks and in provisioner blocks. It rejects any use that would store the value, such
