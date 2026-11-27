@@ -170,13 +170,15 @@ func NextTokenStep(current, desired map[string]TokenSpec) (TokenStep, bool) {
 	}
 
 	// desired is a set Britive does not allow (no ACTIVE token, more than 3 tokens or more than
-	// 2 ACTIVE). Send the next change as it is, so Britive rejects it with its own error.
+	// 2 ACTIVE). ValidateTokens rejects such a set in the plan, and the resource checks it again
+	// before any call, so this is not reached in practice. Send the next change as it is, so
+	// Britive rejects it with its own error instead of the loop stopping silently.
 	return directTokenStep(current, desired), true
 }
 
 // directTokenStep returns the first change between current and desired without checking
 // Britive's rules: delete a token that is not in desired, create a missing one, or update one
-// that differs. It is used only when desired breaks the rules, so Britive returns its error.
+// that differs. It is a safety net for a desired set that breaks the rules (see NextTokenStep).
 func directTokenStep(current, desired map[string]TokenSpec) TokenStep {
 	for _, name := range sortedNames(current) {
 		if _, ok := desired[name]; !ok {
@@ -199,14 +201,35 @@ func directTokenStep(current, desired map[string]TokenSpec) TokenStep {
 	return TokenStep{}
 }
 
-// ValidateTokens checks a desired token set in the plan: it must have at least one token.
-// Britive's own limits (at most 3 tokens, at most 2 ACTIVE, at least 1 ACTIVE) are not
-// checked here; Britive rejects a set that breaks them with its own error during apply.
+// ValidateTokens checks a desired token set against Britive's limits, before any API call. A
+// token change is a series of calls, so a set Britive does not allow would only be rejected
+// part-way through, after earlier calls (such as deleting a token the brokers use) were made.
+// A token whose Status is "" has an unknown status: it counts toward the number of tokens but
+// not toward the ACTIVE checks.
 func ValidateTokens(desired map[string]TokenSpec) []string {
 	if len(desired) == 0 {
 		return []string{"A broker pool must have at least one token in tokens."}
 	}
-	return nil
+	var problems []string
+	if len(desired) > MaxTokens {
+		problems = append(problems, fmt.Sprintf("Britive allows at most %d tokens per pool; tokens has %d.", MaxTokens, len(desired)))
+	}
+	active, unknown := 0, false
+	for _, spec := range desired {
+		switch spec.Status {
+		case TokenStatusActive:
+			active++
+		case "":
+			unknown = true
+		}
+	}
+	if active > MaxActiveTokens {
+		problems = append(problems, fmt.Sprintf("Britive allows at most %d ACTIVE tokens per pool; tokens has %d.", MaxActiveTokens, active))
+	}
+	if active == 0 && !unknown {
+		problems = append(problems, "Britive requires at least 1 ACTIVE token per pool; tokens has none.")
+	}
+	return problems
 }
 
 // ApplyTokenStep returns current after step, as Britive would hold it.

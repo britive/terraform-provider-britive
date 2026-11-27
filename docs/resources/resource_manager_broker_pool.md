@@ -99,6 +99,9 @@ The provider checks these rules in the plan, before any API call:
 * `tokens` must have at least 1 token.
 * When the pool is created, `tokens` must include `default` (see below).
 * A token name allows letters, numbers, `_` and `-`.
+* Britive's limits: at most 3 tokens, at most 2 of them `ACTIVE`, and at least 1 `ACTIVE`.
+
+If `tokens` breaks a rule, the plan fails and the pool's tokens are not changed.
 
 A token name cannot be changed: a new key is a new token with a new value.
 

@@ -16,20 +16,41 @@ resource. Put all of the pool's labels in that one resource as separate `resourc
 blocks. If two of these resources point to the same pool, each one removes the other's labels
 on every apply, and the plan never settles. The provider does not detect this.
 
+~> **Important:** Each `label_key` must be an existing resource label, and each value must be
+one of that label's values. Otherwise Britive rejects the label with
+`E1003: Invalid resource label key provided in the request` or
+`E1003: Invalid resource label value in request`. Create the label with
+[`britive_resource_manager_resource_label`](resource_manager_resource_label.md) or in the
+Britive UI first, and reference it as in the example below so Terraform creates it before the
+pool's labels.
+
 ## Example Usage
 
 ```hcl
 resource "britive_resource_manager_broker_pool" "east" {
-  name = "pool-east"
+  name   = "pool-east"
   tokens = { default = { status = "ACTIVE" } }
+}
+
+# The resource label and its values must exist before they can be assigned to a pool.
+resource "britive_resource_manager_resource_label" "team" {
+  name = "Team"
+
+  values {
+    name = "Platform"
+  }
+  values {
+    name = "Security"
+  }
 }
 
 resource "britive_resource_manager_broker_pool_labels" "east" {
   pool_id = britive_resource_manager_broker_pool.east.pool_id
 
+  # Referencing the resource label makes Terraform create it first.
   resource_labels {
-    label_key = "Team"
-    values    = []
+    label_key = britive_resource_manager_resource_label.team.name
+    values    = ["Platform"]
   }
 }
 ```
@@ -38,8 +59,8 @@ resource "britive_resource_manager_broker_pool_labels" "east" {
 
 * `pool_id` - (Required) The ID of the broker pool. Changing it creates a new resource.
 * `resource_labels` - (Required) The labels assigned to the pool. At least one block is required. Each block supports:
-  * `label_key` - (Required) The label key. Only letters, numbers, `_` and `-`. Each `label_key` can appear in only one block.
-  * `values` - (Required) The label values. Can be empty (`[]`).
+  * `label_key` - (Required) The label key: the name of an existing resource label. Only letters, numbers, `_` and `-`. Each `label_key` can appear in only one block.
+  * `values` - (Required) The label values: values of that resource label. Can be empty (`[]`).
 
 To remove all labels from the pool, remove this resource.
 

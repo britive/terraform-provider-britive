@@ -304,7 +304,7 @@ func TestBritiveBrokerPoolImportErrors(t *testing.T) {
 	resource "britive_resource_manager_broker_pool_labels" "labels" {
 		pool_id = britive_resource_manager_broker_pool.pool.pool_id
 		resource_labels {
-			label_key = "Region"
+			label_key = "AT-BP-Region"
 			values    = []
 		}
 	}`
@@ -483,17 +483,18 @@ func TestBritiveBrokerPoolTokensWithoutDefault(t *testing.T) {
 	})
 }
 
-// TestBritiveBrokerPoolTokensNoActive: tokens without an ACTIVE token pass the plan, and
-// Britive rejects them with its own error:
+// TestBritiveBrokerPoolTokensNoActive: tokens without an ACTIVE token fail in the plan, before
+// any API call, and the pool's tokens are left unchanged:
 //  1. create with default ACTIVE and AT-ci INACTIVE
-//  2. set default INACTIVE: Britive rejects it ("at least 1 remaining active token"); the state
-//     keeps the tokens Britive really holds
-//  3. back to the first configuration: nothing to change, default is still ACTIVE in Britive
+//  2. set default INACTIVE: the plan fails
+//  3. drop default and keep only AT-ci INACTIVE: the plan fails, so default is not deleted
+//  4. back to the first configuration: nothing to change, and Britive still holds both tokens
 func TestBritiveBrokerPoolTokensNoActive(t *testing.T) {
 	client := testAccBritiveClient(t)
 	poolName := "AT-BP-Tokens-No-Active"
 	var poolID string
 	ci := `"AT-ci" = { status = "INACTIVE" }`
+	noActive := regexp.MustCompile(`at\s+least\s+1\s+ACTIVE\s+token\s+per\s+pool`)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -506,29 +507,44 @@ func TestBritiveBrokerPoolTokensNoActive(t *testing.T) {
 			},
 			{
 				Config:      testAccBrokerPoolWithTokens(poolName, `default = { status = "INACTIVE" }`, ci),
-				ExpectError: regexp.MustCompile(`(?i)(E1003|remaining active token)`),
+				PlanOnly:    true,
+				ExpectError: noActive,
+			},
+			{
+				Config:      testAccBrokerPoolWithTokens(poolName, ci),
+				PlanOnly:    true,
+				ExpectError: noActive,
 			},
 			{
 				Config:           testAccBrokerPoolWithTokens(poolName, `default = { status = "ACTIVE" }`, ci),
 				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionNoop),
-				Check:            testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckTokenNamesAPI(client, &poolID, "AT-ci", "default"),
+					testAccCheckDefaultTokenAPI(client, &poolID, "ACTIVE", ""),
+					testAccCheckTokenAPI(client, &poolID, "AT-ci", "INACTIVE", ""),
+				),
 			},
 		},
 	})
 }
 
-// TestBritiveBrokerPoolTokensOverLimit: more than 2 ACTIVE tokens or more than 3 tokens pass
-// the plan, and Britive rejects them during apply. The provider makes the changes Britive
-// accepts first, then saves what Britive holds:
+// TestBritiveBrokerPoolTokensOverLimit: more than 2 ACTIVE tokens or more than 3 tokens fail in
+// the plan, before any API call. Before this check, the provider made every change Britive
+// accepted first, so default (the token the brokers use) was deleted before Britive rejected
+// the set. Now the pool's tokens are left unchanged:
 //  1. create with default ACTIVE
-//  2. 3 ACTIVE tokens: Britive rejects the third activation
-//  3. 4 tokens: Britive rejects the fourth token
-//  4. back to default only: the extra tokens are deleted
+//  2. default plus 2 more ACTIVE tokens (3 ACTIVE): the plan fails
+//  3. 3 ACTIVE tokens that replace default: the plan fails, so default is not deleted
+//  4. default plus 3 more tokens (4 tokens): the plan fails
+//  5. 4 tokens that replace default: the plan fails, so default is not deleted
+//  6. back to default only: nothing to change, and Britive still holds only default
 func TestBritiveBrokerPoolTokensOverLimit(t *testing.T) {
 	client := testAccBritiveClient(t)
 	poolName := "AT-BP-Tokens-Over-Limit"
 	var poolID string
 	def := `default = { status = "ACTIVE" }`
+	tooManyActive := regexp.MustCompile(`at\s+most\s+2\s+ACTIVE\s+tokens\s+per\s+pool;\s+tokens\s+has\s+3`)
+	tooMany := regexp.MustCompile(`at\s+most\s+3\s+tokens\s+per\s+pool;\s+tokens\s+has\s+4`)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -542,15 +558,30 @@ func TestBritiveBrokerPoolTokensOverLimit(t *testing.T) {
 			{
 				Config: testAccBrokerPoolWithTokens(poolName, def,
 					`"AT-a" = { status = "ACTIVE" }`, `"AT-b" = { status = "ACTIVE" }`),
-				ExpectError: regexp.MustCompile(`Error Updating Broker Pool Tokens`),
+				PlanOnly:    true,
+				ExpectError: tooManyActive,
+			},
+			{
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`"AT-a" = { status = "ACTIVE" }`, `"AT-b" = { status = "ACTIVE" }`, `"AT-c" = { status = "ACTIVE" }`),
+				PlanOnly:    true,
+				ExpectError: tooManyActive,
 			},
 			{
 				Config: testAccBrokerPoolWithTokens(poolName, def,
 					`"AT-a" = { status = "INACTIVE" }`, `"AT-b" = { status = "INACTIVE" }`, `"AT-c" = { status = "INACTIVE" }`),
-				ExpectError: regexp.MustCompile(`Error Updating Broker Pool Tokens`),
+				PlanOnly:    true,
+				ExpectError: tooMany,
 			},
 			{
-				Config: testAccBrokerPoolWithTokens(poolName, def),
+				Config: testAccBrokerPoolWithTokens(poolName,
+					`"AT-a" = { status = "ACTIVE" }`, `"AT-b" = { status = "INACTIVE" }`, `"AT-c" = { status = "INACTIVE" }`, `"AT-d" = { status = "INACTIVE" }`),
+				PlanOnly:    true,
+				ExpectError: tooMany,
+			},
+			{
+				Config:           testAccBrokerPoolWithTokens(poolName, def),
+				ConfigPlanChecks: expectAction(bpPool, plancheck.ResourceActionNoop),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(bpPool, "tokens.%", "1"),
 					testAccCheckTokenNamesAPI(client, &poolID, "default"),
@@ -562,20 +593,24 @@ func TestBritiveBrokerPoolTokensOverLimit(t *testing.T) {
 }
 
 // TestBritiveBrokerPoolTokensNoActiveOnCreate: a new pool with default INACTIVE as its only
-// token. The plan passes; Britive rejects the change after the pool is created, so the apply
-// fails and the pool is saved as tainted. The test's destroy deletes it (checked by
-// CheckDestroy).
+// token fails in the plan, so no pool is created (checked by CheckDestroy, which also looks
+// the pool up by name).
 func TestBritiveBrokerPoolTokensNoActiveOnCreate(t *testing.T) {
 	client := testAccBritiveClient(t)
+	poolName := "AT-BP-Tokens-No-Active-Create"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			testAccCheckBrokerPoolDestroy(client),
+			testAccCheckBrokerPoolNameCountAPI(client, poolName, 0),
+		),
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccBrokerPoolWithTokens("AT-BP-Tokens-No-Active-Create", `default = { status = "INACTIVE" }`),
-				ExpectError: regexp.MustCompile(`(?i)(E1003|remaining active token)`),
+				Config:      testAccBrokerPoolWithTokens(poolName, `default = { status = "INACTIVE" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`at\s+least\s+1\s+ACTIVE\s+token\s+per\s+pool`),
 			},
 		},
 	})
@@ -622,9 +657,8 @@ func TestBritiveBrokerPoolTokensFullPool(t *testing.T) {
 }
 
 // TestBritiveBrokerPoolTokensValidation: these configurations fail in the plan, before any API
-// call. Britive's limits (no ACTIVE token, more than 3 tokens, more than 2 ACTIVE) are not
-// checked here: Britive rejects them (see TestBritiveBrokerPoolTokensNoActive and
-// TestBritiveBrokerPoolTokensOverLimit).
+// call, on a new pool. Britive's limits on an existing pool are covered by
+// TestBritiveBrokerPoolTokensNoActive and TestBritiveBrokerPoolTokensOverLimit.
 func TestBritiveBrokerPoolTokensValidation(t *testing.T) {
 	config := func(tokens ...string) string {
 		return testAccBrokerPoolWithTokens("AT-BP-Tokens-Validation", tokens...)
@@ -654,6 +688,18 @@ func TestBritiveBrokerPoolTokensValidation(t *testing.T) {
 				Config:      config(`default = { status = "active" }`),
 				PlanOnly:    true,
 				ExpectError: regexp.MustCompile(`value must be one of`),
+			},
+			{
+				Config: config(`default = { status = "ACTIVE" }`,
+					`"AT-a" = { status = "ACTIVE" }`, `"AT-b" = { status = "ACTIVE" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`at\s+most\s+2\s+ACTIVE\s+tokens`),
+			},
+			{
+				Config: config(`default = { status = "ACTIVE" }`,
+					`"AT-a" = { status = "INACTIVE" }`, `"AT-b" = { status = "INACTIVE" }`, `"AT-c" = { status = "INACTIVE" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`at\s+most\s+3\s+tokens`),
 			},
 		},
 	})
@@ -1060,48 +1106,48 @@ func TestBritiveBrokerPoolLabels(t *testing.T) {
 		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccBrokerPoolLabelsConfig("AT-BP-Labels", `Region = ["East"]`, `Team = []`),
+				Config: testAccBrokerPoolLabelsConfig("AT-BP-Labels", `AT-BP-Region = ["East"]`, `AT-BP-Team = []`),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCaptureAttr(bpPool, "pool_id", &poolID),
 					resource.TestCheckResourceAttrPair(bpLabels, "pool_id", bpPool, "pool_id"),
 					resource.TestCheckResourceAttrSet(bpLabels, "id"),
 					resource.TestCheckResourceAttr(bpLabels, "resource_labels.#", "2"),
-					resource.TestCheckTypeSetElemNestedAttrs(bpLabels, "resource_labels.*", map[string]string{"label_key": "Team", "values.#": "0"}),
-					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"Region": {"East"}, "Team": {}}),
+					resource.TestCheckTypeSetElemNestedAttrs(bpLabels, "resource_labels.*", map[string]string{"label_key": "AT-BP-Team", "values.#": "0"}),
+					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"AT-BP-Region": {"East"}, "AT-BP-Team": {}}),
 				),
 			},
 			{
-				Config:   testAccBrokerPoolLabelsConfig("AT-BP-Labels", `Team = []`, `Region = ["East"]`),
+				Config:   testAccBrokerPoolLabelsConfig("AT-BP-Labels", `AT-BP-Team = []`, `AT-BP-Region = ["East"]`),
 				PlanOnly: true,
 			},
 			{
-				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `Region = ["East", "West"]`, `Team = []`),
+				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `AT-BP-Region = ["East", "West"]`, `AT-BP-Team = []`),
 				ConfigPlanChecks: expectAction(bpLabels, plancheck.ResourceActionUpdate),
-				Check:            testAccCheckLabelsAPI(client, &poolID, map[string][]string{"Region": {"East", "West"}, "Team": {}}),
+				Check:            testAccCheckLabelsAPI(client, &poolID, map[string][]string{"AT-BP-Region": {"East", "West"}, "AT-BP-Team": {}}),
 			},
 			{
-				Config:   testAccBrokerPoolLabelsConfig("AT-BP-Labels", `Region = ["West", "East"]`, `Team = []`),
+				Config:   testAccBrokerPoolLabelsConfig("AT-BP-Labels", `AT-BP-Region = ["West", "East"]`, `AT-BP-Team = []`),
 				PlanOnly: true,
 			},
 			{
-				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `Region = ["West"]`, `Team = []`),
+				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `AT-BP-Region = ["West"]`, `AT-BP-Team = []`),
 				ConfigPlanChecks: expectAction(bpLabels, plancheck.ResourceActionUpdate),
-				Check:            testAccCheckLabelsAPI(client, &poolID, map[string][]string{"Region": {"West"}, "Team": {}}),
+				Check:            testAccCheckLabelsAPI(client, &poolID, map[string][]string{"AT-BP-Region": {"West"}, "AT-BP-Team": {}}),
 			},
 			{
-				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `Region = ["West"]`, `Team = []`, `Owner = []`),
+				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `AT-BP-Region = ["West"]`, `AT-BP-Team = []`, `AT-BP-Owner = []`),
 				ConfigPlanChecks: expectAction(bpLabels, plancheck.ResourceActionUpdate),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(bpLabels, "resource_labels.#", "3"),
-					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"Region": {"West"}, "Team": {}, "Owner": {}}),
+					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"AT-BP-Region": {"West"}, "AT-BP-Team": {}, "AT-BP-Owner": {}}),
 				),
 			},
 			{
-				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `Region = ["West"]`, `Owner = []`),
+				Config:           testAccBrokerPoolLabelsConfig("AT-BP-Labels", `AT-BP-Region = ["West"]`, `AT-BP-Owner = []`),
 				ConfigPlanChecks: expectAction(bpLabels, plancheck.ResourceActionUpdate),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(bpLabels, "resource_labels.#", "2"),
-					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"Region": {"West"}, "Owner": {}}),
+					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"AT-BP-Region": {"West"}, "AT-BP-Owner": {}}),
 				),
 			},
 			{
@@ -1156,11 +1202,11 @@ func TestBritiveBrokerPoolLabelsValidation(t *testing.T) {
 			{
 				Config: labels(`
 				resource_labels {
-					label_key = "Region"
+					label_key = "AT-BP-Region"
 					values    = ["East"]
 				}
 				resource_labels {
-					label_key = "Region"
+					label_key = "AT-BP-Region"
 					values    = ["West"]
 				}`),
 				PlanOnly:    true,
@@ -1192,8 +1238,8 @@ func TestBritiveBrokerPoolLabelsValidation(t *testing.T) {
 func TestBritiveBrokerPoolLabelsDrift(t *testing.T) {
 	client := testAccBritiveClient(t)
 	var poolID string
-	config := testAccBrokerPoolLabelsConfig("AT-BP-Labels-Drift", `Region = ["East"]`, `Team = []`)
-	want := map[string][]string{"Region": {"East"}, "Team": {}}
+	config := testAccBrokerPoolLabelsConfig("AT-BP-Labels-Drift", `AT-BP-Region = ["East"]`, `AT-BP-Team = []`)
+	want := map[string][]string{"AT-BP-Region": {"East"}, "AT-BP-Team": {}}
 
 	driftStep := func(change func() error) resource.TestStep {
 		return resource.TestStep{
@@ -1218,13 +1264,13 @@ func TestBritiveBrokerPoolLabelsDrift(t *testing.T) {
 				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
 			},
 			driftStep(func() error {
-				return client.CreateBrokerPoolLabel(poolID, britive.RemoteBrokerPoolLabel{Key: "Owner", LabelValues: []string{}})
+				return client.CreateBrokerPoolLabel(poolID, britive.RemoteBrokerPoolLabel{Key: "AT-BP-Owner", LabelValues: []string{}})
 			}),
 			driftStep(func() error {
-				return client.UpdateBrokerPoolLabel(poolID, "Region", []string{"East", "West"})
+				return client.UpdateBrokerPoolLabel(poolID, "AT-BP-Region", []string{"East", "West"})
 			}),
 			driftStep(func() error {
-				return client.DeleteBrokerPoolLabel(poolID, "Team")
+				return client.DeleteBrokerPoolLabel(poolID, "AT-BP-Team")
 			}),
 		},
 	})
@@ -1238,7 +1284,7 @@ func TestBritiveBrokerPoolLabelsChangePool(t *testing.T) {
 
 	config := func(target string) string {
 		return testAccBrokerPoolMinimal("pool_b", "AT-BP-Labels-Move-B") +
-			testAccBrokerPoolLabelsConfigFor("pool", "AT-BP-Labels-Move-A", target, `Region = ["East"]`)
+			testAccBrokerPoolLabelsConfigFor("pool", "AT-BP-Labels-Move-A", target, `AT-BP-Region = ["East"]`)
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -1251,7 +1297,7 @@ func TestBritiveBrokerPoolLabelsChangePool(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCaptureAttr(bpPool, "pool_id", &poolA),
 					testAccCaptureAttr(bpPoolB, "pool_id", &poolB),
-					testAccCheckLabelsAPI(client, &poolA, map[string][]string{"Region": {"East"}}),
+					testAccCheckLabelsAPI(client, &poolA, map[string][]string{"AT-BP-Region": {"East"}}),
 				),
 			},
 			{
@@ -1260,7 +1306,7 @@ func TestBritiveBrokerPoolLabelsChangePool(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttrPair(bpLabels, "pool_id", bpPoolB, "pool_id"),
 					testAccCheckLabelsAPI(client, &poolA, map[string][]string{}),
-					testAccCheckLabelsAPI(client, &poolB, map[string][]string{"Region": {"East"}}),
+					testAccCheckLabelsAPI(client, &poolB, map[string][]string{"AT-BP-Region": {"East"}}),
 				),
 			},
 		},
@@ -1272,7 +1318,7 @@ func TestBritiveBrokerPoolLabelsChangePool(t *testing.T) {
 func TestBritiveBrokerPoolLabelsPoolDeletedOutside(t *testing.T) {
 	client := testAccBritiveClient(t)
 	var poolID string
-	config := testAccBrokerPoolLabelsConfig("AT-BP-Labels-Pool-Deleted", `Region = ["East"]`)
+	config := testAccBrokerPoolLabelsConfig("AT-BP-Labels-Pool-Deleted", `AT-BP-Region = ["East"]`)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -1296,7 +1342,7 @@ func TestBritiveBrokerPoolLabelsPoolDeletedOutside(t *testing.T) {
 				}},
 				Check: resource.ComposeTestCheckFunc(
 					testAccCaptureAttr(bpPool, "pool_id", &poolID),
-					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"Region": {"East"}}),
+					testAccCheckLabelsAPI(client, &poolID, map[string][]string{"AT-BP-Region": {"East"}}),
 				),
 			},
 		},
@@ -1305,17 +1351,17 @@ func TestBritiveBrokerPoolLabelsPoolDeletedOutside(t *testing.T) {
 
 // TestBritiveBrokerPoolLabelsExistingLabels: the labels resource is added to a pool that
 // already has labels (for example added in the UI):
-//  1. create the pool only
-//  2. add Region = ["Old"] and Owner = [] through the API, then create the labels
-//     resource with Region = ["East"]. Create must not fail on the existing key, and
+//  1. create the pool and the resource labels only
+//  2. add AT-BP-Region = ["Old"] and AT-BP-Owner = [] through the API, then create the labels
+//     resource with AT-BP-Region = ["East"]. Create must not fail on the existing key, and
 //     Britive must end up with the configured values. The labels resource manages every label
-//     on the pool, so the plan after the apply shows Owner to be removed (not empty)
-//  3. apply again: Owner is removed, and the plan is empty
+//     on the pool, so the plan after the apply shows AT-BP-Owner to be removed (not empty)
+//  3. apply again: AT-BP-Owner is removed, and the plan is empty
 func TestBritiveBrokerPoolLabelsExistingLabels(t *testing.T) {
 	client := testAccBritiveClient(t)
 	var poolID string
 	poolName := "AT-BP-Labels-Existing"
-	config := testAccBrokerPoolLabelsConfig(poolName, `Region = ["East"]`)
+	config := testAccBrokerPoolLabelsConfig(poolName, `AT-BP-Region = ["East"]`)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckFramework(t) },
@@ -1323,14 +1369,14 @@ func TestBritiveBrokerPoolLabelsExistingLabels(t *testing.T) {
 		CheckDestroy:             testAccCheckBrokerPoolDestroy(client),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccBrokerPoolMinimal("pool", poolName),
+				Config: testAccBrokerPoolMinimal("pool", poolName) + testAccBrokerPoolResourceLabels,
 				Check:  testAccCaptureAttr(bpPool, "pool_id", &poolID),
 			},
 			{
 				PreConfig: func() {
 					for _, l := range []britive.RemoteBrokerPoolLabel{
-						{Key: "Region", LabelValues: []string{"Old"}},
-						{Key: "Owner", LabelValues: []string{}},
+						{Key: "AT-BP-Region", LabelValues: []string{"Old"}},
+						{Key: "AT-BP-Owner", LabelValues: []string{}},
 					} {
 						if err := client.CreateBrokerPoolLabel(poolID, l); err != nil {
 							t.Fatalf("adding label %q outside Terraform: %v", l.Key, err)
@@ -1341,13 +1387,13 @@ func TestBritiveBrokerPoolLabelsExistingLabels(t *testing.T) {
 				ConfigPlanChecks:   expectAction(bpLabels, plancheck.ResourceActionCreate),
 				ExpectNonEmptyPlan: true,
 				Check: testAccCheckLabelsAPI(client, &poolID, map[string][]string{
-					"Region": {"East"}, "Owner": {},
+					"AT-BP-Region": {"East"}, "AT-BP-Owner": {},
 				}),
 			},
 			{
 				Config:           config,
 				ConfigPlanChecks: expectAction(bpLabels, plancheck.ResourceActionUpdate),
-				Check:            testAccCheckLabelsAPI(client, &poolID, map[string][]string{"Region": {"East"}}),
+				Check:            testAccCheckLabelsAPI(client, &poolID, map[string][]string{"AT-BP-Region": {"East"}}),
 			},
 		},
 	})
@@ -1500,13 +1546,14 @@ func TestBritiveBrokerPoolEndToEnd(t *testing.T) {
 	resource "britive_resource_manager_broker_pool_labels" "labels" {
 		pool_id = britive_resource_manager_broker_pool.pool.pool_id
 		resource_labels {
-			label_key = "Region"
+			label_key = "AT-BP-Region"
 			values    = ["East", "West"]
 		}
 		resource_labels {
-			label_key = "Team"
+			label_key = "AT-BP-Team"
 			values    = []
 		}
+		%s
 	}
 
 	resource "britive_resource_manager_resource_broker_pools" "link" {
@@ -1517,7 +1564,7 @@ func TestBritiveBrokerPoolEndToEnd(t *testing.T) {
 	data "britive_resource_manager_broker_pool" "lookup" {
 		name       = britive_resource_manager_broker_pool.pool.name
 		depends_on = [britive_resource_manager_resource_broker_pools.link]
-	}`, resourceName, poolName)
+	}`+testAccBrokerPoolResourceLabels, resourceName, poolName, bpResourceLabelsDependsOn)
 
 	check := resource.ComposeTestCheckFunc(
 		resource.TestCheckResourceAttrPair(bpData, "pool_id", bpPool, "pool_id"),
@@ -1658,8 +1705,53 @@ func testAccBrokerPoolMinimal(resName, name string) string {
 	`, resName, name)
 }
 
-// testAccBrokerPoolLabelsConfig builds a pool named poolName plus a labels resource on it.
-// Each label is written as `Key = [values]`.
+// testAccBrokerPoolResourceLabels creates the resource labels the broker pool label tests use.
+// Britive accepts a broker pool label only when its key is an existing resource label and each
+// value is one of that label's values; otherwise it returns E1003. The tests create their own
+// labels so they run on any tenant. The names start with AT-BP- so they do not clash with
+// labels that already exist in the tenant.
+const testAccBrokerPoolResourceLabels = `
+	resource "britive_resource_manager_resource_label" "region" {
+		name        = "AT-BP-Region"
+		description = "AT broker pool labels"
+		label_color = "#abc123"
+		values {
+			name        = "East"
+			description = "AT east"
+		}
+		values {
+			name        = "West"
+			description = "AT west"
+		}
+		values {
+			name        = "Old"
+			description = "AT old"
+		}
+	}
+
+	resource "britive_resource_manager_resource_label" "team" {
+		name        = "AT-BP-Team"
+		description = "AT broker pool labels"
+		label_color = "#abc123"
+	}
+
+	resource "britive_resource_manager_resource_label" "owner" {
+		name        = "AT-BP-Owner"
+		description = "AT broker pool labels"
+		label_color = "#abc123"
+	}
+`
+
+// bpResourceLabelsDependsOn makes a broker pool labels resource wait for the resource labels
+// above on create, and be removed before them on destroy.
+const bpResourceLabelsDependsOn = `depends_on = [
+			britive_resource_manager_resource_label.region,
+			britive_resource_manager_resource_label.team,
+			britive_resource_manager_resource_label.owner,
+		]`
+
+// testAccBrokerPoolLabelsConfig builds a pool named poolName, the resource labels the tests
+// use, and a labels resource on the pool. Each label is written as `Key = [values]`.
 func testAccBrokerPoolLabelsConfig(poolName string, labels ...string) string {
 	return testAccBrokerPoolLabelsConfigFor("pool", poolName, "pool", labels...)
 }
@@ -1674,12 +1766,13 @@ func testAccBrokerPoolLabelsConfigFor(poolRes, poolName, target string, labels .
 			values    = %s
 		}`, strings.TrimSpace(key), strings.TrimSpace(values))
 	}
-	return testAccBrokerPoolMinimal(poolRes, poolName) + fmt.Sprintf(`
+	return testAccBrokerPoolMinimal(poolRes, poolName) + testAccBrokerPoolResourceLabels + fmt.Sprintf(`
 	resource "britive_resource_manager_broker_pool_labels" "labels" {
 		pool_id = britive_resource_manager_broker_pool.%s.pool_id
 		%s
+		%s
 	}
-	`, target, blocks.String())
+	`, target, blocks.String(), bpResourceLabelsDependsOn)
 }
 
 func expectAction(name string, action plancheck.ResourceActionType) resource.ConfigPlanChecks {

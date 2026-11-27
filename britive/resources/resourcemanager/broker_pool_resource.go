@@ -120,7 +120,7 @@ func (r *BrokerPoolResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Computed:    true,
 			},
 			"tokens": schema.MapNestedAttribute{
-				Description: "The tokens of the pool, as a map with the token name as the key. The map is the exact set of tokens: a token in Britive that is not in the map is deleted. Use the key \"default\" to keep the default token Britive creates with every pool. At least 1 token. Britive allows at most 3 tokens, at most 2 ACTIVE and at least 1 ACTIVE, and rejects other sets during apply. When the pool is created, it must include \"default\"; after that, the default token can be changed or removed like any other token.",
+				Description: "The tokens of the pool, as a map with the token name as the key. The map is the exact set of tokens: a token in Britive that is not in the map is deleted. Use the key \"default\" to keep the default token Britive creates with every pool. At least 1 token. At most 3 tokens, at most 2 ACTIVE and at least 1 ACTIVE (Britive's limits, checked in the plan). When the pool is created, it must include \"default\"; after that, the default token can be changed or removed like any other token.",
 				Required:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -180,9 +180,10 @@ func (r *BrokerPoolResource) Configure(_ context.Context, req resource.Configure
 	r.client = client
 }
 
-// ValidateConfig checks the tokens map in the plan, before any API call: token names and at
-// least 1 token. Britive's limits (at most 3 tokens, at most 2 ACTIVE, at least 1 ACTIVE) are
-// left to Britive, which rejects a set that breaks them with its own error.
+// ValidateConfig checks the tokens map in the plan, before any API call: token names, and
+// Britive's limits (at least 1 token, at most 3 tokens, at most 2 ACTIVE, at least 1 ACTIVE).
+// The limits must be checked here: tokens are changed one call at a time, so Britive would
+// only reject a set that breaks them part-way through the apply.
 func (r *BrokerPoolResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var tokens types.Map
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("tokens"), &tokens)...)
@@ -446,6 +447,17 @@ func (r *BrokerPoolResource) applyTokens(ctx context.Context, poolID string, pla
 	specs := make(map[string]brokerpool.TokenSpec, len(desired))
 	for name, token := range desired {
 		specs[name] = brokerpool.TokenSpec{Status: token.Status.ValueString(), Description: token.Description.ValueString()}
+	}
+
+	// ValidateConfig skips the ACTIVE checks while a status is unknown, so check the set again
+	// now that every status is known, before any call changes the pool's tokens.
+	if problems := brokerpool.ValidateTokens(specs); len(problems) > 0 {
+		held, err := r.client.GetBrokerPoolTokens(poolID)
+		if err == nil {
+			plan.Tokens = brokerpool.TokensToMap(ctx, poolID, held, diags)
+		}
+		diags.AddError("Invalid Broker Pool Tokens", strings.Join(problems, " "))
+		return
 	}
 
 	held, err := r.syncTokens(poolID, specs)

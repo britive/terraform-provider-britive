@@ -83,7 +83,7 @@ func (r *BrokerPoolLabelsResource) Schema(_ context.Context, _ resource.SchemaRe
 					Attributes: map[string]schema.Attribute{
 						"label_key": schema.StringAttribute{
 							Required:    true,
-							Description: "The label key. Only letters, numbers, underscore and hyphen. Each key can appear in only one block.",
+							Description: "The label key: the name of an existing resource label. Only letters, numbers, underscore and hyphen. Each key can appear in only one block.",
 							Validators: []validator.String{
 								stringvalidator.RegexMatches(brokerpool.NamePattern, "must contain only letters, numbers, underscore and hyphen"),
 							},
@@ -91,7 +91,7 @@ func (r *BrokerPoolLabelsResource) Schema(_ context.Context, _ resource.SchemaRe
 						"values": schema.SetAttribute{
 							Required:    true,
 							ElementType: types.StringType,
-							Description: "The label values. Can be empty.",
+							Description: "The label values: values of that resource label. Can be empty.",
 						},
 					},
 				},
